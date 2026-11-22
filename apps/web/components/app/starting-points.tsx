@@ -1,6 +1,7 @@
 "use client";
 
 import { appListing, STARTING_POINTS, type FactSource } from "@auni/shared";
+import { RefreshCw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -8,9 +9,15 @@ import { useEffect } from "react";
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { useStartConversation } from "@/components/app/use-start-conversation";
 import { useMoney } from "@/components/money/money-provider";
+import { useMe } from "@/components/personalization/use-me";
 import { LogoImage, preloadLogo } from "@/components/specialist/marks";
-import { useStartingPoints, useStartingPointsKept } from "@/lib/data/starting-points";
+import {
+  useRefreshStartingPoints,
+  useStartingPoints,
+  useStartingPointsKept,
+} from "@/lib/data/starting-points";
 import { formatUsdcBalance } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import tightMascot from "@/public/brand/auni-mascot-tight.png";
 
 /** A point's picture, whether a coin, a market's own or Auni's mascot. */
@@ -41,9 +48,12 @@ const ROW_SPACING = { paddingLeft: INSET, gap: GAP } as const;
  */
 export function StartingPoints() {
   const { busy, error, start } = useStartConversation();
-  const { points, waiting } = useStartingPoints();
+  const { points, waiting, pending } = useStartingPoints();
+  const refresh = useRefreshStartingPoints();
   const { portfolio } = useMoney();
-  const { addMoneyHref } = useAppDialogs();
+  const me = useMe();
+  const { addMoneyHref, settingsHref } = useAppDialogs();
+  const needsSignals = !me.xHandle && me.watchedWallets.length === 0;
 
   return (
     <div className="w-full">
@@ -92,23 +102,59 @@ export function StartingPoints() {
       )}
       {/* Always one line tall: their money is read after the page draws, and a line arriving
           then would push the page, which is centred, up by half of it. */}
-      <p
-        className="mt-2 h-5 whitespace-nowrap text-[13px] leading-5 text-muted-foreground"
+      <div
+        className="mt-2 flex h-5 items-center justify-between gap-3 pr-2 text-[13px] leading-5 text-muted-foreground"
         style={{ paddingLeft: WORDS_START }}
       >
-        {portfolio?.empty ? (
-          <span className="auni-stagger-in inline-block">
-            Your balance is {formatUsdcBalance(0n)}.{" "}
+        <span className="min-w-0 truncate">
+          {portfolio?.empty ? (
+            <span className="auni-stagger-in inline-block">
+              Balance {formatUsdcBalance(0n)}.{" "}
+              <Link
+                href={addMoneyHref}
+                scroll={false}
+                className="font-medium text-primary transition-opacity hover:opacity-75"
+              >
+                Add money
+              </Link>
+              {needsSignals ? (
+                <>
+                  {" or "}
+                  <Link
+                    href={settingsHref("personalization")}
+                    scroll={false}
+                    className="transition-colors hover:text-ink"
+                  >
+                    tailor with X or wallet
+                  </Link>
+                </>
+              ) : null}
+            </span>
+          ) : needsSignals ? (
             <Link
-              href={addMoneyHref}
+              href={settingsHref("personalization")}
               scroll={false}
-              className="font-medium text-primary transition-opacity hover:opacity-75"
+              className="transition-colors hover:text-ink"
             >
-              Add money
+              Connect X or a watch-only wallet for tailored ideas
             </Link>
-          </span>
+          ) : null}
+        </span>
+        {!waiting ? (
+          <button
+            type="button"
+            disabled={refresh.isPending || pending}
+            onClick={() => refresh.mutate()}
+            className="inline-flex flex-none items-center gap-1 text-[12px] text-faint transition-colors hover:text-ink disabled:opacity-50"
+          >
+            <RefreshCw
+              aria-hidden
+              className={cn("size-3", (refresh.isPending || pending) && "animate-spin")}
+            />
+            <span>Refresh</span>
+          </button>
         ) : null}
-      </p>
+      </div>
       {error && (
         <p role="alert" className="mt-2 text-center text-xs text-destructive">
           {error}

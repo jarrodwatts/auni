@@ -1,10 +1,11 @@
 "use client";
 
 import type { AppWire } from "@auni/shared";
-import { LayoutGrid } from "lucide-react";
+import { Cpu, LayoutGrid, MessageSquare, WalletMinimal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { useAppDialogs } from "@/components/app/app-dialogs";
 import { ThreadFailureNotice } from "@/components/app/thread-failure-notice";
 import { PlaceHeader } from "@/components/places/place-header";
 import { PortfolioSection } from "@/components/portfolio/portfolio-section";
@@ -36,6 +37,7 @@ function byWhatMatters(a: AppWire, b: AppWire): number {
  */
 export function AppsScreen() {
   const apps = useApps();
+  const { openSettings } = useAppDialogs();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -65,20 +67,21 @@ export function AppsScreen() {
   };
 
   const all = apps.data?.apps ?? [];
+  const isVenueOrData = (app: AppWire) => app.canSwitch && app.pairing === null;
   // Each tile keeps the place it had when the page was opened: one just turned off stays put.
   const [places, setPlaces] = useState<ReadonlyMap<string, number> | null>(null);
   if (apps.data && !places)
     setPlaces(
       new Map(
         all
-          .filter(({ canSwitch }) => canSwitch)
+          .filter(isVenueOrData)
           .toSorted(byWhatMatters)
           .map(({ id }, place) => [id, place]),
       ),
     );
   const placeOf = (id: string) => places?.get(id) ?? Number.MAX_SAFE_INTEGER;
   const yours = all
-    .filter(({ canSwitch }) => canSwitch)
+    .filter(isVenueOrData)
     .toSorted((a, b) => placeOf(a.id) - placeOf(b.id) || byWhatMatters(a, b));
   const plumbing = all.filter(({ canSwitch }) => !canSwitch);
   const sheet = all.find(({ id }) => id === shown);
@@ -105,12 +108,39 @@ export function AppsScreen() {
             <>
               <section aria-label="Your apps">
                 <h2 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.035em] text-ink">
-                  Your apps
+                  Venues &amp; data apps
                 </h2>
-                <p className="mt-1.5 max-w-[520px] text-ui leading-[1.5] font-normal text-muted-foreground">
-                  The services Auni acts through for you. Open one to see what you have there and
-                  what Auni can do with it.
+                <p className="mt-1.5 max-w-[540px] text-ui leading-[1.5] font-normal text-muted-foreground">
+                  The financial venues and research services Auni acts through. Open one to see what
+                  you hold there, configure keys, or turn it on or off.
                 </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
+                  <span>Looking for system setup?</span>
+                  <button
+                    type="button"
+                    onClick={() => openSettings("brains")}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-foreground/[0.08] bg-card px-3 py-1 font-medium text-ink transition-colors hover:bg-foreground/[0.04]"
+                  >
+                    <Cpu className="size-3.5 text-muted-foreground" />
+                    AI Brains
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openSettings("wallet")}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-foreground/[0.08] bg-card px-3 py-1 font-medium text-ink transition-colors hover:bg-foreground/[0.04]"
+                  >
+                    <WalletMinimal className="size-3.5 text-muted-foreground" />
+                    Wallet &amp; Keys
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openSettings("channels")}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-foreground/[0.08] bg-card px-3 py-1 font-medium text-ink transition-colors hover:bg-foreground/[0.04]"
+                  >
+                    <MessageSquare className="size-3.5 text-muted-foreground" />
+                    Channels
+                  </button>
+                </div>
                 <ul className={cn(GRID, "mt-5")}>
                   {yours.map((app) => (
                     <li key={app.id} className="flex min-w-0">

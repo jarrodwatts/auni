@@ -1,16 +1,24 @@
-import { type meSchema, SOLANA_BRING_FIELD, updateMeRequestSchema } from "@auni/shared";
+import {
+  addWatchedWalletRequestSchema,
+  type meSchema,
+  SOLANA_BRING_FIELD,
+  updateMeRequestSchema,
+} from "@auni/shared";
 import express, { Router } from "express";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { brainStatus } from "../agent/brain.ts";
+import { brainStatus, preferredBrainId } from "../agent/brain.ts";
 import { reachWire } from "../always-on.ts";
 import { theOwner } from "../auth/owner.ts";
 import { ownerHere } from "../auth/proof.ts";
 import { canBeHome, channelStates, pairedChannels } from "../channels/home.ts";
+import { publishMe } from "../conversation/stream.ts";
 import { db } from "../db/client.ts";
 import { aMoveLanded, answerStarPrompt, starOnGitHub, starredOnGitHub } from "../github-star.ts";
 import { NoWallet, WalletExists } from "../apps/contract.ts";
 import { owner } from "../db/schema.ts";
+import { enqueueSignalsRefresh, forceRefreshStartingPoints } from "../jobs/kinds.ts";
 import { postgresKnowsZone } from "../money/value-history.ts";
 import {
   addMissingKey,
@@ -19,15 +27,20 @@ import {
   revealWalletKeys,
   walletAddresses,
 } from "../money/wallets.ts";
+import {
+  appendWatchedWallet,
+  normalizeXHandle,
+  refreshOwnerSignals,
+  resolveWatchedWallet,
+} from "../signals.ts";
 
 export const meRouter = Router();
 
 /**
- * The owner as web reads them: their settings, the wallet's addresses (none until they make or
- * bring one, or while it can't be reached), what Auni thinks with, the chat apps it talks in,
- * how the owner reaches it, and whether to ask them for a star (github-star.ts).
+ * The owner as web reads them: their settings, personalization signals, wallet addresses,
+ * what Auni thinks with, the chat apps it talks in, how the owner reaches it, and star status.
  */
-async function meWire(): Promise<z.input<typeof meSchema>> {
+async function meWire(proved = false): Promise<z.input<typeof meSchema>> {
   const [me, wallets, walletLacks, bringSolana, brain, channels, reach, landed] = await Promise.all(
     [
       theOwner(),
@@ -49,6 +62,14 @@ async function meWire(): Promise<z.input<typeof meSchema>> {
   return {
     name: me.name,
     timeZone: me.timeZone,
+    look: me.look,
+    brief: me.brief,
+    preferredBrain: preferredBrainId(),
+    xHandle: me.xHandle,
+    watchedWallets: me.watchedWallets,
+    profileSummary: me.profileSummary,
+    profileSignals: me.profileSignals,
+    ownerHere: proved,
     wallets,
     walletLacks,
     bringSolana,
@@ -71,8 +92,8 @@ async function meWire(): Promise<z.input<typeof meSchema>> {
 // Each router parses the bodies it takes, at its own size limit.
 meRouter.use(express.json({ limit: "16kb" }));
 
-meRouter.get("/", async (_req, res) => {
-  res.json(await meWire());
+meRouter.get("/", async (req, res) => {
+  res.json(await meWire(ownerHere(req)));
 });
 
 meRouter.patch("/", async (req, res) => {
@@ -91,13 +112,91 @@ meRouter.patch("/", async (req, res) => {
     res.status(400).json({ error: "channel_not_paired" });
     return;
   }
-  if (Object.keys(patch).length > 0)
-    await db.update(owner).set({
-      ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.time_zone !== undefined ? { timeZone: patch.time_zone } : {}),
-      ...(patch.home_channel !== undefined ? { homeChannel: patch.home_channel } : {}),
+  let xHandle: string | null | undefined;
+  if (patch.x_handle !== undefined) {
+    if (patch.x_handle === null || patch.x_handle.trim() === "") {
+      xHandle = null;
+    } else {
+      const normalized = normalizeXHandle(patch.x_handle);
+      if (!normalized) {
+        res
+          .status(400)
+          .json({
+            error: "invalid_x_handle",
+            detail: "Enter a valid X handle (letters, numbers, underscores).",
+          });
+        return;
+      }
+      xHandle = normalized;
+    }
+  }
+  if (Object.keys(patch).length > 0) {
+    await db.transaction(async (tx) => {
+      await tx.update(owner).set({
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.time_zone !== undefined ? { timeZone: patch.time_zone } : {}),
+        ...(patch.home_channel !== undefined ? { homeChannel: patch.home_channel } : {}),
+        ...(patch.look !== undefined ? { look: patch.look } : {}),
+        ...(patch.brief !== undefined ? { brief: patch.brief } : {}),
+        ...(xHandle !== undefined ? { xHandle } : {}),
+        ...(patch.profile_summary !== undefined
+          ? { profileSummary: patch.profile_summary || null }
+          : {}),
+        ...(patch.welcomed !== undefined
+          ? { welcomedAt: patch.welcomed ? sql`coalesce(${owner.welcomedAt}, now())` : null }
+          : {}),
+      });
+      if (xHandle !== undefined) {
+        await enqueueSignalsRefresh(tx, { replaceSummary: true });
+      } else if (patch.profile_summary !== undefined) {
+        await forceRefreshStartingPoints(tx);
+      }
     });
-  res.json(await meWire());
+    publishMe();
+  }
+  res.json(await meWire(ownerHere(req)));
+});
+
+/** Adds a watch-only public wallet (EVM, ENS, or Solana) for tailored prompts and context. */
+meRouter.post("/watched-wallets", async (req, res) => {
+  const parsed = addWatchedWalletRequestSchema.safeParse(req.body);
+  if (!parsed.success)
+    return void res.status(400).json({ error: "invalid_body", issues: parsed.error.issues });
+  try {
+    const resolved = await resolveWatchedWallet(parsed.data.address, parsed.data.label);
+    await db.transaction(async (tx) => {
+      const me = await theOwner(tx);
+      const next = appendWatchedWallet(me.watchedWallets, resolved);
+      await tx.update(owner).set({ watchedWallets: next });
+      await enqueueSignalsRefresh(tx, { replaceSummary: !me.profileSummary });
+    });
+    publishMe();
+    res.json(await meWire(ownerHere(req)));
+  } catch (error) {
+    res.status(400).json({
+      error: "invalid_wallet",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/** Removes a watch-only wallet by address. */
+meRouter.delete("/watched-wallets/:address", async (req, res) => {
+  const target = req.params.address.toLowerCase();
+  await db.transaction(async (tx) => {
+    const me = await theOwner(tx);
+    const next = me.watchedWallets.filter((w) => w.address.toLowerCase() !== target);
+    await tx.update(owner).set({ watchedWallets: next });
+    await enqueueSignalsRefresh(tx);
+  });
+  publishMe();
+  res.json(await meWire(ownerHere(req)));
+});
+
+/** Refreshes X + watch-only wallet signals and re-synthesizes the owner profile + starting points. */
+meRouter.post("/signals/refresh", async (req, res) => {
+  await refreshOwnerSignals({ replaceSummary: true }).catch(() => null);
+  res.json(await meWire(ownerHere(req)));
 });
 
 /**
@@ -122,7 +221,7 @@ meRouter.post("/keys", async (req, res) => {
  * the owner's session alone; the owner saves the new key with their backup from Show wallet keys,
  * which takes their proof.
  */
-meRouter.post("/wallet/missing", async (_req, res) => {
+meRouter.post("/wallet/missing", async (req, res) => {
   try {
     await addMissingKey();
   } catch (error) {
@@ -130,7 +229,8 @@ meRouter.post("/wallet/missing", async (_req, res) => {
       return void res.status(409).json({ error: "nothing_missing" });
     throw error;
   }
-  res.json(await meWire());
+  publishMe();
+  res.json(await meWire(ownerHere(req)));
 });
 
 /**

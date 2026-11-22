@@ -1,4 +1,4 @@
-import type { Me } from "@auni/shared";
+import type { Me, TailscaleEnableResult, TailscaleStateWire } from "@auni/shared";
 import { execFile, execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { hostname, platform, userInfo } from "node:os";
@@ -9,6 +9,7 @@ import { doorSocket } from "./auth/tailscale.ts";
 import type { Finding } from "./doctor.ts";
 import { env } from "./env.ts";
 import { enableLinger, lingers, serviceInstalled } from "./service.ts";
+import { clearAlwaysOn, saveAlwaysOn } from "./settings.ts";
 
 // Always-on Auni: this machine keeps Auni running, and the owner's devices reach it through
 // Tailscale (auth/tailscale.ts says who comes in). `auni up --always-on` sets it up, in steps that
@@ -161,7 +162,7 @@ interface StaysOn {
 }
 
 /** Whether this machine keeps Auni running while the owner is away from it. */
-async function staysOn(): Promise<StaysOn> {
+export async function staysOn(): Promise<StaysOn> {
   if (await isLaptop())
     return {
       stays: false,
@@ -582,4 +583,209 @@ export async function reachWire(): Promise<Me["reach"]> {
     owner: env.TAILSCALE_OWNER ?? null,
     staysOn: { stays, laptop, says },
   };
+}
+
+/**
+ * Detailed live Tailscale state on this machine, for Settings -> Remote access and the onboarding
+ * wizard. Never mutates anything.
+ */
+export async function inspectTailscale(): Promise<TailscaleStateWire> {
+  const configured = Boolean(env.TAILSCALE_OWNER);
+  let status: TailscaleStatus;
+  try {
+    status = JSON.parse((await run("tailscale", ["status", "--json"], { timeout: 10_000 })).stdout);
+  } catch (error) {
+    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+    return {
+      state: missing ? "missing" : "stopped",
+      dnsName: null,
+      login: env.TAILSCALE_OWNER ?? null,
+      configured,
+      served: false,
+      port: null,
+      url: configured ? env.WEB_ORIGIN : null,
+      problem: missing
+        ? "Tailscale isn't installed on this machine yet."
+        : "Tailscale isn't running yet. Start Tailscale or run `tailscale up`.",
+    };
+  }
+  if (status.BackendState !== "Running" || !status.Self) {
+    return {
+      state: "stopped",
+      dnsName: null,
+      login: env.TAILSCALE_OWNER ?? null,
+      configured,
+      served: false,
+      port: null,
+      url: configured ? env.WEB_ORIGIN : null,
+      problem: "Tailscale isn't signed in or connected yet. Open Tailscale or run `tailscale up`.",
+    };
+  }
+  const { Self } = status;
+  const dnsName = Self.DNSName?.replace(/\.$/u, "") ?? null;
+  if (Self.Tags?.length) {
+    return {
+      state: "tagged",
+      dnsName,
+      login: null,
+      configured,
+      served: false,
+      port: null,
+      url: null,
+      problem:
+        "This machine uses a Tailscale tag, so Tailscale can't verify your personal login. Re-authenticate with `tailscale up --force-reauth`.",
+    };
+  }
+  const login = status.User?.[String(Self.UserID)]?.LoginName ?? null;
+  if (!login || !dnsName) {
+    return {
+      state: "stopped",
+      dnsName,
+      login,
+      configured,
+      served: false,
+      port: null,
+      url: null,
+      problem: "Tailscale didn't report a MagicDNS name or user login for this machine.",
+    };
+  }
+  if (!status.CertDomains?.includes(dnsName)) {
+    return {
+      state: "https_off",
+      dnsName,
+      login,
+      configured,
+      served: false,
+      port: null,
+      url: null,
+      problem:
+        "HTTPS certificates are off for your tailnet. Enable MagicDNS and HTTPS Certificates in Tailscale's DNS settings.",
+    };
+  }
+  const routes = await served(dnsName).catch(() => new Map<number, string>());
+  const doorEntry = [...routes].find(([, route]) => route === doorRoute());
+  const freePort = portFor(routes, null);
+  const activePort = doorEntry?.[0] ?? freePort;
+  return {
+    state: "ready",
+    dnsName,
+    login,
+    configured,
+    served: doorEntry !== undefined,
+    port: activePort,
+    url: activePort !== null ? tailnetOrigin(dnsName, activePort) : null,
+    problem:
+      activePort === null
+        ? "Tailscale is already serving on every port Auni checks (443, 8443+). Pick a custom port."
+        : null,
+  };
+}
+
+/**
+ * Enables Tailscale HTTPS for this machine from Settings (step-up gated): saves TAILSCALE_OWNER
+ * and WEB_ORIGIN, enables Linux linger if non-root allows, and runs `tailscale serve` non-interactively.
+ * When `tailscale serve` requires root, returns the exact copyable sudo command.
+ */
+export async function enableTailscaleFromUi(
+  askedPort: number | null,
+): Promise<TailscaleEnableResult> {
+  const found = await placeHere(askedPort);
+  const steps = [...found.steps];
+  if (!found.place || !found.owner) {
+    return {
+      ok: false,
+      url: null,
+      owner: found.owner,
+      needsSudo: false,
+      sudoCommand: null,
+      needsRestart: false,
+      steps,
+    };
+  }
+  const { port, address, served: alreadyServed } = found.place;
+  saveAlwaysOn(found.owner, address);
+  steps.push({
+    step: "settings",
+    status: "done",
+    says: `Saved Tailscale access for ${found.owner} at ${address}.`,
+  });
+
+  if (platform() === "linux" && lingers() !== true) {
+    try {
+      enableLinger();
+      steps.push({
+        step: "linger",
+        status: "done",
+        says: "Enabled background lingering so Auni keeps running after logout.",
+      });
+    } catch {
+      steps.push({
+        step: "linger",
+        status: "note",
+        says: "To keep Auni running when logged out, enable lingering once.",
+        run: `sudo loginctl enable-linger ${userInfo().username}`,
+      });
+    }
+  }
+
+  const command = serveCommand(port);
+  const result = alreadyServed ? "done" : await serve(command, false);
+  let needsSudo = false;
+  let sudoCommand: string | null = null;
+  if (result === "done") {
+    steps.push({
+      step: "serve",
+      status: "done",
+      says: `Tailscale proxies ${address} directly to Auni's unix door.`,
+    });
+  } else if (result === "root") {
+    needsSudo = true;
+    sudoCommand = `sudo ${command.join(" ")}`;
+    steps.push({
+      step: "serve",
+      status: "fix",
+      says: "Tailscale Serve needs root permission once to proxy to Auni's private unix socket.",
+      run: sudoCommand,
+    });
+  } else {
+    steps.push({
+      step: "serve",
+      status: "fix",
+      says: `Tailscale wouldn't serve it: ${result.failed}`,
+    });
+  }
+
+  const needsRestart = env.TAILSCALE_OWNER !== found.owner || env.WEB_ORIGIN !== address;
+  return {
+    ok: !needsSudo && result === "done",
+    url: address,
+    owner: found.owner,
+    needsSudo,
+    sudoCommand,
+    needsRestart,
+    steps,
+  };
+}
+
+/**
+ * Disables Tailscale HTTPS in `~/.auni/.env` and attempts to turn off Tailscale Serve for Auni's
+ * port. Returns whether a restart is needed (always true if currently running in Tailscale mode).
+ */
+export async function disableTailscaleFromUi(): Promise<{
+  readonly ok: boolean;
+  readonly needsRestart: boolean;
+  readonly note: string | null;
+}> {
+  const wasTailscale = Boolean(env.TAILSCALE_OWNER);
+  const activePort = wasTailscale ? Number(new URL(env.WEB_ORIGIN).port || 443) : null;
+  clearAlwaysOn();
+  let note: string | null = null;
+  if (activePort !== null) {
+    try {
+      await run("tailscale", ["serve", `--https=${activePort}`, "off"], { timeout: 15_000 });
+    } catch {
+      note = `Saved local-only mode. To stop the Tailscale route too, run: sudo tailscale serve --https=${activePort} off`;
+    }
+  }
+  return { ok: true, needsRestart: wasTailscale, note };
 }

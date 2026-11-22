@@ -121,6 +121,26 @@ export async function refreshStartingPoints(
   return true;
 }
 
+/** Forces fresh starting points right now (e.g. after onboarding or signal/profile updates). */
+export async function forceRefreshStartingPoints(executor: Executor): Promise<void> {
+  await startingPointsKind.enqueue(executor, {});
+}
+
+/** Refreshes owner personalization signals (X handle + watched wallets) and then starting points. */
+export const signalsKind = jobKind(
+  "signals",
+  z.object({ replaceSummary: z.boolean().optional() }),
+  () => ["signals"],
+);
+
+/** Queues a background refresh of the owner's connected signals. */
+export async function enqueueSignalsRefresh(
+  executor: Executor,
+  options: { readonly replaceSummary?: boolean } = {},
+): Promise<void> {
+  await signalsKind.enqueue(executor, options);
+}
+
 /** A reading of the owner's portfolio (see askForReading). */
 export const readingKind = jobKind("reading", z.object({}));
 

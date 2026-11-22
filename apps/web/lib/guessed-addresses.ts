@@ -17,7 +17,7 @@ const PLACES: readonly (readonly [string, string])[] = [
   ["/app/chats", "/app/new"],
   ["/app/history", "/app/activity"],
   ["/app/apps/:app", "/app/apps?app=:app"],
-  ["/app/settings", "/app?settings=profile"],
+  ["/app/settings", "/app?settings=general"],
   ["/app/wallet", "/app?settings=wallet"],
   ["/app/add-money", "/app?fund=open"],
   ["/app/deposit", "/app?fund=open"],

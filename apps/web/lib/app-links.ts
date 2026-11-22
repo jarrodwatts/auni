@@ -4,8 +4,26 @@ export const SETTINGS_DIALOG_PARAM = "settings";
 
 const DIALOG_OPEN_VALUE = "open";
 
-const SETTINGS_SECTIONS = ["profile", "wallet", "machine", "help"] as const;
+export const SETTINGS_SECTIONS = [
+  "general",
+  "appearance",
+  "personalization",
+  "brains",
+  "wallet",
+  "channels",
+  "remote",
+  "network",
+  "diagnostics",
+  "about",
+] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+
+/** Legacy Settings query aliases kept working for old bookmarks and messages. */
+const LEGACY_SECTIONS: Readonly<Record<string, SettingsSection>> = {
+  profile: "general",
+  machine: "remote",
+  help: "diagnostics",
+};
 
 function withParam(pathname: string, search: string | undefined, param: string, value: string) {
   const params = new URLSearchParams(search);
@@ -27,12 +45,14 @@ export function fundingAsked(value: string | null): { readonly need: string | nu
 export function settingsDialogHref(
   pathname: string,
   search?: string,
-  section: SettingsSection = "profile",
+  section: SettingsSection = "general",
 ): string {
   return withParam(pathname, search, SETTINGS_DIALOG_PARAM, section);
 }
 
 export function settingsSection(value: string | null): SettingsSection | null {
+  if (!value) return null;
+  if (value in LEGACY_SECTIONS) return LEGACY_SECTIONS[value]!;
   return SETTINGS_SECTIONS.find((section) => section === value) ?? null;
 }
 

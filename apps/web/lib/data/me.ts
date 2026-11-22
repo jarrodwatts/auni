@@ -1,8 +1,10 @@
 import {
+  addWatchedWalletRequestSchema,
   meSchema,
   starredSchema,
   updateMeRequestSchema,
   walletKeysResponseSchema,
+  type AddWatchedWalletRequest,
   type Me,
   type UpdateMeRequest,
 } from "@auni/shared";
@@ -60,4 +62,24 @@ export async function starOnGitHub(): Promise<boolean> {
 /** Records the owner's answer to the ask for a star, for every device. */
 export async function answerStarPrompt(): Promise<void> {
   await requestCore("me/star/answer", { method: "POST", body: "{}" });
+}
+
+/** Adds a watch-only public EVM, ENS, or Solana address for personalization signals. */
+export async function addWatchedWallet(input: AddWatchedWalletRequest): Promise<Me> {
+  const body = addWatchedWalletRequestSchema.parse(input);
+  return meSchema.parse(
+    await requestCore("me/watched-wallets", { method: "POST", body: JSON.stringify(body) }),
+  );
+}
+
+/** Removes a watch-only public address. */
+export async function removeWatchedWallet(address: string): Promise<Me> {
+  return meSchema.parse(
+    await requestCore(`me/watched-wallets/${encodeURIComponent(address)}`, { method: "DELETE" }),
+  );
+}
+
+/** Asks core to re-read watched wallets and public X handle and rebuild profile signals. */
+export async function refreshOwnerSignals(): Promise<Me> {
+  return meSchema.parse(await requestCore("me/signals/refresh", { method: "POST", body: "{}" }));
 }

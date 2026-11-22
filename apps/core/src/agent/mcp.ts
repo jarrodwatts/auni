@@ -18,6 +18,7 @@ import { walletReach } from "../money/wallets.ts";
 import { offered } from "../apps/registry.ts";
 import { watchedLookup } from "../app-troubles.ts";
 import { readChainTool } from "../money/read-chain.ts";
+import { auniCapabilityTools } from "./auni-tools.ts";
 import { connectAppTool } from "./connect-tool.ts";
 import { sendFeedbackTool } from "./feedback-tool.ts";
 import { fetchUrlTool } from "./fetch-tool.ts";
@@ -105,6 +106,7 @@ export function toolsFor(context: ToolContext, reach: Reach = { solana: true }):
     connectAppTool(turn),
     requestSecretTool(turn),
     sendFeedbackTool(turn),
+    ...auniCapabilityTools(),
     readChainTool({
       threadId: context.thread.id,
       turnStartedAt: context.thread.turnStartedAt?.toISOString() ?? "",

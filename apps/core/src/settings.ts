@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
-import type { AppAbout, AppSetting } from "@auni/shared";
+import { NETWORK_KEYS, type AppAbout, type AppSetting, type NetworkKey } from "@auni/shared";
 
 import { dataDir, envFile } from "./data-dir.ts";
 import {
@@ -106,15 +106,16 @@ export function settingsChanged(): AbortSignal {
   return changed.signal;
 }
 
-/** Calls `heard` each time a setting is saved, until the function it returns is called. */
-export function onSettingsChange(heard: () => void): () => void {
+/** Calls `heard` each time a setting is saved, with its variable name, until unsubscribed. */
+export function onSettingsChange(heard: (name: string) => void): () => void {
   let listening = true;
   const next = () =>
     settingsChanged().addEventListener(
       "abort",
-      () => {
+      (event) => {
         if (!listening) return;
-        heard();
+        const reason = (event.target as AbortSignal | null)?.reason;
+        heard(typeof reason === "string" ? reason : "");
         next();
       },
       { once: true },
@@ -190,12 +191,67 @@ export async function saveSwitch(id: string, on: boolean): Promise<void> {
 
 /**
  * Records that Auni runs always on (always-on.ts): the owner's Tailscale login and this machine's
- * https address on the tailnet. Whom Auni trusts is decided at the terminal where it runs, so only
- * `auni up --always-on` calls this, and no route.
+ * https address on the tailnet. Called by `auni up --always-on` and the step-up-gated Remote
+ * access settings route.
  */
 export function saveAlwaysOn(owner: string, origin: string): void {
   write("WEB_ORIGIN", origin);
   write("TAILSCALE_OWNER", owner);
+}
+
+/** Clears Tailscale always-on settings so Auni returns to local-only pairing mode on next start. */
+export function clearAlwaysOn(): void {
+  write("TAILSCALE_OWNER", "");
+  write("WEB_ORIGIN", "");
+}
+
+/**
+ * Sets or clears the owner's preferred brain app (`BRAIN`) in the settings file and immediately
+ * in this process. Validates that any non-null id names a real brain app.
+ */
+export async function savePreferredBrain(id: string | null): Promise<void> {
+  if (id !== null) {
+    const { brains } = await import("./apps/registry.ts");
+    if (!brains().some(({ about }) => about.id === id))
+      throw new PrivateFieldRefused(`${id} is not an AI brain in this Auni.`);
+  }
+  write("BRAIN", id ?? "");
+}
+
+/** Whether a custom RPC URL is safe to store and use: HTTPS, or local loopback HTTP for a fork/node. */
+function validRpcUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!SAVABLE.test(trimmed))
+    throw new PrivateFieldRefused("That URL contains characters that cannot be saved safely.");
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new PrivateFieldRefused("Enter a valid RPC URL.");
+  }
+  const loopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
+  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && loopback))
+    throw new PrivateFieldRefused("RPC URLs must use HTTPS (or localhost HTTP for a local node).");
+  return parsed.toString().replace(/\/+$/u, "");
+}
+
+/**
+ * Sets or clears a custom RPC URL (`RPC_URL_<CHAIN>`) in the owner's settings file and puts it
+ * in use immediately (money/chains.ts clears cached clients on settings change).
+ */
+export function saveRpcUrl(chain: NetworkKey, url: string | null): void {
+  if (!(NETWORK_KEYS as readonly string[]).includes(chain))
+    throw new PrivateFieldRefused(`${chain} is not a supported network.`);
+  const envName = `RPC_URL_${chain.toUpperCase()}`;
+  write(envName, url === null || url.trim() === "" ? "" : validRpcUrl(url));
+}
+
+/**
+ * Sets or clears `ALCHEMY_API_KEY` in the owner's settings file and puts it in use immediately.
+ * Never returns or logs the key value.
+ */
+export function saveAlchemyKey(key: string | null): void {
+  write("ALCHEMY_API_KEY", key === null || key.trim() === "" ? "" : savable(key));
 }
 
 /**
@@ -256,7 +312,7 @@ function write(name: string, value: string): void {
   process.env[name] = value;
   const ended = changed;
   changed = new AbortController();
-  ended.abort("a setting changed");
+  ended.abort(name);
 }
 
 /** A typed value as it is saved, or a refusal: keys are pasted, so the space around one goes. */

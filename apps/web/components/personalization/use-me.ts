@@ -1,10 +1,16 @@
 "use client";
 
-import type { Me, UpdateMeRequest } from "@auni/shared";
+import type { AddWatchedWalletRequest, Me, UpdateMeRequest } from "@auni/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { addMissingKey, updateMe } from "@/lib/data/me";
+import {
+  addMissingKey,
+  addWatchedWallet,
+  refreshOwnerSignals,
+  removeWatchedWallet,
+  updateMe,
+} from "@/lib/data/me";
 
 /** The one copy of the owner, which ClientDataProvider seeds with what OwnerProvider read. */
 export const ME_KEY = ["me"] as const;
@@ -36,6 +42,33 @@ export function useAddMissingKey() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: addMissingKey,
+    onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
+  });
+}
+
+/** Adds a watch-only public wallet address and writes core's updated owner record back. */
+export function useAddWatchedWallet() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddWatchedWalletRequest) => addWatchedWallet(input),
+    onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
+  });
+}
+
+/** Removes a watch-only public wallet address and writes core's updated owner record back. */
+export function useRemoveWatchedWallet() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (address: string) => removeWatchedWallet(address),
+    onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
+  });
+}
+
+/** Triggers a fresh background read of X handle and watch-only wallet holdings. */
+export function useRefreshSignals() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: refreshOwnerSignals,
     onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
   });
 }

@@ -1,9 +1,64 @@
 import { z } from "zod";
 
+const BRIEF_DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+const BRIEF_TIME = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/u);
+
+/** When the owner's daily brief runs on their own clock (matches core's automations/schedule.ts). */
+export const briefScheduleSchema = z.union([
+  z.strictObject({ every: z.literal("day"), at: BRIEF_TIME }),
+  z.strictObject({ every: z.array(z.enum(BRIEF_DAYS)).min(1).max(7), at: BRIEF_TIME }),
+  z.strictObject({
+    every: z.literal("month"),
+    day: z.number().int().min(1).max(31),
+    at: BRIEF_TIME,
+  }),
+]);
+export type BriefSchedule = z.infer<typeof briefScheduleSchema>;
+
+/** A public address the owner asked Auni to watch for tailored context (read-only, no keys). */
+export const watchedWalletSchema = z.object({
+  address: z.string().min(1).max(128),
+  chain: z.enum(["evm", "solana"]),
+  label: z.string().max(64).nullable(),
+});
+export type WatchedWallet = z.infer<typeof watchedWalletSchema>;
+
+/** Cached snapshot of what Auni learned from the owner's connected signals (X, watched wallets). */
+export const ownerSignalsSchema = z.object({
+  refreshedAt: z.iso.datetime({ offset: true }),
+  xBio: z.string().nullable(),
+  xTopics: z.array(z.string()),
+  watchedHoldings: z.array(
+    z.object({
+      symbol: z.string(),
+      name: z.string(),
+      usdValue: z.string(),
+      chain: z.string(),
+    }),
+  ),
+});
+export type OwnerSignals = z.infer<typeof ownerSignalsSchema>;
+
 /** The owner as `GET /me` and `PATCH /me` return them. */
 export const meSchema = z.object({
   name: z.string().nullable(),
   timeZone: z.string(),
+  /** Synced visual theme ("light", "dark", or an app theme id); null defaults to light. */
+  look: z.string().nullable(),
+  /** Daily brief schedule on the owner's clock; null when turned off. */
+  brief: briefScheduleSchema.nullable(),
+  /** Preferred brain app id (e.g. "claude-code", "codex"), or null for automatic order. */
+  preferredBrain: z.string().nullable(),
+  /** Public X/Twitter handle (without @) Auni learns interests from, or null. */
+  xHandle: z.string().nullable(),
+  /** Public watch-only external wallets Auni reads for tailored prompts and context. */
+  watchedWallets: z.array(watchedWalletSchema),
+  /** Auto-learned (and owner-editable) short profile summary of what Auni knows about the owner. */
+  profileSummary: z.string().nullable(),
+  /** Latest signal snapshot read from X and watched wallets; null before any refresh. */
+  profileSignals: ownerSignalsSchema.nullable(),
+  /** Whether this request carries owner step-up proof (freshly paired or Tailscale owner). */
+  ownerHere: z.boolean(),
   /** The wallet's addresses, which Add money shows; null on a chain it holds no key for. */
   wallets: z.object({ evm: z.string().nullable(), solana: z.string().nullable() }),
   /**
@@ -42,7 +97,7 @@ export const meSchema = z.object({
    * web app alone, or null for wherever they last talked to Auni.
    */
   home: z.string().nullable(),
-  /** The owner sent their first take; until they do, the app is that take's question. */
+  /** Onboarding is complete; until true, the app opens on the setup wizard. */
   welcomed: z.boolean(),
   /** How the owner reaches Auni, and whether the machine it runs on keeps it running. */
   reach: z.object({
@@ -132,6 +187,24 @@ export const updateMeRequestSchema = z
     time_zone: timeZoneSchema,
     /** As `home` reads; a channel must be paired. */
     home_channel: z.string().max(64).nullable(),
+    /** Visual theme ("light", "dark", or an app theme id); null resets to light. */
+    look: z.string().trim().min(1).max(64).nullable(),
+    /** Daily brief schedule, or null to turn it off. */
+    brief: briefScheduleSchema.nullable(),
+    /** Public X/Twitter handle (with or without leading @), or null to clear. */
+    x_handle: z.string().trim().max(120).nullable(),
+    /** Owner-editable summary of what Auni knows about them, or null to clear. */
+    profile_summary: z.string().trim().max(2_000).nullable(),
+    /** False re-opens the onboarding wizard; true marks onboarding complete. */
+    welcomed: z.boolean(),
   })
   .partial();
 export type UpdateMeRequest = z.infer<typeof updateMeRequestSchema>;
+
+/** Request body for `POST /me/watched-wallets`. */
+export const addWatchedWalletRequestSchema = z.object({
+  /** EVM 0x address, Solana Base58 address, or .eth ENS name. */
+  address: z.string().trim().min(1).max(160),
+  label: z.string().trim().max(64).optional(),
+});
+export type AddWatchedWalletRequest = z.infer<typeof addWatchedWalletRequestSchema>;

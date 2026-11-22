@@ -15,7 +15,9 @@ ownerRouter.post("/pair", fromTheApp, async (req, res) => {
   // Always on, Tailscale says who the owner is (auth/tailscale.ts), and no browser pairs.
   if (env.TAILSCALE_OWNER) return void res.status(404).json({ error: "pairing_off" });
   const body = pairBody.safeParse(req.body);
-  const token = body.success ? await pair(body.data.code) : null;
+  const userAgent =
+    typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null;
+  const token = body.success ? await pair(body.data.code, { userAgent }) : null;
   // One answer for wrong, spent and expired, so a guess learns nothing.
   if (!token) return void res.status(403).json({ error: "pairing_code_invalid" });
   res.setHeader("Set-Cookie", sessionCookie(token));

@@ -214,7 +214,18 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       );
     await take(page, out, "new-chat", `${origin}/app/new`, "top");
     // Settings, each of its panes.
-    for (const section of ["profile", "wallet", "machine", "help"])
+    for (const section of [
+      "general",
+      "appearance",
+      "personalization",
+      "brains",
+      "wallet",
+      "channels",
+      "remote",
+      "network",
+      "diagnostics",
+      "about",
+    ])
       await take(page, out, `settings-${section}`, `${origin}/app?settings=${section}`, "top");
     for (const thread of threads.toReversed()) {
       const name = slug(thread.title ?? thread.id);
@@ -234,18 +245,8 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
   }
 }
 
-/** The demo's take, typed into first run's question and sent as the owner sends it. */
-const SEND_TAKE = `(() => {
-  const box = document.getElementById("auni-take");
-  const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
-  set.call(box, "Peptides go mainstream by 2028");
-  box.dispatchEvent(new Event("input", { bubbles: true }));
-  setTimeout(() => box.form.requestSubmit(), 300);
-})()`;
-
 /**
- * First run, as a new owner meets it (`auni demo --first-run`): its question, then the chat its
- * take starts, with the first card its answer puts up.
+ * First run, as a new owner meets it (`auni demo --first-run`): the local setup wizard.
  */
 async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
   const browser = await launch();
@@ -259,12 +260,6 @@ async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise
     await page.open(link);
     await page.until("location.pathname.startsWith('/app') && !location.hash");
     await take(page, out, "first-run", `${origin}/app/new`, "top");
-    await page.evaluate(SEND_TAKE);
-    await page.until(
-      `location.pathname.startsWith("/app/chat/") && document.body.innerText.includes("to start")`,
-      60_000,
-    );
-    await take(page, out, "first-run-card", await page.evaluate<string>("location.href"), "end");
   } finally {
     await browser.close();
     await demo.stop();

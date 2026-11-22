@@ -54,23 +54,48 @@ describe("systemPrompt", () => {
 });
 
 describe("turnContext", () => {
-  const context = (owner: { name?: string | null; timeZone?: string }, newUser: boolean) =>
-    turnContext({
-      owner: { timeZone: "UTC", name: null, ...owner },
-      newUser,
+  const baseOwner = {
+    timeZone: "UTC",
+    name: null as string | null,
+    xHandle: null as string | null,
+    profileSummary: null as string | null,
+    profileSignals: null,
+  };
+
+  it("includes fenced owner personalization signals when present and omits them when empty", () => {
+    const empty = turnContext({
+      owner: baseOwner,
       placeContext: null,
       wallets: null,
       now: new Date("2026-10-30T00:00:00Z"),
     });
+    expect(empty).not.toContain("# Their first take");
+    expect(empty).not.toContain("owner_profile");
+    expect(empty.endsWith("</system-reminder>")).toBe(true);
 
-  it("gives someone new the first-take flow", () => {
-    const first = context({}, true);
-    expect(first).toContain("# Their first take");
-    expect(first.endsWith("</system-reminder>")).toBe(true);
-  });
-
-  it("leaves it out for someone who has built a specialist", () => {
-    expect(context({}, false)).not.toContain("# Their first take");
+    const personalized = turnContext({
+      owner: {
+        ...baseOwner,
+        name: "Jarrod",
+        xHandle: "jarrodwatts",
+        profileSummary: "Focuses on AI infrastructure and avoids leverage.",
+        profileSignals: {
+          refreshedAt: "2026-10-30T00:00:00Z",
+          xBio: "Building local AI tools",
+          xTopics: ["AI infrastructure", "DeFi"],
+          watchedHoldings: [
+            { symbol: "ETH", name: "Ethereum", usdValue: "5000.00", chain: "Ethereum" },
+          ],
+        },
+      },
+      placeContext: null,
+      wallets: null,
+      now: new Date("2026-10-30T00:00:00Z"),
+    });
+    expect(personalized).toContain("The owner's name: Jarrod.");
+    expect(personalized).toContain("owner_profile");
+    expect(personalized).toContain("AI infrastructure");
+    expect(personalized).toContain("@jarrodwatts");
   });
 
   // A wallet brought with its EVM key alone was offered Jupiter to buy on Solana, which it can't.
@@ -78,8 +103,7 @@ describe("turnContext", () => {
     const evm = "0x00000000000000000000000000000000000000a1";
     const facts = (wallets: { evm: string | null; solana: string | null }) =>
       turnContext({
-        owner: { timeZone: "UTC", name: null },
-        newUser: false,
+        owner: baseOwner,
         placeContext: null,
         wallets,
         now: new Date("2026-10-30T00:00:00Z"),

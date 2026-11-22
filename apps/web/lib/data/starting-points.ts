@@ -3,9 +3,12 @@ import {
   type StartingPoint,
   type StartingPointsWire,
 } from "@auni/shared";
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { requestCore } from "@/lib/core";
+
+import { listenLive } from "./live";
 
 /** A new chat's starting points: core's `GET /starting-points`. */
 
@@ -45,6 +48,13 @@ function waitingOn(read: Read | undefined): boolean {
 /** The one read both a new chat and the app's shell keep, polling while new ones are written. */
 function useRead() {
   const client = useQueryClient();
+  useEffect(() => {
+    const refresh = () => void client.invalidateQueries({ queryKey: KEY });
+    const live = listenLive((message) => {
+      if (message.topic === "starting-points") refresh();
+    });
+    return live.close;
+  }, [client]);
   return useQuery({
     queryKey: KEY,
     queryFn: reader(client),
@@ -59,12 +69,27 @@ function useRead() {
 export function useStartingPoints(): {
   readonly points: readonly StartingPoint[];
   readonly waiting: boolean;
+  readonly pending: boolean;
 } {
   const query = useRead();
   return {
     points: query.data?.points ?? [],
     waiting: query.isPending || waitingOn(query.data),
+    pending: query.data?.pending ?? false,
   };
+}
+
+/** Asks core to regenerate tailored starting points right away from current signals. */
+export function useRefreshStartingPoints() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await requestCore("starting-points/refresh", { method: "POST", body: "{}" });
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: KEY });
+    },
+  });
 }
 
 /** The same points, kept read wherever the app is open, so a new chat never waits for them. */

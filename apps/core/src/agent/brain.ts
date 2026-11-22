@@ -6,6 +6,7 @@ import { readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 
 import { databaseFiles } from "../db/client.ts";
 import { env } from "../env.ts";
+import { onSettingsChange } from "../settings.ts";
 import type { Brain, BrainCheck, BrainEvent, BrainNotReady, BrainTurn } from "../apps/contract.ts";
 import { brains } from "../apps/registry.ts";
 import { theBox, type Box } from "./box.ts";
@@ -226,14 +227,24 @@ export const ON_WINDOWS =
   "Auni runs on Linux and macOS. On Windows, run it inside WSL: `wsl --install` in PowerShell " +
   "(restart if it asks), then open the Ubuntu terminal it adds and set Auni up there, from the start.";
 
+/** The owner's preferred brain id (`BRAIN`), or null for automatic order. */
+export function preferredBrainId(): string | null {
+  return env.BRAIN?.trim() || null;
+}
+
+onSettingsChange((name) => {
+  if (name === "BRAIN") env.BRAIN = process.env.BRAIN?.trim() || undefined;
+});
+
 /**
  * Why no brain can think on this machine whatever the owner logs in to, or null: Windows, where
  * the box (built on Linux's and macOS's sandboxes) can't run, or a BRAIN naming no brain app.
  */
 export function brainsBlocked(): string | null {
   if (platform() === "win32") return ON_WINDOWS;
-  if (env.BRAIN && !brains().some(({ about }) => about.id === env.BRAIN))
-    return `BRAIN=${env.BRAIN} names no brain app: change it in ~/.auni/.env, or remove it.`;
+  const preferred = preferredBrainId();
+  if (preferred && !brains().some(({ about }) => about.id === preferred))
+    return `BRAIN=${preferred} names no brain app: change it in ~/.auni/.env, or remove it.`;
   return null;
 }
 
@@ -247,8 +258,9 @@ export interface NoBrain {
 /** The brains in the order a turn asks them: the one BRAIN names, then the order order.ts gives. */
 function inTurn(): ReturnType<typeof brains> {
   const all = brains();
+  const preferred = preferredBrainId();
   return all.toSorted(
-    (a, b) => Number(b.about.id === env.BRAIN) - Number(a.about.id === env.BRAIN),
+    (a, b) => Number(b.about.id === preferred) - Number(a.about.id === preferred),
   );
 }
 
@@ -260,7 +272,7 @@ export function whichBrainSays(settingsFile: string): string | null {
   const names = inTurn().map(({ about }) => about.name);
   if (names.length < 2) return null;
   const order = `${names.slice(0, -1).join(", ")}, then ${names.at(-1)}`;
-  return env.BRAIN
+  return preferredBrainId()
     ? `Auni asks ${order}, as BRAIN in ${settingsFile} says, and thinks with the first that is ready.`
     : `Auni asks ${order}, and thinks with the first that is ready. To choose, set BRAIN in ${settingsFile}.`;
 }
@@ -378,11 +390,11 @@ export function fromTheApp(id: string, why: BrainNotReady): "sign-in" | "install
 }
 
 /** How the owner fixes a brain: in the app where it can, else `fix` itself, a command or why. */
-function howToFix({ id, name }: Named, why: BrainNotReady, fix: string): string {
+function howToFix({ id }: Named, why: BrainNotReady, fix: string): string {
   const app = fromTheApp(id, why);
   if (!app) return fix;
   const does = app === "sign-in" ? "sign it in" : "install it";
-  return `${does} from Apps, on ${name}'s sheet, on any of your devices (or run \`${fix}\` where Auni runs)`;
+  return `${does} from Settings → AI Brains, on any of your devices (or run \`${fix}\` where Auni runs)`;
 }
 
 interface Named {

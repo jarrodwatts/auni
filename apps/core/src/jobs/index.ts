@@ -11,6 +11,7 @@ import { sweepJob } from "./sweep.ts";
 import { pruneJob } from "./prune.ts";
 import type { Job } from "./queue.ts";
 import { readingBackstopJob, readingJob } from "./readings.ts";
+import { signalsJob } from "./signals.ts";
 import { statementsJob } from "./statements.ts";
 import { turnJob } from "./turn.ts";
 
@@ -35,6 +36,7 @@ export const jobs: readonly Job<unknown>[] = [
   channelsJob,
   deliverJob,
   startingPointsJob,
+  signalsJob,
   pruneJob,
   ...apps().flatMap((app) => app.jobs ?? []),
 ];

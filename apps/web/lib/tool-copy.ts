@@ -143,6 +143,12 @@ const AUNI_TOOL_COPY: Record<
   connect_app: copy("Offering an app", "Offered an app", "Couldn’t offer that app"),
   request_secret: copy("Asking for it", "Asked for it", "Couldn’t ask for that"),
   send_feedback: copy("Writing it up", "Wrote it up", "Couldn’t write that up"),
+  inspect_auni: copy("Checking Auni’s setup", "Checked Auni’s setup", "Couldn’t read Auni’s setup"),
+  update_auni_preferences: copy(
+    "Updating your settings",
+    "Updated your settings",
+    "Couldn’t update your settings",
+  ),
 };
 
 /** The brain's own tools: the web shows as steps, its computer never does. */

@@ -1,13 +1,40 @@
 ---
 name: how-auni-works
-description: Load when someone asks how Auni itself works, or why it did something - where their money is, which networks they can add money on, why they were or weren't told about money arriving, why a trade went to Solana, why a card checks it's them, what Auni charges, how long a move takes, whether Auni can move money without asking, how adding money, withdrawing, selling, specialists or predictions work, or whether their money is safe. Answer from this rather than guessing.
+description: Load when someone asks how Auni itself works, how to configure or run it locally or remotely, or why it did something - AI brains (Claude Code / Codex), Tailscale remote access, always-on background service, paired devices, Telegram, custom RPCs, personalization (X handle, watch-only wallets, profile), diagnostics (auni doctor / triage), updates, where their money is, which networks they can add money on, why a trade went to Solana, why a card checks it's them, what Auni charges, how specialists work, or whether their money is safe. Answer from this and inspect_auni rather than guessing.
 ---
 
 # How Auni works
 
-Answer product questions as someone who built it: plainly, confidently, in dollars and
-everyday words. Where this says a tool or card holds the live answer, read it rather
-than quoting from memory.
+Answer product and setup questions as someone who built it: plainly, confidently, in everyday words.
+Always call `inspect_auni` first when answering about THIS Auni's live status (active brain, Tailscale,
+background service, channels, apps, RPCs, or health via `include_health: true`) rather than guessing.
+Give clickable in-app Settings links like `[Remote access](/app?settings=remote)` whenever directing the owner to a Settings pane.
+
+## Running locally, open-source & Settings
+
+Auni is a single-owner, open-source program that runs locally on the owner's own machine (with its own
+embedded Postgres unless `DATABASE_URL` is set) and thinks with the owner's own AI CLI login (Claude
+Code or Codex). No hosted account, no cloud relay, no fees.
+
+Every local configuration area lives in **Settings** (press `/` or `Cmd+F` inside Settings to search any option):
+
+- **General** (`/app?settings=general`): display name, time zone, daily brief schedule, show-thinking toggle, and re-running the setup wizard.
+- **Appearance** (`/app?settings=appearance`): Light, Dark, or app-provided themes (synced across devices; Auni can switch this directly with `update_auni_preferences`).
+- **Personalization** (`/app?settings=personalization`): inspectable, editable "What Auni knows about you" summary, public X/Twitter handle (`@handle`), watch-only external wallets (public EVM, ENS, or Solana addresses — zero keys needed), and refreshing tailored starting prompts.
+- **AI Brains** (`/app?settings=brains`): live status of Claude Code and Codex, one-click CLI install or inline sign-in from any device, and picking a preferred brain (takes effect immediately; if one hits a usage limit, Auni automatically falls back to another ready brain).
+- **Wallet & Keys** (`/app?settings=wallet`): local EVM and Solana addresses, Withdraw, adding a missing chain key, importing an existing key, and revealing keys (gated by owner step-up proof). Keys live on this machine in the OS keychain or a `0600` file.
+- **Channels** (`/app?settings=channels`): Telegram setup (bot token via private field + 15-minute one-time pairing code) and choosing where unasked notices/briefs go.
+- **Remote access** (`/app?settings=remote`):
+  - **Tailscale HTTPS**: detect Tailscale on this machine, pick an HTTPS port (443 or 8443+), enable Tailscale Serve to Auni's private `0700` unix door socket, and get a MagicDNS HTTPS URL + scannable QR code to open Auni on your phone. If root is needed once for `tailscale serve`, Settings shows the exact `sudo` command to run and verifies live.
+  - **Background service (Always on)**: install or uninstall the machine's user service (`systemd` on Linux, `launchd` on macOS) and enable Linux `loginctl enable-linger` so Auni keeps running after logout.
+  - **Paired devices & browsers** (in local mode): mint a one-time 15-minute pairing link + QR code, view connected browser sessions, and revoke individual or other sessions.
+  - **Move to another machine (Handover)**: hand everything (wallet keys, database, settings) once over Tailscale to an always-on Linux/Mac machine.
+- **Network & RPCs** (`/app?settings=network`): set an Alchemy API key or per-chain custom RPC URLs (`Monad`, `Base`, `Arbitrum`, `Polygon`, `Ethereum`, `Solana`). Takes effect immediately; gated by owner step-up proof.
+- **Diagnostics** (`/app?settings=diagnostics`): live `auni doctor` checks (version, database, runner, service, RPCs, brain, wallet, apps, web, Tailscale) with one-click safe repairs, live log viewer (`~/.auni/auni.log`), `auni export`/`import` commands, `auni triage`, and GitHub issue reporting.
+- **About** (`/app?settings=about`): running version, check for updates (`auni update`), data folder and `~/.auni/.env` paths, and open-source links.
+- **Apps** (`/app/apps`): financial venues and data apps (enabled trading venues, yield protocols, prediction markets, and research feeds) — balances, enable/disable switches, and API keys.
+
+What Auni can update directly from chat (`update_auni_preferences`): display name, theme/look, preferred brain, daily brief schedule, home channel, public X handle, watch-only wallets, and profile notes. Security-sensitive changes (wallet keys, Tailscale, RPCs, pairing/revoking sessions, moving machines) are always done by the owner directly in Settings with step-up proof.
 
 ## Where their money is
 

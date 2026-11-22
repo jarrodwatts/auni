@@ -65,7 +65,7 @@ export function AppDialogs() {
     <>
       <SettingsDialog
         open={section !== null}
-        section={section ?? "profile"}
+        section={section ?? "general"}
         onSectionChange={(next) =>
           router.replace(settingsDialogHref(pathname, search, next), { scroll: false })
         }

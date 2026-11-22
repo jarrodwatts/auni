@@ -13,6 +13,8 @@ import {
   ownedBy,
   readSettings,
   requiredSetting,
+  savePreferredBrain,
+  saveRpcUrl,
   saveSetting,
   saveSwitch,
   setBy,
@@ -358,4 +360,57 @@ describe("readSettings", () => {
     expect(process.env.APPS_OFF).toBe("elfa");
     expect(readdirSync(home)).toEqual([]);
   }, 60_000);
+});
+
+describe("local system settings writers", () => {
+  afterEach(() => {
+    delete process.env.BRAIN;
+    delete process.env.RPC_URL_BASE;
+    delete process.env.ALCHEMY_API_KEY;
+    delete process.env.TAILSCALE_OWNER;
+    delete process.env.WEB_ORIGIN;
+  });
+
+  it("saves and clears a valid preferred brain, refusing unknown ids", async () => {
+    await expect(savePreferredBrain("not-a-brain")).rejects.toThrow(PrivateFieldRefused);
+    await savePreferredBrain("codex");
+    expect(process.env.BRAIN).toBe("codex");
+    expect(parseEnv(text()).BRAIN).toBe("codex");
+    await savePreferredBrain(null);
+    expect(process.env.BRAIN).toBe("");
+  });
+
+  it("validates and saves custom RPC URLs (HTTPS or localhost HTTP only)", () => {
+    expect(() => saveRpcUrl("base", "http://example.com")).toThrow(PrivateFieldRefused);
+    expect(() => saveRpcUrl("base", "not-a-url")).toThrow(PrivateFieldRefused);
+    saveRpcUrl("base", "https://rpc.example.com/");
+    expect(process.env.RPC_URL_BASE).toBe("https://rpc.example.com");
+    saveRpcUrl("base", "http://127.0.0.1:8545");
+    expect(process.env.RPC_URL_BASE).toBe("http://127.0.0.1:8545");
+    saveRpcUrl("base", null);
+    expect(process.env.RPC_URL_BASE).toBe("");
+  });
+
+  it("saves and clears ALCHEMY_API_KEY and always-on settings", async () => {
+    const prevAlchemy = process.env.ALCHEMY_API_KEY;
+    delete process.env.ALCHEMY_API_KEY;
+    try {
+      vi.resetModules();
+      const started = await import("./settings.ts");
+      started.readSettings();
+      started.saveAlchemyKey("alc_test_123");
+      expect(process.env.ALCHEMY_API_KEY).toBe("alc_test_123");
+      started.saveAlchemyKey(null);
+      expect(process.env.ALCHEMY_API_KEY).toBe("");
+
+      started.saveAlwaysOn("owner@example.com", "https://box.ts.net");
+      expect(process.env.TAILSCALE_OWNER).toBe("owner@example.com");
+      started.clearAlwaysOn();
+      expect(process.env.TAILSCALE_OWNER).toBe("");
+      expect(process.env.WEB_ORIGIN).toBe("");
+    } finally {
+      if (prevAlchemy === undefined) delete process.env.ALCHEMY_API_KEY;
+      else process.env.ALCHEMY_API_KEY = prevAlchemy;
+    }
+  });
 });

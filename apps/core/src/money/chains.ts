@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import {
   EVM_CHAIN_KEYS,
+  NETWORK_KEYS,
   appListing,
   NETWORKS,
   type EvmChainKey,
@@ -22,7 +23,8 @@ import {
 } from "viem";
 import * as viemChains from "viem/chains";
 
-import { env } from "../env.ts";
+import { env, rpcUrlVar } from "../env.ts";
+import { onSettingsChange } from "../settings.ts";
 import { WRAPPED_SOL } from "./fill-key.ts";
 import type { CashPlace } from "./recipe.ts";
 
@@ -205,6 +207,31 @@ export function rpcAnswered(error: unknown): boolean {
 
 const clients = new Map<number, PublicClient>();
 const publicClients = new Map<number, PublicClient>();
+const endpointClients = new Map<string, PublicClient>();
+
+/** Clears cached RPC clients so a newly saved RPC URL or Alchemy key takes effect immediately. */
+export function resetRpcClients(): void {
+  clients.clear();
+  publicClients.clear();
+  endpointClients.clear();
+}
+
+onSettingsChange((name) => {
+  if (name === "ALCHEMY_API_KEY") {
+    env.ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY?.trim() || undefined;
+    resetRpcClients();
+    return;
+  }
+  const matched = NETWORK_KEYS.find((chain) => rpcUrlVar(chain) === name);
+  if (matched) {
+    const next = { ...env.RPC_URLS };
+    const value = process.env[name]?.trim();
+    if (value) next[matched] = value;
+    else delete next[matched];
+    env.RPC_URLS = next;
+    resetRpcClients();
+  }
+});
 
 /** viem's entry for a chain Auni can read: no testnet, and a public RPC that isn't local. */
 function readableChain(chainId: number): Chain {
@@ -275,8 +302,6 @@ export function publicRpcClient(chainId: number): PublicClient | null {
 export function publicClient(key: EvmChainKey): PublicClient {
   return evmClient(NETWORKS[key].viem.id);
 }
-
-const endpointClients = new Map<string, PublicClient>();
 
 /**
  * Each of a network's RPCs on its own (see rpcFor), by its URL, for a read whose limits differ

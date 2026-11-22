@@ -85,6 +85,71 @@ const REPAIRS = {
 
 export type RepairId = keyof typeof REPAIRS;
 
+/** Human-readable description of a doctor repair id, for UI and JSON output. */
+export function repairDescription(id: RepairId): string {
+  return REPAIRS[id].does;
+}
+
+/** Whether `id` is a known doctor repair id. */
+export function isRepairId(id: string): id is RepairId {
+  return Object.hasOwn(REPAIRS, id);
+}
+
+/**
+ * Runs one safe doctor repair from the web UI (Diagnostics -> Fix). Never runs repairs that would
+ * kill the currently serving process mid-response without returning a clean command instead.
+ */
+export async function runUiRepair(id: RepairId): Promise<{
+  readonly ok: boolean;
+  readonly message: string;
+  readonly sudoCommand: string | null;
+}> {
+  if (id === "restart-service") {
+    return {
+      ok: false,
+      message:
+        "Restart Auni from your terminal so this session doesn't cut off mid-request: `auni stop && auni service install`.",
+      sudoCommand: null,
+    };
+  }
+  const notes: string[] = [];
+  try {
+    if (id === "linger") {
+      enableLinger();
+      return {
+        ok: true,
+        message: "Enabled boot lingering for your user service.",
+        sudoCommand: null,
+      };
+    }
+    if (id === "tailscale-serve") {
+      await serveDoorAgain();
+      return {
+        ok: true,
+        message: "Restored the Tailscale Serve route to Auni's door.",
+        sudoCommand: null,
+      };
+    }
+    if (id === "install-service" || id === "rewrite-service") {
+      notes.push(installService());
+      return {
+        ok: true,
+        message: notes.join(" ").trim() || "Service installed.",
+        sudoCommand: null,
+      };
+    }
+    if (id === "start-service") {
+      if (!(await runningAuni())) startService();
+      return { ok: true, message: "Started Auni's background service.", sudoCommand: null };
+    }
+    return { ok: false, message: "Unsupported repair.", sudoCommand: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const sudoMatch = /run `(sudo [^`]+)`/u.exec(message);
+    return { ok: false, message, sudoCommand: sudoMatch?.[1] ?? null };
+  }
+}
+
 /** A repair as a finding offers it (doctor.ts), and as `auni doctor --json` says it. */
 interface Offer {
   readonly id: RepairId;

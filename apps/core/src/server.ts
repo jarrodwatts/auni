@@ -18,6 +18,7 @@ import { privateRouter } from "./routes/private.ts";
 import { setupRouter } from "./routes/setup.ts";
 import { siteMarksRouter } from "./routes/site-marks.ts";
 import { startingPointsRouter } from "./routes/starting-points.ts";
+import { systemRouter } from "./routes/system.ts";
 import { specialistsRouter } from "./specialists/routes.ts";
 import { actionsRouter, activityRouter, portfolioRouter, proposalsRouter } from "./money/routes.ts";
 import { withdrawalsRouter } from "./money/withdrawal-routes.ts";
@@ -59,6 +60,7 @@ export function coreApp(): Express {
   app.use("/feedback", requireOwner, feedbackRouter);
   app.use("/site-marks", requireOwner, siteMarksRouter);
   app.use("/handover", requireOwner, handoverRouter);
+  app.use("/system", requireOwner, systemRouter);
   // Called by the agent's CLI on this machine with the per-turn token, never the owner's session.
   app.use(mcpRouter);
   // Last: a body that isn't JSON is turned down, and a handler that throws is logged.

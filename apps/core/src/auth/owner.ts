@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
+import type { OwnerSessionWire } from "@auni/shared";
+import { and, desc, eq, gt, lt, ne, sql } from "drizzle-orm";
 
 import { db, type Tx } from "../db/client.ts";
 import { owner, ownerSessions, type OwnerRow } from "../db/schema.ts";
@@ -56,12 +57,13 @@ function theRow([row]: readonly OwnerRow[]): OwnerRow {
 }
 
 /** A fresh one-time code; codes past their 15 minutes are cleared on the way. */
-export async function mintPairingCode(): Promise<string> {
+export async function mintPairingCode(label?: string | null): Promise<string> {
   const code = newToken();
   await db.delete(ownerSessions).where(lt(ownerSessions.expiresAt, sql`now()`));
   await db.insert(ownerSessions).values({
     tokenHash: hashOf(code),
     kind: "pairing",
+    label: label?.trim() ? label.trim().slice(0, 64) : null,
     expiresAt: new Date(Date.now() + PAIRING_TTL_MS),
   });
   return code;
@@ -73,7 +75,10 @@ export function pairingLink(code: string, path = "/app"): string {
 }
 
 /** Spends a pairing code: the new session's token, or null for a code that is wrong, spent or old. */
-export async function pair(code: string): Promise<string | null> {
+export async function pair(
+  code: string,
+  meta: { readonly label?: string | null; readonly userAgent?: string | null } = {},
+): Promise<string | null> {
   return db.transaction(async (tx) => {
     // One statement, so two browsers racing with one code can't both pass.
     const [spent] = await tx
@@ -85,12 +90,16 @@ export async function pair(code: string): Promise<string | null> {
           gt(ownerSessions.expiresAt, sql`now()`),
         ),
       )
-      .returning({ id: ownerSessions.id });
+      .returning({ id: ownerSessions.id, label: ownerSessions.label });
     if (!spent) return null;
     const session = newToken();
+    const now = new Date();
     await tx.insert(ownerSessions).values({
       tokenHash: hashOf(session),
       kind: "session",
+      label: meta.label ?? spent.label ?? null,
+      userAgent: meta.userAgent?.slice(0, 240) ?? null,
+      lastSeenAt: now,
       expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     });
     return session;
@@ -104,10 +113,12 @@ export async function pair(code: string): Promise<string | null> {
  */
 export async function sessionOf(
   token: string,
-): Promise<{ readonly freshlyPaired: boolean } | null> {
+): Promise<{ readonly id: string; readonly freshlyPaired: boolean } | null> {
   const [session] = await db
     .select({
+      id: ownerSessions.id,
       freshlyPaired: sql<boolean>`${ownerSessions.createdAt} > now() - ${FRESH_PAIRING}`,
+      lastSeenAt: ownerSessions.lastSeenAt,
     })
     .from(ownerSessions)
     .where(
@@ -117,7 +128,60 @@ export async function sessionOf(
         gt(ownerSessions.expiresAt, sql`now()`),
       ),
     );
-  return session ?? null;
+  if (!session) return null;
+  // Touch lastSeenAt at most once every 5 minutes so Settings -> Remote access shows fresh activity without write noise.
+  if (!session.lastSeenAt || Date.now() - session.lastSeenAt.getTime() > 5 * 60_000) {
+    void db
+      .update(ownerSessions)
+      .set({ lastSeenAt: sql`now()` })
+      .where(eq(ownerSessions.id, session.id))
+      .catch(() => undefined);
+  }
+  return { id: session.id, freshlyPaired: session.freshlyPaired };
+}
+
+/** Active paired browser sessions, newest first, marking which one belongs to this request. */
+export async function listSessions(currentSessionId?: string): Promise<OwnerSessionWire[]> {
+  const rows = await db
+    .select({
+      id: ownerSessions.id,
+      label: ownerSessions.label,
+      userAgent: ownerSessions.userAgent,
+      createdAt: ownerSessions.createdAt,
+      lastSeenAt: ownerSessions.lastSeenAt,
+      freshlyPaired: sql<boolean>`${ownerSessions.createdAt} > now() - ${FRESH_PAIRING}`,
+    })
+    .from(ownerSessions)
+    .where(and(eq(ownerSessions.kind, "session"), gt(ownerSessions.expiresAt, sql`now()`)))
+    .orderBy(desc(ownerSessions.createdAt));
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    userAgent: row.userAgent,
+    createdAt: row.createdAt.toISOString(),
+    lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+    current: row.id === currentSessionId,
+    freshlyPaired: row.freshlyPaired,
+  }));
+}
+
+/** Revokes a single paired browser session by id (refuses to revoke the caller's own session). */
+export async function revokeSession(id: string, currentSessionId?: string): Promise<boolean> {
+  if (currentSessionId && id === currentSessionId) return false;
+  const deleted = await db
+    .delete(ownerSessions)
+    .where(and(eq(ownerSessions.id, id), eq(ownerSessions.kind, "session")))
+    .returning({ id: ownerSessions.id });
+  return deleted.length > 0;
+}
+
+/** Revokes every paired browser session except the caller's current one; returns how many were revoked. */
+export async function revokeOtherSessions(currentSessionId?: string): Promise<number> {
+  const where = currentSessionId
+    ? and(eq(ownerSessions.kind, "session"), ne(ownerSessions.id, currentSessionId))
+    : eq(ownerSessions.kind, "session");
+  const deleted = await db.delete(ownerSessions).where(where).returning({ id: ownerSessions.id });
+  return deleted.length;
 }
 
 /**

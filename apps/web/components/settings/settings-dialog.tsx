@@ -123,7 +123,7 @@ export function SettingsDialog({
           >
             <div className="mx-auto w-full max-w-[680px] pb-6">
               {current.id === "general" ? (
-                <GeneralPane highlightedTarget={highlightedTarget} onCloseSettings={close} />
+                <GeneralPane highlightedTarget={highlightedTarget} />
               ) : current.id === "appearance" ? (
                 <AppearancePane highlightedTarget={highlightedTarget} />
               ) : current.id === "personalization" ? (

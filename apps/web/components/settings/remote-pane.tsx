@@ -107,6 +107,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
   const [port, setPort] = useState<number>(443);
   const [showQr, setShowQr] = useState(true);
   const [tsCommand, setTsCommand] = useState<string | null>(null);
+  const [tsRestartCommand, setTsRestartCommand] = useState<string | null>(null);
   const [tsRestartNote, setTsRestartNote] = useState<string | null>(null);
   const [tsError, setTsError] = useState<string | null>(null);
   const [pairAgainFor, setPairAgainFor] = useState<string | null>(null);
@@ -142,10 +143,16 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
     window.setTimeout(() => setCopiedUrl(false), 1800);
   };
 
+  const restartCmd =
+    data.service.runningAs === "service" || data.service.installed
+      ? "auni stop && auni service install"
+      : "auni stop && auni";
+
   const handleEnableTs = async () => {
     setTsError(null);
     setTsCommand(null);
     setTsRestartNote(null);
+    setTsRestartCommand(null);
     setPairAgainFor(null);
     try {
       const result = await enableTs.mutateAsync({ port });
@@ -157,8 +164,9 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
       }
       if (result.needsRestart) {
         setTsRestartNote(
-          "Tailscale HTTPS is configured. Restart Auni (`auni restart`) so it listens on the private Tailscale door.",
+          "Tailscale HTTPS is saved and Serve is active. Restart Auni so it starts listening on the private Tailscale door:",
         );
+        setTsRestartCommand(restartCmd);
       }
     } catch (error) {
       if (isPairAgain(error)) setPairAgainFor("tailscale");
@@ -170,12 +178,12 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
     setTsError(null);
     setTsCommand(null);
     setTsRestartNote(null);
+    setTsRestartCommand(null);
     setPairAgainFor(null);
     try {
       await disableTs.mutateAsync();
-      setTsRestartNote(
-        "Tailscale HTTPS disabled. Restart Auni to return to local browser pairing mode.",
-      );
+      setTsRestartNote("Tailscale HTTPS disabled. Restart Auni to return to local pairing mode:");
+      setTsRestartCommand(restartCmd);
     } catch (error) {
       if (isPairAgain(error)) setPairAgainFor("tailscale");
       else setTsError(errDetail(error, "Could not disable Tailscale HTTPS."));
@@ -442,15 +450,31 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
         {tsCommand ? (
           <SettingsRow
             label="One-time root permission needed"
-            description="Run this once in your terminal so Tailscale Serve can forward HTTPS traffic to Auni, then click Re-check."
+            description="Run this once in your terminal so Tailscale Serve can forward HTTPS traffic to Auni, then click Verify & save below. Nothing has been saved yet, so your current local access stays intact."
             stacked
           >
             <CopyLine value={tsCommand} command />
+            <div>
+              <button
+                type="button"
+                disabled={enableTs.isPending}
+                onClick={() => void handleEnableTs()}
+                className={SETTINGS_PRIMARY_BUTTON}
+              >
+                {enableTs.isPending ? (
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                ) : (
+                  <Check className="size-3.5" />
+                )}
+                I ran it, verify &amp; save
+              </button>
+            </div>
           </SettingsRow>
         ) : null}
         {tsRestartNote ? (
-          <div className="bg-positive/[0.08] px-4 py-3 text-[12.5px] leading-[1.45] text-positive sm:px-5">
-            {tsRestartNote}
+          <div className="flex flex-col gap-2 bg-positive/[0.08] px-4 py-3 text-[12.5px] leading-[1.45] text-positive sm:px-5">
+            <span>{tsRestartNote}</span>
+            {tsRestartCommand ? <CopyLine value={tsRestartCommand} command /> : null}
           </div>
         ) : null}
         {tsError ? (

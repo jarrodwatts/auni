@@ -142,12 +142,20 @@ const inspectAuniTool = defineTool({
         settingsLinks: SETTINGS_LINKS,
         ...(health
           ? {
-              health: health.map((f) => ({
-                check: f.check,
-                status: f.status,
-                says: f.says,
-                hasAutoRepair: Boolean(f.repair),
-              })),
+              health: {
+                summary: {
+                  ok: health.filter((f) => f.status === "ok").length,
+                  note: health.filter((f) => f.status === "note").length,
+                  fix: health.filter((f) => f.status === "fix").length,
+                },
+                // Structured check names and statuses only: never forward raw error text to the brain.
+                checks: health.map((f) => ({
+                  check: f.check,
+                  status: f.status,
+                  hasAutoRepair: Boolean(f.repair),
+                })),
+                detailsLink: SETTINGS_LINKS.diagnostics,
+              },
             }
           : {}),
       };

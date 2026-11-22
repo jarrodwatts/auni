@@ -84,13 +84,13 @@ export const pairingMintWireSchema = z.object({
 });
 export type PairingMintWire = z.infer<typeof pairingMintWireSchema>;
 
-/** Per-chain RPC state (`GET /system/rpcs`). Secret keys are never returned. */
+/** Per-chain RPC state (`GET /system/rpcs`). Secret keys and full RPC URLs are never returned. */
 export const rpcChainWireSchema = z.object({
   key: z.enum(NETWORK_KEYS),
   name: z.string(),
   source: z.enum(["own", "alchemy", "public"]),
-  /** Custom URL when set in file/env (never contains Alchemy key). Null for public/Alchemy. */
-  customUrl: z.string().nullable(),
+  /** Hostname (and port) of a custom override when set; path, query, and credentials are stripped. */
+  customHost: z.string().nullable(),
   envVar: z.string(),
   /** True when set by the host shell environment rather than ~/.auni/.env. */
   envLocked: z.boolean(),

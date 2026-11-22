@@ -1,6 +1,7 @@
-/** Add money and Settings open from anywhere by URL, over whatever page is underneath. */
+/** Add money, Settings, and re-opening the setup wizard open from anywhere by URL. */
 export const FUNDING_DIALOG_PARAM = "fund";
 export const SETTINGS_DIALOG_PARAM = "settings";
+export const WIZARD_PARAM = "wizard";
 
 const DIALOG_OPEN_VALUE = "open";
 

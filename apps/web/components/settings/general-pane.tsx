@@ -2,6 +2,7 @@
 
 import type { BriefSchedule } from "@auni/shared";
 import { Check, LoaderCircle, RotateCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useOwner } from "@/components/auth/owner-provider";
@@ -10,6 +11,7 @@ import { useShowThinking } from "@/components/places/stored-state";
 import { ChoicePills } from "@/components/ui/choice-pills";
 import { Switch } from "@/components/ui/switch";
 import { UNNAMED_OWNER } from "@/lib/account-display";
+import { WIZARD_PARAM } from "@/lib/app-links";
 import { cn } from "@/lib/utils";
 
 import {
@@ -45,14 +47,9 @@ function browserTimeZone(): string | null {
   }
 }
 
-export function GeneralPane({
-  highlightedTarget,
-  onCloseSettings,
-}: {
-  readonly highlightedTarget: string | null;
-  readonly onCloseSettings: () => void;
-}) {
+export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget: string | null }) {
   const me = useMe();
+  const router = useRouter();
   const { setOwner } = useOwner();
   const updateMe = useUpdateMe();
   const [showThinking, setShowThinking] = useShowThinking();
@@ -98,10 +95,8 @@ export function GeneralPane({
     flashSaved("brief");
   };
 
-  const rerunWizard = async () => {
-    const updated = await updateMe.mutateAsync({ welcomed: false });
-    setOwner(updated);
-    onCloseSettings();
+  const rerunWizard = () => {
+    router.replace(`/app/new?${WIZARD_PARAM}=1`, { scroll: false });
   };
 
   return (
@@ -256,12 +251,7 @@ export function GeneralPane({
           label="Setup wizard"
           description="Re-open the 3-step onboarding walkthrough without deleting any data."
         >
-          <button
-            type="button"
-            disabled={updateMe.isPending}
-            onClick={() => void rerunWizard()}
-            className={SETTINGS_BUTTON}
-          >
+          <button type="button" onClick={rerunWizard} className={SETTINGS_BUTTON}>
             <RotateCcw className="size-3.5" />
             Re-run setup wizard
           </button>

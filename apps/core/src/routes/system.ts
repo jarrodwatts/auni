@@ -79,6 +79,16 @@ async function diagnosticsWire(): Promise<DiagnosticsWire> {
   };
 }
 
+/** Strips path, query string, and userinfo from a custom RPC URL so embedded API keys never leave core. */
+function safeHost(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    return new URL(raw).host || null;
+  } catch {
+    return null;
+  }
+}
+
 function rpcsWire(): RpcsWire {
   const alchemySource = setBy("ALCHEMY_API_KEY");
   return {
@@ -86,12 +96,12 @@ function rpcsWire(): RpcsWire {
     chains: NETWORK_KEYS.map((key) => {
       const envVar = rpcUrlVar(key);
       const source = rpcFor(key).source;
-      const customUrl = env.RPC_URLS[key] ?? null;
+      const customHost = safeHost(env.RPC_URLS[key]);
       return {
         key,
         name: NETWORKS[key].name,
         source,
-        customUrl,
+        customHost,
         envVar,
         envLocked: setBy(envVar) === "environment",
       };

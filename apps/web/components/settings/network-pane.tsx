@@ -1,12 +1,13 @@
 "use client";
 
 import type { NetworkKey } from "@auni/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, KeyRound, LoaderCircle, Pencil, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import { PairAgain } from "@/components/auth/pair-again";
 import { CoreApiError } from "@/lib/core";
-import { useRpcs, useSaveAlchemy, useSaveRpc } from "@/lib/data/system";
+import { RPCS_KEY, saveAlchemyKey, saveChainRpc, useRpcs } from "@/lib/data/system";
 import { cn } from "@/lib/utils";
 
 import {
@@ -35,16 +36,17 @@ const SOURCE_BADGE = {
 };
 
 export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget: string | null }) {
+  const queryClient = useQueryClient();
   const rpcs = useRpcs(true);
-  const saveRpc = useSaveRpc();
-  const saveAlchemy = useSaveAlchemy();
 
   const [alchemyDraft, setAlchemyDraft] = useState("");
+  const [alchemySaving, setAlchemySaving] = useState(false);
   const [alchemyError, setAlchemyError] = useState<string | null>(null);
   const [alchemySaved, setAlchemySaved] = useState(false);
 
   const [editingChain, setEditingChain] = useState<NetworkKey | null>(null);
   const [rpcDraft, setRpcDraft] = useState("");
+  const [rpcSaving, setRpcSaving] = useState(false);
   const [rpcError, setRpcError] = useState<string | null>(null);
 
   const [pairAgainFor, setPairAgainFor] = useState<"alchemy" | "rpc" | null>(null);
@@ -72,27 +74,35 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
   const submitAlchemy = async (value: string | null) => {
     setAlchemyError(null);
     setPairAgainFor(null);
+    setAlchemySaving(true);
     try {
-      await saveAlchemy.mutateAsync({ apiKey: value });
+      const updated = await saveAlchemyKey(value);
+      queryClient.setQueryData(RPCS_KEY, updated);
       setAlchemyDraft("");
       setAlchemySaved(true);
       window.setTimeout(() => setAlchemySaved(false), 2000);
     } catch (error) {
       if (isPairAgain(error)) setPairAgainFor("alchemy");
       else setAlchemyError(errDetail(error, "Could not save Alchemy API key."));
+    } finally {
+      setAlchemySaving(false);
     }
   };
 
   const submitRpc = async (chain: NetworkKey, url: string | null) => {
     setRpcError(null);
     setPairAgainFor(null);
+    setRpcSaving(true);
     try {
-      await saveRpc.mutateAsync({ chain, url });
+      const updated = await saveChainRpc(chain, url);
+      queryClient.setQueryData(RPCS_KEY, updated);
       setEditingChain(null);
       setRpcDraft("");
     } catch (error) {
       if (isPairAgain(error)) setPairAgainFor("rpc");
       else setRpcError(errDetail(error, "Could not save RPC URL."));
+    } finally {
+      setRpcSaving(false);
     }
   };
 
@@ -142,8 +152,12 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                     data.alchemy.set ? "Paste replacement key…" : "Paste Alchemy API key…"
                   }
                   autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
                   spellCheck={false}
-                  disabled={saveAlchemy.isPending}
+                  data-1p-ignore
+                  data-lpignore="true"
+                  disabled={alchemySaving}
                   onChange={(event) => {
                     setAlchemyDraft(event.target.value);
                     setAlchemyError(null);
@@ -153,10 +167,10 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
               </div>
               <button
                 type="submit"
-                disabled={!alchemyDraft.trim() || saveAlchemy.isPending}
+                disabled={!alchemyDraft.trim() || alchemySaving}
                 className={SETTINGS_PRIMARY_BUTTON}
               >
-                {saveAlchemy.isPending ? (
+                {alchemySaving ? (
                   <LoaderCircle className="size-3.5 animate-spin" />
                 ) : data.alchemy.set ? (
                   "Replace"
@@ -167,7 +181,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
               {data.alchemy.set ? (
                 <button
                   type="button"
-                  disabled={saveAlchemy.isPending}
+                  disabled={alchemySaving}
                   onClick={() => void submitAlchemy(null)}
                   className={cn(SETTINGS_BUTTON, "text-destructive")}
                 >
@@ -211,9 +225,9 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                 </span>
               }
               description={
-                chain.customUrl ? (
+                chain.customHost ? (
                   <code className="font-mono text-[12px] break-all text-ink-soft">
-                    {chain.customUrl}
+                    {chain.customHost} (write-only override)
                   </code>
                 ) : (
                   <span className="font-mono text-[11.5px] text-faint">{chain.envVar}</span>
@@ -226,15 +240,25 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                     className="flex flex-wrap items-center gap-2"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      void submitRpc(chain.key, rpcDraft.trim() || null);
+                      if (rpcDraft.trim()) void submitRpc(chain.key, rpcDraft.trim());
                     }}
                   >
                     <input
-                      type="url"
+                      type="password"
                       value={rpcDraft}
-                      placeholder="https://your-rpc-endpoint.example"
+                      placeholder={
+                        chain.customHost
+                          ? "Paste replacement RPC URL…"
+                          : "https://your-rpc-endpoint.example"
+                      }
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      data-1p-ignore
+                      data-lpignore="true"
                       autoFocus
-                      disabled={saveRpc.isPending}
+                      disabled={rpcSaving}
                       onChange={(event) => {
                         setRpcDraft(event.target.value);
                         setRpcError(null);
@@ -243,19 +267,21 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                     />
                     <button
                       type="submit"
-                      disabled={saveRpc.isPending}
+                      disabled={!rpcDraft.trim() || rpcSaving}
                       className={SETTINGS_PRIMARY_BUTTON}
                     >
-                      {saveRpc.isPending ? (
+                      {rpcSaving ? (
                         <LoaderCircle className="size-3.5 animate-spin" />
+                      ) : chain.customHost ? (
+                        "Replace"
                       ) : (
                         "Save"
                       )}
                     </button>
-                    {chain.customUrl ? (
+                    {chain.customHost ? (
                       <button
                         type="button"
-                        disabled={saveRpc.isPending}
+                        disabled={rpcSaving}
                         onClick={() => void submitRpc(chain.key, null)}
                         className={SETTINGS_BUTTON}
                       >
@@ -267,6 +293,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                       type="button"
                       onClick={() => {
                         setEditingChain(null);
+                        setRpcDraft("");
                         setRpcError(null);
                       }}
                       className={SETTINGS_BUTTON}
@@ -286,14 +313,14 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                       type="button"
                       onClick={() => {
                         setEditingChain(chain.key);
-                        setRpcDraft(chain.customUrl ?? "");
+                        setRpcDraft("");
                         setRpcError(null);
                         setPairAgainFor(null);
                       }}
                       className={SETTINGS_BUTTON}
                     >
                       <Pencil className="size-3.5" />
-                      {chain.customUrl ? "Edit" : "Set custom"}
+                      {chain.customHost ? "Replace" : "Set custom"}
                     </button>
                   ) : null}
                 </div>

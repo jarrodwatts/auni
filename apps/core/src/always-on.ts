@@ -682,9 +682,9 @@ export async function inspectTailscale(): Promise<TailscaleStateWire> {
 }
 
 /**
- * Enables Tailscale HTTPS for this machine from Settings (step-up gated): saves TAILSCALE_OWNER
- * and WEB_ORIGIN, enables Linux linger if non-root allows, and runs `tailscale serve` non-interactively.
- * When `tailscale serve` requires root, returns the exact copyable sudo command.
+ * Enables Tailscale HTTPS for this machine from Settings (step-up gated): first verifies or starts
+ * `tailscale serve` non-interactively, and ONLY commits TAILSCALE_OWNER + WEB_ORIGIN once Serve is
+ * active so a failed or root-blocked Serve can never lock the owner out on restart.
  */
 export async function enableTailscaleFromUi(
   askedPort: number | null,
@@ -703,6 +703,52 @@ export async function enableTailscaleFromUi(
     };
   }
   const { port, address, served: alreadyServed } = found.place;
+  const command = serveCommand(port);
+  const result = alreadyServed ? "done" : await serve(command, false);
+  let needsSudo = false;
+  let sudoCommand: string | null = null;
+  if (result === "done") {
+    steps.push({
+      step: "serve",
+      status: "done",
+      says: `Tailscale proxies ${address} directly to Auni's unix door.`,
+    });
+  } else if (result === "root") {
+    needsSudo = true;
+    sudoCommand = `sudo ${command.join(" ")}`;
+    steps.push({
+      step: "serve",
+      status: "fix",
+      says: "Tailscale Serve needs root permission once to proxy to Auni's private unix socket. Run the command below, then enable again to save.",
+      run: sudoCommand,
+    });
+    return {
+      ok: false,
+      url: address,
+      owner: found.owner,
+      needsSudo,
+      sudoCommand,
+      needsRestart: false,
+      steps,
+    };
+  } else {
+    steps.push({
+      step: "serve",
+      status: "fix",
+      says: `Tailscale wouldn't serve it: ${result.failed}`,
+    });
+    return {
+      ok: false,
+      url: address,
+      owner: found.owner,
+      needsSudo: false,
+      sudoCommand: null,
+      needsRestart: false,
+      steps,
+    };
+  }
+
+  // Only persist Tailscale-only owner auth once Serve is confirmed active.
   saveAlwaysOn(found.owner, address);
   steps.push({
     step: "settings",
@@ -728,36 +774,9 @@ export async function enableTailscaleFromUi(
     }
   }
 
-  const command = serveCommand(port);
-  const result = alreadyServed ? "done" : await serve(command, false);
-  let needsSudo = false;
-  let sudoCommand: string | null = null;
-  if (result === "done") {
-    steps.push({
-      step: "serve",
-      status: "done",
-      says: `Tailscale proxies ${address} directly to Auni's unix door.`,
-    });
-  } else if (result === "root") {
-    needsSudo = true;
-    sudoCommand = `sudo ${command.join(" ")}`;
-    steps.push({
-      step: "serve",
-      status: "fix",
-      says: "Tailscale Serve needs root permission once to proxy to Auni's private unix socket.",
-      run: sudoCommand,
-    });
-  } else {
-    steps.push({
-      step: "serve",
-      status: "fix",
-      says: `Tailscale wouldn't serve it: ${result.failed}`,
-    });
-  }
-
   const needsRestart = env.TAILSCALE_OWNER !== found.owner || env.WEB_ORIGIN !== address;
   return {
-    ok: !needsSudo && result === "done",
+    ok: true,
     url: address,
     owner: found.owner,
     needsSudo,

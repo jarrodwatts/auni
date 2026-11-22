@@ -18,7 +18,7 @@ import {
   Wallet,
   WalletMinimal,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
@@ -36,7 +36,7 @@ import { ME_KEY, useMe, useRefreshMe } from "@/components/personalization/use-me
 import { SecretInput, SecretNote, secretRefusal } from "@/components/private-input/secret-input";
 import { SETTINGS_INPUT, SettingsBadge } from "@/components/settings/settings-layout";
 import { ChoicePills } from "@/components/ui/choice-pills";
-import { SETTINGS_DIALOG_PARAM } from "@/lib/app-links";
+import { dialogClosedHref, SETTINGS_DIALOG_PARAM, WIZARD_PARAM } from "@/lib/app-links";
 import { browserWallet, connect } from "@/lib/browser-wallet";
 import { CoreApiError } from "@/lib/core";
 import { useApps } from "@/lib/data/apps";
@@ -70,12 +70,22 @@ export function WelcomeWizard() {
   const firstRun = useFirstRun();
   const searchParams = useSearchParams();
   const settingsOpen = searchParams.get(SETTINGS_DIALOG_PARAM) !== null;
+  const reopened = searchParams.get(WIZARD_PARAM) === "1";
 
-  if (!firstRun || settingsOpen) return null;
-  return <WizardSurface />;
+  if ((!firstRun && !reopened) || settingsOpen) return null;
+  return <WizardSurface firstRun={firstRun} reopened={reopened} />;
 }
 
-function WizardSurface() {
+function WizardSurface({
+  firstRun,
+  reopened,
+}: {
+  readonly firstRun: boolean;
+  readonly reopened: boolean;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<StepIndex>(0);
   const [xHandle, setXHandle] = useState("");
   const [watchedWallet, setWatchedWallet] = useState("");
@@ -94,22 +104,36 @@ function WizardSurface() {
     setup.data?.wallet.addresses?.evm || setup.data?.wallet.addresses?.solana,
   );
 
+  const closeReopened = () => {
+    if (reopened) {
+      router.replace(dialogClosedHref(pathname, searchParams.toString(), WIZARD_PARAM), {
+        scroll: false,
+      });
+    }
+  };
+
   const complete = async (withSignals: boolean) => {
     if (finishing) return;
+    const body = withSignals
+      ? {
+          ...(xHandle.trim() ? { xHandle: xHandle.trim() } : {}),
+          ...(watchedWallet.trim() ? { watchedWallet: watchedWallet.trim() } : {}),
+        }
+      : {};
+    // When re-opened from Settings with no new inputs, simply dismiss without a server round-trip.
+    if (!firstRun && Object.keys(body).length === 0) {
+      closeReopened();
+      return;
+    }
     setFinishing(true);
     setFinishError(null);
     try {
-      const body = withSignals
-        ? {
-            ...(xHandle.trim() ? { xHandle: xHandle.trim() } : {}),
-            ...(watchedWallet.trim() ? { watchedWallet: watchedWallet.trim() } : {}),
-          }
-        : {};
       await runStep.mutateAsync({ path: "setup/done", body });
       const fresh = await getMe();
       queryClient.setQueryData(ME_KEY, fresh);
       setOwner(fresh);
       void queryClient.invalidateQueries({ queryKey: ["starting-points"] });
+      closeReopened();
     } catch (error) {
       setFinishError(
         (error instanceof CoreApiError && error.detail) ||

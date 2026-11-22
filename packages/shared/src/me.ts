@@ -195,8 +195,6 @@ export const updateMeRequestSchema = z
     x_handle: z.string().trim().max(120).nullable(),
     /** Owner-editable summary of what Auni knows about them, or null to clear. */
     profile_summary: z.string().trim().max(2_000).nullable(),
-    /** False re-opens the onboarding wizard; true marks onboarding complete. */
-    welcomed: z.boolean(),
   })
   .partial();
 export type UpdateMeRequest = z.infer<typeof updateMeRequestSchema>;

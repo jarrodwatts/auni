@@ -25,7 +25,7 @@ import { requestCore } from "@/lib/core";
 /** Local-first system endpoints under `/system/*`. */
 
 const REMOTE_KEY = ["system", "remote"] as const;
-const RPCS_KEY = ["system", "rpcs"] as const;
+export const RPCS_KEY = ["system", "rpcs"] as const;
 const DIAGNOSTICS_KEY = ["system", "diagnostics"] as const;
 const LOGS_KEY = ["system", "logs"] as const;
 const ABOUT_KEY = ["system", "about"] as const;
@@ -162,34 +162,24 @@ export function useRpcs(enabled = true) {
   });
 }
 
-export function useSaveRpc() {
-  const queryClient = useQueryClient();
-  return useMutation<
-    RpcsWire,
-    unknown,
-    { readonly chain: NetworkKey; readonly url: string | null }
-  >({
-    mutationFn: async (body) =>
-      rpcsWireSchema.parse(
-        await requestCore("system/rpcs", { method: "PUT", body: JSON.stringify(body) }),
-      ),
-    onSuccess: (rpcs) => {
-      queryClient.setQueryData(RPCS_KEY, rpcs);
-    },
-  });
+/**
+ * Saves or clears a custom chain RPC URL directly without storing the URL (which may carry an
+ * embedded provider key) in TanStack Query's mutation cache.
+ */
+export async function saveChainRpc(chain: NetworkKey, url: string | null): Promise<RpcsWire> {
+  return rpcsWireSchema.parse(
+    await requestCore("system/rpcs", { method: "PUT", body: JSON.stringify({ chain, url }) }),
+  );
 }
 
-export function useSaveAlchemy() {
-  const queryClient = useQueryClient();
-  return useMutation<RpcsWire, unknown, { readonly apiKey: string | null }>({
-    mutationFn: async (body) =>
-      rpcsWireSchema.parse(
-        await requestCore("system/alchemy", { method: "PUT", body: JSON.stringify(body) }),
-      ),
-    onSuccess: (rpcs) => {
-      queryClient.setQueryData(RPCS_KEY, rpcs);
-    },
-  });
+/**
+ * Saves or clears the Alchemy API key directly without storing the secret in TanStack Query's
+ * mutation cache.
+ */
+export async function saveAlchemyKey(apiKey: string | null): Promise<RpcsWire> {
+  return rpcsWireSchema.parse(
+    await requestCore("system/alchemy", { method: "PUT", body: JSON.stringify({ apiKey }) }),
+  );
 }
 
 export function useDiagnostics(enabled = true) {

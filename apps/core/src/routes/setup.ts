@@ -76,20 +76,47 @@ const doneBodySchema = z
   })
   .optional();
 
-/** Finishing ensures a wallet exists, saves any optional wizard signals, and opens Auni's chat. */
+/** Finishing validates any supplied signals first, ensures a wallet exists, and opens Auni's chat. */
 setupRouter.post("/done", async (req, res) => {
-  const body = doneBodySchema.safeParse(req.body ?? {});
+  const parsed = doneBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body", issues: parsed.error.issues });
+    return;
+  }
+
+  let xHandle: string | null = null;
+  if (parsed.data?.xHandle) {
+    xHandle = normalizeXHandle(parsed.data.xHandle);
+    if (!xHandle) {
+      res.status(400).json({
+        error: "invalid_x_handle",
+        detail: "Enter a valid X handle (letters, numbers, underscores), or leave it blank.",
+      });
+      return;
+    }
+  }
+
+  let watchedResolved: Awaited<ReturnType<typeof resolveWatchedWallet>> | null = null;
+  if (parsed.data?.watchedWallet) {
+    try {
+      watchedResolved = await resolveWatchedWallet(parsed.data.watchedWallet);
+    } catch (error) {
+      res.status(400).json({
+        error: "invalid_wallet",
+        detail:
+          error instanceof Error
+            ? error.message
+            : "Enter a valid EVM 0x address, .eth ENS name, or Solana address.",
+      });
+      return;
+    }
+  }
+
   if (!(await walletFacts()).addresses)
     await createWallet().catch((error: unknown) => {
       // Made meanwhile, say by a second tab finishing at once: that one is theirs.
       if (!(error instanceof WalletExists)) throw error;
     });
-
-  const xHandle = body.success && body.data?.xHandle ? normalizeXHandle(body.data.xHandle) : null;
-  const watchedResolved =
-    body.success && body.data?.watchedWallet
-      ? await resolveWatchedWallet(body.data.watchedWallet).catch(() => null)
-      : null;
 
   await db.transaction(async (tx) => {
     const me = await theOwner(tx);

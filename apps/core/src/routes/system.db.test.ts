@@ -81,13 +81,20 @@ describe("/system routes", () => {
     const rpcRes = await fetch(url("/system/rpcs"), {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chain: "base", url: "https://custom-base.example.com/" }),
+      body: JSON.stringify({
+        chain: "base",
+        url: "https://user:pass_secret@custom-base.example.com/v2/rpc_key_secret?token=query_secret",
+      }),
     });
     expect(rpcRes.status).toBe(200);
-    const afterRpc = rpcsWireSchema.parse(await rpcRes.json());
+    const rpcText = await rpcRes.text();
+    expect(rpcText).not.toContain("pass_secret");
+    expect(rpcText).not.toContain("rpc_key_secret");
+    expect(rpcText).not.toContain("query_secret");
+    const afterRpc = rpcsWireSchema.parse(JSON.parse(rpcText));
     const base = afterRpc.chains.find((c) => c.key === "base");
     expect(base?.source).toBe("own");
-    expect(base?.customUrl).toBe("https://custom-base.example.com");
+    expect(base?.customHost).toBe("custom-base.example.com");
   });
 
   it("redacts bearer tokens, pairing codes, API keys, and 64-hex keys from GET /system/logs", async () => {
@@ -124,15 +131,23 @@ describe("/system routes", () => {
 });
 
 describe("auniCapabilityTools", () => {
-  it("inspect_auni exposes live config and settings links without leaking secrets", async () => {
+  it("inspect_auni exposes live config and structured health checks without leaking secrets or raw doctor text", async () => {
     env.ALCHEMY_API_KEY = "alc_never_leak_this_to_agent";
     const [inspect] = auniCapabilityTools();
-    const out = await inspect!.handler({ include_health: false });
+    const out = await inspect!.handler({ include_health: true });
     const text = out.content.map((c) => (c.type === "text" ? c.text : "")).join("");
     expect(text).toContain("/app?settings=remote");
     expect(text).toContain("/app?settings=diagnostics");
     expect(text).not.toContain("alc_never_leak_this_to_agent");
     expect(text).not.toContain(env.TURN_TOKEN_SECRET);
+    // Structured health checks carry check/status/hasAutoRepair only, never free-form `says`.
+    const structured = out.structuredContent as {
+      health?: { checks?: { says?: unknown }[] };
+    };
+    expect(structured.health?.checks?.length ?? 0).toBeGreaterThan(0);
+    for (const check of structured.health?.checks ?? []) {
+      expect(check).not.toHaveProperty("says");
+    }
   });
 
   it("update_auni_preferences persists safe prefs and queues signals refresh atomically", async () => {

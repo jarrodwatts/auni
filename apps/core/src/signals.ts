@@ -509,20 +509,32 @@ export async function refreshOwnerSignals(
     watchedHoldings,
   };
 
-  const nextSummary =
-    options.replaceSummary || !me.profileSummary
-      ? (synthesizedSummary ?? me.profileSummary)
-      : me.profileSummary;
+  const snapshotWalletsKey = JSON.stringify(me.watchedWallets);
+  const wrote = await db.transaction(async (tx) => {
+    const latest = await theOwner(tx);
+    // Abort stale write if the owner changed X handle or watched wallets while this run was in flight.
+    if (
+      latest.xHandle !== me.xHandle ||
+      JSON.stringify(latest.watchedWallets) !== snapshotWalletsKey
+    ) {
+      return false;
+    }
+    // Never overwrite a manual edit or clear made while this refresh was running.
+    const canUpdateSummary =
+      synthesizedSummary !== null &&
+      (options.replaceSummary || me.profileSummary === null) &&
+      latest.profileSummary === me.profileSummary;
+    await tx
+      .update(owner)
+      .set({
+        profileSignals: nextSignals,
+        ...(canUpdateSummary ? { profileSummary: synthesizedSummary } : {}),
+      })
+      .where(eq(owner.id, 1));
+    await forceRefreshStartingPoints(tx);
+    return true;
+  });
 
-  await db
-    .update(owner)
-    .set({
-      profileSignals: nextSignals,
-      ...(nextSummary !== undefined ? { profileSummary: nextSummary } : {}),
-    })
-    .where(eq(owner.id, 1));
-
-  publishMe();
-  await forceRefreshStartingPoints(db);
-  return nextSignals;
+  if (wrote) publishMe();
+  return wrote ? nextSignals : null;
 }

@@ -5,7 +5,6 @@ import {
   updateMeRequestSchema,
 } from "@auni/shared";
 import express, { Router } from "express";
-import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { brainStatus, preferredBrainId } from "../agent/brain.ts";
@@ -119,12 +118,10 @@ meRouter.patch("/", async (req, res) => {
     } else {
       const normalized = normalizeXHandle(patch.x_handle);
       if (!normalized) {
-        res
-          .status(400)
-          .json({
-            error: "invalid_x_handle",
-            detail: "Enter a valid X handle (letters, numbers, underscores).",
-          });
+        res.status(400).json({
+          error: "invalid_x_handle",
+          detail: "Enter a valid X handle (letters, numbers, underscores).",
+        });
         return;
       }
       xHandle = normalized;
@@ -141,9 +138,6 @@ meRouter.patch("/", async (req, res) => {
         ...(xHandle !== undefined ? { xHandle } : {}),
         ...(patch.profile_summary !== undefined
           ? { profileSummary: patch.profile_summary || null }
-          : {}),
-        ...(patch.welcomed !== undefined
-          ? { welcomedAt: patch.welcomed ? sql`coalesce(${owner.welcomedAt}, now())` : null }
           : {}),
       });
       if (xHandle !== undefined) {

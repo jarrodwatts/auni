@@ -1,0 +1,13 @@
+{
+  "from": "Across's SpokePool source (github.com/across-protocol/contracts, contracts/spoke-pools/SpokePool.sol, read 2026-11-12): every deposit while Across has paused them reverts DepositsArePaused(), here as a simulated call's result would carry it.",
+  "answer": {
+    "returnData": "0x",
+    "logs": [],
+    "status": "0x0",
+    "error": {
+      "code": 3,
+      "message": "execution reverted",
+      "data": "0x5a65d188"
+    }
+  }
+}

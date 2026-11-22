@@ -1,0 +1,8 @@
+{
+  "from": "Polymarket's docs, \"Error Codes\" (docs.polymarket.com/resources/error-codes), read 2026-11-12: status 425 under \"Matching Engine Errors\", which the docs give no body for.",
+  "answer": {
+    "service": "Polymarket CLOB",
+    "status": 425,
+    "body": ""
+  }
+}

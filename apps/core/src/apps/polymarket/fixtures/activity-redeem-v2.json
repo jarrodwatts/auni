@@ -1,0 +1,122 @@
+{
+  "recorded": "2026-11-13, GET https://data-api.polymarket.com/v2/activity?type=REDEEM&start=1&sort_by=TIMESTAMP&sort_direction=ASC&limit=2 for a public wallet, then its next_cursor",
+  "pages": [
+    {
+      "data": [
+        {
+          "proxy_wallet": "0x6ac5bb06a9eb05641fd5e82640268b92f3ab4b6e",
+          "timestamp": 1763896569,
+          "condition_id": "0x5a2d9b92bb304d5d3e3e692f5d2e192a2770e03eba5f2070a0082186a2305423",
+          "type": "REDEEM",
+          "size": 5,
+          "usdc_size": 5,
+          "transaction_hash": "0x6221d54f1d484117daf12b47848a897f9d296841fc8404b5db24f6c772c4fed5",
+          "price": 0,
+          "token_id": "69219453070743011099307243832467014878707119554092298322745436022352431406535",
+          "side": "",
+          "outcome_index": 0,
+          "title": "Valorant: Ninetails vs Xipto GC - Map 1 Winner",
+          "slug": "val-nit-xip-2025-11-23-game1",
+          "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/valorant-logo-6fab741a16.png",
+          "event_slug": "val-nit-xip-2025-11-23",
+          "outcome": "Ninetails",
+          "name": "robloxgamblemaster-2008-10-18",
+          "pseudonym": "Rosy-Trinket",
+          "bio": "",
+          "profile_image": "",
+          "profile_image_optimized": ""
+        },
+        {
+          "proxy_wallet": "0x6ac5bb06a9eb05641fd5e82640268b92f3ab4b6e",
+          "timestamp": 1763896569,
+          "condition_id": "0x5a2d9b92bb304d5d3e3e692f5d2e192a2770e03eba5f2070a0082186a2305423",
+          "type": "REDEEM",
+          "size": 34.997387,
+          "usdc_size": 0,
+          "transaction_hash": "0x6221d54f1d484117daf12b47848a897f9d296841fc8404b5db24f6c772c4fed5",
+          "price": 0,
+          "token_id": "95070827863370908081574421036774686850612733903311748329486979786994422030975",
+          "side": "",
+          "outcome_index": 1,
+          "title": "Valorant: Ninetails vs Xipto GC - Map 1 Winner",
+          "slug": "val-nit-xip-2025-11-23-game1",
+          "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/valorant-logo-6fab741a16.png",
+          "event_slug": "val-nit-xip-2025-11-23",
+          "outcome": "Xipto GC",
+          "name": "robloxgamblemaster-2008-10-18",
+          "pseudonym": "Rosy-Trinket",
+          "bio": "",
+          "profile_image": "",
+          "profile_image_optimized": ""
+        }
+      ],
+      "pagination": {
+        "limit": 2,
+        "offset": 0,
+        "has_more": true,
+        "next_cursor": "eyJkYXRhIjp7InR5cGUiOiJhY3Rpdml0eSIsInBhcmFtcyI6eyJsIjoyLCJ0cyI6MTc2Mzg5NjU2OSwic3EiOiI3OTM5NTc2ODAwMDczMDUwNzEiLCJkIjoyLCJkaXIiOiJBU0MifX0sInNpZyI6Ijc0Y2FmYzdmZDM2NmFkOWIyYjUwMmJkMjhkOTZiOGQyIn0"
+      }
+    },
+    {
+      "data": [
+        {
+          "proxy_wallet": "0x6ac5bb06a9eb05641fd5e82640268b92f3ab4b6e",
+          "timestamp": 1763898773,
+          "condition_id": "0x0204f104b3d3774de3663d4ee51f89688900d45951df2300bd249100ca01782e",
+          "type": "REDEEM",
+          "size": 10,
+          "usdc_size": 0,
+          "transaction_hash": "0x73faaa8d5a69535ddedaa9302b53a8c5b13c7dcf1d82106e592aa7c4b4acb20d",
+          "price": 0,
+          "token_id": "53884102942732527669374542172343255362592859984317951092070135297035003259410",
+          "side": "",
+          "outcome_index": 0,
+          "title": "Valorant: Ninetails vs Xipto GC - Map 2 Winner",
+          "slug": "val-nit-xip-2025-11-23-game2",
+          "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/valorant-logo-6fab741a16.png",
+          "event_slug": "val-nit-xip-2025-11-23",
+          "outcome": "Ninetails",
+          "name": "robloxgamblemaster-2008-10-18",
+          "pseudonym": "Rosy-Trinket",
+          "bio": "",
+          "profile_image": "",
+          "profile_image_optimized": ""
+        },
+        {
+          "proxy_wallet": "0x6ac5bb06a9eb05641fd5e82640268b92f3ab4b6e",
+          "timestamp": 1763898773,
+          "condition_id": "0x0204f104b3d3774de3663d4ee51f89688900d45951df2300bd249100ca01782e",
+          "type": "REDEEM",
+          "size": 5,
+          "usdc_size": 5,
+          "transaction_hash": "0x73faaa8d5a69535ddedaa9302b53a8c5b13c7dcf1d82106e592aa7c4b4acb20d",
+          "price": 0,
+          "token_id": "66197083064722548793036891118749047855093076376556259230459564873258597852506",
+          "side": "",
+          "outcome_index": 1,
+          "title": "Valorant: Ninetails vs Xipto GC - Map 2 Winner",
+          "slug": "val-nit-xip-2025-11-23-game2",
+          "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/valorant-logo-6fab741a16.png",
+          "event_slug": "val-nit-xip-2025-11-23",
+          "outcome": "Xipto GC",
+          "name": "robloxgamblemaster-2008-10-18",
+          "pseudonym": "Rosy-Trinket",
+          "bio": "",
+          "profile_image": "",
+          "profile_image_optimized": ""
+        }
+      ],
+      "pagination": {
+        "limit": 2,
+        "offset": 2,
+        "has_more": true,
+        "next_cursor": "eyJkYXRhIjp7InR5cGUiOiJhY3Rpdml0eSIsInBhcmFtcyI6eyJsIjoyLCJ0cyI6MTc2Mzg5ODc3Mywic3EiOiI3OTM5Njg3MDAwMDUxMDQxOTEiLCJkIjo0LCJkaXIiOiJBU0MifX0sInNpZyI6IjA0MjRiNTQwOTkyYzc4Mjc3MzUzNDk1ZmM0Y2U3Y2VlIn0"
+      }
+    }
+  ],
+  "v1": {
+    "error": "Data API v1 has been retired",
+    "migration": "https://data-api.polymarket.com/v2/",
+    "docs": "https://docs.polymarket.com/api-reference/data-api/overview"
+  }
+}

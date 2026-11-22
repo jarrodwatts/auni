@@ -1,0 +1,8 @@
+{
+  "from": "Recorded 2026-11-12 from Aave V3's USDC pool on Base (mainnet.base.org), as eth_estimateGas answered a supply of 0 USDC for a key made that moment, which never held money. Monad's, Arbitrum's and Polygon's pools answered the same.",
+  "answer": {
+    "code": 3,
+    "message": "execution reverted",
+    "data": "0x2c5211c6"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "from": "Hyperliquid's docs, \"Exchange endpoint\", under \"Cancel order(s)\" (hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint), read 2026-11-12: the error response it shows for a cancel.",
+  "answer": {
+    "status": "ok",
+    "response": {
+      "type": "cancel",
+      "data": {
+        "statuses": [
+          {
+            "error": "Order was never placed, already canceled, or filled."
+          }
+        ]
+      }
+    }
+  }
+}

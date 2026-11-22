@@ -1,0 +1,6 @@
+{
+  "from": "Recorded 2026-11-14 from Polygon's public nodes (eth_simulateV1, nothing signed or sent): the batch that brings 1 pUSD home, run from a real deposit wallet (0xB8A21B28d08021E4f6FAc26939beB17EA9B06a43) that held 1.947719 pUSD, with the swap asked to pay at least 1.000000 USDC when the pool paid 0.999962. Uniswap V3's SwapRouter (0xE592427A0AEce92De3Edee1F18E0157C05861564) reverted the last call with its own words.",
+  "answer": {
+    "data": "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000013546f6f206c6974746c6520726563656976656400000000000000000000000000"
+  }
+}

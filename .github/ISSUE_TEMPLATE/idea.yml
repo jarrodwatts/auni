@@ -1,0 +1,22 @@
+name: Suggest something
+description: Something you wish Auni did.
+title: "Idea: "
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What you would like Auni to do, and when you would have used it.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Auni's version
+  - type: textarea
+    id: details
+    attributes:
+      label: The same, as data
+      description: Auni fills this in so a coding agent need not read the prose. Leave it as it is.
+      render: json

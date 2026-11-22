@@ -1,0 +1,85 @@
+{
+  "from": "Recorded from Hyperliquid info API on 2026-11-14 for a public unified account that is not the owner’s: isolated ARB and MON positions open, and limit orders waiting to open more of them.",
+  "answers": {
+    "userAbstraction": "unifiedAccount",
+    "spotClearinghouseState": {
+      "balances": [
+        {
+          "coin": "USDC",
+          "token": 0,
+          "total": "2575.89520025",
+          "hold": "1230.65331",
+          "entryNtl": "0.0"
+        }
+      ],
+      "tokenToAvailableAfterMaintenance": [[0, "1933.95483825"]]
+    },
+    "clearinghouseState": {
+      "marginSummary": {
+        "accountValue": "944.595382",
+        "totalNtlPos": "4740.813616",
+        "totalRawUsd": "-2896.579802",
+        "totalMarginUsed": "516.593922"
+      },
+      "crossMarginSummary": {
+        "accountValue": "428.00146",
+        "totalNtlPos": "0.0",
+        "totalRawUsd": "428.00146",
+        "totalMarginUsed": "0.0"
+      },
+      "crossMaintenanceMarginUsed": "0.0",
+      "withdrawable": "4.237638",
+      "assetPositions": [
+        {
+          "type": "oneWay",
+          "position": {
+            "coin": "ARB",
+            "szi": "29902.4",
+            "leverage": {
+              "type": "isolated",
+              "value": 10,
+              "rawUsd": "-3864.558729"
+            },
+            "entryPx": "0.14759",
+            "positionValue": "4290.9944",
+            "unrealizedPnl": "-122.421229",
+            "returnOnEquity": "-0.2773843193",
+            "liquidationPx": "0.1360411391",
+            "marginUsed": "426.435671",
+            "maxLeverage": 10,
+            "cumFunding": {
+              "allTime": "-0.040864",
+              "sinceOpen": "0.657665",
+              "sinceChange": "0.0"
+            }
+          }
+        },
+        {
+          "type": "oneWay",
+          "position": {
+            "coin": "MON",
+            "szi": "-26686.0",
+            "leverage": {
+              "type": "isolated",
+              "value": 5,
+              "rawUsd": "539.977467"
+            },
+            "entryPx": "0.016864",
+            "positionValue": "449.819216",
+            "unrealizedPnl": "0.21826",
+            "returnOnEquity": "0.0024249092",
+            "liquidationPx": "0.0183949864",
+            "marginUsed": "90.158251",
+            "maxLeverage": 5,
+            "cumFunding": {
+              "allTime": "-1.945298",
+              "sinceOpen": "0.0",
+              "sinceChange": "0.0"
+            }
+          }
+        }
+      ],
+      "time": 1794620326282
+    }
+  }
+}

@@ -1,0 +1,210 @@
+/*
+ * Auni over a money card's top edge. The stage sits on that edge and takes
+ * no room: its body hangs behind the card, its paws, shadow and anything it
+ * throws in front. Only Auni itself answers a pointer. Every part is placed
+ * and moved from script, with transforms alone.
+ */
+.edge {
+  --auni-eye-x: 0px;
+  --auni-eye-y: 0px;
+  --auni-cap: 0deg;
+  --auni-lid: 1;
+
+  position: absolute;
+  inset: 0 0 auto;
+  height: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.edge[data-tucked] {
+  opacity: 0;
+}
+
+.body,
+.cap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--edge-size);
+  height: var(--edge-size);
+  will-change: transform;
+}
+
+/* Behind the card, which sits a layer up. */
+.body {
+  z-index: 0;
+  transform-origin: 0 0;
+}
+
+/* The cap that flies off turns about its own middle. */
+.cap {
+  z-index: 2;
+  visibility: hidden;
+  transform-origin: 64.8% 26.6%;
+}
+
+.paw {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: calc(var(--edge-size) * 0.2);
+  height: calc(var(--edge-size) * 0.13);
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 28%, #eef6ff 0, #bddfff 32%, #7aa6ff 78%, #5388ff);
+  box-shadow:
+    0 0 0 1px rgb(52 92 214 / 38%),
+    0 2px 3px rgb(30 60 160 / 24%),
+    inset 0 -1.5px 2px rgb(30 60 170 / 28%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* Two little toes. */
+.paw::before,
+.paw::after {
+  position: absolute;
+  top: 18%;
+  width: 1px;
+  height: 36%;
+  border-radius: 1px;
+  background: rgb(40 70 170 / 22%);
+  content: "";
+}
+
+.paw::before {
+  left: 36%;
+}
+
+.paw::after {
+  left: 60%;
+}
+
+.contact {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: calc(var(--edge-size) * 0.72);
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(40 70 170 / 16%), transparent);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.hit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: calc(var(--edge-size) * 0.6);
+  border-radius: 50% 50% 40% 40%;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.z {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  color: #8c94ec;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Springs move the face; nothing eases it on top of them. */
+.edge :global(.auni-mascot-art) {
+  filter: none;
+}
+
+.edge :global(.auni-mascot-face) {
+  transition: none;
+}
+
+.edge :global(.auni-mascot-eye) {
+  animation: none;
+  transform: scaleY(var(--auni-lid));
+}
+
+.edge :global(.auni-mascot-cap) {
+  transform: rotate(var(--auni-cap));
+  transform-box: view-box;
+  transform-origin: 150px 50px;
+}
+
+.edge[data-cap-off] :global(.auni-mascot-cap) {
+  visibility: hidden;
+}
+
+.edge :global(.auni-mascot-attention),
+.edge :global(.auni-mascot-joy) {
+  display: none;
+}
+
+/* At work: brow down. */
+.edge[data-mood="work"] :global(.auni-mascot-brow) {
+  transform: translateY(5px) rotate(16deg);
+}
+
+/* Up and alert: brow raised, and the little marks of noticing. */
+.edge[data-mood="up"] :global(.auni-mascot-brow) {
+  transform: translateY(-7px) rotate(-12deg);
+}
+
+.edge[data-mood="up"] :global(.auni-mascot-attention) {
+  display: inline;
+}
+
+/* Worried, and sad: both brows up in the middle. Sad also looks down. */
+.edge:is([data-mood="worried"], [data-mood="sad"]) :global(.auni-mascot-brow) {
+  display: none;
+}
+
+.edge:is([data-mood="worried"], [data-mood="sad"]) :global(.auni-mascot-worry) {
+  display: inline;
+}
+
+.edge[data-mood="sad"] :global(.auni-mascot-eyes) {
+  transform: translateY(5px);
+}
+
+.edge:is([data-mood="happy"], [data-mood="sleep"], [data-mood="dizzy"]) :global(.auni-mascot-eyes) {
+  display: none;
+}
+
+.edge[data-mood="happy"] :global(.auni-mascot-joy),
+.edge[data-mood="sleep"] :global(.auni-mascot-shut),
+.edge[data-mood="dizzy"] :global(.auni-mascot-dizzy) {
+  display: inline;
+}
+
+.edge :global(.auni-mascot-dizzy path) {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: edge-swirl 900ms linear infinite;
+}
+
+@keyframes edge-swirl {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.edge[data-wink] :global(.auni-mascot-eye:first-child) {
+  visibility: hidden;
+}
+
+.edge[data-wink] :global(.auni-mascot-wink) {
+  display: inline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge :global(.auni-mascot-dizzy path) {
+    animation: none;
+  }
+}

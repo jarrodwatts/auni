@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+      "entityType": "token",
+      "name": "Hyperliquid",
+      "symbol": "HYPE",
+      "handle": "HyperliquidX",
+      "matchedOn": "symbol",
+      "score": 0.9,
+      "externalIds": {
+        "coingeckoId": "hyperliquid",
+        "figi": null,
+        "cik": null
+      }
+    }
+  ],
+  "nextCursor": "WRroJK83.MC45fDAuMDkwOTA5MDkwOTA5MDkwOTF8NzAyMA",
+  "hasMore": true
+}

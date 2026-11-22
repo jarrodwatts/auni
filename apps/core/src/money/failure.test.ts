@@ -1,0 +1,147 @@
+import { describe, expect, it } from "vitest";
+
+import { assertApprovedSpend, PriceMoved } from "./approved.ts";
+import { failureKind, retryRefusal } from "./failure.ts";
+import { FeesUnpaid, MayHaveSent, NothingMoved } from "./recipe.ts";
+import { Refused, refused } from "./refused.ts";
+
+describe("failureKind", () => {
+  it("knows a price past what was approved by its refusal, whatever it says", () => {
+    expect(failureKind(new PriceMoved("anything"))).toBe("price");
+    expect(() => assertApprovedSpend({ amountUsd: "10", details: {} }, 11_000_000n)).toThrow(
+      PriceMoved,
+    );
+  });
+
+  it("lets a move run again whose card's fee purchase went out and hasn't paid: it buys once", () => {
+    const kind = failureKind(new FeesUnpaid("Relay has the 15 MON and hasn't paid the ETH yet."));
+    expect(kind).toBe("fees");
+    const row = {
+      status: "failed" as const,
+      failureKind: kind,
+      tool: "bridge_usdc" as const,
+      details: {},
+      txs: [{ chain: "monad", hash: "0xbought", setup: true as const, buysFees: "0xorder" }],
+    };
+    expect(retryRefusal(row)).toBeNull();
+  });
+
+  it("takes an app's word for a refusal it knows, and guesses at one it doesn't", () => {
+    const problems = {
+      said: () => undefined,
+      known: [
+        { example: "", when: /too far/u, kind: "rule" as const, say: "The price is too far away." },
+        { example: "", when: /far|busy/u, kind: "busy" as const, say: "It is busy." },
+      ],
+    };
+    // The first row that knows it wins, and its kind stands whatever its words would be read as.
+    const known = refused("Venue", problems, "price too far, insufficient margin");
+    expect(known).toBeInstanceOf(Refused);
+    expect(known.message).toBe("The price is too far away.");
+    expect(failureKind(known)).toBe("rule");
+    expect(failureKind(refused("Venue", problems, "busy now"))).toBe("busy");
+    // One no row knows says what the service said, and is read by its words like any message.
+    const unknown = refused("Venue", problems, "insufficient margin");
+    expect(unknown).not.toBeInstanceOf(Refused);
+    expect(unknown.message).toBe("Venue refused: insufficient margin");
+    expect(failureKind(unknown)).toBe("funds");
+  });
+
+  it("reads money that isn't there", () => {
+    for (const said of [
+      "Insufficient margin to place order. asset=5",
+      "Too little ETH for gas: bridge a few dollars of their cash there as ETH first.",
+      "Ledger holds only 0.5 of it.",
+      "insufficient funds for gas * price + value",
+      "Transfer amount exceeds balance",
+    ])
+      expect(failureKind(new Error(said))).toBe("funds");
+  });
+
+  it("reads a venue's rules", () => {
+    expect(failureKind(new Error("BTC allows at most 40x leverage."))).toBe("rule");
+    expect(failureKind(new Error("Order must have minimum value of $10."))).toBe("rule");
+    expect(failureKind(new Error("50% of the position is below BTC's smallest size."))).toBe(
+      "rule",
+    );
+  });
+
+  it("reads a busy venue", () => {
+    expect(
+      failureKind(
+        new Error(
+          "The Polymarket wallet already has a transaction in flight; nothing new was sent. Retry once it settles.",
+        ),
+      ),
+    ).toBe("busy");
+    expect(
+      failureKind(
+        new Error("Polymarket's relayer quota for Auni is used up for now; nothing moved."),
+      ),
+    ).toBe("busy");
+    expect(failureKind(new Error("Jupiter answered 429 Too Many Requests"))).toBe("busy");
+  });
+
+  it("reads a network blip", () => {
+    expect(failureKind(new TypeError("fetch failed"))).toBe("glitch");
+    expect(failureKind(new Error("The operation timed out."))).toBe("glitch");
+    expect(
+      failureKind(
+        new Error(
+          "Auni couldn't check this in a simulation just now, so nothing was sent. Try again in a moment.",
+        ),
+      ),
+    ).toBe("glitch");
+    expect(failureKind(new MayHaveSent({ chain: "solana" }, "The wallet", "socket hang up"))).toBe(
+      "glitch",
+    );
+  });
+
+  it("calls an order its recipe knows nobody filled unfilled", () => {
+    expect(failureKind(new NothingMoved("No one filled the order on Monad."))).toBe("unfilled");
+  });
+
+  it("calls anything else unknown", () => {
+    expect(failureKind("something odd")).toBe("unknown");
+  });
+});
+
+describe("retryRefusal", () => {
+  const failed: Parameters<typeof retryRefusal>[0] = {
+    status: "failed",
+    failureKind: "glitch",
+    tool: "stock_trade",
+    details: {},
+    txs: [],
+  };
+
+  it("lets a blip, a busy venue, a moved price or anything unknown run again", () => {
+    for (const failureKind of ["glitch", "busy", "price", "unknown"] as const)
+      expect(retryRefusal({ ...failed, failureKind })).toBeNull();
+  });
+
+  it("never runs a step that failed before kinds were recorded, which may have sent", () => {
+    expect(retryRefusal({ ...failed, failureKind: null })).toBe("not_retryable");
+  });
+
+  it("refuses what running again can't fix", () => {
+    for (const failureKind of ["funds", "rule", "sent"] as const)
+      expect(retryRefusal({ ...failed, failureKind })).toBe("not_retryable");
+    expect(retryRefusal({ ...failed, txs: [{ chain: "base", hash: "0x1" }] })).toBe(
+      "not_retryable",
+    );
+    // An unfilled order's sends stay on its record, which a run again would settle by.
+    expect(
+      retryRefusal({ ...failed, failureKind: "unfilled", txs: [{ chain: "monad", hash: "0x1" }] }),
+    ).toBe("not_retryable");
+    expect(retryRefusal({ ...failed, status: "done" })).toBe("not_failed");
+  });
+
+  it("never runs money leaving the person, or anything the owner's proof vouched for, again on a tap", () => {
+    expect(retryRefusal({ ...failed, tool: "withdraw_usdc" })).toBe("needs_proof");
+    expect(retryRefusal({ ...failed, details: { leavesTo: "0xabc" } })).toBe("needs_proof");
+    expect(
+      retryRefusal({ ...failed, details: { needsStepUp: "lets 0xabc spend your USDC" } }),
+    ).toBe("needs_proof");
+  });
+});

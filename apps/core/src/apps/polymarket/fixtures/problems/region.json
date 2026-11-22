@@ -1,0 +1,10 @@
+{
+  "from": "Recorded 2026-11-12 from clob.polymarket.com, answering a buy signed by a throwaway key with no money, posted from a region where Polymarket lets positions be closed and none opened. A sale posted from the same place was not refused this way.",
+  "answer": {
+    "service": "Polymarket CLOB",
+    "status": 403,
+    "body": {
+      "error": "Trading restricted in your region, please refer to available regions - https://docs.polymarket.com/developers/CLOB/geoblock"
+    }
+  }
+}

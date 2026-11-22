@@ -1,0 +1,68 @@
+{
+  "steps": [
+    {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for USDC",
+      "kind": "transaction",
+      "requestId": "0x179391583710e2edf48b8365f0fb743c75a880e369ba44d1389cce5a2660f312",
+      "items": [
+        {
+          "status": "incomplete",
+          "data": {
+            "from": "0x000000000000000000000000000000000000dEaD",
+            "to": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "data": "0x095ea7b30000000000000000000000004cd00e387622c35bddb9b4c962c136462338bc3100000000000000000000000000000000000000000000000000000000000f4240",
+            "value": "0",
+            "chainId": 143
+          }
+        }
+      ]
+    },
+    {
+      "id": "deposit",
+      "action": "Confirm transaction in your wallet",
+      "description": "Depositing funds to the relayer to execute the swap for SOL",
+      "kind": "transaction",
+      "requestId": "0x179391583710e2edf48b8365f0fb743c75a880e369ba44d1389cce5a2660f312",
+      "items": [
+        {
+          "status": "incomplete",
+          "data": {
+            "from": "0x000000000000000000000000000000000000dEaD",
+            "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+            "data": "0xe8017952000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000000f4240f930976442e8642a7c25a7edc222ec870f51203bbc3d4a068bad84648ecabb3c",
+            "value": "0",
+            "chainId": 143
+          }
+        }
+      ]
+    }
+  ],
+  "details": {
+    "operation": "swap",
+    "sender": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+    "currencyIn": {
+      "currency": {
+        "chainId": 143,
+        "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      "amount": "1000000",
+      "minimumAmount": "1000000"
+    },
+    "currencyOut": {
+      "currency": {
+        "chainId": 792703809,
+        "address": "11111111111111111111111111111111",
+        "symbol": "SOL",
+        "decimals": 9
+      },
+      "amount": "10855085",
+      "minimumAmount": "10411112"
+    },
+    "timeEstimate": 1
+  }
+}

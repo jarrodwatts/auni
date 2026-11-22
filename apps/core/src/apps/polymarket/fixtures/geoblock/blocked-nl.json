@@ -1,0 +1,4 @@
+{
+  "from": "Recorded by the orchestrator of this work on 2026-11-14 from polymarket.com/api/geoblock, asked through an exit in North Holland, the Netherlands: a place Polymarket's docs list as close-only on its website alone, its API (which Auni trades through) not restricted.",
+  "answer": { "blocked": true, "ip": "172.233.45.186", "country": "NL", "region": "NH" }
+}

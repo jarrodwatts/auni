@@ -1,0 +1,8 @@
+{
+  "from": "Recorded 2026-11-12 from Aave V3's USDC pool on an anvil fork of Base at block 56115270, as eth_estimateGas answered for a key that never held real money (its USDC was written into the token's balance slot on the fork). It asked to supply 40M USDC, more than the room left under the market's 230M supply cap.",
+  "answer": {
+    "code": 3,
+    "message": "execution reverted: custom error 0xf58f733a",
+    "data": "0xf58f733a"
+  }
+}

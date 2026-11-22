@@ -1,0 +1,8 @@
+{
+  "from": "Recorded 2026-11-12 from Aave V3's USDC pool on an anvil fork of Base at block 56115270, as eth_estimateGas answered for a key that never held real money (its USDC was written into the token's balance slot on the fork). The key supplied 2M USDC; the borrow cap was lifted by Aave's ACL admin and another key borrowed all but 1M of what the pool had left to lend; then the first asked to withdraw its 2M.",
+  "answer": {
+    "code": 3,
+    "message": "execution reverted: panic: arithmetic underflow or overflow (0x11)",
+    "data": "0x4e487b710000000000000000000000000000000000000000000000000000000000000011"
+  }
+}

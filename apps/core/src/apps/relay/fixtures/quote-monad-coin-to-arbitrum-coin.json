@@ -1,0 +1,63 @@
+{
+  "steps": [
+    {
+      "id": "deposit",
+      "action": "Confirm transaction in your wallet",
+      "description": "Depositing funds to the relayer to execute the swap for ETH",
+      "kind": "transaction",
+      "requestId": "0x17945733066887b15afc7c70469aeab8bf1dc25c2015015dbeff73811b67f881",
+      "items": [
+        {
+          "status": "incomplete",
+          "data": {
+            "from": "0x2222222222222222222222222222222222222222",
+            "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+            "data": "0x49290c1c000000000000000000000000222222222222222222222222222222222222222244d9e955352609d87b3312b0c53c974798111372a7ab18b6f41eee967d6f63b3",
+            "value": "30000000000000000000",
+            "chainId": 143
+          }
+        }
+      ]
+    }
+  ],
+  "details": {
+    "operation": "swap",
+    "sender": "0x2222222222222222222222222222222222222222",
+    "recipient": "0x2222222222222222222222222222222222222222",
+    "currencyIn": {
+      "currency": {
+        "chainId": 143,
+        "address": "0x0000000000000000000000000000000000000000",
+        "symbol": "MON",
+        "name": "Monad",
+        "decimals": 18,
+        "metadata": {
+          "logoURI": "https://assets.coingecko.com/coins/images/38927/large/monad.jpg",
+          "verified": true
+        }
+      },
+      "amount": "30000000000000000000",
+      "amountFormatted": "30.0",
+      "amountUsd": "0.493770",
+      "minimumAmount": "30000000000000000000"
+    },
+    "currencyOut": {
+      "currency": {
+        "chainId": 42161,
+        "address": "0x0000000000000000000000000000000000000000",
+        "symbol": "ETH",
+        "name": "Ether",
+        "decimals": 18,
+        "metadata": {
+          "logoURI": "https://assets.relay.link/icons/1/light.png",
+          "verified": true
+        }
+      },
+      "amount": "236578231450976",
+      "amountFormatted": "0.000236578231450976",
+      "amountUsd": "0.463270",
+      "minimumAmount": "225861237566247"
+    },
+    "timeEstimate": 1
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // Node runs this package as TypeScript source (type stripping), which can't run enums or namespaces.
+  "compilerOptions": { "noEmit": true, "erasableSyntaxOnly": true },
+  "include": ["src"]
+}

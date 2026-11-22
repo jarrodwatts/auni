@@ -1,0 +1,13 @@
+{
+  "from": "Across's SpokePoolPeriphery source (github.com/across-protocol/contracts, contracts/periphery/SpokePoolPeriphery.sol, read 2026-11-12): a swap as the money leaves that returns less than its minExpectedInputTokenAmount reverts MinimumExpectedInputAmount(), here as a simulated call's result would carry it.",
+  "answer": {
+    "returnData": "0x",
+    "logs": [],
+    "status": "0x0",
+    "error": {
+      "code": 3,
+      "message": "execution reverted",
+      "data": "0x0492ff87"
+    }
+  }
+}

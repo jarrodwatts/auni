@@ -1,0 +1,10 @@
+{
+  "from": "Polymarket's docs, \"Error Codes\" (docs.polymarket.com/resources/error-codes), read 2026-11-12: the 400 an order answers under \"Order Processing Errors\" when its size is under the market's minimum, with example values put where the docs write {id}, {size} and {min}.",
+  "answer": {
+    "service": "Polymarket CLOB",
+    "status": 400,
+    "body": {
+      "error": "order 0x0f2a is invalid. Size (0.5) lower than the minimum: 1"
+    }
+  }
+}

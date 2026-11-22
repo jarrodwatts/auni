@@ -1,0 +1,8 @@
+{
+  "from": "Recorded 2026-11-12 from Aave V3's USDC pool on an anvil fork of Base at block 56115270, as eth_estimateGas answered for a key that never held real money (its USDC was written into the token's balance slot on the fork). Aave's ACL admin made an emergency admin, which paused the USDC reserve; then a supply of 1M USDC was asked.",
+  "answer": {
+    "code": 3,
+    "message": "execution reverted: custom error 0xd37f5f1c",
+    "data": "0xd37f5f1c"
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "threads" RENAME COLUMN "settled_at" TO "archived_at";

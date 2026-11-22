@@ -1,0 +1,1 @@
+ALTER TABLE "threads" ADD COLUMN "answer_so_far" jsonb;

@@ -1,0 +1,10 @@
+{
+  "from": "Polymarket's docs, \"Error Codes\" (docs.polymarket.com/resources/error-codes), read 2026-11-12: status 503 under \"POST order\", which the page explains as \"The exchange is in cancel-only mode. You can cancel existing orders but cannot place new orders.\" Its post-only twin reads \"post-only mode: only post-only orders and cancels are allowed\".",
+  "answer": {
+    "service": "Polymarket CLOB",
+    "status": 503,
+    "body": {
+      "error": "Trading is currently cancel-only. New orders are not accepted, but cancels are allowed."
+    }
+  }
+}

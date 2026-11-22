@@ -1,0 +1,518 @@
+[
+  {
+    "title": "Prime Minister of Israel after the next election?",
+    "slug": "who-will-be-the-next-prime-minister-of-israel-after-the-next-election",
+    "volume24hr": 1001952.411847,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/who-will-be-the-next-prime-minister-of-israel-after-the-2026-election-lWDmU0z7U_Vj.png",
+    "markets": [
+      {
+        "question": "Will Gadi Eizenkot be the next Prime Minister of Israel?",
+        "groupItemTitle": "Gadi Eizenkot",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.7125\", \"0.2875\"]",
+        "volume24hr": 180619.30614900004,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Benjamin Netanyahu be the next Prime Minister of Israel?",
+        "groupItemTitle": "Benjamin Netanyahu",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1775\", \"0.8225\"]",
+        "volume24hr": 426456.152469,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Avigdor Lieberman be the next Prime Minister of Israel?",
+        "groupItemTitle": "Avigdor Lieberman",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.056\", \"0.944\"]",
+        "volume24hr": 98026.64918100002,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Naftali Bennett be the next Prime Minister of Israel?",
+        "groupItemTitle": "Naftali Bennett",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.0265\", \"0.9735\"]",
+        "volume24hr": 20586.035546,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "Israel x Iran ceasefire continues through...?",
+    "slug": "israel-x-iran-ceasefire-continues-throughptptpt-20260716224448963",
+    "volume24hr": 957984.04529,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/israel-x-iran-ceasefire-continues-throughptptpt-20260716224448963-FEQHrNm5Q53X.jpg",
+    "markets": [
+      {
+        "question": "Israel x Iran ceasefire continues through November 5?",
+        "groupItemTitle": "November 5",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.999\", \"0.001\"]",
+        "volume24hr": 36438.033882,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Israel x Iran ceasefire continues through November 6?",
+        "groupItemTitle": "November 6",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.9985\", \"0.0015\"]",
+        "volume24hr": 63198.351,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Israel x Iran ceasefire continues through November 7?",
+        "groupItemTitle": "November 7",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.997\", \"0.003\"]",
+        "volume24hr": 336166.641182,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Israel x Iran ceasefire continues through November 15?",
+        "groupItemTitle": "November 15",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.885\", \"0.115\"]",
+        "volume24hr": 210009.21257199996,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Israel x Iran ceasefire continues through July 18?",
+        "groupItemTitle": "July 18",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"1\", \"0\"]",
+        "active": true,
+        "closed": true,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "Democratic Presidential Nominee 2028",
+    "slug": "democratic-presidential-nominee-2028",
+    "volume24hr": 644988.34558,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/democrats+2028+donkey.png",
+    "markets": [
+      {
+        "question": "Will Jon Ossoff win the 2028 Democratic presidential nomination?",
+        "groupItemTitle": "Jon Ossoff",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.2615\", \"0.7385\"]",
+        "volume24hr": 64717.71685399999,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Alexandria Ocasio-Cortez win the 2028 Democratic presidential nomination?",
+        "groupItemTitle": "Alexandria Ocasio-Cortez",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1665\", \"0.8335\"]",
+        "volume24hr": 34166.961921999995,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Gavin Newsom win the 2028 Democratic presidential nomination?",
+        "groupItemTitle": "Gavin Newsom",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1055\", \"0.8945\"]",
+        "volume24hr": 173891.73256400003,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Kamala Harris win the 2028 Democratic presidential nomination?",
+        "groupItemTitle": "Kamala Harris",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.059\", \"0.941\"]",
+        "volume24hr": 46873.55272400001,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "Next French Presidential Election",
+    "slug": "next-french-presidential-election",
+    "volume24hr": 575656.689683,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/france-presidential-election-2027-U5QY3acvfubZ.png",
+    "markets": [
+      {
+        "question": "Will Marine Le Pen win the 2027 French presidential election?",
+        "groupItemTitle": "Marine Le Pen",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.4505\", \"0.5495\"]",
+        "volume24hr": 40869.26547899999,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will David Lisnard win the 2027 French presidential election?",
+        "groupItemTitle": "David Lisnard",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1485\", \"0.8515\"]",
+        "volume24hr": 29604.369173,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Jean-Luc Mélenchon win the 2027 French presidential election?",
+        "groupItemTitle": "Jean-Luc Mélenchon",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.135\", \"0.865\"]",
+        "volume24hr": 85985.52885799999,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Édouard Philippe win the 2027 French presidential election?",
+        "groupItemTitle": "Édouard Philippe",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.095\", \"0.905\"]",
+        "volume24hr": 34078.199046,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "Presidential Election Winner 2028",
+    "slug": "presidential-election-winner-2028",
+    "volume24hr": 544317.006447,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/presidential-election-winner-2024-afdda358-219d-448a-abb5-ba4d14118d71.png",
+    "markets": [
+      {
+        "question": "Will JD Vance win the 2028 US Presidential Election?",
+        "groupItemTitle": "JD Vance",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1765\", \"0.8235\"]",
+        "volume24hr": 19308.963782000003,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Jon Ossoff win the 2028 US Presidential Election?",
+        "groupItemTitle": "Jon Ossoff",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1755\", \"0.8245\"]",
+        "volume24hr": 24003.357961,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Alexandria Ocasio-Cortez win the 2028 US Presidential Election?",
+        "groupItemTitle": "Alexandria Ocasio-Cortez",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1205\", \"0.8795\"]",
+        "volume24hr": 1957.6384259999998,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Marco Rubio win the 2028 US Presidential Election?",
+        "groupItemTitle": "Marco Rubio",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.0955\", \"0.9045\"]",
+        "volume24hr": 6552.635901000002,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "US announces end of Iranian blockade by...?",
+    "slug": "us-announces-end-of-iranian-blockade-byptptpt-20260713152715080",
+    "volume24hr": 484793.44747099996,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/us-announces-blockade-on-iran-byptptpt-20260622191049039-hE3ZTZ51JJy3.jpg",
+    "markets": [
+      {
+        "question": "US announces end of Iranian blockade by March 31, 2027?",
+        "groupItemTitle": "March 31",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.655\", \"0.345\"]",
+        "volume24hr": 78871.441853,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "US announces end of Iranian blockade by December 31, 2026?",
+        "groupItemTitle": "December 31",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.3405\", \"0.6595\"]",
+        "volume24hr": 63700.24295200001,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "US announces end of Iranian blockade by November 30, 2026?",
+        "groupItemTitle": "November 30",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.145\", \"0.855\"]",
+        "volume24hr": 125871.07163100001,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "US announces end of Iranian blockade by November 15, 2026?",
+        "groupItemTitle": "November 15",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.0365\", \"0.9635\"]",
+        "volume24hr": 216350.69103499997,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "US announces end of Iranian blockade by July 24, 2026?",
+        "groupItemTitle": "July 24",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0\", \"1\"]",
+        "active": true,
+        "closed": true,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "Republican Presidential Nominee 2028",
+    "slug": "republican-presidential-nominee-2028",
+    "volume24hr": 465865.490617,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/republicans+2028.png",
+    "markets": [
+      {
+        "question": "Will J.D. Vance win the 2028 Republican presidential nomination?",
+        "groupItemTitle": "J.D. Vance",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.3425\", \"0.6575\"]",
+        "volume24hr": 23512.810913,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Marco Rubio win the 2028 Republican presidential nomination?",
+        "groupItemTitle": "Marco Rubio",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.192\", \"0.808\"]",
+        "volume24hr": 22733.627677999997,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Ron DeSantis win the 2028 Republican presidential nomination?",
+        "groupItemTitle": "Ron DeSantis",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.152\", \"0.848\"]",
+        "volume24hr": 153971.29466999997,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will John McEntee win the 2028 Republican presidential nomination?",
+        "groupItemTitle": "John McEntee",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.0385\", \"0.9615\"]",
+        "volume24hr": 32011.377462,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "What price will Bitcoin hit November 2-8?",
+    "slug": "what-price-will-bitcoin-hit-november-2-8-2026",
+    "volume24hr": 306084.798379,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+    "markets": [
+      {
+        "question": "Will Bitcoin dip to $74,000 November 2-8?",
+        "groupItemTitle": "↓ 74,000",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.077\", \"0.923\"]",
+        "volume24hr": 47210.85643099999,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Bitcoin reach $78,000 November 2-8?",
+        "groupItemTitle": "↑ 78,000",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.06\", \"0.94\"]",
+        "volume24hr": 4665.60339,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Bitcoin dip to $72,000 November 2-8?",
+        "groupItemTitle": "↓ 72,000",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.0125\", \"0.9875\"]",
+        "volume24hr": 26686.66891,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Bitcoin reach $80,000 November 2-8?",
+        "groupItemTitle": "↑ 80,000",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.007\", \"0.993\"]",
+        "volume24hr": 25209.384837999998,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Bitcoin reach $80,000 November 2-8?",
+        "groupItemTitle": "↑ 80,000",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"1\", \"0\"]",
+        "active": true,
+        "closed": true,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "Elon Musk # tweets November 3 - November 10, 2026?",
+    "slug": "elon-musk-of-tweets-november-3-november-10-2026",
+    "volume24hr": 289123.724425,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/elon-musk-of-tweets-nov-22-29-apMPG21-pzx_.jpg",
+    "markets": [
+      {
+        "question": "Will Elon Musk post 260-279 tweets from November 3 to November 10, 2026?",
+        "groupItemTitle": "260-279",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.3215\", \"0.6785\"]",
+        "volume24hr": 13404.992936000002,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Elon Musk post 280-299 tweets from November 3 to November 10, 2026?",
+        "groupItemTitle": "280-299",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.27\", \"0.73\"]",
+        "volume24hr": 10612.824094000001,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Elon Musk post 240-259 tweets from November 3 to November 10, 2026?",
+        "groupItemTitle": "240-259",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.172\", \"0.828\"]",
+        "volume24hr": 30171.699639000002,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Elon Musk post 300-319 tweets from November 3 to November 10, 2026?",
+        "groupItemTitle": "300-319",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.1215\", \"0.8785\"]",
+        "volume24hr": 17195.573676000004,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Will Elon Musk post 0-19 tweets from November 3 to November 10, 2026?",
+        "groupItemTitle": "<20",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0\", \"1\"]",
+        "active": true,
+        "closed": true,
+        "enableOrderBook": true
+      }
+    ]
+  },
+  {
+    "title": "Puffpaw FDV above ___ one day after launch?",
+    "slug": "puffpaw-fdv-above-one-day-after-launch",
+    "volume24hr": 264501.255679,
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/puffpaw-fdv-above-one-day-after-launch-LifCgtfa8s9_.jpg",
+    "markets": [
+      {
+        "question": "Puffpaw FDV above $200M one day after launch?",
+        "groupItemTitle": "$200M",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.9735\", \"0.0265\"]",
+        "volume24hr": 57249.74669199999,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Puffpaw FDV above $50M one day after launch?",
+        "groupItemTitle": "$50M",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.9605\", \"0.0395\"]",
+        "volume24hr": 48569.841178,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Puffpaw FDV above $100M one day after launch?",
+        "groupItemTitle": "$100M",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.9595\", \"0.0405\"]",
+        "volume24hr": 102637.592535,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      },
+      {
+        "question": "Puffpaw FDV above $300M one day after launch?",
+        "groupItemTitle": "$300M",
+        "outcomes": "[\"Yes\", \"No\"]",
+        "outcomePrices": "[\"0.928\", \"0.072\"]",
+        "volume24hr": 22672.862669000002,
+        "active": true,
+        "closed": false,
+        "enableOrderBook": true
+      }
+    ]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "from": "Polymarket's relayer API spec (docs.polymarket.com/api-spec/relayer-openapi.yaml), read 2026-11-12: the example of the 429 that submitting a transaction can answer.",
+  "answer": {
+    "service": "Polymarket relayer",
+    "status": 429,
+    "body": {
+      "error": "quota exceeded"
+    }
+  }
+}

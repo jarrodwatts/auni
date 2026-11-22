@@ -1,0 +1,14 @@
+{
+  "name": "auni",
+  "description": "Auni's skill for coding agents: set up, run, fix and extend Auni.",
+  "owner": {
+    "name": "Jarrod Watts"
+  },
+  "plugins": [
+    {
+      "name": "auni",
+      "source": "./",
+      "description": "Set up, run, fix and extend Auni, the open-source AI money agent you run yourself."
+    }
+  ]
+}

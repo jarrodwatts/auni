@@ -1,0 +1,28 @@
+{
+  "points": [
+    {
+      "statement": "AI chips holds NVIDIA.",
+      "action": "Still right?",
+      "prompt": "My AI chips specialist holds $620.40 of NVIDIA, down $4.10 today. Is it still the best way to hold that take, or should it spread out?",
+      "facts": [3, 2]
+    },
+    {
+      "statement": "$310.50 is in cash.",
+      "action": "Put it to work",
+      "prompt": "I have $310.50 sitting in cash out of $1,240.18. What would you do with it right now?",
+      "facts": [1]
+    },
+    {
+      "statement": "Bitcoin at $74K: 8%.",
+      "action": "Agree?",
+      "prompt": "Polymarket gives Bitcoin an 8% chance of dipping to $74,000 this week. Do you agree, and is there a position in it for me?",
+      "facts": [5]
+    },
+    {
+      "statement": "ENA fell 3.8% today.",
+      "action": "Why?",
+      "prompt": "ENA is down 3.8% today on Hyperliquid with $11.8M traded. What's behind it, and is there a take in it?",
+      "facts": [6, 6]
+    }
+  ]
+}

@@ -1,0 +1,550 @@
+/*
+ * First run, past its landing (components/landing): the door for an auni.io wallet, and what
+ * first run asks in the chat when it must (a brain, the spare key). Light and still, Auni
+ * the only thing that moves much; where motion is reduced, everything shows without moving.
+ */
+
+/* A door, not a button: quiet until pointed at. */
+.door {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--color-muted-foreground);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.door:hover {
+  background: color-mix(in srgb, var(--color-foreground) 4%, transparent);
+  color: var(--color-ink);
+}
+
+.door:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-ring) 45%, transparent);
+}
+
+@keyframes take-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/*
+ * The door's own scene: Auni, what to do in a line, the private field. It hangs from a fixed
+ * height rather than sitting in the middle, so what grows under the field (a Solana key's own
+ * field, what the keys sign for, a refusal) grows down and never lifts the words above it.
+ */
+.scene {
+  display: flex;
+  width: min(480px, 100%);
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto;
+  padding: max(40px, calc(50dvh - 300px)) 16px 40px;
+  text-align: center;
+  animation: take-in 600ms var(--motion-drift) both;
+}
+
+.sceneTitle {
+  margin-top: 18px;
+  color: var(--color-ink);
+  font-size: clamp(30px, 4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+/* Focus lands here as the scene opens, for a screen reader to read it; it is no control. */
+.sceneTitle:focus {
+  outline: none;
+}
+
+.sceneLine {
+  margin-top: 14px;
+  color: var(--color-ink-soft);
+  font-size: 16px;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+.sceneLine b {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.sceneLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  text-underline-offset: 3px;
+}
+
+.sceneLink:hover {
+  text-decoration-color: currentColor;
+}
+
+.sceneField {
+  width: 100%;
+  margin-top: 22px;
+  text-align: left;
+}
+
+.sceneNote {
+  margin-top: 8px;
+  color: var(--color-muted-foreground);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.scene .door {
+  margin-top: 14px;
+}
+
+/* An auni.io wallet come home, at the take's foot: its vault, and what it holds. */
+.home {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  animation: take-in 500ms var(--motion-drift) both;
+}
+
+.homeVault {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.homeAmount {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/*
+ * Auni beside a secret. Facing the owner, it may hold the spare key up over its head; once the
+ * secret shows it turns its back (mirrored, face gone) and a note says so.
+ */
+.looker {
+  position: relative;
+  flex: none;
+}
+
+.lookerGlow {
+  position: absolute;
+  inset: -30%;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-halo) 30%, transparent),
+    transparent 64%
+  );
+}
+
+.lookerBody {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 85%;
+  transition: transform 520ms var(--motion-settle);
+}
+
+.looker[data-away] .lookerBody {
+  transform: scaleX(-1) rotate(-3deg);
+}
+
+.looker :global(:is(.auni-mascot-joy, .auni-mascot-attention)) {
+  opacity: 0;
+}
+
+.looker[data-away] :global(.auni-mascot-face) {
+  opacity: 0;
+  transition: opacity 120ms ease 160ms;
+}
+
+.lookerNote {
+  position: absolute;
+  bottom: 92%;
+  left: 50%;
+  translate: -50% 0;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--color-card);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 10px 24px color-mix(in srgb, var(--color-shade-blue) 12%, transparent);
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: rotate(-5deg) translateY(8px) scale(0.85);
+  transition:
+    opacity 200ms ease,
+    transform 420ms var(--motion-settle);
+}
+
+/* Checking it's really them: the key goes back under its cap, and it leans in to ask. */
+.looker[data-asking] .lookerBody {
+  transform: translateX(-3px) rotate(-8deg);
+}
+
+.looker[data-asking] .lookerKey {
+  animation: none;
+  opacity: 0;
+  transition:
+    opacity 200ms ease,
+    transform 420ms var(--motion-settle);
+}
+
+.looker[data-asking] .lookerNote {
+  opacity: 1;
+  transform: rotate(4deg);
+  transition-delay: 200ms;
+}
+
+.looker[data-away] .lookerNote {
+  opacity: 1;
+  transform: rotate(-5deg);
+  transition-delay: 260ms;
+}
+
+/* The key comes out from under the cap, and goes back as Auni turns away. */
+.lookerKey {
+  position: absolute;
+  z-index: 0;
+  top: 2%;
+  left: 54%;
+  color: var(--color-primary);
+  transform: translateY(0) rotate(-35deg) scale(0.4);
+  opacity: 0;
+  animation: key-out 900ms 400ms var(--motion-settle) both;
+}
+
+.lookerKey svg {
+  width: 44px;
+  height: 44px;
+}
+
+.looker[data-pose="key"]:not([data-away], [data-asking]) :global(.auni-mascot-cap) {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+  animation: cap-lift 900ms 300ms var(--motion-settle) both;
+}
+
+.looker[data-away] .lookerKey {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes key-out {
+  from {
+    opacity: 0;
+    transform: translateY(26px) rotate(-35deg) scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-6px, -40px) rotate(-20deg) scale(1);
+  }
+}
+
+@keyframes cap-lift {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: rotate(-22deg) translateY(-4px);
+  }
+}
+
+/* Lend me a brain? An empty thought over Auni, filled by the AI that signs in. */
+.brain {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  margin: 8px 0 4px;
+  padding: 24px;
+}
+
+/* The card behind the ask, its own layer, so it can come and go while Auni stays. */
+.brain::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: 24px;
+  background: var(--color-card);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 18px 50px color-mix(in srgb, var(--color-shade-blue) 8%, transparent);
+  content: "";
+  transition: opacity 360ms ease;
+}
+
+/*
+ * It shows from the send, as the answer to come does. Asked from the first take, Auni is the one
+ * that came down from the question (ConversationLaunchStage): it is there at once, and the card
+ * and words come in around it once the take's words have flown past to the top of the chat.
+ */
+:global(.auni-conversation-launch[data-handoff]) .brain::before,
+:global(.auni-conversation-launch[data-handoff]) .brainWords {
+  animation: take-in 480ms 560ms var(--motion-drift) both;
+}
+
+:global(.auni-conversation-launch[data-handoff]) .thought {
+  animation:
+    take-in 480ms 560ms var(--motion-drift) both,
+    thought-bob 3.6s ease-in-out infinite;
+}
+
+/* With a brain, the ask has done its job: no card, only Auni's thought and one line. */
+.brain[data-ready] {
+  align-items: center;
+}
+
+.brain[data-ready]::before {
+  opacity: 0;
+}
+
+.brain[data-ready] .brainWords {
+  padding-top: 40px;
+}
+
+.brain[data-ready] .brainTitle {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 640px) {
+  .brain {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+}
+
+.brainStage {
+  position: relative;
+  width: 168px;
+  height: 196px;
+}
+
+.thought {
+  position: absolute;
+  top: 0;
+  left: 18px;
+  width: 150px;
+  height: 96px;
+  stroke: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  stroke-width: 3;
+  fill: var(--color-card);
+  animation: thought-bob 3.6s ease-in-out infinite;
+}
+
+.thoughtMark {
+  position: absolute;
+  top: 18px;
+  left: 70px;
+  animation: mark-in 620ms var(--motion-settle) both;
+}
+
+.brainAuni {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 112px;
+  height: 112px;
+}
+
+.brain:not([data-ready]) .brainAuni :global(.auni-mascot-brow) {
+  transform: translateY(-6px) rotate(-12deg);
+}
+
+.brain[data-ready] .brainAuni :global(.auni-mascot-eyes) {
+  opacity: 0;
+}
+
+.brain:not([data-ready]) .brainAuni :global(.auni-mascot-joy) {
+  opacity: 0;
+}
+
+.brain[data-ready] .brainAuni {
+  animation: auni-hop 820ms var(--motion-settle) both;
+}
+
+.brainWords {
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.brainTitle {
+  color: var(--color-ink);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.brainLine {
+  max-width: 460px;
+  margin-top: 8px;
+  color: var(--color-muted-foreground);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.brainRows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+@keyframes thought-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-14deg);
+  }
+}
+
+@keyframes auni-hop {
+  0% {
+    transform: none;
+  }
+  18% {
+    transform: scale(1.1, 0.88);
+  }
+  45% {
+    transform: translateY(-22px) scale(0.94, 1.08);
+  }
+  70% {
+    transform: scale(1.06, 0.94);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* The spare key, a card in the chat. */
+.key {
+  /* Brought into view clear of the composer's fade (SpareKey). */
+  scroll-margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  /* As far under the words over it as one answer is under another, its actions row included. */
+  margin: 6px 0 4px;
+  padding: 24px 24px 22px;
+  border-radius: 24px;
+  background: var(--color-card);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 18px 50px color-mix(in srgb, var(--color-shade-blue) 8%, transparent);
+  animation: take-in 600ms var(--motion-drift) both;
+}
+
+@media (max-width: 640px) {
+  .key {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+}
+
+.keyAuni {
+  margin: 34px 18px 0 4px;
+}
+
+.keyAuni .lookerNote {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.keyWords {
+  min-width: 0;
+}
+
+.keyTitle {
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.keyTitle:focus {
+  outline: none;
+}
+
+.keyLine {
+  margin-top: 6px;
+  color: var(--color-muted-foreground);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.keyError {
+  margin-top: 10px;
+  color: var(--color-destructive);
+  font-size: 13px;
+}
+
+.keySaved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* The end of the chat: clear of the fade over the reply box, as an answer's own actions are. */
+  margin: 0 0 28px;
+  color: var(--color-muted-foreground);
+  font-size: 14px;
+}
+
+.keySaved svg {
+  color: var(--color-positive);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene,
+  .home,
+  .key,
+  .thought,
+  .thoughtMark,
+  .brain[data-ready] .brainAuni,
+  .lookerKey,
+  .looker[data-pose="key"]:not([data-away], [data-asking]) :global(.auni-mascot-cap) {
+    animation: none;
+  }
+
+  .lookerKey {
+    opacity: 1;
+    transform: translate(-6px, -40px) rotate(-20deg);
+  }
+
+  .lookerBody,
+  .lookerNote {
+    transition: opacity 200ms ease;
+  }
+}

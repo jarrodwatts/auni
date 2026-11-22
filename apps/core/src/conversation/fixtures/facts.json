@@ -1,0 +1,117 @@
+[
+  {
+    "text": "The owner has $1,240.18 in all, $310.50 of it cash.",
+    "source": {
+      "app": "auni",
+      "label": "Your money",
+      "link": "/app"
+    },
+    "image": null,
+    "starts": [
+      {
+        "statement": "You have $1,240.18.",
+        "action": "Look it over",
+        "prompt": "Look over my portfolio. How is it doing, and what stands out to you?"
+      },
+      {
+        "statement": "Have a belief?",
+        "action": "Make it real",
+        "prompt": "I have a belief about where the world is going. Ask me what it is, then show me how you'd build a position for it."
+      },
+      {
+        "statement": "Markets today.",
+        "action": "What's moving?",
+        "prompt": "What's moving in the markets today that I might hold a view on? Pick a few and tell me why they're moving."
+      },
+      {
+        "statement": "New to Auni?",
+        "action": "Start here",
+        "prompt": "I'm new to Auni. What can you do with my money, and what would a first take look like?"
+      }
+    ]
+  },
+  {
+    "text": "The owner's specialist \"AI chips\", a take: AI keeps eating software. Its latest read: NVIDIA held up after earnings.",
+    "source": {
+      "app": "auni",
+      "label": "AI chips",
+      "link": "/app/s/7c0f0014-5b1e-4c2a-9d3f-0000000000a1"
+    },
+    "image": null,
+    "starts": [
+      {
+        "statement": "Your AI chips specialist.",
+        "action": "Check in",
+        "prompt": "How is my AI chips specialist doing, and is there anything it should change?"
+      }
+    ]
+  },
+  {
+    "text": "The owner holds $620.40 of NVIDIA, down $4.10 today.",
+    "source": {
+      "app": "auni",
+      "label": "NVIDIA",
+      "link": "/app"
+    },
+    "image": "https://xstocks-metadata.backed.fi/logos/tokens/NVDAx.png",
+    "starts": [
+      {
+        "statement": "NVIDIA is down $4.10.",
+        "action": "What next?",
+        "prompt": "I hold $620.40 of NVIDIA. How is it doing, and would you change anything?"
+      }
+    ]
+  },
+  {
+    "text": "On Polymarket, \"Prime Minister of Israel after the next election?\" has Gadi Eizenkot at 71%, with $1M traded today.",
+    "source": {
+      "app": "polymarket",
+      "label": "Prime Minister of Israel after the next election?",
+      "link": "https://polymarket.com/event/who-will-be-the-next-prime-minister-of-israel-after-the-next-election"
+    },
+    "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/who-will-be-the-next-prime-minister-of-israel-after-the-2026-election-lWDmU0z7U_Vj.png",
+    "starts": []
+  },
+  {
+    "text": "On Polymarket, \"What price will Bitcoin hit November 2-8?\" has ↓ 74,000 at 8%, with $306.1K traded today.",
+    "source": {
+      "app": "polymarket",
+      "label": "What price will Bitcoin hit November 2-8?",
+      "link": "https://polymarket.com/event/what-price-will-bitcoin-hit-november-2-8-2026"
+    },
+    "image": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+    "starts": []
+  },
+  {
+    "text": "ENA is down 3.8% in the last day on Hyperliquid, at $0.1548, with $11.8M traded.",
+    "source": {
+      "app": "prices",
+      "label": "ENA on Hyperliquid",
+      "link": "https://app.hyperliquid.xyz/trade/ENA"
+    },
+    "image": "https://app.hyperliquid.xyz/coins/ENA.svg",
+    "starts": [
+      {
+        "statement": "ENA is down 3.8% today.",
+        "action": "Why?",
+        "prompt": "ENA is down 3.8% in the last day on Hyperliquid. What's behind the move, and is there a take in it for me?"
+      }
+    ]
+  },
+  {
+    "text": "NVDA, which the owner holds, is down 0.2% in the last day on Hyperliquid, at $187.53.",
+    "source": {
+      "app": "prices",
+      "label": "NVDA on Hyperliquid",
+      "link": "https://app.hyperliquid.xyz/trade/xyz:NVDA"
+    },
+    "image": "https://xstocks-metadata.backed.fi/logos/tokens/NVDAx.png",
+    "starts": [
+      {
+        "statement": "Your NVDA is down 0.2%.",
+        "action": "What next?",
+        "prompt": "NVDA, which I hold, is down 0.2% in the last day. What's going on with it, and should I do anything?"
+      }
+    ]
+  }
+]

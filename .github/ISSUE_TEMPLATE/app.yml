@@ -1,0 +1,49 @@
+name: Ask for an app
+description: A service you would like Auni to work with well.
+title: "App request: "
+labels: ["app-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An app teaches Auni one service: what Claude should know there, and how its cards read. With no app Auni still does the job, by building the transaction itself. Auni's own card fills this form in for you; everything here is public, so check it before you post.
+  - type: input
+    id: service
+    attributes:
+      label: The service
+      description: Its name as people know it.
+      placeholder: Lido
+    validations:
+      required: true
+  - type: input
+    id: site
+    attributes:
+      label: Its site
+      placeholder: lido.fi
+  - type: textarea
+    id: asked
+    attributes:
+      label: What you asked for
+      description: What you wanted to do there, in a sentence. No amounts.
+    validations:
+      required: true
+  - type: input
+    id: chain
+    attributes:
+      label: Chain
+  - type: textarea
+    id: steps
+    attributes:
+      label: The steps that worked
+      description: The contract and function Auni called when it did this by hand. Posted soon after, they can show which wallet is yours.
+  - type: textarea
+    id: transaction
+    attributes:
+      label: The transaction link
+      description: This shows your wallet address beside your GitHub name.
+  - type: textarea
+    id: details
+    attributes:
+      label: The same, as data
+      description: Auni fills this in so a coding agent need not read the prose. Leave it as it is.
+      render: json

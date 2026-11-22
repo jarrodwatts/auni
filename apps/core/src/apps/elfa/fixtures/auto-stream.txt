@@ -1,0 +1,19 @@
+: keep-alive
+
+event: notification
+id: 6f1c1a52-0f0e-4a77-9b52-2f6f3a0c9a10
+data: {"status":"triggered","title":"Plan Triggered","body":"BTC below 100k","queryId":"a12d20ff-6cb2-433e-afed-cc2e6a0380b6","executionId":"2dbf0d70-a85f-4f67-9bd3-876e8fd89f86","triggerTime":"2026-04-01T12:00:00.000Z","conditionsMet":1,"trigger":{"type":"price","time":"2026-04-01T12:00:00.000Z","matchedConditions":[{"condition":{"source":"price","method":"current","args":{"symbol":"BTC"},"operator":"<","value":100000},"match":{"observedValue":97250.5}}]},"autoDetails":"Alert my runner when BTC drops below 100k.","timestamp":1775044801000}
+
+event: notification
+id: 0b6a7d3e-77d4-4f67-8a0e-0d1a7f0b2c55
+data: {"status":"triggered","title":"Plan Triggered","body":"Someone else's alert","queryId":"9f9f9f9f-0000-4000-8000-000000000000","executionId":"11111111-2222-4333-8444-555555555555","triggerTime":"2026-04-01T12:01:00.000Z","conditionsMet":1,"trigger":{"type":"price","matchedConditions":[]},"timestamp":1775044861000}
+
+: keep-alive
+
+event: notification
+id: 3c2b1a00-1111-4222-8333-444444444444
+data: {"status":"update","queryId":"a12d20ff-6cb2-433e-afed-cc2e6a0380b6","timestamp":1775044900000}
+
+event: end
+data: {"code":"USER_STREAM_CLOSED"}
+

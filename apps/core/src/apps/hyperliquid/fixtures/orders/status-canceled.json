@@ -1,0 +1,28 @@
+{
+  "from": "Recorded from Hyperliquid's info API (orderStatus) on 2026-11-12, for a public account that is not the owner's: a limit order its owner cancelled before any of it filled.",
+  "answer": {
+    "status": "order",
+    "order": {
+      "order": {
+        "coin": "HYPE",
+        "side": "A",
+        "limitPx": "72.588",
+        "sz": "0.82",
+        "oid": 602214168968,
+        "timestamp": 1794441810020,
+        "triggerCondition": "N/A",
+        "isTrigger": false,
+        "triggerPx": "0.0",
+        "children": [],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Limit",
+        "origSz": "0.82",
+        "tif": "Gtc",
+        "cloid": null
+      },
+      "status": "canceled",
+      "statusTimestamp": 1794467080105
+    }
+  }
+}

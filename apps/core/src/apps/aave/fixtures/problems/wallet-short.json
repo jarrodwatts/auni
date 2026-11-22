@@ -1,0 +1,8 @@
+{
+  "from": "Recorded 2026-11-12 from Aave V3's USDC pool on an anvil fork of Base at block 56117408, as eth_estimateGas answered for a key that never held real money (its USDC was written into the token's balance slot on the fork). The key held 400 USDC and had approved the pool for 1,000; then a supply of 1,000 USDC was asked.",
+  "answer": {
+    "code": 3,
+    "message": "execution reverted: ERC20: transfer amount exceeds balance",
+    "data": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002645524332303a207472616e7366657220616d6f756e7420657863656564732062616c616e63650000000000000000000000000000000000000000000000000000"
+  }
+}

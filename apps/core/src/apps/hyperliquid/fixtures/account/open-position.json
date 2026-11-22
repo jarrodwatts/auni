@@ -1,0 +1,61 @@
+{
+  "from": "Recorded from Hyperliquid info API on 2026-11-14 for a public unified account that is not the owner’s: one isolated AAVE long open with a stop on it, and no order waiting.",
+  "answers": {
+    "userAbstraction": "unifiedAccount",
+    "spotClearinghouseState": {
+      "balances": [
+        {
+          "coin": "USDC",
+          "token": 0,
+          "total": "45.966468",
+          "hold": "10.068412",
+          "entryNtl": "0.0"
+        }
+      ],
+      "tokenToAvailableAfterMaintenance": [[0, "35.898056"]]
+    },
+    "clearinghouseState": {
+      "marginSummary": {
+        "accountValue": "10.068412",
+        "totalNtlPos": "99.0837",
+        "totalRawUsd": "109.152112",
+        "totalMarginUsed": "10.068412"
+      },
+      "crossMarginSummary": {
+        "accountValue": "0.0",
+        "totalNtlPos": "0.0",
+        "totalRawUsd": "0.0",
+        "totalMarginUsed": "0.0"
+      },
+      "crossMaintenanceMarginUsed": "0.0",
+      "withdrawable": "0.0",
+      "assetPositions": [
+        {
+          "type": "oneWay",
+          "position": {
+            "coin": "AAVE",
+            "szi": "-0.89",
+            "leverage": {
+              "type": "isolated",
+              "value": 10,
+              "rawUsd": "109.152112"
+            },
+            "entryPx": "111.52",
+            "positionValue": "99.0837",
+            "unrealizedPnl": "0.1691",
+            "returnOnEquity": "0.0170373027",
+            "liquidationPx": "116.8026880685",
+            "marginUsed": "10.068412",
+            "maxLeverage": 10,
+            "cumFunding": {
+              "allTime": "0.0",
+              "sinceOpen": "0.0",
+              "sinceChange": "0.0"
+            }
+          }
+        }
+      ],
+      "time": 1794620326012
+    }
+  }
+}

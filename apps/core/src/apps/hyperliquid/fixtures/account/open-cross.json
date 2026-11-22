@@ -1,0 +1,60 @@
+{
+  "from": "Recorded from Hyperliquid info API on 2026-11-14 for a public unified account that is not the owner’s: one cross ETH long open, using the whole balance, and no order waiting.",
+  "answers": {
+    "userAbstraction": "unifiedAccount",
+    "spotClearinghouseState": {
+      "balances": [
+        {
+          "coin": "USDC",
+          "token": 0,
+          "total": "36.417454",
+          "hold": "36.417454",
+          "entryNtl": "0.0"
+        }
+      ],
+      "tokenToAvailableAfterMaintenance": [[0, "17.974302"]]
+    },
+    "clearinghouseState": {
+      "marginSummary": {
+        "accountValue": "36.417454",
+        "totalNtlPos": "922.1576",
+        "totalRawUsd": "-885.740146",
+        "totalMarginUsed": "36.886304"
+      },
+      "crossMarginSummary": {
+        "accountValue": "36.417454",
+        "totalNtlPos": "922.1576",
+        "totalRawUsd": "-885.740146",
+        "totalMarginUsed": "36.886304"
+      },
+      "crossMaintenanceMarginUsed": "18.443152",
+      "withdrawable": "0.0",
+      "assetPositions": [
+        {
+          "type": "oneWay",
+          "position": {
+            "coin": "ETH",
+            "szi": "0.478",
+            "leverage": {
+              "type": "cross",
+              "value": 25
+            },
+            "entryPx": "1930.28",
+            "positionValue": "922.1576",
+            "unrealizedPnl": "-0.5193",
+            "returnOnEquity": "-0.0140704726",
+            "liquidationPx": "1890.8294466741",
+            "marginUsed": "36.886304",
+            "maxLeverage": 25,
+            "cumFunding": {
+              "allTime": "0.252122",
+              "sinceOpen": "0.0",
+              "sinceChange": "0.0"
+            }
+          }
+        }
+      ],
+      "time": 1794620333805
+    }
+  }
+}

@@ -1,0 +1,100 @@
+name: ci
+# Every change reaches main through a PR, and a PR's run already checks the merge
+# result, so pushes run nothing. The nightly run on main keeps the dependency cache
+# every PR restores from warm.
+on:
+  pull_request:
+  schedule:
+    - cron: "0 7 * * *"
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        # gen:check fails when the committed app list no longer matches src/apps/ (pnpm gen);
+        # knip when a file, export or dependency is no longer used (knip.jsonc).
+        task: [gen:check, typecheck, lint, knip, test, build]
+    name: ${{ matrix.task }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .node-version, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ${{ matrix.task }}
+  migrations:
+    name: migrations match schema.ts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .node-version, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # A schema.ts change without its generated migration leaves new files behind.
+      - run: pnpm --filter @auni/core exec drizzle-kit generate && test -z "$(git status --porcelain apps/core/drizzle)"
+  db-tests:
+    # Running an action once, the row lock on a specialist's free cash and the deposit
+    # key all live in SQL, which the test job's mocks can't see break.
+    name: core against Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: auni_test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .node-version, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @auni/core test:db
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/auni_test
+  image:
+    # A break only the image would hit (a Dockerfile mistake, an import Node can't
+    # resolve, a migration Postgres rejects) fails here: Auni starts its own Postgres in
+    # the container, migrates it, and answers through the web app's /core rewrite.
+    name: image migrates and boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t auni .
+      - run: docker run -d --name auni -p 127.0.0.1:3000:3000 auni
+      - run: curl -fsS --retry 90 --retry-delay 1 --retry-all-errors http://localhost:3000/core/health
+      - run: docker exec auni node apps/core/bin/auni.mjs doctor || true
+      - if: failure()
+        run: docker logs auni
+  install:
+    # install.sh as a person runs it, from the source of this commit: a private Node checked
+    # against nodejs.org, the dependencies, the build, and the auni command. Then Auni boots from
+    # the installed layout (absolute paths, its own Node, its own Postgres for this OS).
+    name: install.sh on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-latest, macos-latest] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # The runner's temp folder is known only once a step runs, so its env can't be the job's.
+      - run: echo "AUNI_HOME=$RUNNER_TEMP/auni-home" >> "$GITHUB_ENV"
+      - run: git archive --format=tar.gz --prefix=auni/ -o "$RUNNER_TEMP/auni.tar.gz" HEAD
+      - run: sh install.sh
+        env: { AUNI_SOURCE: "${{ runner.temp }}/auni.tar.gz" }
+      - run: ~/.local/bin/auni --version
+      - run: ~/.local/bin/auni doctor --json > doctor.json || true
+      - run: '"$AUNI_HOME/app/current/.node/bin/node" -e "JSON.parse(require(\"fs\").readFileSync(\"doctor.json\"))"'
+      - run: ~/.local/bin/auni --no-open > auni.log 2>&1 &
+      - run: curl -fsS --retry 120 --retry-delay 1 --retry-all-errors http://localhost:3000/core/health
+      # As an owner leaves: it stops the running Auni, removes the app and the command, and keeps
+      # the data folder.
+      - run: ~/.local/bin/auni uninstall --yes
+      - run: test ! -e ~/.local/bin/auni && test ! -e "$AUNI_HOME/app" && test -d "$AUNI_HOME"
+      - if: failure()
+        run: cat auni.log

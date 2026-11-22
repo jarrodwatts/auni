@@ -1,0 +1,27 @@
+packages:
+  - apps/*
+  - packages/*
+
+minimumReleaseAge: 1440
+
+# Native addons below have pure-JS fallbacks, so their install scripts stay off. Postgres's
+# packages only link their own libraries to each other (scripts/hydrate-symlinks.js).
+allowBuilds:
+  esbuild: true
+  sharp: true
+  "@embedded-postgres/darwin-arm64": true
+  "@embedded-postgres/darwin-x64": true
+  "@embedded-postgres/linux-arm64": true
+  "@embedded-postgres/linux-x64": true
+  "@reown/appkit": false
+  bufferutil: false
+  keccak: false
+  protobufjs: false
+  unrs-resolver: false
+  utf-8-validate: false
+
+# Floors for advisories in transitive packages, each within its major: viem pins a ws
+# below the fix, and postcss would otherwise keep source-map-js 1.2.1.
+overrides:
+  "ws@>=8.0.0 <8.21.0": 8.22.0
+  "source-map-js@>=1.0.0 <1.2.2": 1.2.2

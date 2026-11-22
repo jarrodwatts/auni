@@ -1,0 +1,60 @@
+# Auni
+
+> Auni is an open-source AI agent for a person's own money, which they run on their own machine
+> with their own AI login (Claude Code or Codex) and their own wallet. It researches a take they
+> have, builds a position for it, and manages it; every money move is a card they tap to allow.
+> Nobody operates it: no accounts, no fees, no token. MIT licensed, unaudited, use at your own
+> risk.
+
+This is a pnpm monorepo in TypeScript on Node 24, run as one program: `auni` runs its own
+Postgres, `apps/core` (the API and the job runner that runs turns, moves and watches) and
+`apps/web` (the Next.js app); `packages/shared` holds what both read. `auni doctor` says what
+works and what to fix. Each outside service is one app folder in `apps/core/src/apps/<id>/`.
+
+Helping someone set Auni up? Install it with
+`curl -fsSL https://raw.githubusercontent.com/jarrodwatts/auni/main/install.sh | sh` (it builds
+from source into `~/.auni/app`), then follow `auni setup --json` until it says stop, as the agent
+skill below explains. Never ask for a private key, seed phrase or login token, and never read a
+pairing link: `auni` opens it in their browser.
+
+## Start here
+
+- [README](README.md): what Auni is and isn't, how to install, run and update it yourself
+- [Agent skill](skills/auni/SKILL.md): installing Auni and setting it up with
+  `auni setup --json`, running it and changing it, for a coding agent (also a Claude Code plugin: `.claude-plugin/`)
+- [Repo map](AGENTS.md): Auni's words and the checks every change passes; each area's own
+  AGENTS.md, beside its code, says the rest
+
+## Extending it
+
+- [Apps](apps/core/src/apps/AGENTS.md): what an app is, its three sizes and its parts, the rules,
+  and `pnpm scaffold <id> [--with <parts>]`. Read it first, whatever you add
+- Know-how, the smallest app: `pnpm scaffold <id>`, then write its `SKILL.md` (when Claude should
+  load it, and the steps that work there). Nothing else is needed
+- A reader, so a transaction Claude builds for a service reads as a real card under its name:
+  `pnpm scaffold <id> --with reads`, then its `addresses` and `reads`, as
+  [KyberSwap's](apps/core/src/apps/kyberswap/reader.ts) are
+- A venue, for what a transaction can't do: `pnpm scaffold <id> --with moves,account`, then each
+  money tool with its drill, the account, and `problems.ts`, as
+  [Aave's](apps/core/src/apps/aave/) are
+- A look: `pnpm scaffold <id> --with theme`, then its `theme.css`, which may only give the
+  design tokens of `apps/web/app/tokens.css` other values (`apps/core/src/apps/theme.ts`). The
+  owner picks it in Settings. None ships yet
+- [Venues, readers and jobs for core](apps/core/src/apps/venue.md): a money tool, an account, a
+  reader, and the jobs an app does for Auni itself (a swap route, a Solana route, a bridge, a
+  pay-in, a token feed), the last four of which also add one line to
+  [who is asked first](apps/core/src/apps/order.ts)
+- [Lookups](apps/core/src/apps/tools.md): adding read-only tools the agent may call
+- [Wallets](apps/core/src/apps/wallet.md): holding the owner's keys and signing
+- [Brains](apps/core/src/apps/brain.md): running turns on an AI CLI, locked in a box
+- [Watch sources](apps/core/src/apps/source.md): watching the world for the owner's watches
+- [Channels](apps/core/src/apps/channel.md): a chat app the owner talks to Auni in, such as
+  Telegram
+- [Hosts](hosts/README.md): keeping Auni running as a service, in Docker, on Railway or Fly
+- [Contributing](CONTRIBUTING.md): adding an app, the four things it answers for, and pull requests
+
+## Optional
+
+- [Security](SECURITY.md): what counts as a security problem, and how to report one privately
+- [What Auni tells its agent](apps/core/src/agent/prompt.ts): the system prompt
+- [How Auni works](apps/core/skills/how-auni-works/SKILL.md): the product, as the agent explains it

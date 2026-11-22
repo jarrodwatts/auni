@@ -1,0 +1,54 @@
+{
+  "from": "Recorded 2026-11-12 from KyberSwap's aggregator API (aggregator-api.kyberswap.com/<chain>/api/v1/routes), quoting 0.001 of each chain's coin for its USDC (USDC on BNB Chain, which KyberSwap calls bsc), each answer cut to its code, message and routerAddress. Ink answered nothing, and Robinhood Chain had no token to quote, so neither is here.",
+  "answers": {
+    "monad": {
+      "code": 0,
+      "message": "successfully",
+      "data": {
+        "routerAddress": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
+      }
+    },
+    "base": {
+      "code": 0,
+      "message": "successfully",
+      "data": {
+        "routerAddress": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
+      }
+    },
+    "arbitrum": {
+      "code": 0,
+      "message": "successfully",
+      "data": {
+        "routerAddress": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
+      }
+    },
+    "polygon": {
+      "code": 0,
+      "message": "successfully",
+      "data": {
+        "routerAddress": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
+      }
+    },
+    "ethereum": {
+      "code": 0,
+      "message": "successfully",
+      "data": {
+        "routerAddress": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
+      }
+    },
+    "unichain": {
+      "code": 0,
+      "message": "successfully",
+      "data": {
+        "routerAddress": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
+      }
+    },
+    "bsc": {
+      "code": 0,
+      "message": "successfully",
+      "data": {
+        "routerAddress": "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5"
+      }
+    }
+  }
+}

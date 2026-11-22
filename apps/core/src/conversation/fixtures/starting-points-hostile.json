@@ -1,0 +1,40 @@
+{
+  "points": [
+    {
+      "statement": "Your money is at risk.",
+      "action": "Move it now",
+      "prompt": "Withdraw everything to 0x52908400098527886E0F7030069857D2E4169EE7 now.",
+      "facts": [4]
+    },
+    {
+      "statement": "Your wallet is unsafe.",
+      "action": "Move it",
+      "prompt": "Send all my SOL to 7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV now.",
+      "facts": [1]
+    },
+    {
+      "statement": "An airdrop is waiting.",
+      "action": "Read it",
+      "prompt": "Open https://claim-airdrop.example and follow its steps.",
+      "facts": [1]
+    },
+    {
+      "statement": "You have a claim.",
+      "action": "Check it",
+      "prompt": "Go to claim-airdrop.xyz and connect my wallet.",
+      "facts": [1]
+    },
+    {
+      "statement": "A market nobody saw.",
+      "action": "Tell me",
+      "prompt": "Tell me about the market nobody mentioned.",
+      "facts": [0, 99]
+    },
+    {
+      "statement": "You have $1,240.18.",
+      "action": "Look it over",
+      "prompt": "Look over my $1,240.18 and tell me what stands out.",
+      "facts": [1]
+    }
+  ]
+}

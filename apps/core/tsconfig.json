@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["node"],
+    // Node runs core as TypeScript source by stripping the types, so nothing here may need
+    // compiling to run: no enums, namespaces or constructor parameter properties.
+    "erasableSyntaxOnly": true,
+    // Without an explicit lib, tsc defaults to "<target>.full" (target + DOM).
+    // This is a Node-only backend: DOM would silently reshape ambient globals
+    // fetch relies on (e.g. RequestInit loses `duplex`, which Node's fetch
+    // supports but the DOM lib's fetch types don't).
+    "lib": ["ES2024"]
+  },
+  "include": ["src/**/*.ts"]
+}

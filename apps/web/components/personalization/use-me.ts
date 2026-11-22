@@ -1,0 +1,41 @@
+"use client";
+
+import type { Me, UpdateMeRequest } from "@auni/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+
+import { addMissingKey, updateMe } from "@/lib/data/me";
+
+/** The one copy of the owner, which ClientDataProvider seeds with what OwnerProvider read. */
+export const ME_KEY = ["me"] as const;
+
+/** The owner as core last said: their name, time zone, wallets, brain and chat apps. */
+export function useMe(): Me {
+  const { data } = useQuery<Me>({ queryKey: ME_KEY });
+  if (!data) throw new Error("useMe is read inside the paired product, which seeds it.");
+  return data;
+}
+
+/** Reads the owner again, for what changes outside the app (a login, a pairing, new keys). */
+export function useRefreshMe(): () => void {
+  const queryClient = useQueryClient();
+  return useCallback(() => void queryClient.invalidateQueries({ queryKey: ME_KEY }), [queryClient]);
+}
+
+/** Saves a change, and writes core's answer back as the one copy. */
+export function useUpdateMe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (update: UpdateMeRequest) => updateMe(update),
+    onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
+  });
+}
+
+/** Makes the key the wallet lacks beside the one it holds, and writes core's answer back. */
+export function useAddMissingKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: addMissingKey,
+    onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
+  });
+}

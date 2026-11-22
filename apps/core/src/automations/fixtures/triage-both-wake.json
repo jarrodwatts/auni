@@ -1,0 +1,14 @@
+{
+  "verdicts": [
+    {
+      "fire": "{{eth-drop}}",
+      "verdict": "wake",
+      "reason": "ETH crossed below $2,000, the level they wanted to add at."
+    },
+    {
+      "fire": "{{eth-news}}",
+      "verdict": "wake",
+      "reason": "An SEC filing names ETH staking; it bears on the add."
+    }
+  ]
+}

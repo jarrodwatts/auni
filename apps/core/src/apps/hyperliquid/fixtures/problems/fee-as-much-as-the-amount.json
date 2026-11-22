@@ -1,0 +1,8 @@
+{
+  "from": "Recorded 2026-11-13 from Circle's TokenMessengerV2 on an anvil fork of Arbitrum at block 523850079, as eth_estimateGas answered for an address that never held real money: it asked to burn 0.10 USDC for Hyperliquid with a fee of up to 0.20 USDC.",
+  "answer": {
+    "code": 3,
+    "message": "execution reverted: Max fee must be less than amount",
+    "data": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000204d617820666565206d757374206265206c657373207468616e20616d6f756e74"
+  }
+}

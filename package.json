@@ -1,0 +1,42 @@
+{
+  "name": "auni",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": "24.x"
+  },
+  "bin": {
+    "auni": "apps/core/bin/auni.mjs"
+  },
+  "scripts": {
+    "start": "node apps/core/bin/auni.mjs",
+    "auni": "node apps/core/bin/auni.mjs",
+    "dev": "pnpm -r --parallel --filter ./apps/* run dev",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint --cache .",
+    "knip": "knip --no-progress",
+    "test": "pnpm -r run test",
+    "format": "prettier --write .",
+    "gen": "node scripts/gen-apps.ts",
+    "gen:check": "node scripts/gen-apps.ts --check",
+    "pair": "node apps/core/bin/auni.mjs pair",
+    "demo": "node apps/core/bin/auni.mjs demo",
+    "demo:shots": "node scripts/demo-shots.ts",
+    "scaffold": "pnpm --filter @auni/core scaffold",
+    "release": "node apps/core/src/release/make-cli.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "26.1.1",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
+    "knip": "6.42.1",
+    "prettier": "3.9.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.63.0"
+  }
+}

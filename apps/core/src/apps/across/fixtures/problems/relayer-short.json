@@ -1,0 +1,14 @@
+{
+  "from": "Recorded 2026-11-12 from Across's swap API (app.across.to/api/swap/approval), as it answered a quote for a wallet that never held money: 10^30 units of DEGEN on Base, swapped as it leaves, to USDC on Arbitrum.",
+  "answer": {
+    "status": 400,
+    "body": {
+      "type": "AcrossApiError",
+      "code": "INVALID_PARAM",
+      "status": 400,
+      "message": "Relayer Address (0x00000000000000000000000007ae8551be970cb1cca11dd7a11f47ae82e70e67) doesn't have enough funds to support this deposit; for help, please reach out to us on https://across.to",
+      "param": "relayer",
+      "id": "nthg5-1794413259787-d5153d779c34"
+    }
+  }
+}

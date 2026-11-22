@@ -1,0 +1,214 @@
+/*
+ * Auni reading beside a pile of the pages it has opened (ReadingAuni), the owner's take first: its
+ * eyes run along the page's lines, and each new page drops onto the pile as Auni nods to it. It is
+ * the newest line of the work, so it sits in the steps' own column, close under the last of them.
+ */
+.desk {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  /* Room for Auni and its bob; Auni's art is inset in its box, so it steps back to the column. */
+  height: 70px;
+  margin: 2px 0 0 -9px;
+  animation: desk-in 520ms var(--motion-drift) both;
+}
+
+.auni {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  transform-origin: 50% 90%;
+  animation:
+    nod 620ms var(--motion-settle) both,
+    breathe 3.2s 620ms ease-in-out infinite;
+}
+
+.auni :global(.auni-mascot-art) {
+  filter: drop-shadow(0 10px 16px color-mix(in srgb, var(--color-primary) 18%, transparent));
+}
+
+/* Busy, not calling for anyone. */
+.auni :global(.auni-mascot-attention) {
+  display: none;
+}
+
+/* Reading: along each line of the page beside it, and back for the next. */
+.auni :global(.auni-mascot-eyes) {
+  animation: read-lines 2.2s ease-in-out infinite;
+}
+
+/* Searching: it looks along the pile, from one side to the other, while its top pages riffle. */
+.desk[data-searching] .auni :global(.auni-mascot-eyes) {
+  animation: scan 1.6s ease-in-out infinite;
+}
+
+.desk[data-searching] .page[data-depth="0"] {
+  animation:
+    page-in 520ms var(--motion-settle) both,
+    riffle 1.6s 520ms ease-in-out infinite;
+}
+
+.pile {
+  position: relative;
+  width: 48px;
+  height: 58px;
+  flex: none;
+  margin-bottom: 4px;
+}
+
+.page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 8px 8px 0;
+  border-radius: 9px;
+  background: var(--color-card);
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    0 8px 18px -8px color-mix(in srgb, var(--color-shade-blue) 30%, transparent);
+  transition:
+    transform 420ms var(--motion-settle),
+    opacity 420ms ease;
+}
+
+.page i {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-muted);
+}
+
+.page i:last-child {
+  width: 62%;
+}
+
+.page[data-depth="0"] {
+  z-index: 3;
+  animation: page-in 520ms var(--motion-settle) both;
+}
+
+.page[data-depth="1"] {
+  z-index: 2;
+  transform: translate(7px, -3px) rotate(7deg);
+}
+
+.page[data-depth="2"] {
+  z-index: 1;
+  opacity: 0.7;
+  transform: translate(12px, -5px) rotate(13deg);
+}
+
+.site {
+  align-self: center;
+  margin-left: 18px;
+  color: var(--color-muted-foreground);
+  font-size: 13.5px;
+  animation: desk-in 420ms var(--motion-drift) both;
+}
+
+.site b {
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+@keyframes desk-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translate(-30px, -34px) rotate(-14deg) scale(0.8);
+  }
+}
+
+@keyframes nod {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: translateY(3px) scale(1.06, 0.93);
+  }
+  70% {
+    transform: translateY(-5px) scale(0.97, 1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes scan {
+  0%,
+  100% {
+    transform: translate(1px, 3px);
+  }
+  50% {
+    transform: translate(14px, 3px);
+  }
+}
+
+@keyframes riffle {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translate(-3px, -4px) rotate(-6deg);
+  }
+  60% {
+    transform: translate(1px, -1px) rotate(2deg);
+  }
+}
+
+@keyframes read-lines {
+  0% {
+    transform: translate(2px, 4px);
+  }
+  38% {
+    transform: translate(13px, 4px);
+  }
+  50% {
+    transform: translate(2px, 9px);
+  }
+  88% {
+    transform: translate(13px, 9px);
+  }
+  100% {
+    transform: translate(2px, 4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desk,
+  .auni,
+  .auni :global(.auni-mascot-eyes),
+  .desk[data-searching] .auni :global(.auni-mascot-eyes),
+  .page[data-depth="0"],
+  .desk[data-searching] .page[data-depth="0"],
+  .site {
+    animation: none;
+  }
+
+  .page {
+    transition: none;
+  }
+}

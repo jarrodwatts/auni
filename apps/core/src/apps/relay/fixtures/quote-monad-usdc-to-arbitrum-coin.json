@@ -1,0 +1,82 @@
+{
+  "steps": [
+    {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for USDC",
+      "kind": "transaction",
+      "requestId": "0x1794573307eac4076323bbf5a72ebea1705781fca9794a721fe4071a2c098c33",
+      "items": [
+        {
+          "status": "incomplete",
+          "data": {
+            "from": "0x2222222222222222222222222222222222222222",
+            "to": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+            "data": "0x095ea7b30000000000000000000000004cd00e387622c35bddb9b4c962c136462338bc3100000000000000000000000000000000000000000000000000000000000f4240",
+            "value": "0",
+            "chainId": 143
+          }
+        }
+      ]
+    },
+    {
+      "id": "deposit",
+      "action": "Confirm transaction in your wallet",
+      "description": "Depositing funds to the relayer to execute the swap for ETH",
+      "kind": "transaction",
+      "requestId": "0x1794573307eac4076323bbf5a72ebea1705781fca9794a721fe4071a2c098c33",
+      "items": [
+        {
+          "status": "incomplete",
+          "data": {
+            "from": "0x2222222222222222222222222222222222222222",
+            "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+            "data": "0xe80179520000000000000000000000002222222222222222222222222222222222222222000000000000000000000000754704bc059f8c67012fed69bc8a327a5aafb60300000000000000000000000000000000000000000000000000000000000f4240de9235e71f2b121b7a2ae27afbcc844c6c963f85854f0e7d749221fb7d44df64",
+            "value": "0",
+            "chainId": 143
+          }
+        }
+      ]
+    }
+  ],
+  "details": {
+    "operation": "swap",
+    "sender": "0x2222222222222222222222222222222222222222",
+    "recipient": "0x2222222222222222222222222222222222222222",
+    "currencyIn": {
+      "currency": {
+        "chainId": 143,
+        "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+        }
+      },
+      "amount": "1000000",
+      "amountFormatted": "1.0",
+      "amountUsd": "0.999751",
+      "minimumAmount": "1000000"
+    },
+    "currencyOut": {
+      "currency": {
+        "chainId": 42161,
+        "address": "0x0000000000000000000000000000000000000000",
+        "symbol": "ETH",
+        "name": "Ether",
+        "decimals": 18,
+        "metadata": {
+          "logoURI": "https://assets.relay.link/icons/1/light.png",
+          "verified": true
+        }
+      },
+      "amount": "498305616849300",
+      "amountFormatted": "0.0004983056168493",
+      "amountUsd": "0.975788",
+      "minimumAmount": "477924917120163"
+    },
+    "timeEstimate": 1
+  }
+}

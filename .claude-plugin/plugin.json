@@ -1,0 +1,12 @@
+{
+  "name": "auni",
+  "version": "0.1.0",
+  "description": "Set up, run, fix and extend Auni, the open-source AI money agent you run on your own machine with your own AI login and wallet. Its skill (skills/auni) walks a coding agent through `pnpm auni setup --json`.",
+  "author": {
+    "name": "Jarrod Watts"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/jarrodwatts/auni",
+  "repository": "https://github.com/jarrodwatts/auni",
+  "keywords": ["auni", "setup", "money agent", "self-hosted"]
+}

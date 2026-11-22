@@ -1,0 +1,4 @@
+{
+  "from": "Recorded 2026-11-14 from polymarket.com/api/geoblock, asked by the machine Auni's live test ran on, in New South Wales, Australia, a place Polymarket's docs list as close-only. The address it saw is left out.",
+  "answer": { "blocked": true, "country": "AU", "region": "NSW" }
+}

@@ -1,0 +1,4 @@
+{
+  "from": "Recorded by the Internet Archive on 2026-04-11 (web.archive.org/web/20260411060430id_/https://polymarket.com/api/geoblock), asked from its crawler in the United States, a place Polymarket's docs list as close-only. The address it saw is left out.",
+  "answer": { "blocked": true, "country": "US", "region": "" }
+}

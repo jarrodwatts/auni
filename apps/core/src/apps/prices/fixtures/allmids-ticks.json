@@ -1,0 +1,218 @@
+[
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79673.5",
+        "ETH": "2389.65"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.885"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79672.5",
+        "ETH": "2389.35"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.845"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79659.5",
+        "ETH": "2389.45"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.83"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79651.5",
+        "ETH": "2388.85"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.845"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79633.5",
+        "ETH": "2388.05"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.785"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79620.5",
+        "ETH": "2387.65"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.675"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79618.5",
+        "ETH": "2387.25"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.715"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79618.5",
+        "ETH": "2387.35"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.64"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79618.5",
+        "ETH": "2387.15"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.705"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79622.5",
+        "ETH": "2387.25"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.655"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79609.5",
+        "ETH": "2386.05"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.56"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "mids": {
+        "BTC": "79587.5",
+        "ETH": "2385.25"
+      }
+    }
+  },
+  {
+    "channel": "allMids",
+    "data": {
+      "dex": "xyz",
+      "mids": {
+        "xyz:NVDA": "196.535"
+      }
+    }
+  }
+]

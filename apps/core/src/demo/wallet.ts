@@ -1,0 +1,63 @@
+import { keccak256, toHex, type Address, type Hex, type TypedDataDefinition } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+
+import { chainKey } from "../money/chains.ts";
+import type { EvmTx } from "../money/recipe.ts";
+import { WalletExists, type WalletProvider } from "../apps/contract.ts";
+import { chains } from "./world/chain.ts";
+
+// The demo's wallet: a wallet app like any other (apps/wallet.md) that reaches no key the
+// owner holds and no chain. A send goes to the demo's own ledger (world/chain.ts), which mines
+// it at once, so a move plays through to done with nothing signed for a real network.
+
+/**
+ * The key the demo wallet signs with. It is printed here for anyone to read, so its address is
+ * nobody's wallet: never send it money. A venue's order is signed with it only so core's own
+ * check passes, that a signature recovers to the wallet (money/typed-data.ts).
+ */
+const PUBLISHED_KEY: Hex = keccak256(toHex("auni demo wallet: this key is public"));
+const account = privateKeyToAccount(PUBLISHED_KEY);
+
+/** The demo owner's addresses. The Solana one has no key at all. */
+export const WALLET = {
+  evm: account.address,
+  solana: "AuniDemo111111111111111111111111111111111111",
+} as const;
+
+export const demoWallet: WalletProvider = {
+  addresses: async () => WALLET,
+  // The demo starts with its wallet made, as an owner past first run has.
+  create: () => Promise.reject(new WalletExists()),
+  // The demo's chains ask no fee, so no move waits on the chain's coin.
+  sponsored: () => true,
+  signer: async ({ onSent }) => ({
+    evmAddress: WALLET.evm,
+    solanaAddress: WALLET.solana,
+    async sendEvmTransaction(chainId, tx) {
+      const txs: readonly EvmTx[] = "to" in tx ? [tx] : tx;
+      const chain = [...chains.values()].find(({ id }) => id === chainId);
+      if (!chain) throw new Error(`The demo has no chain ${chainId}, so nothing was sent.`);
+      const hash = chain.send(
+        WALLET.evm,
+        txs.map(({ to, data, value }) => ({
+          to: to as Address,
+          data: (data ?? "0x") as Hex,
+          value: BigInt(value ?? 0),
+        })),
+      );
+      await onSent({
+        chain: chainKey(chainId),
+        hash,
+        ...(txs.every(({ setup }) => setup) ? { setup: true as const } : {}),
+      });
+      return hash;
+    },
+    signEvmTypedData: (document) => account.signTypedData(document as TypedDataDefinition),
+    sendSolanaTransaction: () =>
+      Promise.reject(new Error("The demo sends nothing on Solana, so nothing was sent.")),
+  }),
+  // Every send is mined as it is handed over, so none is ever left for the wallet to answer for.
+  sendStatus: async () => "pending",
+  // Its key is printed above for anyone to read, so showing it (first run's spare key) shows nobody's.
+  revealKeys: async () => ({ evm: PUBLISHED_KEY, solana: null }),
+};

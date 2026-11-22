@@ -1,0 +1,10 @@
+{
+  "from": "Polymarket's docs, \"Error Codes\" (docs.polymarket.com/resources/error-codes), read 2026-11-12: the 400 an order answers under \"Order Processing Errors\" when nothing on the book matches it.",
+  "answer": {
+    "service": "Polymarket CLOB",
+    "status": 400,
+    "body": {
+      "error": "no orders found to match with FAK order. FAK orders are partially filled or killed if no match is found."
+    }
+  }
+}

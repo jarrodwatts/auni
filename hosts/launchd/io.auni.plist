@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Auni as a launchd agent: `auni service install` writes this to
+     ~/Library/LaunchAgents/io.auni.plist, filled in for this Mac, and loads it. An install runs
+     its launcher, which runs the current version, so `auni update` applies here too. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>io.auni</string>
+  <key>ProgramArguments</key>
+  <array>
+@COMMAND@
+  </array>
+  <key>WorkingDirectory</key>
+  <string>@HOME@</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- AUNI_RUNS_AS=service, so `auni stop` and `auni update` stop it as the service. Then
+         from the shell that installed it: PATH, so the brain's CLIs (claude, codex) are found,
+         and AUNI_HOME, CLAUDE_CONFIG_DIR and CODEX_HOME where set. The rest of Auni's
+         settings it reads from $AUNI_HOME/.env. -->
+@ENVIRONMENT@
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <!-- Started again whenever it exits: as it does, with 1, if its Postgres stops under it. -->
+  <key>KeepAlive</key>
+  <true/>
+  <!-- SIGTERM is a Ctrl-C: running moves get up to two minutes to finish. -->
+  <key>ExitTimeOut</key>
+  <integer>150</integer>
+  <key>StandardOutPath</key>
+  <string>@LOG@</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG@</string>
+</dict>
+</plist>

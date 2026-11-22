@@ -1,0 +1,92 @@
+import { describe, expect, it } from "vitest";
+
+import { askAboutKeys, farewell, REMOVE_KEYS, type KeysFacts } from "./uninstall.ts";
+
+const inKeychain = {
+  place: 'in the OS keychain, as "wallet-keys:/home/me/.auni" under "auni"',
+  inDataFolder: false,
+};
+const facts: KeysFacts = {
+  kept: inKeychain,
+  addresses: { evm: "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23", solana: null },
+  backupSavedAt: new Date("2026-11-02T09:30:00Z"),
+  reading: { usd: "12.4", takenAt: new Date("2026-11-14T08:00:00Z") },
+};
+
+/** Asks `facts` with these answers typed in turn, and what was said and asked. */
+async function asked(answers: readonly string[] | null, given: KeysFacts = facts) {
+  const said: string[] = [];
+  const questions: string[] = [];
+  const queue = [...(answers ?? [])];
+  const answer = await askAboutKeys(
+    given,
+    answers &&
+      (async (question) => {
+        questions.push(question);
+        return queue.shift()!;
+      }),
+    (line) => said.push(line),
+  );
+  return { answer, said: said.join("\n"), questions };
+}
+
+describe("uninstalling, the wallet's keys", () => {
+  it("stay when the owner presses Enter, after being told where they are and what they hold", async () => {
+    const { answer, said, questions } = await asked([""]);
+    expect(answer).toBe("keep");
+    expect(said).toContain(`Your wallet's keys are ${inKeychain.place}.`);
+    expect(said).toContain("They sign for EVM 0x2c7536E3605D9C16a7a3D7b1898e529396a65c23.");
+    expect(said).toContain("put everything you hold at $12.40");
+    expect(said).toContain("the backup you saved at 2026-11-02 09:30 UTC");
+    expect(questions).toEqual([
+      `Press Enter to keep them, or type "${REMOVE_KEYS}" to remove them: `,
+    ]);
+  });
+
+  it("are removed only on the sentence that says what removing does", async () => {
+    expect((await asked([REMOVE_KEYS])).answer).toBe("remove");
+    expect((await asked([`  ${REMOVE_KEYS}\n`])).answer).toBe("remove");
+  });
+
+  // A mistyped sentence may still have meant yes, so it is asked again, not taken as a no.
+  it("stop the uninstall with nothing removed on any other answer", async () => {
+    for (const typed of ["yes", "y", "remove", "Remove my keys and lose this wallet"]) {
+      const { answer, said } = await asked([typed]);
+      expect(answer).toBe("stop");
+      expect(said).toMatch(/nothing was removed/u);
+    }
+  });
+
+  it("stay, unasked, with no terminal to ask in", async () => {
+    const { answer, said } = await asked(null);
+    expect(answer).toBe("keep");
+    expect(said).toContain(inKeychain.place);
+  });
+
+  it("stay, unasked, before the owner has saved the wallet's backup", async () => {
+    const { answer, said, questions } = await asked([REMOVE_KEYS], {
+      ...facts,
+      backupSavedAt: null,
+    });
+    expect(answer).toBe("keep");
+    expect(questions).toEqual([]);
+    expect(said).toMatch(/haven't saved this wallet's backup/u);
+  });
+
+  it("are said truthfully as Auni goes: a keychain entry outlives the data folder", () => {
+    expect(farewell("/home/me/.auni", inKeychain, false)).toBe(
+      "Auni is uninstalled. Your data stays in /home/me/.auni: its database and your settings. " +
+        `Your wallet's keys stay ${inKeychain.place}, and removing that folder leaves them there: ` +
+        "an Auni installed into /home/me/.auni again signs with the same wallet. Deleting that " +
+        "entry with your OS's keychain app removes them, and loses the wallet unless its money " +
+        "is moved out first or you have its backup.",
+    );
+    expect(
+      farewell("/srv/auni", { place: "in /srv/auni/wallet-keys.json", inDataFolder: true }, false),
+    ).toMatch(
+      /stays in \/srv\/auni: its database and your settings, and your wallet's keys\. Removing that folder loses the wallet/u,
+    );
+    expect(farewell("/home/me/.auni", inKeychain, true)).toMatch(/your wallet's keys are removed/u);
+    expect(farewell("/home/me/.auni", null, false)).not.toMatch(/keys/u);
+  });
+});

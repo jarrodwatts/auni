@@ -1,0 +1,4 @@
+{
+  "from": "Recorded 2026-11-14 from polymarket.com/api/geoblock, asked through Google's translation proxy, which reached it from Singapore, a place Polymarket's docs list as close-only. The address it saw is left out.",
+  "answer": { "blocked": true, "country": "SG", "region": "" }
+}

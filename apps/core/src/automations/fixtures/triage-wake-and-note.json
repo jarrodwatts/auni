@@ -1,0 +1,14 @@
+{
+  "verdicts": [
+    {
+      "fire": "{{hype-unlock}}",
+      "verdict": "wake",
+      "reason": "A $90M HYPE unlock lands tomorrow and they hold $412 of HYPE they meant to trim on supply news."
+    },
+    {
+      "fire": "{{eth-recap}}",
+      "verdict": "note",
+      "reason": "A recap of yesterday's ETH ETF flows, which the last fire already covered."
+    }
+  ]
+}

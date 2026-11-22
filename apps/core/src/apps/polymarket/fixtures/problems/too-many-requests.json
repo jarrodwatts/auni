@@ -1,0 +1,10 @@
+{
+  "from": "Polymarket's docs, \"Error Codes\" (docs.polymarket.com/resources/error-codes), read 2026-11-12: the 429 any endpoint can answer, under \"Global Errors\".",
+  "answer": {
+    "service": "Polymarket CLOB",
+    "status": 429,
+    "body": {
+      "error": "Too Many Requests"
+    }
+  }
+}

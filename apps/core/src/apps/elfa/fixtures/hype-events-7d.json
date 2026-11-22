@@ -1,0 +1,494 @@
+{
+  "events": [
+    {
+      "id": "e1a0fc65-39e6-44f8-80c8-e7223019bc96",
+      "eventClass": "market",
+      "alertTitle": "Hyperliquid Strategies adds about 5.1 million HYPE in 29 days",
+      "summary": "Two accounts report that Hyperliquid Strategies accumulated approximately 5.1 million HYPE since mid-September, worth about $414.5 million at the quoted price. Its reported total holdings reached roughly 38.7 million HYPE by October 15.",
+      "implication": "bullish",
+      "eventType": "marketFlow",
+      "primaryEntities": [
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        }
+      ],
+      "relatedEntities": [],
+      "alertAction": "alert",
+      "originCount": 2,
+      "impacts": [
+        {
+          "entityId": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "priceChange1d": 0.00892131,
+          "movedFirst": false,
+          "marketWide": false,
+          "final": false
+        }
+      ],
+      "analyzedAt": 1792152654,
+      "firstSeenAt": 1792137770,
+      "storylineId": "909a25c3-176e-4f2f-8b43-ce58253eaee0",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2111004930727186591",
+          "handle": "Havochl_",
+          "link": "https://x.com/Havochl_/status/2111004930727186591"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2111017900718846129",
+          "handle": "HypedLaunches",
+          "link": "https://x.com/HypedLaunches/status/2111017900718846129"
+        }
+      ],
+      "positions": null,
+      "novelty": "new"
+    },
+    {
+      "id": "0a458380-67f6-4b8d-9fc1-85e6c58d455a",
+      "eventClass": "market",
+      "alertTitle": "Phantom\u2019s $50B in Hyperliquid perps volume is linked to more than $12M in HYPE buybacks",
+      "summary": "Posts report that Phantom has generated over $50 billion in perpetuals trading volume, with one also attributing more than $12 million in HYPE buybacks to that activity. The posts cite 192,000 traders and millions of positions since the product launched.",
+      "implication": "bullish",
+      "eventType": "marketFlow",
+      "primaryEntities": [
+        {
+          "id": "532d6285-c57a-4e5f-8dd0-d9b47b6fc7a4",
+          "symbol": null,
+          "name": "Phantom",
+          "entityType": "project"
+        },
+        {
+          "id": "66256be7-9015-4688-9364-7748003a9667",
+          "symbol": null,
+          "name": "Hyperliquid",
+          "entityType": "project"
+        },
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        }
+      ],
+      "relatedEntities": [],
+      "alertAction": "alert",
+      "originCount": 4,
+      "impacts": [
+        {
+          "entityId": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "priceChange1d": 0.0019334313,
+          "movedFirst": false,
+          "marketWide": false,
+          "final": false
+        }
+      ],
+      "analyzedAt": 1792144497,
+      "firstSeenAt": 1792114303,
+      "storylineId": "3a83e0f5-71a0-471c-9041-5a40d2483a6d",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2110906502424961243",
+          "handle": "KORypto_JUN",
+          "link": "https://x.com/KORypto_JUN/status/2110906502424961243"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2110958973918785799",
+          "handle": "Hyperliquid_Hub",
+          "link": "https://x.com/Hyperliquid_Hub/status/2110958973918785799"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2111032898480468386",
+          "handle": "HYPEconomist",
+          "link": "https://x.com/HYPEconomist/status/2111032898480468386"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2111044205778751537",
+          "handle": "HypedLaunches",
+          "link": "https://x.com/HypedLaunches/status/2111044205778751537"
+        }
+      ],
+      "positions": null,
+      "novelty": "update"
+    },
+    {
+      "id": "d8457434-4ac0-4915-a90f-fd2154a7e69e",
+      "eventClass": "market",
+      "alertTitle": "kHYPE launches on Ethereum and becomes collateral on Derive",
+      "summary": "Derive V3 and Kinetiq brought kHYPE to Ethereum via Chainlink CCIP, allowing holders to retain HYPE staking rewards while using it as collateral for options and perpetuals on Derive. Kinetiq says kHYPE is already a significant part of Derive\u2019s TVL.",
+      "implication": "bullish",
+      "eventType": "protocol",
+      "primaryEntities": [
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        },
+        {
+          "id": "f56ec999-ecb3-4f55-b213-5bcaab4e9b4a",
+          "symbol": "DRV",
+          "name": "Derive",
+          "entityType": "token"
+        }
+      ],
+      "relatedEntities": [],
+      "alertAction": "alert",
+      "originCount": 2,
+      "impacts": [
+        {
+          "entityId": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "priceChange1d": -0.009703112,
+          "movedFirst": false,
+          "marketWide": true,
+          "final": true
+        }
+      ],
+      "analyzedAt": 1791898200,
+      "firstSeenAt": 1791897387,
+      "storylineId": "37408a6a-c253-4083-b683-e3ee6aa2b72a",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109996688580685833",
+          "handle": "DeriveXYZ",
+          "link": "https://x.com/DeriveXYZ/status/2109996688580685833"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109999935307579711",
+          "handle": "Kinetiq_xyz",
+          "link": "https://x.com/Kinetiq_xyz/status/2109999935307579711"
+        }
+      ],
+      "positions": null,
+      "novelty": "new"
+    },
+    {
+      "id": "df3771de-b17f-4fd2-af58-4a64f981512a",
+      "eventClass": "market",
+      "alertTitle": "Hyperliquid leads seven-day perpetual DEX volume with $48.1 billion",
+      "summary": "Two accounts report Hyperliquid at $48.1 billion in notional volume over the past seven days, more than three times the second-place venue, Kalshi. The figures are presented as a ranking of perpetual DEX activity.",
+      "implication": "bullish",
+      "eventType": "marketFlow",
+      "primaryEntities": [
+        {
+          "id": "66256be7-9015-4688-9364-7748003a9667",
+          "symbol": null,
+          "name": "Hyperliquid",
+          "entityType": "project"
+        },
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        }
+      ],
+      "relatedEntities": [],
+      "alertAction": "alert",
+      "originCount": 2,
+      "impacts": [
+        {
+          "entityId": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "priceChange1d": -0.053186152,
+          "movedFirst": false,
+          "marketWide": false,
+          "final": true
+        }
+      ],
+      "analyzedAt": 1791805932,
+      "firstSeenAt": 1791789600,
+      "storylineId": "e8b62041-30fb-4590-bd63-2f802c0aa1d2",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109544597755933022",
+          "handle": "HYPERDailyTK",
+          "link": "https://x.com/HYPERDailyTK/status/2109544597755933022"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109550717601984944",
+          "handle": "HypedLaunches",
+          "link": "https://x.com/HypedLaunches/status/2109550717601984944"
+        }
+      ],
+      "positions": null,
+      "novelty": "new"
+    },
+    {
+      "id": "f0c2abb1-de02-445b-88af-ab59d4d7ed2c",
+      "eventClass": "market",
+      "alertTitle": "Whale sells $34M of BTC and buys $36M of ETH",
+      "summary": "Lookonchain reports a whale sold 410.14 BTC on Hyperliquid and used DEXs to buy 14,341 ETH, a roughly $36.14 million rotation from BTC into ETH. The same report was relayed on Telegram.",
+      "implication": "mixed",
+      "eventType": "marketFlow",
+      "primaryEntities": [
+        {
+          "id": "360fd4a8-46e3-4713-8a91-3627b86029fc",
+          "symbol": "BTC",
+          "name": "Bitcoin",
+          "entityType": "token"
+        },
+        {
+          "id": "7e735621-f411-49c0-b985-2dddc65ac570",
+          "symbol": "ETH",
+          "name": "Ethereum",
+          "entityType": "token"
+        }
+      ],
+      "relatedEntities": [
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        }
+      ],
+      "alertAction": "alert",
+      "originCount": 15,
+      "impacts": [
+        {
+          "entityId": "360fd4a8-46e3-4713-8a91-3627b86029fc",
+          "symbol": "BTC",
+          "priceChange1d": -0.01378889,
+          "movedFirst": false,
+          "marketWide": false,
+          "final": true
+        },
+        {
+          "entityId": "7e735621-f411-49c0-b985-2dddc65ac570",
+          "symbol": "ETH",
+          "priceChange1d": -0.02901583,
+          "movedFirst": false,
+          "marketWide": false,
+          "final": true
+        }
+      ],
+      "analyzedAt": 1791769883,
+      "firstSeenAt": 1791769780,
+      "storylineId": "13394df6-2077-4153-81b7-e9b623e95bd2",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109461465828925587",
+          "handle": "lookonchain",
+          "link": "https://x.com/lookonchain/status/2109461465828925587"
+        },
+        {
+          "source": "telegram",
+          "sourceRecordId": "telegram_group:83253f6b327544d03a43b11aeb3754ed",
+          "handle": "ctlivefeed",
+          "link": "https://t.me/CTLIVEFEED/15847"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109486659595382976",
+          "handle": "wublockchain12",
+          "link": "https://x.com/wublockchain12/status/2109486659595382976"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109608770863042760",
+          "handle": "cryptorover",
+          "link": "https://x.com/cryptorover/status/2109608770863042760"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109575506786218436",
+          "handle": "AshCrypto",
+          "link": "https://x.com/AshCrypto/status/2109575506786218436"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109609281922515320",
+          "handle": "feifan7686",
+          "link": "https://x.com/feifan7686/status/2109609281922515320"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109596543896764463",
+          "handle": "LintonWorm",
+          "link": "https://x.com/LintonWorm/status/2109596543896764463"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109485259570200582",
+          "handle": "EmberCN",
+          "link": "https://x.com/EmberCN/status/2109485259570200582"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109535789658914877",
+          "handle": "TheMoonShow",
+          "link": "https://x.com/TheMoonShow/status/2109535789658914877"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109650572815253737",
+          "handle": "BitcoinArchive",
+          "link": "https://x.com/BitcoinArchive/status/2109650572815253737"
+        }
+      ],
+      "positions": null,
+      "novelty": "new"
+    },
+    {
+      "id": "9618d0d2-6f93-4a0d-8f4c-24044e998d8e",
+      "eventClass": "market",
+      "alertTitle": "Hyperliquid reports $14.58M in monthly USDC reserve yield as its balance grows",
+      "summary": "Posts report that Hyperliquid received $14.58 million from USDC reserve yield over one interval, while the balance behind the revenue stream rose from $4.43 billion in June to $6.05 billion in October. One post says each additional $1 billion at the current rate would add about $32 million in annual yield.",
+      "implication": "bullish",
+      "eventType": "company",
+      "primaryEntities": [
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        }
+      ],
+      "relatedEntities": [],
+      "alertAction": "alert",
+      "originCount": 2,
+      "impacts": [
+        {
+          "entityId": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "priceChange1d": 0.027173081,
+          "movedFirst": false,
+          "marketWide": false,
+          "final": true
+        }
+      ],
+      "analyzedAt": 1791725487,
+      "firstSeenAt": 1791708748,
+      "storylineId": "4ffe1a15-32e3-4265-b4b4-c66a52d342c2",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109205482556784984",
+          "handle": "marcuslayerx",
+          "link": "https://x.com/marcuslayerx/status/2109205482556784984"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2109275575856607577",
+          "handle": "PDmytriiev",
+          "link": "https://x.com/PDmytriiev/status/2109275575856607577"
+        }
+      ],
+      "positions": null,
+      "novelty": "new"
+    },
+    {
+      "id": "b90152f2-779e-4936-8aa2-7666c02b208d",
+      "eventClass": "market",
+      "alertTitle": "Hyperliquid perpetuals become monitorable on Bloomberg Terminal and tradable through Copper",
+      "summary": "Two accounts report that institutions can monitor Hyperliquid perpetual prices on Bloomberg Terminal and trade them through Copper APIs. The posts frame the access as newly available, though they do not provide further rollout details.",
+      "implication": "bullish",
+      "eventType": "protocol",
+      "primaryEntities": [
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        }
+      ],
+      "relatedEntities": [],
+      "alertAction": "alert",
+      "originCount": 2,
+      "impacts": [
+        {
+          "entityId": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "priceChange1d": 0.0073104445,
+          "movedFirst": false,
+          "marketWide": false,
+          "final": true
+        }
+      ],
+      "analyzedAt": 1791617094,
+      "firstSeenAt": 1791616404,
+      "storylineId": "682b0d41-1ad2-46d5-87e6-28800ab346d5",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2108818162942882158",
+          "handle": "Bitcoineo",
+          "link": "https://x.com/Bitcoineo/status/2108818162942882158"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2108820859679064302",
+          "handle": "Hyperliquid_Hub",
+          "link": "https://x.com/Hyperliquid_Hub/status/2108820859679064302"
+        }
+      ],
+      "positions": null,
+      "novelty": "new"
+    },
+    {
+      "id": "f509b153-2060-4ce9-8219-987064fad44b",
+      "eventClass": "market",
+      "alertTitle": "Papertrade expected to go live after a scheduled Hyperliquid network upgrade",
+      "summary": "Two accounts report a Hyperliquid network upgrade scheduled for 8:15 UTC, with Papertrade trading expected to go live around 9:15 UTC. One post notes roughly 10 minutes of downtime during the upgrade.",
+      "implication": "bullish",
+      "eventType": "protocol",
+      "primaryEntities": [
+        {
+          "id": "db6ef83e-9835-47ee-903a-d3aebff8a289",
+          "symbol": null,
+          "name": "Papertrade",
+          "entityType": "project"
+        }
+      ],
+      "relatedEntities": [
+        {
+          "id": "944dcaf0-1b0a-44aa-bffc-11c1a80e1839",
+          "symbol": "HYPE",
+          "name": "Hyperliquid",
+          "entityType": "token"
+        }
+      ],
+      "alertAction": "alert",
+      "originCount": 2,
+      "impacts": [],
+      "analyzedAt": 1791613845,
+      "firstSeenAt": 1791611393,
+      "storylineId": "9c203938-2f1b-446a-9822-ce786c93fc2f",
+      "citedSources": [
+        {
+          "source": "twitter",
+          "sourceRecordId": "2108797143146287440",
+          "handle": "HyperliquidNews",
+          "link": "https://x.com/HyperliquidNews/status/2108797143146287440"
+        },
+        {
+          "source": "twitter",
+          "sourceRecordId": "2108807288874283393",
+          "handle": "vish_hl",
+          "link": "https://x.com/vish_hl/status/2108807288874283393"
+        }
+      ],
+      "positions": null,
+      "novelty": "new"
+    }
+  ],
+  "nextCursor": null,
+  "hasMore": false,
+  "servedFrom": 1791550875
+}

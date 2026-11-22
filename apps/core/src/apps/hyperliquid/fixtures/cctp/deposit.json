@@ -1,0 +1,90 @@
+{
+  "from": "Recorded on 2026-11-13 from public data, for a deposit somebody else made (not the owner's, and no key of Auni's): the Arbitrum transaction that burned 2,000 USDC through Circle's TokenMessengerV2 for the sender's own Hyperliquid account; what Circle's API said of that transaction once it was carried on (iris-api.circle.com/v2/messages/3?transactionHash=); the lines Hyperliquid's ledger then listed for the account (userNonFundingLedgerUpdates); and the account's balances read 0.25 seconds after the burn was seen and again once the credit was listed (userAbstraction, spotClearinghouseState, clearinghouseState).",
+  "answer": {
+    "transaction": {
+      "hash": "0x36cc1baedf836b56a01f773f3dcef8c912f7b50a951e6f69fa166f023cf8ab51",
+      "from": "0x9239bfe4b9f5e55326880b519fbe62301241f31b",
+      "to": "0x28b5a0e9c621a5badaa536219b3a228c8168cf5d",
+      "input": "0x779b432d00000000000000000000000000000000000000000000000000000000773594000000000000000000000000000000000000000000000000000000000000000013000000000000000000000000b21d281dedb17ae5b501f6aa8256fe38c4e45757000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831000000000000000000000000b21d281dedb17ae5b501f6aa8256fe38c4e457570000000000000000000000000000000000000000000000000000000000030d4000000000000000000000000000000000000000000000000000000000000003e800000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000038636374702d666f727761726400000000000000000000000000000000000000189239bfe4b9f5e55326880b519fbe62301241f31b000000000000000000000000"
+    },
+    "burnedAt": 1794568955000,
+    "amount": "2000",
+    "account": "0x9239bfe4b9f5e55326880b519fbe62301241f31b",
+    "circle": {
+      "messages": [
+        {
+          "attestation": "0x420c363f8c7ac417fe34fe8df03ec28d7202e9fc85c97cb06b9612feadb1de936350f8847e13194948445275797033a9846fbde66c4275a7da84cb4e651b07891cc4491c93394f8f67f20eb138e4dcdaea0b857058836400ff7efaa5c8de72932b109078f970dea63cf5ca74524757828fa1e06a8fb831fc4464da833b85a92b331b",
+          "message": "0x0000000100000003000000138cbb7cfcc743fa37efdbc9aa40c4cbb754030be2b7ae980aab35f84d2e182c6900000000000000000000000028b5a0e9c621a5badaa536219b3a228c8168cf5d00000000000000000000000028b5a0e9c621a5badaa536219b3a228c8168cf5d000000000000000000000000b21d281dedb17ae5b501f6aa8256fe38c4e45757000003e8000003e800000001000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831000000000000000000000000b21d281dedb17ae5b501f6aa8256fe38c4e4575700000000000000000000000000000000000000000000000000000000773594000000000000000000000000009239bfe4b9f5e55326880b519fbe62301241f31b0000000000000000000000000000000000000000000000000000000000030d400000000000000000000000000000000000000000000000000000000000030d4000000000000000000000000000000000000000000000000000000000030dd081636374702d666f727761726400000000000000000000000000000000000000189239bfe4b9f5e55326880b519fbe62301241f31b00000000",
+          "eventNonce": "0x8cbb7cfcc743fa37efdbc9aa40c4cbb754030be2b7ae980aab35f84d2e182c69",
+          "cctpVersion": 2,
+          "status": "complete",
+          "decodedMessage": {
+            "sourceDomain": "3",
+            "destinationDomain": "19",
+            "nonce": "0x8cbb7cfcc743fa37efdbc9aa40c4cbb754030be2b7ae980aab35f84d2e182c69",
+            "sender": "0x28b5a0e9c621a5badaa536219b3a228c8168cf5d",
+            "recipient": "0x28b5a0e9c621a5badaa536219b3a228c8168cf5d",
+            "destinationCaller": "0xb21d281dedb17ae5b501f6aa8256fe38c4e45757",
+            "minFinalityThreshold": "1000",
+            "finalityThresholdExecuted": "1000",
+            "messageBody": "0x00000001000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e5831000000000000000000000000b21d281dedb17ae5b501f6aa8256fe38c4e4575700000000000000000000000000000000000000000000000000000000773594000000000000000000000000009239bfe4b9f5e55326880b519fbe62301241f31b0000000000000000000000000000000000000000000000000000000000030d400000000000000000000000000000000000000000000000000000000000030d4000000000000000000000000000000000000000000000000000000000030dd081636374702d666f727761726400000000000000000000000000000000000000189239bfe4b9f5e55326880b519fbe62301241f31b00000000",
+            "decodedMessageBody": {
+              "burnToken": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+              "mintRecipient": "0xb21d281dedb17ae5b501f6aa8256fe38c4e45757",
+              "amount": "2000000000",
+              "messageSender": "0x9239bfe4b9f5e55326880b519fbe62301241f31b",
+              "maxFee": "200000",
+              "feeExecuted": "200000",
+              "expirationBlock": "51236993",
+              "hookData": "0x636374702d666f727761726400000000000000000000000000000000000000189239bfe4b9f5e55326880b519fbe62301241f31b00000000"
+            },
+            "decodedCctpXMessageBody": null
+          },
+          "delayReason": null,
+          "forwardState": "COMPLETE",
+          "forwardTxHash": "0xfca9c2a1fbb03fe379bb2e4e8f8f32321d44a7e98b8709be0d89663504726a81",
+          "destinationMintTxHash": "0xfca9c2a1fbb03fe379bb2e4e8f8f32321d44a7e98b8709be0d89663504726a81"
+        }
+      ],
+      "sourceTxHash": "0x36cc1baedf836b56a01f773f3dcef8c912f7b50a951e6f69fa166f023cf8ab51"
+    },
+    "ledger": [
+      {
+        "time": 1794568961376,
+        "hash": "0xf882c41625e748c9f9fc0448b325a1010100dbfbc0ea679c9c4b6f68e4eb22b4",
+        "delta": {
+          "type": "send",
+          "user": "0x6b9e773128f453f5c2c60935ee2de2cbc5390a24",
+          "destination": "0x9239bfe4b9f5e55326880b519fbe62301241f31b",
+          "sourceDex": "spot",
+          "destinationDex": "",
+          "token": "USDC",
+          "amount": "1999.8",
+          "usdcValue": "1999.8",
+          "fee": "0.0",
+          "nativeTokenFee": "0.0",
+          "nonce": 5829735,
+          "feeToken": ""
+        }
+      }
+    ],
+    "before": {
+      "mode": "unifiedAccount",
+      "spotUsdc": "297.6",
+      "spotHold": "0.0",
+      "perpsWithdrawable": "0.0",
+      "perpsAccountValue": "0.0",
+      "positions": 0,
+      "auniFreeUsd": 297.6
+    },
+    "after": {
+      "mode": "unifiedAccount",
+      "spotUsdc": "2297.4",
+      "spotHold": "0.0",
+      "perpsWithdrawable": "0.0",
+      "perpsAccountValue": "0.0",
+      "positions": 0,
+      "auniFreeUsd": 2297.4
+    }
+  }
+}

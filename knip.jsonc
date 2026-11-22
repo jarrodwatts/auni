@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@6.42.1/schema-jsonc.json",
+  "workspaces": {
+    "apps/core": {
+      // Run by hand to record a brain's fixtures (apps/brain.md), so nothing imports them.
+      "entry": ["src/apps/*/record.ts"],
+      // OpenSSH's ssh-keygen, which signs and checks releases, and systemd's loginctl and
+      // journalctl, which doctor and triage read a service by: none is a package.
+      "ignoreBinaries": ["ssh-keygen", "loginctl", "journalctl"],
+      // The app contract: an app's author may name any of its kinds' types.
+      "ignoreIssues": { "src/apps/contract.ts": ["types"] },
+      // An app's own card (<view>.card.tsx) is built by the web app and draws with its parts.
+      "paths": { "@/*": ["../web/*"] },
+    },
+    "apps/web": {
+      // Vendored shadcn/ui, owned upstream and kept whole (as in eslint.config.mjs).
+      "ignore": ["components/ui/**"],
+    },
+  },
+}

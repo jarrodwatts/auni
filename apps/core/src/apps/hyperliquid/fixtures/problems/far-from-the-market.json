@@ -1,0 +1,16 @@
+{
+  "from": "Hyperliquid's docs, \"Error responses\" (hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/error-responses), read 2026-11-12: the error string for Oracle, in the shape its \"Exchange endpoint\" page shows a refused order answered in.",
+  "answer": {
+    "status": "ok",
+    "response": {
+      "type": "order",
+      "data": {
+        "statuses": [
+          {
+            "error": "Order price too far from oracle"
+          }
+        ]
+      }
+    }
+  }
+}

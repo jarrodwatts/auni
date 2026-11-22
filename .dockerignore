@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+.pnpm-store
+.eslintcache
+**/.DS_Store
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo

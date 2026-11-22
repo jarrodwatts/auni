@@ -1,0 +1,147 @@
+import { createHash, randomBytes } from "node:crypto";
+
+import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
+
+import { db, type Tx } from "../db/client.ts";
+import { owner, ownerSessions, type OwnerRow } from "../db/schema.ts";
+import { env } from "../env.ts";
+
+// Auni runs for one person: whoever can read what the hub prints is its owner, since they can
+// read its keys too. A pairing code printed there turns one browser into the owner's for a
+// long while; nothing else (not a request from this machine, not a guess) acts as the owner.
+//
+//   auni opens  WEB_ORIGIN/app#pair=<code>   (with nobody paired; `auni pair` prints one)
+//        |      the code lives in the fragment, so no server log or Referer sees it
+//        v
+//   the app POSTs the code -> pair() spends it once -> a session token in an HttpOnly cookie
+//        |      and goes on as the owner's: first run (their first take) until it's sent, then the app
+//        v
+//   every owner route: requireOwner looks the cookie's hash up here
+
+/** How long a pairing code works. */
+export const PAIRING_TTL_MS = 15 * 60_000;
+/**
+ * How long after pairing a browser has proved its owner is there (auth/proof.ts). Pairing needs
+ * the terminal where Auni runs, which already reaches the keys, so it is the root of trust; an
+ * old session, say a stolen cookie, proves nothing.
+ */
+const FRESH_PAIRING = sql`interval '15 minutes'`;
+const SESSION_TTL_MS = 400 * 24 * 60 * 60_000;
+export const SESSION_COOKIE = "auni_session";
+
+function hashOf(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function newToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+/** The owner's settings: their name, time zone, brief and channels. */
+export async function theOwner(executor: Pick<Tx, "select"> = db): Promise<OwnerRow> {
+  return theRow(await executor.select().from(owner));
+}
+
+/**
+ * The owner's settings, held for the rest of `tx`, so arrivals, news and other tokens record one
+ * at a time, and a settings change waits for them.
+ */
+export async function lockOwner(tx: Tx): Promise<OwnerRow> {
+  return theRow(await tx.select().from(owner).for("update"));
+}
+
+function theRow([row]: readonly OwnerRow[]): OwnerRow {
+  if (!row) throw new Error("The owner's settings row is missing: the migrations make it.");
+  return row;
+}
+
+/** A fresh one-time code; codes past their 15 minutes are cleared on the way. */
+export async function mintPairingCode(): Promise<string> {
+  const code = newToken();
+  await db.delete(ownerSessions).where(lt(ownerSessions.expiresAt, sql`now()`));
+  await db.insert(ownerSessions).values({
+    tokenHash: hashOf(code),
+    kind: "pairing",
+    expiresAt: new Date(Date.now() + PAIRING_TTL_MS),
+  });
+  return code;
+}
+
+/** The link that signs a browser in as the owner's, straight into the app, at `path` of it. */
+export function pairingLink(code: string, path = "/app"): string {
+  return `${env.WEB_ORIGIN}${path}#pair=${code}`;
+}
+
+/** Spends a pairing code: the new session's token, or null for a code that is wrong, spent or old. */
+export async function pair(code: string): Promise<string | null> {
+  return db.transaction(async (tx) => {
+    // One statement, so two browsers racing with one code can't both pass.
+    const [spent] = await tx
+      .delete(ownerSessions)
+      .where(
+        and(
+          eq(ownerSessions.tokenHash, hashOf(code)),
+          eq(ownerSessions.kind, "pairing"),
+          gt(ownerSessions.expiresAt, sql`now()`),
+        ),
+      )
+      .returning({ id: ownerSessions.id });
+    if (!spent) return null;
+    const session = newToken();
+    await tx.insert(ownerSessions).values({
+      tokenHash: hashOf(session),
+      kind: "session",
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    });
+    return session;
+  });
+}
+
+/**
+ * The live session a token holds, or null when the token isn't live: whether its browser paired
+ * in the last 15 minutes. The database judges that by its own clock, which also stamped the
+ * pairing, so no other clock's drift, and nothing a request says, can make a session fresh.
+ */
+export async function sessionOf(
+  token: string,
+): Promise<{ readonly freshlyPaired: boolean } | null> {
+  const [session] = await db
+    .select({
+      freshlyPaired: sql<boolean>`${ownerSessions.createdAt} > now() - ${FRESH_PAIRING}`,
+    })
+    .from(ownerSessions)
+    .where(
+      and(
+        eq(ownerSessions.tokenHash, hashOf(token)),
+        eq(ownerSessions.kind, "session"),
+        gt(ownerSessions.expiresAt, sql`now()`),
+      ),
+    );
+  return session ?? null;
+}
+
+/**
+ * When the newest browser still signed in paired, or null with none: `auni` opens a pairing link
+ * when there is none, and setup reads whether any browser is the owner's yet.
+ */
+export async function lastPaired(): Promise<Date | null> {
+  const [session] = await db
+    .select({ at: ownerSessions.createdAt })
+    .from(ownerSessions)
+    .where(and(eq(ownerSessions.kind, "session"), gt(ownerSessions.expiresAt, sql`now()`)))
+    .orderBy(desc(ownerSessions.createdAt))
+    .limit(1);
+  return session?.at ?? null;
+}
+
+/** Signs every browser out, for a lost or shared device; pairing again lets the owner back in. */
+export async function signOutEverywhere(): Promise<void> {
+  await db.delete(ownerSessions).where(eq(ownerSessions.kind, "session"));
+}
+
+/** The cookie that carries a session: host-only, never readable by script, never sent cross-site. */
+export function sessionCookie(token: string): string {
+  const secure = env.WEB_ORIGIN.startsWith("https:") ? "; Secure" : "";
+  const maxAge = Math.floor(SESSION_TTL_MS / 1_000);
+  return `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`;
+}

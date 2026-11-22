@@ -1,0 +1,111 @@
+{
+  "requestId": "0x17939139390b60dad3f8f75003c142d7d08a99793f720c383b58d943d58950d7",
+  "steps": [
+    {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for USDC",
+      "kind": "transaction",
+      "items": [
+        {
+          "status": "incomplete",
+          "data": {
+            "from": "0x2222222222222222222222222222222222222222",
+            "to": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "data": "0x095ea7b30000000000000000000000004cd00e387622c35bddb9b4c962c136462338bc310000000000000000000000000000000000000000000000000000000001312d00",
+            "value": "0",
+            "chainId": 8453,
+            "gas": "73112",
+            "maxFeePerGas": "6858981",
+            "maxPriorityFeePerGas": "1320000"
+          }
+        }
+      ],
+      "requestId": "0x17939139390b60dad3f8f75003c142d7d08a99793f720c383b58d943d58950d7"
+    },
+    {
+      "id": "deposit",
+      "action": "Confirm transaction in your wallet",
+      "description": "Depositing funds to the relayer to execute the swap for USDC",
+      "kind": "transaction",
+      "items": [
+        {
+          "status": "incomplete",
+          "data": {
+            "from": "0x2222222222222222222222222222222222222222",
+            "to": "0x4cd00e387622c35bddb9b4c962c136462338bc31",
+            "data": "0xe80179520000000000000000000000002222222222222222222222222222222222222222000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000001312d005e3778f2f430cee3dfef48535f6332ac6fdcdee2053ece688ec54527c0fef42c",
+            "value": "0",
+            "chainId": 8453,
+            "gas": "76194",
+            "maxFeePerGas": "6858981",
+            "maxPriorityFeePerGas": "1320000"
+          },
+          "check": {
+            "endpoint": "/intents/status/v3?requestId=0x17939139390b60dad3f8f75003c142d7d08a99793f720c383b58d943d58950d7",
+            "method": "GET"
+          }
+        }
+      ],
+      "requestId": "0x17939139390b60dad3f8f75003c142d7d08a99793f720c383b58d943d58950d7",
+      "depositAddress": ""
+    }
+  ],
+  "details": {
+    "operation": "swap",
+    "sender": "0x2222222222222222222222222222222222222222",
+    "recipient": "0x1111111111111111111111111111111111111111",
+    "currencyIn": {
+      "currency": {
+        "chainId": 8453,
+        "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+        }
+      },
+      "amount": "20000000",
+      "amountFormatted": "20.0",
+      "amountUsd": "19.995020",
+      "minimumAmount": "20000000"
+    },
+    "currencyOut": {
+      "currency": {
+        "chainId": 143,
+        "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": 6,
+        "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+        }
+      },
+      "amount": "18976784",
+      "amountFormatted": "18.976784",
+      "amountUsd": "18.971471",
+      "minimumAmount": "18597249"
+    },
+    "currencyGasTopup": {
+      "currency": {
+        "chainId": 143,
+        "address": "0x0000000000000000000000000000000000000000",
+        "symbol": "MON",
+        "name": "Monad",
+        "decimals": 18,
+        "metadata": {
+          "logoURI": "https://assets.coingecko.com/coins/images/38927/large/monad.jpg",
+          "verified": true
+        }
+      },
+      "amount": "59840823409730117886",
+      "amountFormatted": "59.840823409730117886",
+      "amountUsd": "1.000000",
+      "minimumAmount": "59840823409730117886"
+    },
+    "timeEstimate": 1
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "from": "Recorded 2026-11-14 from Polygon's public nodes (eth_simulateV1, nothing signed or sent): the batch that brings 5 pUSD home, run from a real deposit wallet (0xB8A21B28d08021E4f6FAc26939beB17EA9B06a43) that held 1.947719 pUSD. Polymarket's CollateralOfframp reverted the unwrap as it pulled the pUSD.",
+  "answer": {
+    "data": "0x7939f424"
+  }
+}

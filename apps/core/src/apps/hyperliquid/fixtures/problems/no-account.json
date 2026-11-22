@@ -1,0 +1,7 @@
+{
+  "from": "Recorded 2026-11-12 from api.hyperliquid.xyz/exchange, answering an order signed by a throwaway key that never deposited, so no money could move.",
+  "answer": {
+    "status": "err",
+    "response": "User or API Wallet 0xf44fb8c382f665b7e673c54091750023299591da does not exist."
+  }
+}

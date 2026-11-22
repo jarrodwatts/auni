@@ -1,0 +1,10 @@
+{
+  "from": "Polymarket's docs, \"Error Codes\" (docs.polymarket.com/resources/error-codes), read 2026-11-12: status 503 under \"Global Errors\", which the page explains as \"The exchange is temporarily paused. No orders (including cancels) are accepted.\"",
+  "answer": {
+    "service": "Polymarket CLOB",
+    "status": 503,
+    "body": {
+      "error": "Trading is currently disabled. Check polymarket.com for updates"
+    }
+  }
+}

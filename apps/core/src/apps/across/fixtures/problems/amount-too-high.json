@@ -1,0 +1,13 @@
+{
+  "from": "Recorded 2026-11-12 from Across's swap API (app.across.to/api/swap/approval), as it answered a quote for a wallet that never held money: 100 billion USDC from Base to Arbitrum.",
+  "answer": {
+    "status": 400,
+    "body": {
+      "type": "AcrossApiError",
+      "code": "AMOUNT_TOO_HIGH",
+      "status": 400,
+      "message": "Amount is higher than available liquidity. Max amount is 659872.372733 USDC.",
+      "id": "wkpqx-1794413249151-7ef30c01f2e8"
+    }
+  }
+}

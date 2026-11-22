@@ -1,0 +1,14 @@
+{
+  "from": "Recorded 2026-11-12 from Across's SpokePool on an anvil fork of Base at block 56117408, as eth_simulateV1 answered a deposit of 0.01 ETH to Arbitrum from a key that never held real money (its ETH was set on the fork), carrying a quote timestamp from 1970: the call's result.",
+  "answer": {
+    "returnData": "0x",
+    "logs": [],
+    "gasUsed": "0xa20c",
+    "status": "0x0",
+    "error": {
+      "code": 3,
+      "message": "execution reverted: custom error 0xf722177f",
+      "data": "0xf722177f"
+    }
+  }
+}

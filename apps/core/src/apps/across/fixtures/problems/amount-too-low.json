@@ -1,0 +1,13 @@
+{
+  "from": "Recorded 2026-11-12 from Across's swap API (app.across.to/api/swap/approval), as it answered a quote for a wallet that never held money: 1,000 units (a tenth of a cent) of USDC from Base to Arbitrum.",
+  "answer": {
+    "status": 400,
+    "body": {
+      "type": "AcrossApiError",
+      "code": "AMOUNT_TOO_LOW",
+      "status": 400,
+      "message": "Failed to fetch swap quote: Bridge amount 1000 is too low to cover bridge fees 7630",
+      "id": "67gcf-1794413248854-589b94247b2e"
+    }
+  }
+}

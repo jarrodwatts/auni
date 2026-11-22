@@ -1,0 +1,24 @@
+{
+  "from": "Built, not recorded: what Hyperliquid answered on 2026-11-13 for the QA account (unified) while a $11 limit order at 3x waited and nothing was open, as live use noted it (live/findings.md 17). Only the figures seen then are filled in: spot USDC total and hold, and the main dex value and withdrawable.",
+  "answers": {
+    "userAbstraction": "unifiedAccount",
+    "spotClearinghouseState": {
+      "balances": [
+        {
+          "coin": "USDC",
+          "token": 0,
+          "total": "4.474772",
+          "hold": "3.547335",
+          "entryNtl": "0.0"
+        }
+      ]
+    },
+    "clearinghouseState": {
+      "marginSummary": {
+        "accountValue": "3.547335"
+      },
+      "withdrawable": "0.035122",
+      "assetPositions": []
+    }
+  }
+}

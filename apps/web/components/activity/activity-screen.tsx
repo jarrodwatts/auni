@@ -1,0 +1,258 @@
+"use client";
+
+import type { ActivityItemWire, SpecialistId } from "@auni/shared";
+import { ReceiptText } from "lucide-react";
+import { useState } from "react";
+
+import { ThreadFailureNotice } from "@/components/app/thread-failure-notice";
+import { SpecialistOrb } from "@/components/specialist/specialist-orb";
+import { PlaceHeader } from "@/components/places/place-header";
+import { useMinute, usePlaces } from "@/components/places/use-places";
+import { AuniSheet } from "@/components/ui/auni-sheet";
+import type { Specialist } from "@/lib/data/views";
+import { useMediaQuery } from "@/lib/use-viewport";
+import { cn } from "@/lib/utils";
+
+import { activityGroups, amountText, TONE_CLASS_NAME } from "./activity-groups";
+import { ActivityReceipt, ItemMark } from "./activity-receipt";
+import { useActivity, useSeeActivity } from "./use-activity";
+
+const READ_FAILURE = { message: "Your activity couldn't load.", action: "reload" } as const;
+
+/**
+ * What happened to their money, like a mail app: the list down the left,
+ * filtered to one specialist or not, and whatever is picked opened as a
+ * receipt on the right, so they can read down it without leaving. Without
+ * the room, a tap opens the receipt as a sheet. Looking clears what's unread.
+ */
+export function ActivityScreen({ initialOnly }: { readonly initialOnly: SpecialistId | null }) {
+  const [only, setOnly] = useState(initialOnly);
+  const activity = useActivity(only);
+  const fresh = useSeeActivity(activity.data);
+  const specialists = usePlaces().specialists.map(({ specialist }) => specialist);
+  const owners = new Map(specialists.map((specialist) => [specialist.id, specialist]));
+  // The receipt sits beside the list where the money pane would; below that, it's a sheet.
+  const wide = useMediaQuery("(min-width: 1280px)");
+  const roomy = useMediaQuery("(min-width: 1024px)");
+  const [picked, setPicked] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const items = activity.data?.items ?? [];
+  const open = items.find(({ id }) => id === picked) ?? (wide ? items[0] : undefined);
+  const ownerOf = (item: ActivityItemWire) =>
+    item.specialistId ? owners.get(item.specialistId) : undefined;
+  const pick = (item: ActivityItemWire) => {
+    setPicked(item.id);
+    if (!wide) setSheetOpen(true);
+  };
+
+  return (
+    <section className="relative flex h-full min-h-0 min-w-0 flex-col">
+      <PlaceHeader
+        root
+        icon={<ReceiptText aria-hidden className="size-5 text-ink" strokeWidth={2} />}
+        title="Activity"
+      />
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[760px] px-4 pt-6 pb-16 sm:px-8">
+            <h2 className="text-amount tracking-[-0.02em] text-ink max-sm:hidden">Activity</h2>
+            <Chips
+              specialists={specialists}
+              only={only}
+              onChange={(next) => {
+                setOnly(next);
+                setPicked(null);
+              }}
+            />
+            {activity.isError && !activity.data ? (
+              <div className="mt-6">
+                <ThreadFailureNotice
+                  failure={READ_FAILURE}
+                  onRetry={() => void activity.refetch()}
+                />
+              </div>
+            ) : !activity.data ? (
+              <ul className="auni-appear-late mt-6 flex flex-col gap-2">
+                {[0, 1, 2, 3, 4].map((key) => (
+                  <li key={key} className="h-16 rounded-[16px] bg-surface" />
+                ))}
+              </ul>
+            ) : items.length === 0 ? (
+              <p className="py-16 text-center text-[14px] text-muted-foreground">
+                {only
+                  ? `Nothing has happened in ${owners.get(only)?.name ?? "this specialist"} yet.`
+                  : "Nothing has happened to your money yet."}
+              </p>
+            ) : (
+              <ActivityList
+                items={items}
+                fresh={fresh}
+                ownerOf={ownerOf}
+                selected={wide ? open?.id : sheetOpen ? picked : null}
+                onPick={pick}
+              />
+            )}
+          </div>
+        </div>
+        {wide && open ? (
+          <aside
+            aria-label="Receipt"
+            className="auni-scrollbar-none h-full w-[392px] flex-none overflow-y-auto border-l border-foreground/[0.07]"
+          >
+            <ActivityReceipt key={open.id} item={open} owner={ownerOf(open)} />
+          </aside>
+        ) : null}
+      </div>
+      {open && !wide ? (
+        <AuniSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          side={roomy ? "right" : "bottom"}
+          title={open.title}
+        >
+          <div className="auni-scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+            <ActivityReceipt item={open} owner={ownerOf(open)} />
+          </div>
+        </AuniSheet>
+      ) : null}
+    </section>
+  );
+}
+
+/** Everything, or one specialist's, each chip wearing its orb. */
+function Chips({
+  specialists,
+  only,
+  onChange,
+}: {
+  readonly specialists: readonly Specialist[];
+  readonly only: SpecialistId | null;
+  readonly onChange: (only: SpecialistId | null) => void;
+}) {
+  if (specialists.length === 0) return null;
+  const chip = (on: boolean) =>
+    cn(
+      "flex h-9 flex-none items-center gap-2 rounded-full border px-4 text-[14px] font-medium transition-colors",
+      on
+        ? "border-foreground bg-foreground text-background"
+        : "border-foreground/[0.08] text-ink hover:bg-surface",
+    );
+  return (
+    <div className="auni-scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:mt-4 sm:flex-wrap sm:px-0">
+      <button
+        type="button"
+        aria-pressed={only === null}
+        onClick={() => onChange(null)}
+        className={chip(only === null)}
+      >
+        Everything
+      </button>
+      {specialists.map((specialist) => (
+        <button
+          key={specialist.id}
+          type="button"
+          aria-pressed={only === specialist.id}
+          onClick={() => onChange(specialist.id)}
+          className={cn(chip(only === specialist.id), "pl-2.5")}
+        >
+          <SpecialistOrb specialist={specialist} size={18} />
+          {specialist.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ActivityList({
+  items,
+  fresh,
+  ownerOf,
+  selected,
+  onPick,
+}: {
+  readonly items: readonly ActivityItemWire[];
+  readonly fresh: ReadonlySet<string>;
+  readonly ownerOf: (item: ActivityItemWire) => Specialist | undefined;
+  readonly selected: string | null | undefined;
+  readonly onPick: (item: ActivityItemWire) => void;
+}) {
+  const now = useMinute();
+  return activityGroups(items, now).map(({ label, items: rows }) => (
+    <section key={label} aria-label={label}>
+      <h3 className="mt-6 mb-1 text-meta font-medium text-faint">{label}</h3>
+      <ul>
+        {rows.map((item) => (
+          <li key={item.id}>
+            <Row
+              item={item}
+              fresh={fresh.has(item.id)}
+              owner={ownerOf(item)}
+              selected={item.id === selected}
+              onPick={() => onPick(item)}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  ));
+}
+
+/**
+ * Its mark, what happened over whose and when, and the amount at the edge.
+ * Something done to them that leaves them a decision sits on a faint red;
+ * what was new when they came to look reads heavier until they leave, as an unread chat does.
+ */
+function Row({
+  item,
+  fresh,
+  owner,
+  selected,
+  onPick,
+}: {
+  readonly item: ActivityItemWire;
+  readonly fresh: boolean;
+  readonly owner: Specialist | undefined;
+  readonly selected: boolean;
+  readonly onPick: () => void;
+}) {
+  const decision = item.kind === "outside" && item.decision;
+  return (
+    <button
+      type="button"
+      aria-current={selected || undefined}
+      onClick={onPick}
+      className={cn(
+        "-mx-2.5 flex w-[calc(100%+20px)] items-center gap-3.5 rounded-[14px] px-2.5 py-3 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50",
+        decision
+          ? selected
+            ? "bg-negative/[0.09]"
+            : "bg-negative/[0.045] hover:bg-negative/[0.07]"
+          : selected
+            ? "bg-foreground/[0.05]"
+            : "hover:bg-surface",
+      )}
+    >
+      <span className="flex flex-none">
+        <ItemMark item={item} owner={owner} size={40} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn("block truncate text-ui text-ink", fresh && "font-semibold")}>
+          {fresh ? <span className="sr-only">New: </span> : null}
+          {item.title}
+        </span>
+        <span className="mt-0.5 block truncate text-meta text-faint">{item.subtitle}</span>
+      </span>
+      {item.amount ? (
+        <span
+          className={cn(
+            "flex-none text-ui font-semibold tabular-nums",
+            TONE_CLASS_NAME[item.amount.tone],
+          )}
+        >
+          {amountText(item.amount)}
+        </span>
+      ) : null}
+    </button>
+  );
+}

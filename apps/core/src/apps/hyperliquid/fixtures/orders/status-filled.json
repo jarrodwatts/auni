@@ -1,0 +1,65 @@
+{
+  "from": "Recorded from Hyperliquid's info API (orderStatus) on 2026-11-12, for a public account that is not the owner's: the limit order of fixtures/orders/open.json about twenty minutes on, filled in full, the stops attached to it listed under it.",
+  "answer": {
+    "status": "order",
+    "order": {
+      "order": {
+        "coin": "SOL",
+        "side": "A",
+        "limitPx": "82.941",
+        "sz": "0.0",
+        "oid": 602505323033,
+        "timestamp": 1794467565753,
+        "triggerCondition": "N/A",
+        "isTrigger": false,
+        "triggerPx": "0.0",
+        "children": [
+          {
+            "coin": "SOL",
+            "side": "B",
+            "limitPx": "91.386",
+            "sz": "0.72",
+            "oid": 602505323034,
+            "timestamp": 1794467565753,
+            "triggerCondition": "Price above 83.079",
+            "isTrigger": true,
+            "triggerPx": "83.079",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": true,
+            "orderType": "Stop Market",
+            "origSz": "0.72",
+            "tif": null,
+            "cloid": null
+          },
+          {
+            "coin": "SOL",
+            "side": "B",
+            "limitPx": "90.154",
+            "sz": "0.72",
+            "oid": 602505323035,
+            "timestamp": 1794467565753,
+            "triggerCondition": "Price below 81.959",
+            "isTrigger": true,
+            "triggerPx": "81.959",
+            "children": [],
+            "isPositionTpsl": false,
+            "reduceOnly": true,
+            "orderType": "Take Profit Market",
+            "origSz": "0.72",
+            "tif": null,
+            "cloid": null
+          }
+        ],
+        "isPositionTpsl": false,
+        "reduceOnly": false,
+        "orderType": "Limit",
+        "origSz": "0.72",
+        "tif": "Gtc",
+        "cloid": null
+      },
+      "status": "filled",
+      "statusTimestamp": 1794468535957
+    }
+  }
+}

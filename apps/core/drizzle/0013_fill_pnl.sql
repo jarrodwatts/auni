@@ -1,0 +1,1 @@
+ALTER TABLE "fills" ADD COLUMN "pnl_usd" numeric(20, 6);

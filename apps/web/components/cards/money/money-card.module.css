@@ -1,0 +1,133 @@
+/* Each state settles in with the app's drift curve; the rule above never moves. */
+@keyframes money-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.enter {
+  animation: money-card-enter 420ms var(--motion-drift) both;
+}
+
+/* Said only once the wait is long enough to wonder about. */
+.late {
+  animation: money-card-late 480ms var(--motion-settle) 10s both;
+}
+
+@keyframes money-card-late {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter {
+    animation: none;
+  }
+}
+
+/* A card's footer settles into each new step. */
+@keyframes money-card-step {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.step {
+  animation: money-card-step 260ms var(--motion-settle) both;
+}
+
+/* What only the conversation's newest turn offers (see onlyWhileNewest in failed-step.ts), and
+   the count of steps waiting on the person: anything later has moved the conversation on. */
+:global([data-slot="conversation-turn"]:has(~ [data-slot="conversation-turn"])) .whileNewest {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step {
+    animation: none;
+  }
+}
+
+/* While money moves, the turning arc circles the mark, 5px off it. */
+.ring {
+  composes: arc from "../../motion/status-mark.module.css";
+  position: absolute;
+  inset: -5px;
+  pointer-events: none;
+}
+
+/* Landed: the arc runs on round to a full ring, then gives way to the tick. */
+.ring[data-landed] {
+  --arc-length: 100%;
+  --arc-tail: var(--color-ink);
+  opacity: 0;
+  transition:
+    --arc-length 520ms var(--motion-settle),
+    --arc-tail 520ms var(--motion-settle),
+    opacity 360ms ease 640ms;
+}
+
+/* The tick lands with a little give. */
+.badge {
+  animation: money-card-tick 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 420ms both;
+}
+
+@keyframes money-card-tick {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-20deg);
+  }
+}
+
+/* The words of the step a card is on catch a slow sheen. */
+.shimmer {
+  background: linear-gradient(
+      100deg,
+      var(--color-ink) 0 38%,
+      var(--color-halo) 50%,
+      var(--color-ink) 62% 100%
+    )
+    0 0 / 260% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: money-card-shimmer 2.6s linear infinite;
+}
+
+@keyframes money-card-shimmer {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring[data-landed] {
+    transition: none;
+  }
+
+  .badge {
+    animation: none;
+  }
+
+  .shimmer {
+    animation: none;
+    background: none;
+    color: var(--color-ink);
+  }
+}

@@ -1,0 +1,244 @@
+/*
+ * auni design tokens.
+ *
+ * Semantic colors are recorded from the Claude Design handoff (Auni.dc.html)
+ * and exposed as shadcn-compatible CSS variables plus brand utilities. Kept
+ * separate from globals.css so the token layer stays readable on its own;
+ * globals.css remains the Tailwind entry point and owns content scanning.
+ *
+ * Auni has two looks, light and dark. Each colour here says both, as
+ * light-dark(light, dark), and the browser picks one by `color-scheme`:
+ * light, unless the owner picked another look in Settings, which lib/look.tsx
+ * wears as `data-theme` on the document. Auni doesn't follow the system's. Every colour a person sees comes
+ * from here (tokens.test.ts fails one written into a component), so nothing
+ * else knows there are two looks.
+ */
+
+:root {
+  color-scheme: light;
+
+  --radius: 0.625rem;
+
+  --background: light-dark(#ffffff, #0f1115);
+  --foreground: light-dark(#141414, #eef0f3);
+
+  /* Depth. The page; the sidebar beside it; a card to sign, which is bordered; and what floats
+     over the page (a menu, a dialog, a sheet), which casts a shadow. In the dark each is a step
+     lighter than what it sits on, since a shadow shows little there. */
+  --sidebar: light-dark(#fafbfd, #0b0d10);
+  --card: light-dark(#ffffff, #15181d);
+  --popover: light-dark(#ffffff, #181b21);
+  --popover-foreground: light-dark(#141414, #eef0f3);
+
+  --primary: light-dark(#3d63e0, #7d9cff);
+
+  --muted: light-dark(#eef1f7, #1f2329);
+  --muted-foreground: light-dark(#5c6472, #9aa2af);
+
+  /* Neutral, not blue: --accent is the universal hover/focus fill. Blue lives
+     in --primary and --ring for genuine accent, never in a hover state. */
+  --accent: light-dark(#f0f0f0, #22262d);
+  --accent-foreground: light-dark(#141414, #eef0f3);
+
+  --destructive: light-dark(#a34450, #ec8d98);
+
+  --border: light-dark(#e3e8f2, #262a31);
+  --input: light-dark(#e3e8f2, #262a31);
+  --ring: light-dark(#5b7fe8, #7d9cff);
+
+  --sidebar-border: light-dark(rgb(50 80 150 / 9%), rgb(255 255 255 / 6%));
+
+  /* Motion curves, named by role, not repeated as literals. The first two decelerate
+     hard, so a movement arrives early and eases to rest instead of coasting;
+     that late settle is what reads as calm rather than fast. `settle` is the
+     default for anything the eye tracks; `drift` is its longer, softer form
+     for whole surfaces. `exit` speeds up as it goes, for things leaving;
+     `glide` is even in and out, for things moving from place to place.
+     These and the durations and blurs below must match lib/motion.ts, which
+     hands the same values to the Web Animations API. */
+  --motion-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-drift: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-exit: cubic-bezier(0.7, 0, 0.84, 0);
+  --motion-glide: cubic-bezier(0.45, 0, 0.25, 1);
+  --motion-duration-instant: 120ms;
+  --motion-duration-fast: 160ms;
+  --motion-duration-exit: 180ms;
+  --motion-duration-standard: 240ms;
+  --motion-duration-considered: 480ms;
+  --motion-duration-resize: 420ms;
+  --motion-blur-subtle: 2px;
+  --motion-blur-soft: 4px;
+}
+
+/* A picked look. One an app brings gives these tokens other values, starting from the light
+   ones; Auni's own dark is the second value of each. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar: var(--sidebar);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Radius roles, separate what a shape IS from a hard-coded pixel value. */
+  --radius-control: 10px; /* buttons, nav items, inputs */
+  --radius-card: 16px; /* surfaces */
+
+  /* Type scale, each step with its weight: 600 for money the person owns,
+     500 for labels, 400 for prose. */
+  --text-caption: 12px;
+  --text-caption--font-weight: 500;
+  --text-meta: 13px;
+  --text-meta--line-height: 18px;
+  --text-meta--font-weight: 400;
+  --text-ui: 15px;
+  --text-ui--line-height: 20px;
+  --text-ui--font-weight: 500;
+  --text-reading: 16px;
+  --text-reading--line-height: 1.55;
+  --text-reading--font-weight: 400;
+  --text-section: 20px;
+  --text-section--line-height: 26px;
+  --text-section--font-weight: 600;
+  --text-section--letter-spacing: -0.02em;
+  --text-amount: 24px;
+  --text-amount--font-weight: 600;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace;
+
+  /* Motion curves, as Tailwind utilities. The literals live in `:root` above so
+     hand-written keyframes can reach them too, a value referenced only inside
+     `@theme` is inlined into utilities and never lands on the element. */
+  --ease-settle: var(--motion-settle);
+  --ease-drift: var(--motion-drift);
+  --ease-exit: var(--motion-exit);
+  --ease-glide: var(--motion-glide);
+}
+
+/* Brand utilities for the financial surface, literal values from the handoff. `static`, so each
+   is there for a style written in code (a chart's stroke, a gradient) as well as for a class. */
+@theme static {
+  --color-positive: light-dark(#1d8a5b, #4cc38a);
+  --color-negative: light-dark(#c0452e, #f47c66);
+
+  /* Text ramp, four tiers. Primary is --color-ink, and --color-ink-soft a step softer, for a
+     note read at length or a chip's label; secondary is --muted-foreground, a quiet word;
+     tertiary is --color-faint, for an icon at rest or a field's hint. */
+  --color-ink: light-dark(#101623, #f1f3f6);
+  --color-ink-soft: light-dark(#4a5362, #c5cad3);
+  --color-faint: light-dark(#9aa2ae, #68707d);
+
+  /* Content sits on this fill with no line around it. */
+  --color-surface: light-dark(#f5f7fb, #1c1f25);
+  /* What the page falls away to behind first run and every notice before the app. */
+  --color-floor: light-dark(#f1f4f8, #07080b);
+
+  /* Something to know before going on: the text, and the fill it sits on. */
+  --color-warning: light-dark(#8a5a12, #e9b96a);
+  --color-warning-surface: light-dark(#fff4e5, #2c2416);
+
+  /* The dot on something that waits for the owner. */
+  --color-waiting: #e8a33d;
+
+  /* What a shadow is cast in, and the bluer one under what floats over money. */
+  --color-shade: light-dark(#101623, #000000);
+  --color-shade-blue: light-dark(#28468c, #000000);
+  /* What stands between the page and something opened over it: a sheet dims it, and a dialog
+     frosts it. */
+  --color-scrim: light-dark(rgb(16 22 35 / 0.24), rgb(0 0 0 / 0.56));
+  --color-veil: light-dark(rgb(237 240 245 / 0.82), rgb(7 8 11 / 0.74));
+
+  /* The light Auni is drawn in: the soft blue around the mascot, and the warm end of a chart,
+     which is the same in every look where it lights a drawing, and let down in the dark where
+     it washes over a surface. */
+  --color-halo: #8ba3e8;
+  --color-blush: #ffe3d6;
+  --color-blush-wash: light-dark(#ffe3d6, #4d3228);
+  --color-ember: #f6b08f;
+
+  /* The sky first run opens under (the landing): cool at the top, lighter through the middle,
+     warm at the foot, with soft cloud and light drifting through it; its dawn is the blush wash.
+     And the frosted glass a take floats on over it. */
+  --color-sky-top: light-dark(#edf2ff, #0e1424);
+  --color-sky-middle: light-dark(#f6f8ff, #0f1218);
+  --color-sky-foot: light-dark(#fbf8f7, #14110f);
+  --color-sky-cloud: light-dark(#d7e3ff, #1a2645);
+  --color-sky-light: light-dark(#ffffff, #171c28);
+  --color-glass: light-dark(rgb(255 255 255 / 0.76), rgb(24 27 33 / 0.76));
+
+  /* What a logo or a QR code is printed on, and what is printed: the same in every look, as a
+     logo is. Letters set on a coloured mark are the plate's colour too. */
+  --color-plate: #ffffff;
+  --color-plate-ink: #101623;
+  /* A line around a mark in the dark, where one drawn on a dark tile would have no edge on a
+     dark page. Nothing in the light, where every mark already stands clear. */
+  --color-mark-line: light-dark(transparent, rgb(255 255 255 / 0.14));
+  /* What lifts a deep mark colour (initials on navy, on near-black) a step in the dark, where it
+     would sink into the page. Laid over the colour; nothing in the light. */
+  --color-mark-lift: light-dark(transparent, rgb(255 255 255 / 0.2));
+
+  /* A glyph Auni drew, which is no service's logo, so it never sits on a logo's white plate: it
+     is drawn in the look's ink on a tile of the look's. One that stands where a logo would (a
+     stock's candlesticks, a swap's arrows), and one for a part of Auni itself (the wallet's key,
+     the price watcher's pulse), tinted as Auni is. */
+  --color-glyph-plate: light-dark(rgb(255 255 255 / 0.8), #272c35);
+  --color-glyph-ink: light-dark(#111318, #dfe4ec);
+  --color-tool-plate: light-dark(#e6ecfb, #222a3f);
+  --color-tool-ink: light-dark(#22304f, #c2cff5);
+
+  /* A switch's knob: always the lighter part, so an off switch never reads as a hole. */
+  --color-knob: light-dark(#ffffff, #aeb5c1);
+
+  /* Shadows that more than one thing casts: a card to sign, and a menu. */
+  --shadow-card:
+    0 1px 2px --alpha(var(--color-shade) / 3%), 0 10px 28px -16px --alpha(var(--color-shade) / 12%);
+  --shadow-menu:
+    0 18px 48px --alpha(var(--color-shade) / 13%), 0 2px 6px --alpha(var(--color-shade) / 5%);
+}
+
+/* What has a colour of its own (an app with no logo, a specialist) says only its hue, as --hue
+   where it is drawn; these are what that hue is drawn in, in each look: a soft tile, the words
+   on it, the line around it, a wash behind, and its mark (a specialist's orb), solid.
+   `inline`, so each is worked out there. */
+@theme inline {
+  --color-hue-mark: light-dark(hsl(var(--hue) 64% 62%), hsl(var(--hue) 52% 56%));
+  --color-hue-plate: light-dark(hsl(var(--hue) 78% 95%), hsl(var(--hue) 34% 19%));
+  --color-hue-ink: light-dark(hsl(var(--hue) 42% 34%), hsl(var(--hue) 68% 80%));
+  --color-hue-line: light-dark(hsl(var(--hue) 45% 40% / 0.12), hsl(var(--hue) 60% 78% / 0.14));
+  --color-hue-wash: light-dark(hsl(var(--hue) 95% 97%), hsl(var(--hue) 42% 17%));
+  --color-hue-shade: light-dark(hsl(var(--hue) 45% 35% / 0.35), rgb(0 0 0 / 0.5));
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    letter-spacing: -0.011em; /* the blueprint's ~-0.15px default, tokenized */
+    -webkit-font-smoothing: antialiased;
+  }
+}

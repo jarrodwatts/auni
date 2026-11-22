@@ -1,0 +1,9 @@
+{
+  "verdicts": [
+    {
+      "fire": "{{eth-drop}}",
+      "verdict": "note",
+      "reason": "A wick below $2,000 that recovered within the minute."
+    }
+  ]
+}

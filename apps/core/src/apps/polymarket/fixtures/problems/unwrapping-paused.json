@@ -1,0 +1,8 @@
+{
+  "from": "Recorded 2026-11-14 from Polygon's public nodes (polygon.drpc.org and polygon.gateway.tenderly.co, eth_call at block 97249742, nothing signed or sent): Polymarket's CollateralOfframp (0x2957922Eb93258b93368531d39fAcCA3B4dC5854) asked by a real deposit wallet (0xB8A21B28d08021E4f6FAc26939beB17EA9B06a43) to unwrap 1 pUSD into native USDC, which it has paused. It answers the same for any asset it pauses: its check comes before anything else it does.",
+  "answer": {
+    "code": 3,
+    "message": "execution reverted",
+    "data": "0x49b8b3ac"
+  }
+}

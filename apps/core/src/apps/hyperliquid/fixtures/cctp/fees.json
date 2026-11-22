@@ -1,0 +1,23 @@
+{
+  "from": "Circle's API on 2026-11-13: GET https://iris-api.circle.com/v2/burn/USDC/fees/3/19?forward=true&hyperCoreDeposit=true (Arbitrum is domain 3, HyperEVM 19). The forwarding fee is in USDC units, and minimumFee in hundredths of a percent of the amount.",
+  "answer": [
+    {
+      "finalityThreshold": 1000,
+      "minimumFee": 0,
+      "forwardFee": {
+        "low": 200000,
+        "med": 200000,
+        "high": 200000
+      }
+    },
+    {
+      "finalityThreshold": 2000,
+      "minimumFee": 0,
+      "forwardFee": {
+        "low": 200000,
+        "med": 200000,
+        "high": 200000
+      }
+    }
+  ]
+}

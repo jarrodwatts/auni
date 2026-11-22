@@ -1,0 +1,21 @@
+[
+  { "type": "ready", "model": "claude-sonnet-4-5", "login": "your Claude Max subscription" },
+  {
+    "type": "thinking",
+    "id": "thinking-1",
+    "delta": "ETH dipped under $2,000 and was back above it within the minute. Nothing for them to do."
+  },
+  {
+    "type": "tool-call",
+    "id": "toolu_01settle",
+    "name": "settle_quietly",
+    "input": { "reason": "ETH wicked under $2,000 and recovered within the minute" }
+  },
+  {
+    "type": "tool-result",
+    "id": "toolu_01settle",
+    "output": "Settled quietly: ETH wicked under $2,000 and recovered within the minute. Write nothing more.",
+    "isError": false
+  },
+  { "type": "done" }
+]

@@ -1,0 +1,27 @@
+# Auni as a systemd user service: `auni service install` writes this to
+# ~/.config/systemd/user/auni.service, filled in for this machine, and starts it. An install runs
+# its launcher, which runs the current version, so `auni update` applies here too.
+[Unit]
+Description=Auni, your money agent
+After=network-online.target
+
+[Service]
+ExecStart=@COMMAND@
+WorkingDirectory=@HOME@
+# AUNI_RUNS_AS=service, so `auni stop` and `auni update` stop it as the service. Then from the
+# shell that installed it: PATH, so the brain's CLIs (claude, codex) and the box's tools (bwrap,
+# socat) are found, and AUNI_HOME, CLAUDE_CONFIG_DIR and CODEX_HOME where set. The rest of
+# Auni's settings it reads from $AUNI_HOME/.env.
+@ENVIRONMENT@
+# SIGTERM is a Ctrl-C: running moves get up to two minutes to finish. Only to Auni (mixed): its
+# Postgres, which it stops last, would otherwise refuse new connections while the moves finish.
+# What is left once Auni exits, its Postgres among them, is killed with it, and Auni exits 1 if its
+# Postgres stops under it, so systemd starts both again together.
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=150
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

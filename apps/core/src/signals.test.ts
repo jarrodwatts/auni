@@ -46,6 +46,21 @@ describe("appendWatchedWallet", () => {
     expect(list).toHaveLength(5);
     expect(list[4]?.label).toBe("Vault");
   });
+
+  it("treats Solana Base58 addresses as case-sensitive", () => {
+    const a: WatchedWallet = {
+      address: "So11111111111111111111111111111111111111112",
+      chain: "solana",
+      label: "A",
+    };
+    const b: WatchedWallet = {
+      address: "so11111111111111111111111111111111111111112",
+      chain: "solana",
+      label: "B",
+    };
+    const both = appendWatchedWallet([a], b);
+    expect(both).toHaveLength(2);
+  });
 });
 
 describe("resolveWatchedWallet", () => {

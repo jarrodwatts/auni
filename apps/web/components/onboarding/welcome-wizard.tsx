@@ -35,6 +35,7 @@ import { useFirstRun } from "@/components/first-run/use-first-run";
 import { ME_KEY, useMe, useRefreshMe } from "@/components/personalization/use-me";
 import { SecretInput, SecretNote, secretRefusal } from "@/components/private-input/secret-input";
 import { SETTINGS_INPUT, SettingsBadge } from "@/components/settings/settings-layout";
+import { usePortfolio } from "@/components/specialist/use-specialists";
 import { ChoicePills } from "@/components/ui/choice-pills";
 import { dialogClosedHref, SETTINGS_DIALOG_PARAM, WIZARD_PARAM } from "@/lib/app-links";
 import { browserWallet, connect } from "@/lib/browser-wallet";
@@ -45,6 +46,7 @@ import { getMe } from "@/lib/data/me";
 import { acceptPrivate, checkPrivate } from "@/lib/data/private";
 import { useSetup, useSetupStep } from "@/lib/data/setup";
 import { useRemoteAccess } from "@/lib/data/system";
+import { formatUsdcBalance, formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 type StepIndex = 0 | 1 | 2;
@@ -477,6 +479,7 @@ function WalletStep() {
               </button>
             </div>
           ) : null}
+          <WalletBalanceNotice />
           <p className="text-[12px] text-muted-foreground">
             You can deposit funds or back up your keys anytime from Settings → Wallet &amp; Keys.
           </p>
@@ -558,6 +561,34 @@ function WalletStep() {
         <p role="alert" className="text-[13px] text-destructive">
           {createError}
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Shows detected balances and recent deposits on an imported or newly funded wallet during onboarding. */
+function WalletBalanceNotice() {
+  const portfolio = usePortfolio(true);
+  const data = portfolio.data;
+  if (!data) return null;
+  if (data.looking && data.empty) {
+    return (
+      <p className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+        <LoaderCircle className="size-3.5 animate-spin" />
+        Checking balances across supported chains…
+      </p>
+    );
+  }
+  if (data.empty) return null;
+  const total = formatUsdcBalance(BigInt(data.totalUsd.baseUnits));
+  const latest = data.deposits[0];
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-positive/25 bg-card px-3 py-2 text-[12.5px]">
+      <span className="font-medium text-ink">Detected balance: {total}</span>
+      {latest ? (
+        <span className="text-positive">
+          Received {formatUsd(latest.usdValue)} {latest.symbol} on {latest.network}
+        </span>
       ) : null}
     </div>
   );

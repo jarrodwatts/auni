@@ -13,7 +13,7 @@ import { fenced } from "../agent/fence.ts";
 import { db } from "../db/client.ts";
 import { owner } from "../db/schema.ts";
 import { readFacts, type Fact } from "../facts.ts";
-import { startingPointsKind } from "../jobs/kinds.ts";
+import { markStartingPointsJobSaved, startingPointsKind } from "../jobs/kinds.ts";
 import { defineJob } from "../jobs/queue.ts";
 import { publishStartingPoints } from "./stream.ts";
 
@@ -42,20 +42,21 @@ export const startingPointsJob = defineJob({
   kind: startingPointsKind,
   // Writing them again only replaces what was saved.
   retries: 1,
-  async run() {
-    await save(await writePoints(await readFacts()));
+  async run(_data, job) {
+    await save(await writePoints(await readFacts()), job.id);
   },
   // One that threw past its retry, as when the portfolio couldn't be read, is saved as none: the
   // next is asked for under the key of when these were saved, so saving nothing would leave every
   // new chat waiting on a job already run, for the two weeks a key holds.
-  async cutShort(_data, _job, why) {
+  async cutShort(_data, job, why) {
     if (why === "crashed") return "rerun";
-    await save([]);
+    await save([], job.id);
   },
 });
 
-const save = async (points: StartingPoint[]) => {
+const save = async (points: StartingPoint[], jobId?: string) => {
   await db.update(owner).set({ startingPoints: points, startingPointsAt: sql`clock_timestamp()` });
+  if (jobId) markStartingPointsJobSaved(jobId);
   publishStartingPoints();
 };
 

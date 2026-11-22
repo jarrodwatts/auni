@@ -9,7 +9,7 @@ import { doorSocket } from "./auth/tailscale.ts";
 import type { Finding } from "./doctor.ts";
 import { env } from "./env.ts";
 import { enableLinger, lingers, serviceInstalled } from "./service.ts";
-import { clearAlwaysOn, saveAlwaysOn } from "./settings.ts";
+import { clearAlwaysOn, saveAlwaysOn, setBy } from "./settings.ts";
 
 // Always-on Auni: this machine keeps Auni running, and the owner's devices reach it through
 // Tailscale (auth/tailscale.ts says who comes in). `auni up --always-on` sets it up, in steps that
@@ -798,6 +798,9 @@ export async function disableTailscaleFromUi(): Promise<{
   readonly note: string | null;
 }> {
   const wasTailscale = Boolean(env.TAILSCALE_OWNER);
+  if (!wasTailscale && setBy("TAILSCALE_OWNER") === null) {
+    return { ok: true, needsRestart: false, serveOffCommand: null, note: null };
+  }
   const activePort = wasTailscale ? Number(new URL(env.WEB_ORIGIN).port || 443) : null;
   clearAlwaysOn();
 

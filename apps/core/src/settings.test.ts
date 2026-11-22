@@ -428,4 +428,24 @@ describe("local system settings writers", () => {
     expect(process.env.TAILSCALE_OWNER).toBe("owner@example.com");
     expect(parseEnv(text()).TAILSCALE_OWNER).toBe("owner@example.com");
   });
+
+  it("preserves and restores a custom reverse-proxy WEB_ORIGIN across Tailscale enable/disable", async () => {
+    writeFileSync(join(home, ".env"), "WEB_ORIGIN='https://auni.mydomain.com'\n");
+    delete process.env.WEB_ORIGIN;
+    delete process.env.TAILSCALE_OWNER;
+    delete process.env.LOCAL_WEB_ORIGIN;
+    vi.resetModules();
+    const started = await import("./settings.ts");
+    started.readSettings();
+    expect(process.env.WEB_ORIGIN).toBe("https://auni.mydomain.com");
+
+    started.saveAlwaysOn("owner@example.com", "https://box.tail123.ts.net");
+    expect(process.env.WEB_ORIGIN).toBe("https://box.tail123.ts.net");
+    expect(process.env.LOCAL_WEB_ORIGIN).toBe("https://auni.mydomain.com");
+
+    started.clearAlwaysOn();
+    expect(process.env.TAILSCALE_OWNER).toBe("");
+    expect(process.env.WEB_ORIGIN).toBe("https://auni.mydomain.com");
+    expect(process.env.LOCAL_WEB_ORIGIN).toBe("");
+  });
 });

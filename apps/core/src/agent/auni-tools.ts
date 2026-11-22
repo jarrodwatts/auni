@@ -21,7 +21,12 @@ import { runningVersion } from "../release/layout.ts";
 import { serviceInstalled } from "../service.ts";
 import { savePreferredBrain, setBy } from "../settings.ts";
 import { keyWorthSaving, spareKey } from "../setup.ts";
-import { appendWatchedWallet, normalizeXHandle, resolveWatchedWallet } from "../signals.ts";
+import {
+  appendWatchedWallet,
+  normalizeXHandle,
+  resolveWatchedWallet,
+  sameWatchedWalletAddress,
+} from "../signals.ts";
 import { brainRows, preferredBrainId } from "./brain.ts";
 import { defineTool, failure, result, type AuniTool } from "./tool.ts";
 
@@ -303,9 +308,10 @@ const updateAuniPreferencesTool = defineTool({
             );
           }
           if (input.remove_watched_wallet) {
-            const target = input.remove_watched_wallet.toLowerCase();
+            const target = input.remove_watched_wallet.trim();
+            const targetLower = target.toLowerCase();
             const next = watchedWallets.filter(
-              (w) => w.address.toLowerCase() !== target && w.label?.toLowerCase() !== target,
+              (w) => !sameWatchedWalletAddress(w, target) && w.label?.toLowerCase() !== targetLower,
             );
             if (next.length !== watchedWallets.length) {
               watchedWallets = next;

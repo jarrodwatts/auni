@@ -32,6 +32,7 @@ import {
   normalizeXHandle,
   refreshOwnerSignals,
   resolveWatchedWallet,
+  sameWatchedWalletAddress,
 } from "../signals.ts";
 
 export const meRouter = Router();
@@ -179,10 +180,10 @@ meRouter.post("/watched-wallets", async (req, res) => {
 
 /** Removes a watch-only wallet by address. */
 meRouter.delete("/watched-wallets/:address", async (req, res) => {
-  const target = req.params.address.toLowerCase();
+  const target = req.params.address;
   await db.transaction(async (tx) => {
     const me = await lockOwner(tx);
-    const next = me.watchedWallets.filter((w) => w.address.toLowerCase() !== target);
+    const next = me.watchedWallets.filter((w) => !sameWatchedWalletAddress(w, target));
     await tx.update(owner).set({ watchedWallets: next });
     await enqueueSignalsRefresh(tx);
   });
@@ -190,9 +191,9 @@ meRouter.delete("/watched-wallets/:address", async (req, res) => {
   res.json(await meWire(ownerHere(req)));
 });
 
-/** Refreshes X + watch-only wallet signals and re-synthesizes the owner profile + starting points. */
+/** Refreshes X + watch-only wallet signals while preserving any manually edited profile summary. */
 meRouter.post("/signals/refresh", async (req, res) => {
-  await refreshOwnerSignals({ replaceSummary: true }).catch(() => null);
+  await refreshOwnerSignals().catch(() => null);
   res.json(await meWire(ownerHere(req)));
 });
 

@@ -65,13 +65,23 @@ export async function resolveWatchedWallet(input: string, label?: string): Promi
   throw new Error("Enter a valid EVM address (0x...), ENS name (.eth), or Solana address.");
 }
 
+/** Matches a watched wallet against a target address (case-insensitive for EVM, exact for Solana Base58). */
+export function sameWatchedWalletAddress(
+  wallet: Pick<WatchedWallet, "chain" | "address">,
+  address: string,
+): boolean {
+  return wallet.chain === "evm"
+    ? wallet.address.toLowerCase() === address.toLowerCase()
+    : wallet.address === address;
+}
+
 /** Adds a watched wallet to a list (deduped by chain + address, capped at MAX_WATCHED_WALLETS). */
 export function appendWatchedWallet(
   existing: readonly WatchedWallet[],
   added: WatchedWallet,
 ): WatchedWallet[] {
   const same = (a: WatchedWallet, b: WatchedWallet) =>
-    a.chain === b.chain && a.address.toLowerCase() === b.address.toLowerCase();
+    a.chain === b.chain && sameWatchedWalletAddress(a, b.address);
   const filtered = existing.filter((wallet) => !same(wallet, added));
   if (filtered.length >= MAX_WATCHED_WALLETS) {
     throw new Error(`You can watch up to ${MAX_WATCHED_WALLETS} wallets at once.`);

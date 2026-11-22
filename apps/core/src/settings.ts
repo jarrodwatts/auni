@@ -195,26 +195,38 @@ export async function saveSwitch(id: string, on: boolean): Promise<void> {
   write(APPS_OFF, [...off].toSorted().join(","));
 }
 
+const TAILNET_ORIGIN = /^https:\/\/[^/]+\.ts\.net(?::\d+)?$/iu;
+
 /**
  * Records that Auni runs always on (always-on.ts): the owner's Tailscale login and this machine's
- * https address on the tailnet. Both keys are validated and saved atomically in one file write.
+ * https address on the tailnet. Preserves any custom file-configured local `WEB_ORIGIN` so
+ * disabling Tailscale later restores it cleanly. All keys are written atomically in one file write.
  */
 export function saveAlwaysOn(owner: string, origin: string): void {
-  writeMany([
-    ["WEB_ORIGIN", origin],
-    ["TAILSCALE_OWNER", owner],
-  ]);
+  const existingOrigin = setBy("WEB_ORIGIN") === "file" ? (process.env.WEB_ORIGIN ?? "") : "";
+  const preserveLocal =
+    existingOrigin && !TAILNET_ORIGIN.test(existingOrigin)
+      ? ([["LOCAL_WEB_ORIGIN", existingOrigin]] as const)
+      : ([] as const);
+  writeMany([...preserveLocal, ["WEB_ORIGIN", origin], ["TAILSCALE_OWNER", owner]]);
 }
 
 /**
- * Clears Tailscale always-on settings atomically so Auni returns to local-only pairing mode on
- * next start. If either variable is locked by the host environment, neither is changed.
+ * Clears Tailscale always-on settings atomically so Auni returns to local mode on next start.
+ * Restores any previously saved local `WEB_ORIGIN` (and never wipes an unrelated custom origin).
+ * If any modified variable is locked by the host environment, nothing is changed.
  */
 export function clearAlwaysOn(): void {
-  writeMany([
-    ["TAILSCALE_OWNER", ""],
-    ["WEB_ORIGIN", ""],
-  ]);
+  const currentOrigin = process.env.WEB_ORIGIN ?? "";
+  const savedLocal =
+    setBy("LOCAL_WEB_ORIGIN") === "file" ? (process.env.LOCAL_WEB_ORIGIN ?? "") : "";
+  const entries: [string, string][] = [["TAILSCALE_OWNER", ""]];
+  if (savedLocal) {
+    entries.push(["WEB_ORIGIN", savedLocal], ["LOCAL_WEB_ORIGIN", ""]);
+  } else if (!currentOrigin || TAILNET_ORIGIN.test(currentOrigin)) {
+    entries.push(["WEB_ORIGIN", ""]);
+  }
+  writeMany(entries);
 }
 
 /**

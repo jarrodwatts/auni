@@ -404,7 +404,7 @@ export const APP_ABOUTS = {
   relay: {
     id: "relay",
     name: "Relay",
-    does: "Pays in from a wallet on another chain",
+    does: "Brings coin for fees across chains",
     settings: {
       apiKey: {
         env: "RELAY_API_KEY",

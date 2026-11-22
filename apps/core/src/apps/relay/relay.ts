@@ -65,7 +65,6 @@ const quoteSchema = z.object({
     z.object({
       id: z.string(),
       kind: z.string(),
-      description: z.string().default(""),
       requestId: hex,
       items: z.array(
         z.object({
@@ -82,8 +81,6 @@ const quoteSchema = z.object({
   details: z.object({
     recipient: z.string(),
     currencyOut: currencyAmount,
-    currencyGasTopup: currencyAmount.nullish(),
-    timeEstimate: z.number().nullish(),
   }),
 });
 
@@ -136,13 +133,6 @@ export async function quote(request: PayInRequest): Promise<PayInAnswer> {
         destinationCurrency: to.token,
         amount: request.amount.toString(),
         tradeType: "EXACT_INPUT",
-        ...(request.topUpUsd
-          ? {
-              topupGas: true,
-              // In USDC's six decimals: "1000000" is $1.
-              topupGasAmount: String(Math.round(request.topUpUsd * 1e6)),
-            }
-          : {}),
       }),
     }),
   );
@@ -165,8 +155,6 @@ export function answered(answer: unknown): PayInAnswer {
     },
     out: BigInt(out.amount),
     least: BigInt(out.minimumAmount ?? out.amount),
-    gas: details.currencyGasTopup ? BigInt(details.currencyGasTopup.amount) : null,
-    seconds: details.timeEstimate ?? null,
   };
 }
 

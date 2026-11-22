@@ -148,7 +148,6 @@ function answer(request: PayInRequest) {
   const step = (id: string, to: string, data: Hex) => ({
     id,
     kind: "transaction",
-    description: id,
     requestId: ORDER,
     calls: [{ chainId: MONAD, to, data, value: 0n }],
   });
@@ -173,8 +172,6 @@ function answer(request: PayInRequest) {
     pays: { recipient: request.recipient, ...request.to },
     out: 10_855_085n,
     least: 10_411_112n,
-    gas: null,
-    seconds: 1,
   };
 }
 

@@ -60,16 +60,6 @@ export {
   feedbackSearchUrl,
   feedbackWireSchema,
 } from "./feedback.ts";
-export {
-  FUNDING_FROM,
-  START_MON,
-  type FundingQuoteRequest,
-  fundingQuoteRequestSchema,
-  type FundingQuoteWire,
-  fundingQuoteWireSchema,
-  type FundingStatusWire,
-  fundingStatusWireSchema,
-} from "./funding.ts";
 export { automationCardSchema } from "./automation/card-shape.ts";
 export {
   type AutomationFireWire,

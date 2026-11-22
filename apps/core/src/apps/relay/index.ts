@@ -3,7 +3,7 @@ import { tryKeyAt } from "../../try-key.ts";
 import about from "./about.ts";
 import { deposit, DEPOSITORY, quote, RELAY_API, status } from "./relay.ts";
 
-/** Relay: quotes carrying USDC from another chain to an address of the owner's, in a second or two. */
+/** Relay: quotes carrying coin or USDC across chains for network fees, in a second or two. */
 export default defineApp({
   about,
   payIn: { depository: DEPOSITORY, deposit, quote, status },

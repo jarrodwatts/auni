@@ -81,7 +81,6 @@ traces, and coin that came in where the wallet spent more of it within one sweep
   (`money/token-feeds.ts`).
 - Money arriving: `money/arrivals.ts`, `money/sweep.ts`, `jobs/sweep.ts`. A venue's own record of
   what traded there: `money/statements.ts`, `jobs/statements.ts`.
-- Paying in from a browser wallet: `routes/funding.ts`, and `money/pay-in.ts`, which holds the
-  pay-in app's quote to what was asked.
+- Paying in for fees: `money/pay-in.ts`, which holds the pay-in app's quote to what was asked.
 - What Auni tells a thread unasked of money (a landing, an arrival): `money/news.ts`.
 - A specialist's pot: `money/pot.ts`. The agent's chain reads (`read_chain`): `money/read-chain.ts`.

@@ -83,7 +83,6 @@ vi.mock(import("../../money/pay-in.ts"), async (original) => {
             {
               id: "deposit",
               kind: "transaction",
-              description: "",
               requestId: REQUEST,
               calls: [
                 {
@@ -102,8 +101,6 @@ vi.mock(import("../../money/pay-in.ts"), async (original) => {
           pays: { recipient: request.recipient, chain: "arbitrum", token: "native" },
           out: 100n * LACKS,
           least: 99n * LACKS,
-          gas: null,
-          seconds: 2,
         },
       ),
   };

@@ -787,24 +787,28 @@ export async function enableTailscaleFromUi(
 }
 
 /**
- * Disables Tailscale HTTPS in `~/.auni/.env` and attempts to turn off Tailscale Serve for Auni's
- * port. Returns whether a restart is needed (always true if currently running in Tailscale mode).
+ * Disables Tailscale HTTPS in `~/.auni/.env`. When Auni is currently running in Tailscale mode,
+ * the active Tailscale Serve route is intentionally left open until restart so the remote browser
+ * reliably receives this response and its restart instructions instead of being cut off mid-flight.
  */
 export async function disableTailscaleFromUi(): Promise<{
   readonly ok: boolean;
   readonly needsRestart: boolean;
+  readonly serveOffCommand: string | null;
   readonly note: string | null;
 }> {
   const wasTailscale = Boolean(env.TAILSCALE_OWNER);
   const activePort = wasTailscale ? Number(new URL(env.WEB_ORIGIN).port || 443) : null;
   clearAlwaysOn();
-  let note: string | null = null;
-  if (activePort !== null) {
-    try {
-      await run("tailscale", ["serve", `--https=${activePort}`, "off"], { timeout: 15_000 });
-    } catch {
-      note = `Saved local-only mode. To stop the Tailscale route too, run: sudo tailscale serve --https=${activePort} off`;
-    }
+
+  if (wasTailscale && activePort !== null) {
+    return {
+      ok: true,
+      needsRestart: true,
+      serveOffCommand: `sudo tailscale serve --https=${activePort} off`,
+      note: "Saved local-only mode. Your current Tailscale link stays open until you turn off Serve and restart Auni.",
+    };
   }
-  return { ok: true, needsRestart: wasTailscale, note };
+
+  return { ok: true, needsRestart: false, serveOffCommand: null, note: null };
 }

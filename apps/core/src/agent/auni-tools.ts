@@ -3,8 +3,9 @@ import { z } from "zod";
 
 import { inspectTailscale, staysOn } from "../always-on.ts";
 import { appsWire } from "../app-list.ts";
+import { brains } from "../apps/registry.ts";
 import { lockOwner, theOwner } from "../auth/owner.ts";
-import { briefWhen } from "../automations/brief.ts";
+import { briefWhen, releaseHeld } from "../automations/brief.ts";
 import { SCHEDULE_SHAPES, scheduleSchema } from "../automations/schedule.ts";
 import { canBeHome, channelStates, pairedChannels } from "../channels/home.ts";
 import { publishBrains, publishMe } from "../conversation/stream.ts";
@@ -18,7 +19,7 @@ import { walletAddresses } from "../money/wallets.ts";
 import { PrivateFieldRefused } from "../private-fields.ts";
 import { runningVersion } from "../release/layout.ts";
 import { serviceInstalled } from "../service.ts";
-import { savePreferredBrain } from "../settings.ts";
+import { savePreferredBrain, setBy } from "../settings.ts";
 import { keyWorthSaving, spareKey } from "../setup.ts";
 import { appendWatchedWallet, normalizeXHandle, resolveWatchedWallet } from "../signals.ts";
 import { brainRows, preferredBrainId } from "./brain.ts";
@@ -211,6 +212,7 @@ const updateAuniPreferencesTool = defineTool({
       let signalsChanged = false;
       let pointsChanged = false;
 
+      // Validate every field upfront before persisting either DB changes or `.env` settings.
       if (input.look !== undefined && input.look !== null && !VALID_LOOKS.has(input.look)) {
         return failure(
           new Error(
@@ -220,17 +222,18 @@ const updateAuniPreferencesTool = defineTool({
       }
 
       if (input.preferred_brain !== undefined) {
-        try {
-          await savePreferredBrain(input.preferred_brain);
-          publishBrains();
-          changes.push(
-            input.preferred_brain
-              ? `preferred brain set to ${input.preferred_brain}`
-              : "preferred brain set to automatic",
+        if (setBy("BRAIN") === "environment") {
+          return failure(
+            new Error(
+              "This computer's environment sets BRAIN itself, so Auni can't change it here.",
+            ),
           );
-        } catch (error) {
-          if (error instanceof PrivateFieldRefused) return failure(error);
-          throw error;
+        }
+        if (
+          input.preferred_brain !== null &&
+          !brains().some(({ about }) => about.id === input.preferred_brain)
+        ) {
+          return failure(new Error(`${input.preferred_brain} is not an AI brain in this Auni.`));
         }
       }
 
@@ -340,12 +343,28 @@ const updateAuniPreferencesTool = defineTool({
           if (Object.keys(patch).length > 0) {
             await tx.update(owner).set(patch);
           }
+          if (input.brief === null) await releaseHeld(tx);
           if (signalsChanged) {
-            await enqueueSignalsRefresh(tx, { replaceSummary: xHandle !== undefined });
+            await enqueueSignalsRefresh(tx);
           } else if (pointsChanged) {
             await forceRefreshStartingPoints(tx);
           }
         });
+      }
+
+      if (input.preferred_brain !== undefined) {
+        try {
+          await savePreferredBrain(input.preferred_brain);
+          publishBrains();
+          changes.push(
+            input.preferred_brain
+              ? `preferred brain set to ${input.preferred_brain}`
+              : "preferred brain set to automatic",
+          );
+        } catch (error) {
+          if (error instanceof PrivateFieldRefused) return failure(error);
+          throw error;
+        }
       }
       publishMe();
 

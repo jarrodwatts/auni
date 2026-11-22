@@ -166,9 +166,16 @@ systemRouter.post("/tailscale/enable", async (req, res) => {
 
 systemRouter.post("/tailscale/disable", async (req, res) => {
   if (!ownerHere(req)) return void res.status(403).json({ error: "pair_again" });
-  const result = await disableTailscaleFromUi();
-  publishMe();
-  res.json(result);
+  try {
+    const result = await disableTailscaleFromUi();
+    publishMe();
+    res.json({ ...result, remote: await remoteWire(req.sessionId, true) });
+  } catch (error) {
+    res.status(400).json({
+      error: "tailscale_failed",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 systemRouter.post("/service/install", async (req, res) => {

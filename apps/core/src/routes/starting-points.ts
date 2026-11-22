@@ -18,8 +18,8 @@ startingPointsRouter.get("/", async (_req, res) => {
   res.json({ points: pending ? [] : (startingPoints ?? []), pending } satisfies StartingPointsWire);
 });
 
-/** Queues a fresh starting-points generation right now, e.g. from the Refresh button. */
+/** Queues a fresh starting-points generation right now, reusing an in-flight run if one is pending. */
 startingPointsRouter.post("/refresh", async (_req, res) => {
-  await forceRefreshStartingPoints(db);
+  await forceRefreshStartingPoints(db, { reusePending: true });
   res.json({ points: [], pending: true } satisfies StartingPointsWire);
 });

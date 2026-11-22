@@ -11,6 +11,7 @@ import { brainStatus, preferredBrainId } from "../agent/brain.ts";
 import { reachWire } from "../always-on.ts";
 import { lockOwner, theOwner } from "../auth/owner.ts";
 import { ownerHere } from "../auth/proof.ts";
+import { releaseHeld } from "../automations/brief.ts";
 import { canBeHome, channelStates, pairedChannels } from "../channels/home.ts";
 import { publishMe } from "../conversation/stream.ts";
 import { db } from "../db/client.ts";
@@ -140,8 +141,10 @@ meRouter.patch("/", async (req, res) => {
           ? { profileSummary: patch.profile_summary || null }
           : {}),
       });
+      if (patch.brief === null) await releaseHeld(tx);
       if (xHandle !== undefined) {
-        await enqueueSignalsRefresh(tx, { replaceSummary: true });
+        // Keep auto-managed summary semantics so changing X handle never overwrites manual notes.
+        await enqueueSignalsRefresh(tx);
       } else if (patch.profile_summary !== undefined) {
         await forceRefreshStartingPoints(tx);
       }
@@ -162,7 +165,7 @@ meRouter.post("/watched-wallets", async (req, res) => {
       const me = await lockOwner(tx);
       const next = appendWatchedWallet(me.watchedWallets, resolved);
       await tx.update(owner).set({ watchedWallets: next });
-      await enqueueSignalsRefresh(tx, { replaceSummary: !me.profileSummary });
+      await enqueueSignalsRefresh(tx);
     });
     publishMe();
     res.json(await meWire(ownerHere(req)));

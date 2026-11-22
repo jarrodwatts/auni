@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { watchFireSchema, type WatchFire } from "../conversation/history.ts";
@@ -103,15 +104,24 @@ export const startingPointsKind = jobKind("starting-points", z.object({}), () =>
  */
 const STARTING_POINTS_FRESH_MS = 60 * 60_000;
 
+/** Whether a starting-points generation job is currently queued or running. */
+async function hasPendingStartingPoints(executor: Executor): Promise<boolean> {
+  const rows = await executor.execute(
+    sql`select 1 from jobs where kind = ${startingPointsKind.name} and finished_at is null limit 1`,
+  );
+  return rows.length > 0;
+}
+
 /**
  * Queues new starting points when none are saved (`savedAt` null) or those saved are past
- * STARTING_POINTS_FRESH_MS; true when they are, so none are shown. Once per generation: the key
- * is when the saved ones were written.
+ * STARTING_POINTS_FRESH_MS; true when a generation is already pending or just queued, so stale
+ * points are hidden until the refresh lands.
  */
 export async function refreshStartingPoints(
   executor: Executor,
   savedAt: Date | null,
 ): Promise<boolean> {
+  if (await hasPendingStartingPoints(executor)) return true;
   if (savedAt && Date.now() - savedAt.getTime() < STARTING_POINTS_FRESH_MS) return false;
   await startingPointsKind.enqueue(
     executor,
@@ -121,9 +131,17 @@ export async function refreshStartingPoints(
   return true;
 }
 
-/** Forces fresh starting points right now (e.g. after onboarding or signal/profile updates). */
-export async function forceRefreshStartingPoints(executor: Executor): Promise<void> {
-  await startingPointsKind.enqueue(executor, {});
+/**
+ * Forces fresh starting points right now (e.g. after onboarding, signal/profile updates, or a
+ * manual Refresh click). With `reusePending`, an already queued or running job is reused instead
+ * of scheduling another pass.
+ */
+export async function forceRefreshStartingPoints(
+  executor: Executor,
+  options: { readonly reusePending?: boolean } = {},
+): Promise<void> {
+  if (options.reusePending && (await hasPendingStartingPoints(executor))) return;
+  await startingPointsKind.enqueue(executor, {}, { key: "starting-points:refresh", debounceMs: 1 });
 }
 
 /** Refreshes owner personalization signals (X handle + watched wallets) and then starting points. */

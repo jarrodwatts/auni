@@ -82,12 +82,13 @@ export function useStartingPoints(): {
 /** Asks core to regenerate tailored starting points right away from current signals. */
 export function useRefreshStartingPoints() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      await requestCore("starting-points/refresh", { method: "POST", body: "{}" });
-    },
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: KEY });
+  return useMutation<StartingPointsWire>({
+    mutationFn: async () =>
+      startingPointsWireSchema.parse(
+        await requestCore("starting-points/refresh", { method: "POST", body: "{}" }),
+      ),
+    onSuccess: (wire) => {
+      client.setQueryData<Read>(KEY, { ...wire, waitingSince: Date.now() });
     },
   });
 }

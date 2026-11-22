@@ -59,13 +59,31 @@ export function useEnableTailscale() {
 
 export function useDisableTailscale() {
   const queryClient = useQueryClient();
-  return useMutation<{ readonly ok: boolean; readonly remote: RemoteAccessWire }>({
+  return useMutation<{
+    readonly ok: boolean;
+    readonly needsRestart: boolean;
+    readonly serveOffCommand: string | null;
+    readonly note: string | null;
+    readonly remote: RemoteAccessWire;
+  }>({
     mutationFn: async () => {
       const raw = (await requestCore("system/tailscale/disable", {
         method: "POST",
         body: "{}",
-      })) as { ok: boolean; remote: unknown };
-      return { ok: Boolean(raw.ok), remote: remoteAccessWireSchema.parse(raw.remote) };
+      })) as {
+        ok: boolean;
+        needsRestart?: boolean;
+        serveOffCommand?: string | null;
+        note?: string | null;
+        remote: unknown;
+      };
+      return {
+        ok: Boolean(raw.ok),
+        needsRestart: Boolean(raw.needsRestart),
+        serveOffCommand: typeof raw.serveOffCommand === "string" ? raw.serveOffCommand : null,
+        note: typeof raw.note === "string" ? raw.note : null,
+        remote: remoteAccessWireSchema.parse(raw.remote),
+      };
     },
     onSuccess: ({ remote }) => {
       queryClient.setQueryData(REMOTE_KEY, remote);

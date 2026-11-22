@@ -181,9 +181,13 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
     setTsRestartCommand(null);
     setPairAgainFor(null);
     try {
-      await disableTs.mutateAsync();
-      setTsRestartNote("Tailscale HTTPS disabled. Restart Auni to return to local pairing mode:");
-      setTsRestartCommand(restartCmd);
+      const result = await disableTs.mutateAsync();
+      setTsRestartNote(
+        result.note ?? "Tailscale HTTPS disabled. Restart Auni to return to local pairing mode:",
+      );
+      setTsRestartCommand(
+        result.serveOffCommand ? `${result.serveOffCommand} && ${restartCmd}` : restartCmd,
+      );
     } catch (error) {
       if (isPairAgain(error)) setPairAgainFor("tailscale");
       else setTsError(errDetail(error, "Could not disable Tailscale HTTPS."));

@@ -2,7 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { aboutWireSchema, logsWireSchema, rpcsWireSchema } from "@auni/shared";
+import {
+  aboutWireSchema,
+  logsWireSchema,
+  rpcsWireSchema,
+  startingPointsWireSchema,
+} from "@auni/shared";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +19,7 @@ import { refreshOwnerSignals } from "../signals.ts";
 import { setOwner, wipe } from "../test/db.ts";
 import { serve } from "../test/serve.ts";
 import { privateRouter } from "./private.ts";
+import { startingPointsRouter } from "./starting-points.ts";
 import { systemRouter } from "./system.ts";
 
 const proof = vi.hoisted(() => ({ here: false }));
@@ -21,7 +27,10 @@ vi.mock("../auth/proof.ts", () => ({
   ownerHere: () => proof.here,
 }));
 
-const app = express().use("/system", systemRouter).use("/private", privateRouter);
+const app = express()
+  .use("/system", systemRouter)
+  .use("/private", privateRouter)
+  .use("/starting-points", startingPointsRouter);
 const url = serve(app);
 
 let home: string;
@@ -266,5 +275,51 @@ describe("auniCapabilityTools", () => {
 
     const queued = await db.select().from(jobs);
     expect(queued.some((j) => j.kind === "signals")).toBe(true);
+  });
+
+  it("update_auni_preferences validates all fields before saving preferred_brain", async () => {
+    delete process.env.BRAIN;
+    const [, updatePrefs] = auniCapabilityTools();
+    const out = await updatePrefs!.handler({
+      preferred_brain: "codex",
+      home_channel: "unpaired-channel",
+    });
+    expect(out.isError).toBe(true);
+    expect(process.env.BRAIN).toBeUndefined();
+  });
+
+  it("tracks manual starting-points refreshes as pending on GET and deduplicates repeat clicks", async () => {
+    await setOwner({
+      startingPoints: [
+        {
+          statement: "Wallet is empty.",
+          action: "Get started",
+          prompt: "Help me fund my wallet.",
+          image: null,
+          sources: [{ app: "auni", label: "Your money", link: null }],
+        },
+      ],
+      startingPointsAt: new Date(),
+    });
+
+    const before = startingPointsWireSchema.parse(
+      await (await fetch(url("/starting-points"))).json(),
+    );
+    expect(before.pending).toBe(false);
+    expect(before.points).toHaveLength(1);
+
+    const r1 = await fetch(url("/starting-points/refresh"), { method: "POST" });
+    const r2 = await fetch(url("/starting-points/refresh"), { method: "POST" });
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+
+    const during = startingPointsWireSchema.parse(
+      await (await fetch(url("/starting-points"))).json(),
+    );
+    expect(during.pending).toBe(true);
+    expect(during.points).toEqual([]);
+
+    const queued = (await db.select().from(jobs)).filter((j) => j.kind === "starting-points");
+    expect(queued).toHaveLength(1);
   });
 });

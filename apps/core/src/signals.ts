@@ -535,15 +535,17 @@ export async function refreshOwnerSignals(
     ) {
       return false;
     }
-    // Only update profileSummary when it hasn't been manually edited (or explicit Refresh while unchanged).
+    // Keep auto-managed profileSummary in sync with generatedSummary (including clearing stale text
+    // when a removed signal produces no replacement), while always preserving manual owner edits.
     const untouchedSinceStart = latest.profileSummary === me.profileSummary;
     const isAutoManaged =
       latest.profileSummary === null ||
       latest.profileSummary === latest.profileSignals?.generatedSummary;
     const canUpdateSummary =
-      synthesizedSummary !== null &&
       untouchedSinceStart &&
-      (options.replaceSummary || isAutoManaged);
+      (synthesizedSummary !== null
+        ? options.replaceSummary || isAutoManaged
+        : isAutoManaged && latest.profileSummary !== null);
     await tx
       .update(owner)
       .set({

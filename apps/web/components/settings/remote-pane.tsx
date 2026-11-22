@@ -510,6 +510,16 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
           >
             <CopyLine value="auni stop && auni service install" command />
           </SettingsRow>
+        ) : data.service.supported &&
+          data.service.installed &&
+          data.service.runningAs === "service" ? (
+          <SettingsRow
+            label="User service active"
+            description="Auni is currently running inside the OS background service. To stop and remove it cleanly, run this in a terminal:"
+            stacked
+          >
+            <CopyLine value="auni service uninstall" command />
+          </SettingsRow>
         ) : (
           <SettingsRow
             label={data.service.installed ? "User service installed" : "Run as background service"}

@@ -116,8 +116,9 @@ describe("/system routes & network private fields", () => {
     expect(afterClear.chains.find((c) => c.key === "base")?.customHost).toBeNull();
   });
 
-  it("redacts bearer tokens, pairing codes, API keys, and 64-hex keys from bounded GET /system/logs", async () => {
+  it("redacts RPC URLs, core secrets, bearer tokens, pairing codes, API keys, and 64-hex keys from bounded GET /system/logs", async () => {
     const privKey = "a".repeat(64);
+    env.ALCHEMY_API_KEY = "alchemy_live_secret_987654";
     writeFileSync(
       join(home, "auni.log"),
       [
@@ -125,18 +126,25 @@ describe("/system routes & network private fields", () => {
         "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
         "pairing link http://localhost:3000/app#pair=secretPairCode123",
         "provider key sk-ant-api03-verysecretvalue",
+        "viem error URL: https://base-mainnet.g.alchemy.com/v2/rpc_path_secret_key?apikey=rpc_query_secret",
+        "direct secret alchemy_live_secret_987654",
         `raw key 0x${privKey}`,
       ].join("\n"),
     );
 
     const res = await fetch(url("/system/logs"));
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     const body = logsWireSchema.parse(await res.json());
     const joined = body.lines.join("\n");
     expect(joined).toContain("normal boot line");
+    expect(joined).toContain("base-mainnet.g.alchemy.com");
     expect(joined).not.toContain("eyJhbGci");
     expect(joined).not.toContain("secretPairCode123");
     expect(joined).not.toContain("verysecretvalue");
+    expect(joined).not.toContain("rpc_path_secret_key");
+    expect(joined).not.toContain("rpc_query_secret");
+    expect(joined).not.toContain("alchemy_live_secret_987654");
     expect(joined).not.toContain(privKey);
   });
 
@@ -186,6 +194,32 @@ describe("refreshOwnerSignals disconnection handling", () => {
     [row] = await db.select().from(owner);
     expect(row?.profileSignals).toBeNull();
     expect(row?.profileSummary).toBe("My custom manual investing preferences.");
+  });
+
+  it("clears stale auto-generated summary when X is removed and a remaining watched wallet has no readable holdings", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline test rpc"));
+    try {
+      await setOwner({
+        xHandle: null,
+        watchedWallets: [
+          { address: "0x000000000000000000000000000000000000dEaD", chain: "evm", label: "Empty" },
+        ],
+        profileSummary: "Old X-derived bio summary.",
+        profileSignals: {
+          refreshedAt: new Date().toISOString(),
+          xBio: "Old bio",
+          xTopics: ["AI"],
+          generatedSummary: "Old X-derived bio summary.",
+          watchedHoldings: [],
+        },
+      });
+      await refreshOwnerSignals();
+      const [row] = await db.select().from(owner);
+      expect(row?.profileSignals?.generatedSummary).toBeNull();
+      expect(row?.profileSummary).toBeNull();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 

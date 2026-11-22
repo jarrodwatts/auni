@@ -267,6 +267,9 @@ function clientOf(
     // A reverted call is an answer, which viem's fallback never asks the next endpoint about.
     transport: transports.length > 1 ? fallback(transports, { retryCount: 0 }) : transports[0]!,
     batch: { multicall: true },
+    // Disable EIP-3668 off-chain CCIP-Read lookups so an untrusted ENS resolver or contract can
+    // never cause core to fetch arbitrary URLs outside the agent's network boundary.
+    ccipRead: false,
   }) as PublicClient;
 }
 

@@ -23,6 +23,7 @@ import {
   inspectTailscale,
   staysOn,
 } from "../always-on.ts";
+import { apps } from "../apps/registry.ts";
 import {
   listSessions,
   mintPairingCode,
@@ -42,6 +43,7 @@ import { installed, runningVersion, versionDir } from "../release/layout.ts";
 import { byRelease } from "../release/tags.ts";
 import { isRepairId, repairDescription, runUiRepair } from "../repairs.ts";
 import { runningAuni } from "../running.ts";
+import { errorWords, escaped } from "../safe-words.ts";
 import { installService, lingers, serviceInstalled, uninstallService } from "../service.ts";
 import { ALCHEMY_FIELD, rpcField, setBy } from "../settings.ts";
 
@@ -195,6 +197,16 @@ systemRouter.post("/service/install", async (req, res) => {
 
 systemRouter.post("/service/uninstall", async (req, res) => {
   if (!ownerHere(req)) return void res.status(403).json({ error: "pair_again" });
+  // Removing the OS service while this process IS that managed service synchronously stops
+  // ourselves before the HTTP response or unit file cleanup can complete.
+  const running = await runningAuni().catch(() => null);
+  if (running?.as === "service") {
+    return void res.status(409).json({
+      error: "running_as_service",
+      detail:
+        "Auni is currently running inside the background service. Run `auni service uninstall` in a terminal so the service stops and removes cleanly.",
+    });
+  }
   try {
     uninstallService();
     publishMe();
@@ -272,8 +284,22 @@ const SECRET_PATTERNS = [
   /([0-9a-f]{64})/giu,
 ];
 
-function redactLogLine(line: string): string {
-  let out = line;
+function appSecrets(): string[] {
+  return apps()
+    .flatMap((app) => Object.values(app.about.settings ?? {}))
+    .filter((setting) => setting.kind === "secret")
+    .map((setting) => process.env[setting.env]?.trim() ?? "")
+    .filter((value) => value.length >= 8)
+    .toSorted((a, b) => b.length - a.length);
+}
+
+function redactLogLine(line: string, extraSecrets: readonly string[]): string {
+  // Cut every URL (including RPC URLs with credentials in userinfo/path/query) down to host only,
+  // and scrub every core secret (`ALCHEMY_API_KEY`, `TURN_TOKEN_SECRET`, `DATABASE_URL`, `RPC_URLS`).
+  let out = errorWords(line);
+  for (const secret of extraSecrets) {
+    out = out.replace(new RegExp(escaped(secret), "giu"), "[redacted]");
+  }
   for (const pattern of SECRET_PATTERNS) {
     out = out.replace(pattern, (match, prefix?: string) =>
       typeof prefix === "string" && prefix !== match ? `${prefix}[redacted]` : "[redacted]",
@@ -305,11 +331,12 @@ async function readLogTail(path: string, maxLines: number): Promise<string[]> {
       const firstBreak = text.indexOf("\n");
       if (firstBreak !== -1) text = text.slice(firstBreak + 1);
     }
+    const extraSecrets = appSecrets();
     return text
       .split("\n")
       .filter((line) => line.length > 0)
       .slice(-maxLines)
-      .map(redactLogLine);
+      .map((line) => redactLogLine(line, extraSecrets));
   } catch {
     return [];
   } finally {
@@ -320,6 +347,7 @@ async function readLogTail(path: string, maxLines: number): Promise<string[]> {
 systemRouter.get("/logs", async (_req, res) => {
   const path = auniLog();
   const lines = await readLogTail(path, 200);
+  res.setHeader("Cache-Control", "no-store");
   res.json({ path, lines } satisfies LogsWire);
 });
 

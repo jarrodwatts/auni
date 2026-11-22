@@ -413,4 +413,19 @@ describe("local system settings writers", () => {
       else process.env.ALCHEMY_API_KEY = prevAlchemy;
     }
   });
+
+  it("never partially writes always-on auth settings when WEB_ORIGIN is locked by the host environment", async () => {
+    writeFileSync(join(home, ".env"), "TAILSCALE_OWNER='owner@example.com'\n");
+    process.env.WEB_ORIGIN = "https://box.ts.net";
+    delete process.env.TAILSCALE_OWNER;
+    vi.resetModules();
+    const started = await import("./settings.ts");
+    started.readSettings();
+    expect(process.env.TAILSCALE_OWNER).toBe("owner@example.com");
+
+    expect(() => started.clearAlwaysOn()).toThrow("This computer's environment sets WEB_ORIGIN");
+    // TAILSCALE_OWNER must remain untouched on disk and in process.env.
+    expect(process.env.TAILSCALE_OWNER).toBe("owner@example.com");
+    expect(parseEnv(text()).TAILSCALE_OWNER).toBe("owner@example.com");
+  });
 });

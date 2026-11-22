@@ -197,18 +197,24 @@ export async function saveSwitch(id: string, on: boolean): Promise<void> {
 
 /**
  * Records that Auni runs always on (always-on.ts): the owner's Tailscale login and this machine's
- * https address on the tailnet. Called by `auni up --always-on` and the step-up-gated Remote
- * access settings route.
+ * https address on the tailnet. Both keys are validated and saved atomically in one file write.
  */
 export function saveAlwaysOn(owner: string, origin: string): void {
-  write("WEB_ORIGIN", origin);
-  write("TAILSCALE_OWNER", owner);
+  writeMany([
+    ["WEB_ORIGIN", origin],
+    ["TAILSCALE_OWNER", owner],
+  ]);
 }
 
-/** Clears Tailscale always-on settings so Auni returns to local-only pairing mode on next start. */
+/**
+ * Clears Tailscale always-on settings atomically so Auni returns to local-only pairing mode on
+ * next start. If either variable is locked by the host environment, neither is changed.
+ */
 export function clearAlwaysOn(): void {
-  write("TAILSCALE_OWNER", "");
-  write("WEB_ORIGIN", "");
+  writeMany([
+    ["TAILSCALE_OWNER", ""],
+    ["WEB_ORIGIN", ""],
+  ]);
 }
 
 /**
@@ -279,32 +285,43 @@ export function saveAlchemyKey(key: string | null): void {
  * Nothing in it waits, so two saves never read the same old file.
  */
 function write(name: string, value: string): void {
-  if (fromEnvironment?.has(name))
-    throw new PrivateFieldRefused(
-      `This computer's environment sets ${name} itself, so Auni can't change it here.`,
-    );
-  if (!SAVABLE.test(value)) throw new PrivateFieldRefused(UNSAFE);
+  writeMany([[name, value]]);
+}
+
+function writeMany(entries: readonly (readonly [name: string, value: string])[]): void {
+  if (entries.length === 0) return;
+  for (const [name, value] of entries) {
+    if (fromEnvironment?.has(name))
+      throw new PrivateFieldRefused(
+        `This computer's environment sets ${name} itself, so Auni can't change it here.`,
+      );
+    if (!SAVABLE.test(value)) throw new PrivateFieldRefused(UNSAFE);
+  }
 
   const old = fileText();
-  const line = `${name}='${value}'`;
-  const assigns = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`, "u");
-  let placed = false;
-  const kept = old.split("\n").flatMap((each) => {
-    if (!assigns.test(each)) return [each];
-    if (placed) return [];
-    placed = true;
-    return [line];
-  });
-  const next = placed
-    ? kept.join("\n")
-    : `${old}${old && !old.endsWith("\n") ? "\n" : ""}${line}\n`;
+  let next = old;
+  for (const [name, value] of entries) {
+    const line = `${name}='${value}'`;
+    const assigns = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`, "u");
+    let placed = false;
+    const kept = next.split("\n").flatMap((each) => {
+      if (!assigns.test(each)) return [each];
+      if (placed) return [];
+      placed = true;
+      return [line];
+    });
+    next = placed ? kept.join("\n") : `${next}${next && !next.endsWith("\n") ? "\n" : ""}${line}\n`;
+  }
 
+  const targets = new Map(entries);
   const [was, now] = [parseEnv(old), parseEnv(next)];
   const differs = [...new Set([...Object.keys(was), ...Object.keys(now)])].filter(
     (each) => was[each] !== now[each],
   );
-  if (now[name] !== value || differs.some((each) => each !== name))
-    throw new PrivateFieldRefused(UNSAFE);
+  for (const [name, value] of targets) {
+    if (now[name] !== value) throw new PrivateFieldRefused(UNSAFE);
+  }
+  if (differs.some((each) => !targets.has(each))) throw new PrivateFieldRefused(UNSAFE);
 
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
   const beside = `${envFile()}.${randomBytes(6).toString("hex")}.tmp`;
@@ -315,10 +332,14 @@ function write(name: string, value: string): void {
     rmSync(beside, { force: true });
     throw error;
   }
-  process.env[name] = value;
-  const ended = changed;
-  changed = new AbortController();
-  ended.abort(name);
+  for (const [name, value] of entries) {
+    process.env[name] = value;
+  }
+  for (const [name] of entries) {
+    const ended = changed;
+    changed = new AbortController();
+    ended.abort(name);
+  }
 }
 
 /** A typed value as it is saved, or a refusal: keys are pasted, so the space around one goes. */

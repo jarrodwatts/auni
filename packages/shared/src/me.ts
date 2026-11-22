@@ -26,6 +26,8 @@ export type WatchedWallet = z.infer<typeof watchedWalletSchema>;
 /** Cached snapshot of what Auni learned from the owner's connected signals (X, watched wallets). */
 export const ownerSignalsSchema = z.object({
   refreshedAt: z.iso.datetime({ offset: true }),
+  /** The X handle this snapshot was fetched for, so a handle switch never reuses stale data. */
+  xHandle: z.string().nullable().optional(),
   xBio: z.string().nullable(),
   xTopics: z.array(z.string()),
   /** Last auto-generated summary written by signal synthesis, kept separate from manual edits. */

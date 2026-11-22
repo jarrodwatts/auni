@@ -265,7 +265,7 @@ describe("refreshOwnerSignals disconnection handling", () => {
     }
   });
 
-  it("preserves existing X signals and summary when public X endpoints fail transiently", async () => {
+  it("preserves existing X signals on transient failure for the same handle, but clears them after switching handles", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("transient outage"));
     try {
       await setOwner({
@@ -274,6 +274,7 @@ describe("refreshOwnerSignals disconnection handling", () => {
         profileSummary: "Follows AI infra and ETH.",
         profileSignals: {
           refreshedAt: new Date().toISOString(),
+          xHandle: "alice",
           xBio: "Building AI infra",
           xTopics: ["AI infra", "Ethereum"],
           generatedSummary: "Follows AI infra and ETH.",
@@ -281,10 +282,20 @@ describe("refreshOwnerSignals disconnection handling", () => {
         },
       });
       await refreshOwnerSignals();
-      const [row] = await db.select().from(owner);
+      let [row] = await db.select().from(owner);
+      expect(row?.profileSignals?.xHandle).toBe("alice");
       expect(row?.profileSignals?.xBio).toBe("Building AI infra");
       expect(row?.profileSignals?.xTopics).toEqual(["AI infra", "Ethereum"]);
       expect(row?.profileSummary).toBe("Follows AI infra and ETH.");
+
+      // Switching to a different handle must never reuse Alice's cached signals if the new handle fails.
+      await setOwner({ xHandle: "bob" });
+      await refreshOwnerSignals();
+      [row] = await db.select().from(owner);
+      expect(row?.profileSignals?.xHandle).toBe("bob");
+      expect(row?.profileSignals?.xBio).toBeNull();
+      expect(row?.profileSignals?.xTopics).toEqual([]);
+      expect(row?.profileSummary).toBeNull();
     } finally {
       fetchSpy.mockRestore();
     }

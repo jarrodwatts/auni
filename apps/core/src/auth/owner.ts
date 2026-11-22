@@ -84,6 +84,9 @@ export async function pair(
   meta: { readonly label?: string | null; readonly userAgent?: string | null } = {},
 ): Promise<string | null> {
   return db.transaction(async (tx) => {
+    // Serialize pairing with bulk session/link revocation so a concurrent revoke never misses a
+    // session inserted from a pairing code redeemed mid-flight.
+    await lockOwner(tx);
     // One statement, so two browsers racing with one code can't both pass.
     const [spent] = await tx
       .delete(ownerSessions)
@@ -190,19 +193,22 @@ export async function revokeSession(id: string, currentSessionId?: string): Prom
  * browser-issued pairing links; returns how many active sessions were revoked.
  */
 export async function revokeOtherSessions(currentSessionId?: string): Promise<number> {
-  const sessionsWhere = currentSessionId
-    ? and(eq(ownerSessions.kind, "session"), ne(ownerSessions.id, currentSessionId))
-    : eq(ownerSessions.kind, "session");
-  const deleted = await db
-    .delete(ownerSessions)
-    .where(
-      or(
-        sessionsWhere,
-        and(eq(ownerSessions.kind, "pairing"), eq(ownerSessions.browserIssued, true)),
-      ),
-    )
-    .returning({ id: ownerSessions.id, kind: ownerSessions.kind });
-  return deleted.filter((row) => row.kind === "session").length;
+  return db.transaction(async (tx) => {
+    await lockOwner(tx);
+    const sessionsWhere = currentSessionId
+      ? and(eq(ownerSessions.kind, "session"), ne(ownerSessions.id, currentSessionId))
+      : eq(ownerSessions.kind, "session");
+    const deleted = await tx
+      .delete(ownerSessions)
+      .where(
+        or(
+          sessionsWhere,
+          and(eq(ownerSessions.kind, "pairing"), eq(ownerSessions.browserIssued, true)),
+        ),
+      )
+      .returning({ id: ownerSessions.id, kind: ownerSessions.kind });
+    return deleted.filter((row) => row.kind === "session").length;
+  });
 }
 
 /**
@@ -224,9 +230,12 @@ export async function lastPaired(): Promise<Date | null> {
  * shared device; pairing again from the terminal lets the owner back in.
  */
 export async function signOutEverywhere(): Promise<void> {
-  await db
-    .delete(ownerSessions)
-    .where(or(eq(ownerSessions.kind, "session"), eq(ownerSessions.browserIssued, true)));
+  await db.transaction(async (tx) => {
+    await lockOwner(tx);
+    await tx
+      .delete(ownerSessions)
+      .where(or(eq(ownerSessions.kind, "session"), eq(ownerSessions.browserIssued, true)));
+  });
 }
 
 /** The cookie that carries a session: host-only, never readable by script, never sent cross-site. */

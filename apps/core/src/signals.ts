@@ -522,18 +522,21 @@ export async function refreshOwnerSignals(
     topics = [...new Set(watchedHoldings.slice(0, 4).map((h) => h.name))];
   }
 
-  // If the owner still has an X handle connected, but public X endpoints were unreachable on this
-  // refresh, preserve the previous X-derived bio/topics/summary rather than wiping learned data.
+  // If the owner still has the SAME X handle connected, but public X endpoints were unreachable on
+  // this refresh, preserve the previous X-derived bio/topics/summary rather than wiping learned data.
+  // Never reuse cached X data after the owner switches to a different handle.
   const xFetchFailed = Boolean(me.xHandle && !xProfile);
   const prevSignals = me.profileSignals;
-  const effectiveXBio = xProfile?.bio ?? (xFetchFailed ? (prevSignals?.xBio ?? null) : null);
+  const canReusePrevX = Boolean(xFetchFailed && prevSignals && prevSignals.xHandle === me.xHandle);
+  const effectiveXBio = xProfile?.bio ?? (canReusePrevX ? (prevSignals?.xBio ?? null) : null);
   const effectiveTopics =
-    topics.length > 0 ? topics : xFetchFailed ? (prevSignals?.xTopics ?? []) : [];
+    topics.length > 0 ? topics : canReusePrevX ? (prevSignals?.xTopics ?? []) : [];
   const effectiveSummary =
-    synthesizedSummary ?? (xFetchFailed ? (prevSignals?.generatedSummary ?? null) : null);
+    synthesizedSummary ?? (canReusePrevX ? (prevSignals?.generatedSummary ?? null) : null);
 
   const nextSignals: OwnerSignals = {
     refreshedAt: new Date().toISOString(),
+    xHandle: me.xHandle,
     xBio: effectiveXBio,
     xTopics: effectiveTopics,
     generatedSummary: effectiveSummary,
@@ -551,8 +554,8 @@ export async function refreshOwnerSignals(
       return false;
     }
     // Keep auto-managed profileSummary in sync with generatedSummary (including clearing stale text
-    // when a removed signal produces no replacement), while preserving manual owner edits and
-    // surviving transient X fetch failures.
+    // when a removed/switched signal produces no replacement), while preserving manual owner edits
+    // and surviving transient X fetch failures for the same handle.
     const untouchedSinceStart = latest.profileSummary === me.profileSummary;
     const isAutoManaged =
       latest.profileSummary === null ||
@@ -561,7 +564,7 @@ export async function refreshOwnerSignals(
       untouchedSinceStart &&
       (effectiveSummary !== null
         ? options.replaceSummary || isAutoManaged
-        : !xFetchFailed && isAutoManaged && latest.profileSummary !== null);
+        : !canReusePrevX && isAutoManaged && latest.profileSummary !== null);
     await tx
       .update(owner)
       .set({

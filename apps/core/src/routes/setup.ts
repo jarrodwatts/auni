@@ -129,7 +129,7 @@ setupRouter.post("/done", async (req, res) => {
       ...(nextWatched ? { watchedWallets: nextWatched } : {}),
     });
     if (xHandle || watchedResolved) {
-      await enqueueSignalsRefresh(tx, { replaceSummary: true });
+      await enqueueSignalsRefresh(tx);
       await forceRefreshStartingPoints(tx);
     } else {
       await refreshStartingPoints(tx, me.startingPointsAt);

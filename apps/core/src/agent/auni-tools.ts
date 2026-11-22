@@ -134,7 +134,9 @@ const inspectAuniTool = defineTool({
             name: a.name,
             on: a.on,
             needs: a.needs,
-            troubles: a.troubles,
+            // Structured status only: never forward raw provider trouble strings to the brain.
+            hasTrouble: a.troubles.length > 0,
+            troubleCount: a.troubles.length,
           })),
         rpcs: NETWORK_KEYS.map((key) => ({
           chain: NETWORKS[key].name,

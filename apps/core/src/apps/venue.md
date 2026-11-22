@@ -164,11 +164,11 @@ so, and a card asks for the money rather than bring it across. `across/` is the 
 ### `payIn`
 
 Quotes carrying USDC, or a chain's own coin, from one chain to a recipient on another as steps
-the sender's own wallet sends: paying into Auni from a browser wallet (`../routes/funding.ts`),
-the SOL a wallet that pays its own Solana fees buys (`../money/sol-top-up.ts`), and the coin an
-EVM chain's fees are paid in, bought from a chain that can pay (`../money/fee-coin.ts`). The app
-asks its service and reads the answer into core's names (`quote`, and `status`, which names the
-transactions that paid the recipient once it succeeded), and says two things
+the sender's own wallet sends: the SOL a wallet that pays its own Solana fees buys
+(`../money/sol-top-up.ts`), and the coin an EVM chain's fees are paid in, bought from a chain that
+can pay (`../money/fee-coin.ts`). The app asks its service and reads the answer into core's names
+(`quote`, and `status`, which names the transactions that paid the recipient once it succeeded),
+and says two things
 of its own contract: its `depository`, and how a call to it reads as a `deposit`. Core holds
 every answer to what was asked before anyone sees or signs it (`../money/pay-in.ts`): an exact
 approval of that depository and one deposit of exactly the amount from the sender, or for a

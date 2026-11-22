@@ -35,7 +35,6 @@ import {
   PortalHero,
   RowSkeleton,
 } from "./portal-parts";
-import { PayFromWallet } from "./pay-from-wallet";
 import { useCountUp } from "./use-count-up";
 import { useGaze } from "./use-gaze";
 
@@ -210,7 +209,6 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
                 ))
               : addresses.map((entry) => <RowSkeleton key={entry.address} />)}
           </div>
-          {ready ? <PayFromWallet /> : null}
         </div>
         <DialogClose asChild>
           <Button

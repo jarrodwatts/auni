@@ -3,7 +3,7 @@ import type { AppAbout } from "@auni/shared";
 export default {
   id: "relay",
   name: "Relay",
-  does: "Pays in from a wallet on another chain",
+  does: "Brings coin for fees across chains",
   settings: {
     // Its docs ask every call to carry a key; unset, Auni calls it without one, as it answers today.
     apiKey: {

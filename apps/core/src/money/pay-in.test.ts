@@ -54,7 +54,6 @@ const id = `0x${"ab".repeat(32)}` as const;
 const step = (name: string, to: string, data: Hex) => ({
   id: name,
   kind: "transaction",
-  description: name,
   requestId: id,
   calls: [{ chainId: 8453, to, data, value: 0n }],
 });
@@ -78,8 +77,6 @@ const good = (): PayInAnswer => ({
   pays: { recipient: request.recipient, ...request.to },
   out: 19_900_000n,
   least: 19_800_000n,
-  gas: null,
-  seconds: 2,
 });
 const check = (answer: PayInAnswer) => checkedQuote(request, { name: "Carry", ...carry }, answer);
 

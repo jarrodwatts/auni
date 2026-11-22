@@ -166,8 +166,7 @@ deleting the folder leaves nothing behind (and loses that wallet).
   USDC; send 10 MON with it for network fees, which pays for dozens of moves, and Auni buys more
   with a little of your USDC as it runs low. Money sent on another network can still move: its
   first move there buys that network's coin for the fee with a quarter to a dollar of your money
-  on Monad. With a browser wallet such as MetaMask, you can pay from USDC on another chain there
-  too: Relay carries it to Monad in a few seconds, a dollar of it as MON while you hold little.
+  on Monad.
 - **Something wrong?** `auni doctor` checks the version, the database, the jobs, the service,
   each chain's RPC, the brain, the wallet and the web app, and says what to fix. It offers the
   safe repairs (starting or restarting the service, starting it at boot) and asks about each;
@@ -229,9 +228,9 @@ pnpm start                                      # or pnpm dev, reloading on chan
   `JUPITER_API_KEY` in `~/.auni/.env`). Without
   one, stocks trade on Monad, and with the default wallet USDC still moves to and from Solana by
   bridge or withdrawal.
-- **Relay's key.** Paying in from another chain, and those SOL top-ups, go through Relay's public
-  API. Relay's docs say every call should carry a key; Auni calls without one, as Relay answers
-  today. If Relay starts refusing, paste a key into Relay under Apps.
+- **Relay's key.** Buying a chain's coin for network fees from another chain goes through Relay's
+  public API. Relay's docs say every call should carry a key; Auni calls without one, as Relay
+  answers today. If Relay starts refusing, paste a key into Relay under Apps.
 - **Codex's shell has no network.** With Codex, the agent reads the web only through Auni's own
   `fetch_url` tool (public addresses, a page at a time); Claude Code's shell can also reach the
   public internet through Auni's proxy. Codex also adds your own `~/.codex/AGENTS.md` to every

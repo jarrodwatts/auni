@@ -28,7 +28,6 @@ const request: PayInRequest = {
   from: { chain: "base", token: NETWORKS.base.usdc as Address },
   to: { chain: "monad", token: NETWORKS.monad.usdc },
   amount: 20_000_000n,
-  topUpUsd: 1,
 };
 
 const OTHER = "0x3333333333333333333333333333333333333333";
@@ -54,7 +53,6 @@ describe("Relay's quote, checked", () => {
     ]);
     expect(quote.requestId).toBe(recorded().requestId);
     expect(quote.out).toBeGreaterThan(18_000_000n);
-    expect(quote.gas).toBeGreaterThan(10n ** 18n);
   });
 
   it("refuses a quote that pays someone else", () => {
@@ -266,7 +264,6 @@ describe("asking Relay", () => {
       destinationChainId: 792_703_809,
       destinationCurrency: "11111111111111111111111111111111",
       amount: "20000000",
-      topupGasAmount: "1000000",
     });
     expect(init!.headers).not.toHaveProperty("x-api-key");
     process.env.RELAY_API_KEY = "a-key";

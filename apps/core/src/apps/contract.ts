@@ -552,11 +552,11 @@ export interface BridgeTransfer {
 
 /** Solana tokens: their listings, their prices, and swaps between them. */
 /**
- * Quotes carrying USDC from one chain to a recipient on another as steps the sender's own
- * wallet sends: paying into Auni from a browser wallet, and the SOL a wallet that pays its own
- * Solana fees buys with its USDC on Monad. It only asks its service and reads the answer. Core
- * holds every quote to what was asked before anyone sees or signs it (money/pay-in.ts), by
- * the two things it says of its own contract here.
+ * Quotes carrying USDC or a chain's own coin from one chain to a recipient on another as steps the
+ * sender's own wallet sends: the SOL a wallet that pays its own Solana fees buys with its USDC on
+ * Monad, and the coin an EVM chain's fees are paid in, bought from a chain that can pay. It only
+ * asks its service and reads the answer. Core holds every quote to what was asked before anyone
+ * sees or signs it (money/pay-in.ts), by the two things it says of its own contract here.
  */
 export interface PayIn {
   /** The one contract a quote may approve and deposit into, at this address on every chain it serves. */

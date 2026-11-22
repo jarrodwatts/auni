@@ -55,7 +55,6 @@ function answer(
   const step = (id: string, to: string, data: Hex) => ({
     id,
     kind: "transaction",
-    description: id,
     requestId: `0x${"ab".repeat(32)}` as Hex,
     calls: [{ chainId: 143, to, data, value: 0n }],
   });
@@ -69,8 +68,6 @@ function answer(
     pays: { recipient: request.recipient, ...request.to },
     out: 10_855_085n,
     least: 10_411_112n,
-    gas: null,
-    seconds: 1,
   };
 }
 const payIn = vi.hoisted(() => ({ quote: vi.fn(), status: vi.fn() }));

@@ -15,10 +15,9 @@ import type { EvmTx } from "./recipe.ts";
 
 // Paying in: money carried from one chain to a recipient on another in a second or two. The
 // sender approves a service's depository for the amount and deposits it there under a request
-// id, and the service pays the recipient on the other chain. Core uses it three times: for
-// paying into Auni from a browser wallet (routes/funding.ts), for the SOL a wallet that pays
-// its own Solana fees buys with its USDC on Monad (sol-top-up.ts), and for the coin an EVM
-// chain's fees are paid in, bought from a chain that can pay (fee-coin.ts). The app that fills
+// id, and the service pays the recipient on the other chain. Core uses it for the SOL a wallet
+// that pays its own Solana fees buys with its USDC on Monad (sol-top-up.ts), and for the coin an
+// EVM chain's fees are paid in, bought from a chain that can pay (fee-coin.ts). The app that fills
 // the payIn role (apps/contract.ts) asks its service; what may be asked, and the check on every
 // answer, are core's and are here.
 //
@@ -43,8 +42,6 @@ export interface PayInRequest {
   readonly to: { readonly chain: NetworkKey; readonly token: string };
   /** What `user` sends, in the origin token's base units. */
   readonly amount: bigint;
-  /** Dollars of `amount` that arrive as the destination chain's coin, for its fees. */
-  readonly topUpUsd?: number;
 }
 
 /**
@@ -56,7 +53,6 @@ export interface PayInAnswer {
     readonly id: string;
     /** "transaction" for calls the sender's wallet sends; a step of any other kind is refused. */
     readonly kind: string;
-    readonly description: string;
     /** The service's own id for the request this step belongs to. */
     readonly requestId: Hex;
     readonly calls: readonly {
@@ -72,10 +68,6 @@ export interface PayInAnswer {
   readonly out: bigint;
   /** The least it gets once the service's slippage is spent. */
   readonly least: bigint;
-  /** The destination chain's coin the top-up brings, in its base units; null without one. */
-  readonly gas: bigint | null;
-  /** About how long it takes, in seconds. */
-  readonly seconds: number | null;
 }
 
 /** One call a step makes, as the sender's wallet sends it. */
@@ -88,13 +80,12 @@ interface PayInCall {
 }
 
 /** A quote held to its request: every step is one the sender may sign (see the top). */
-export interface PayInQuote extends Pick<PayInAnswer, "out" | "least" | "gas" | "seconds"> {
+export interface PayInQuote extends Pick<PayInAnswer, "out" | "least"> {
   /** The service's name, for what a person reads of it. */
   readonly by: string;
   readonly requestId: Hex;
   readonly steps: readonly {
     readonly id: "approve" | "deposit";
-    readonly description: string;
     readonly call: PayInCall;
   }[];
 }
@@ -158,8 +149,8 @@ export function checkedQuote(
   if (checked.filter(({ id }) => id === "deposit").length !== 1) refuse("doesn't deposit once");
   if (checked.at(-1)?.id !== "deposit") refuse("doesn't end in its deposit");
 
-  const { out, least, gas, seconds } = answer;
-  return { by: service.name, requestId, steps: checked, out, least, gas, seconds };
+  const { out, least } = answer;
+  return { by: service.name, requestId, steps: checked, out, least };
 }
 
 /** One step, as the sender's wallet would send it, held to the request (see the top). */
@@ -197,14 +188,14 @@ function checkedStep(
       approve.args[1] !== request.amount
     )
       refuse(`approves something other than the amount, to ${service.name}`);
-    return { id: "approve", description: step.description, call };
+    return { id: "approve", call };
   }
   if (step.id === "deposit" && sameAddress(to, service.depository)) {
     // Its id is the service's own for the order, which says who it pays: the recipient checked above.
     const { depositor, token, amount } = decoded(() => service.deposit(data, value));
     if (!isAddressEqual(depositor, request.user) || !sameToken(token, sends) || amount !== asked)
       refuse("deposits something other than this request");
-    return { id: "deposit", description: step.description, call };
+    return { id: "deposit", call };
   }
   return refuse(`calls ${to}, which is neither the token nor ${service.name}`);
 }

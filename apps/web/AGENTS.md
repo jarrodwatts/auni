@@ -60,5 +60,4 @@ network on purpose, as a later `-H` wins.
   one an app brings, its theme, copied by `pnpm gen` into `app/app-themes.generated.css`).
   `lib/look.tsx` keeps the choice on the device and wears it as `data-theme`;
   `lib/look-first.ts` is the script `app/layout.tsx` runs before the first paint.
-- Add money, and paying in from a browser wallet: `components/money/portal/`
-  (`pay-from-wallet.tsx`, `lib/browser-wallet.ts`).
+- Add money: `components/money/portal/`.

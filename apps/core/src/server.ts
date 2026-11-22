@@ -27,7 +27,6 @@ import { placesRouter } from "./routes/places.ts";
 import { threadsRouter } from "./routes/threads.ts";
 import { automationsRouter } from "./routes/automations.ts";
 import { channelsRouter } from "./routes/channels.ts";
-import { fundingRouter } from "./routes/funding.ts";
 
 /** Core's HTTP API: its routes, each behind what it takes. */
 export function coreApp(): Express {
@@ -54,7 +53,6 @@ export function coreApp(): Express {
   app.use("/activity", requireOwner, activityRouter);
   app.use("/specialists", requireOwner, specialistsRouter);
   app.use("/withdrawals", requireOwner, withdrawalsRouter);
-  app.use("/funding", requireOwner, fundingRouter);
   app.use("/automations", requireOwner, automationsRouter);
   app.use("/channels", requireOwner, channelsRouter);
   app.use("/apps", requireOwner, appsRouter);

@@ -2,17 +2,18 @@
 
 import type { NetworkKey } from "@auni/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, KeyRound, LoaderCircle, Pencil, RotateCcw } from "lucide-react";
+import { Check, LoaderCircle, Pencil, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import { PairAgain } from "@/components/auth/pair-again";
+import { SecretInput, secretRefusal } from "@/components/private-input/secret-input";
 import { CoreApiError } from "@/lib/core";
-import { RPCS_KEY, saveAlchemyKey, saveChainRpc, useRpcs } from "@/lib/data/system";
+import { acceptPrivate, clearPrivate } from "@/lib/data/private";
+import { RPCS_KEY, useRpcs } from "@/lib/data/system";
 import { cn } from "@/lib/utils";
 
 import {
   SETTINGS_BUTTON,
-  SETTINGS_INPUT,
   SETTINGS_PRIMARY_BUTTON,
   SettingsBadge,
   SettingsRow,
@@ -23,18 +24,17 @@ function isPairAgain(error: unknown): boolean {
   return error instanceof CoreApiError && error.code === "pair_again";
 }
 
-function errDetail(error: unknown, fallback: string): string {
-  if (error instanceof CoreApiError && error.detail) return error.detail;
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-}
-
 const SOURCE_BADGE = {
   own: { label: "Custom RPC", tone: "accent" as const },
   alchemy: { label: "Alchemy", tone: "ok" as const },
   public: { label: "Public", tone: "neutral" as const },
 };
 
+/**
+ * Network & RPC configuration: reads non-secret status from `GET /system/rpcs` and writes
+ * Alchemy keys and custom RPC URLs exclusively through core's `/private/:id` secret fields
+ * (requiring owner step-up proof and never caching secrets in React Query).
+ */
 export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget: string | null }) {
   const queryClient = useQueryClient();
   const rpcs = useRpcs(true);
@@ -69,38 +69,42 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
   }
 
   const data = rpcs.data;
-  const alchemyLocked = data.alchemy.source === "environment";
+  const alchemyField = data.alchemy.field;
 
   const submitAlchemy = async (value: string | null) => {
+    if (!alchemyField) return;
     setAlchemyError(null);
     setPairAgainFor(null);
     setAlchemySaving(true);
     try {
-      const updated = await saveAlchemyKey(value);
-      queryClient.setQueryData(RPCS_KEY, updated);
+      if (value === null) await clearPrivate(alchemyField, "apiKey");
+      else await acceptPrivate(alchemyField, { apiKey: value });
+      await queryClient.invalidateQueries({ queryKey: RPCS_KEY });
       setAlchemyDraft("");
       setAlchemySaved(true);
       window.setTimeout(() => setAlchemySaved(false), 2000);
     } catch (error) {
       if (isPairAgain(error)) setPairAgainFor("alchemy");
-      else setAlchemyError(errDetail(error, "Could not save Alchemy API key."));
+      else setAlchemyError(secretRefusal(error));
     } finally {
       setAlchemySaving(false);
     }
   };
 
-  const submitRpc = async (chain: NetworkKey, url: string | null) => {
+  const submitRpc = async (field: string | null, url: string | null) => {
+    if (!field) return;
     setRpcError(null);
     setPairAgainFor(null);
     setRpcSaving(true);
     try {
-      const updated = await saveChainRpc(chain, url);
-      queryClient.setQueryData(RPCS_KEY, updated);
+      if (url === null) await clearPrivate(field, "url");
+      else await acceptPrivate(field, { url });
+      await queryClient.invalidateQueries({ queryKey: RPCS_KEY });
       setEditingChain(null);
       setRpcDraft("");
     } catch (error) {
       if (isPairAgain(error)) setPairAgainFor("rpc");
-      else setRpcError(errDetail(error, "Could not save RPC URL."));
+      else setRpcError(secretRefusal(error));
     } finally {
       setRpcSaving(false);
     }
@@ -113,7 +117,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
         id="setting-alchemy"
         highlighted={highlightedTarget === "setting-alchemy"}
         title="Alchemy API key"
-        description="One key upgrades all supported chains from rate-limited public RPCs to Alchemy. Saved locally to your settings file and applied immediately."
+        description="One key upgrades all supported chains from rate-limited public RPCs to Alchemy. Sent through Auni's private field directly to your local settings file."
         action={
           <SettingsBadge tone={data.alchemy.set ? "ok" : "neutral"}>
             {data.alchemy.source === "environment"
@@ -127,7 +131,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
         <SettingsRow
           label="API key"
           description={
-            alchemyLocked
+            !alchemyField
               ? "ALCHEMY_API_KEY is exported by your machine's environment, so Auni cannot overwrite it here."
               : data.alchemy.set
                 ? "Key is stored in your local .env file and never displayed again. Paste a new key to replace it."
@@ -135,66 +139,59 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
           }
           stacked
         >
-          {!alchemyLocked ? (
-            <form
-              className="flex flex-wrap items-center gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (alchemyDraft.trim()) void submitAlchemy(alchemyDraft.trim());
-              }}
-            >
-              <div className="relative flex min-w-[220px] flex-1 items-center">
-                <KeyRound className="pointer-events-none absolute left-2.5 size-3.5 text-faint" />
-                <input
-                  type="password"
-                  value={alchemyDraft}
-                  placeholder={
-                    data.alchemy.set ? "Paste replacement key…" : "Paste Alchemy API key…"
-                  }
-                  autoComplete="off"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  data-1p-ignore
-                  data-lpignore="true"
-                  disabled={alchemySaving}
-                  onChange={(event) => {
-                    setAlchemyDraft(event.target.value);
-                    setAlchemyError(null);
-                  }}
-                  className={cn(SETTINGS_INPUT, "w-full pl-8 font-mono text-[12.5px]")}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={!alchemyDraft.trim() || alchemySaving}
-                className={SETTINGS_PRIMARY_BUTTON}
-              >
-                {alchemySaving ? (
-                  <LoaderCircle className="size-3.5 animate-spin" />
-                ) : data.alchemy.set ? (
-                  "Replace"
-                ) : (
-                  "Save"
-                )}
-              </button>
-              {data.alchemy.set ? (
+          {alchemyField ? (
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="min-w-[220px] flex-1">
+                  <SecretInput
+                    label="Alchemy API key"
+                    labelHidden
+                    value={alchemyDraft}
+                    placeholder={
+                      data.alchemy.set ? "Paste replacement key…" : "Paste Alchemy API key…"
+                    }
+                    disabled={alchemySaving}
+                    onChange={(value) => {
+                      setAlchemyDraft(value);
+                      setAlchemyError(null);
+                    }}
+                    onEnter={() => {
+                      if (alchemyDraft.trim()) void submitAlchemy(alchemyDraft.trim());
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
-                  disabled={alchemySaving}
-                  onClick={() => void submitAlchemy(null)}
-                  className={cn(SETTINGS_BUTTON, "text-destructive")}
+                  disabled={!alchemyDraft.trim() || alchemySaving}
+                  onClick={() => void submitAlchemy(alchemyDraft.trim())}
+                  className={SETTINGS_PRIMARY_BUTTON}
                 >
-                  Clear
+                  {alchemySaving ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                  ) : data.alchemy.set ? (
+                    "Replace"
+                  ) : (
+                    "Save"
+                  )}
                 </button>
-              ) : null}
-              {alchemySaved ? (
-                <span className="inline-flex items-center gap-1 text-[12px] text-positive">
-                  <Check className="size-3.5" />
-                  Saved
-                </span>
-              ) : null}
-            </form>
+                {data.alchemy.set ? (
+                  <button
+                    type="button"
+                    disabled={alchemySaving}
+                    onClick={() => void submitAlchemy(null)}
+                    className={cn(SETTINGS_BUTTON, "text-destructive")}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+                {alchemySaved ? (
+                  <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+                    <Check className="size-3.5" />
+                    Saved
+                  </span>
+                ) : null}
+              </div>
+            </div>
           ) : null}
           {alchemyError ? <p className="text-[12.5px] text-destructive">{alchemyError}</p> : null}
           {pairAgainFor === "alchemy" ? (
@@ -208,7 +205,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
         id="setting-chain-rpcs"
         highlighted={highlightedTarget === "setting-chain-rpcs"}
         title="Per-chain RPC endpoints"
-        description={`Precedence: Custom URL (${data.settingsFile}) → Alchemy → Public RPCs. Changes clear cached clients immediately.`}
+        description={`Precedence: Custom URL (${data.settingsFile}) → Alchemy → Public RPCs. Custom URLs are write-only and sent through Auni's private field.`}
       >
         {data.chains.map((chain) => {
           const badge = SOURCE_BADGE[chain.source];
@@ -234,40 +231,33 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                 )
               }
             >
-              {editing ? (
+              {editing && chain.field ? (
                 <div className="flex flex-col gap-2">
-                  <form
-                    className="flex flex-wrap items-center gap-2"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (rpcDraft.trim()) void submitRpc(chain.key, rpcDraft.trim());
-                    }}
-                  >
-                    <input
-                      type="password"
-                      value={rpcDraft}
-                      placeholder={
-                        chain.customHost
-                          ? "Paste replacement RPC URL…"
-                          : "https://your-rpc-endpoint.example"
-                      }
-                      autoComplete="off"
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      data-1p-ignore
-                      data-lpignore="true"
-                      autoFocus
-                      disabled={rpcSaving}
-                      onChange={(event) => {
-                        setRpcDraft(event.target.value);
-                        setRpcError(null);
-                      }}
-                      className={cn(SETTINGS_INPUT, "min-w-[240px] flex-1 font-mono text-[12.5px]")}
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="min-w-[240px] flex-1">
+                      <SecretInput
+                        label={`${chain.name} RPC URL`}
+                        labelHidden
+                        value={rpcDraft}
+                        placeholder={
+                          chain.customHost
+                            ? "Paste replacement RPC URL…"
+                            : "https://your-rpc-endpoint.example"
+                        }
+                        disabled={rpcSaving}
+                        onChange={(value) => {
+                          setRpcDraft(value);
+                          setRpcError(null);
+                        }}
+                        onEnter={() => {
+                          if (rpcDraft.trim()) void submitRpc(chain.field, rpcDraft.trim());
+                        }}
+                      />
+                    </div>
                     <button
-                      type="submit"
+                      type="button"
                       disabled={!rpcDraft.trim() || rpcSaving}
+                      onClick={() => void submitRpc(chain.field, rpcDraft.trim())}
                       className={SETTINGS_PRIMARY_BUTTON}
                     >
                       {rpcSaving ? (
@@ -282,7 +272,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                       <button
                         type="button"
                         disabled={rpcSaving}
-                        onClick={() => void submitRpc(chain.key, null)}
+                        onClick={() => void submitRpc(chain.field, null)}
                         className={SETTINGS_BUTTON}
                       >
                         <RotateCcw className="size-3.5" />
@@ -300,7 +290,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                     >
                       Cancel
                     </button>
-                  </form>
+                  </div>
                   {rpcError ? <p className="text-[12.5px] text-destructive">{rpcError}</p> : null}
                   {pairAgainFor === "rpc" ? (
                     <PairAgain then="Then save the custom RPC URL again." />
@@ -308,7 +298,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  {!chain.envLocked ? (
+                  {chain.field ? (
                     <button
                       type="button"
                       onClick={() => {

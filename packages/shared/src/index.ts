@@ -172,8 +172,6 @@ export {
   tailscaleEnableResultSchema,
   type TailscaleStateWire,
   tailscaleStateWireSchema,
-  updateAlchemyRequestSchema,
-  updateRpcRequestSchema,
 } from "./system.ts";
 export { AUNI_REPO, AUNI_REPO_URL } from "./repo.ts";
 export {

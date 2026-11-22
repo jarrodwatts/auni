@@ -40,7 +40,7 @@ export function requestSecretTool(turn: ToolTurn) {
     },
     async handler(input) {
       const { field: id, why } = z.object({ field: z.string(), why: whySchema }).parse(input);
-      const fields = await privateFields();
+      const fields = (await privateFields()).filter((each) => !each.ownerOnly);
       const field = fields.find((each) => each.id === id);
       if (!field) {
         const instead = id === SOLANA_BRING_FIELD ? await noSolanaBring() : null;

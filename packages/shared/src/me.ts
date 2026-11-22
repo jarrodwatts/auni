@@ -28,6 +28,8 @@ export const ownerSignalsSchema = z.object({
   refreshedAt: z.iso.datetime({ offset: true }),
   xBio: z.string().nullable(),
   xTopics: z.array(z.string()),
+  /** Last auto-generated summary written by signal synthesis, kept separate from manual edits. */
+  generatedSummary: z.string().nullable().optional(),
   watchedHoldings: z.array(
     z.object({
       symbol: z.string(),

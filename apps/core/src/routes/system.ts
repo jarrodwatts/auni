@@ -3,8 +3,6 @@ import {
   NETWORKS,
   repairRequestSchema,
   tailscaleEnableRequestSchema,
-  updateAlchemyRequestSchema,
-  updateRpcRequestSchema,
   type AboutWire,
   type DiagnosticsWire,
   type LogsWire,
@@ -14,7 +12,7 @@ import {
   type RpcsWire,
 } from "@auni/shared";
 import express, { Router } from "express";
-import { existsSync, readFileSync } from "node:fs";
+import { open } from "node:fs/promises";
 import { arch, hostname, platform, userInfo } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
@@ -39,14 +37,13 @@ import { auniLog, dataDir, settingsFile } from "../data-dir.ts";
 import { doctor } from "../doctor.ts";
 import { env, rpcUrlVar } from "../env.ts";
 import { rpcFor } from "../money/chains.ts";
-import { PrivateFieldRefused } from "../private-fields.ts";
 import { checkRelease } from "../release/check.ts";
 import { installed, runningVersion, versionDir } from "../release/layout.ts";
 import { byRelease } from "../release/tags.ts";
 import { isRepairId, repairDescription, runUiRepair } from "../repairs.ts";
 import { runningAuni } from "../running.ts";
 import { installService, lingers, serviceInstalled, uninstallService } from "../service.ts";
-import { saveAlchemyKey, saveRpcUrl, setBy } from "../settings.ts";
+import { ALCHEMY_FIELD, rpcField, setBy } from "../settings.ts";
 
 /**
  * Local-first system controls behind `requireOwner`:
@@ -92,18 +89,24 @@ function safeHost(raw: string | undefined): string | null {
 function rpcsWire(): RpcsWire {
   const alchemySource = setBy("ALCHEMY_API_KEY");
   return {
-    alchemy: { set: alchemySource !== null, source: alchemySource },
+    alchemy: {
+      set: alchemySource !== null,
+      source: alchemySource,
+      field: alchemySource === "environment" ? null : ALCHEMY_FIELD,
+    },
     chains: NETWORK_KEYS.map((key) => {
       const envVar = rpcUrlVar(key);
       const source = rpcFor(key).source;
       const customHost = safeHost(env.RPC_URLS[key]);
+      const envLocked = setBy(envVar) === "environment";
       return {
         key,
         name: NETWORKS[key].name,
         source,
         customHost,
+        field: envLocked ? null : rpcField(key),
         envVar,
-        envLocked: setBy(envVar) === "environment",
+        envLocked,
       };
     }),
     settingsFile: settingsFile(),
@@ -168,6 +171,16 @@ systemRouter.post("/tailscale/disable", async (req, res) => {
 
 systemRouter.post("/service/install", async (req, res) => {
   if (!ownerHere(req)) return void res.status(403).json({ error: "pair_again" });
+  // Installing and starting a service while this process holds the DB runner lock causes the
+  // newly started service to exit as a duplicate; require an external stop-and-start handoff.
+  const running = await runningAuni().catch(() => null);
+  if (running && running.as !== "service") {
+    return void res.status(409).json({
+      error: "running_outside_service",
+      detail:
+        "Auni is currently running from a terminal or background process. Stop it and run `auni stop && auni service install` so the OS service takes over cleanly.",
+    });
+  }
   try {
     const message = installService();
     publishMe();
@@ -227,40 +240,10 @@ systemRouter.post("/sessions/revoke-others", async (req, res) => {
   res.json({ revoked, remote: await remoteWire(req.sessionId, true) });
 });
 
-// --- Network & RPCs ---
+// --- Network & RPCs (status only; credentials are written solely through /private/:id) ---
 
 systemRouter.get("/rpcs", (_req, res) => {
   res.json(rpcsWire());
-});
-
-systemRouter.put("/rpcs", (req, res) => {
-  if (!ownerHere(req)) return void res.status(403).json({ error: "pair_again" });
-  const parsed = updateRpcRequestSchema.safeParse(req.body);
-  if (!parsed.success)
-    return void res.status(400).json({ error: "invalid_body", issues: parsed.error.issues });
-  try {
-    saveRpcUrl(parsed.data.chain, parsed.data.url);
-    res.json(rpcsWire());
-  } catch (error) {
-    if (error instanceof PrivateFieldRefused)
-      return void res.status(400).json({ error: "invalid_rpc", detail: error.message });
-    throw error;
-  }
-});
-
-systemRouter.put("/alchemy", (req, res) => {
-  if (!ownerHere(req)) return void res.status(403).json({ error: "pair_again" });
-  const parsed = updateAlchemyRequestSchema.safeParse(req.body);
-  if (!parsed.success)
-    return void res.status(400).json({ error: "invalid_body", issues: parsed.error.issues });
-  try {
-    saveAlchemyKey(parsed.data.apiKey);
-    res.json(rpcsWire());
-  } catch (error) {
-    if (error instanceof PrivateFieldRefused)
-      return void res.status(400).json({ error: "invalid_key", detail: error.message });
-    throw error;
-  }
 });
 
 // --- Diagnostics, logs & About ---
@@ -299,21 +282,44 @@ function redactLogLine(line: string): string {
   return out;
 }
 
-systemRouter.get("/logs", (_req, res) => {
-  const path = auniLog();
-  let lines: string[] = [];
-  if (existsSync(path)) {
-    try {
-      const content = readFileSync(path, "utf8");
-      lines = content
-        .split("\n")
-        .filter((line) => line.length > 0)
-        .slice(-200)
-        .map(redactLogLine);
-    } catch {
-      lines = [];
-    }
+/** Maximum tail bytes read asynchronously from auni.log so huge logs never block or OOM core. */
+const MAX_LOG_TAIL_BYTES = 128 * 1024;
+
+async function readLogTail(path: string, maxLines: number): Promise<string[]> {
+  let handle;
+  try {
+    handle = await open(path, "r");
+  } catch {
+    return [];
   }
+  try {
+    const { size } = await handle.stat();
+    if (size === 0) return [];
+    const length = Math.min(size, MAX_LOG_TAIL_BYTES);
+    const start = size - length;
+    const buffer = Buffer.allocUnsafe(length);
+    const { bytesRead } = await handle.read(buffer, 0, length, start);
+    let text = buffer.subarray(0, bytesRead).toString("utf8");
+    // Drop the likely-truncated leading line when we started mid-file.
+    if (start > 0) {
+      const firstBreak = text.indexOf("\n");
+      if (firstBreak !== -1) text = text.slice(firstBreak + 1);
+    }
+    return text
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .slice(-maxLines)
+      .map(redactLogLine);
+  } catch {
+    return [];
+  } finally {
+    await handle.close();
+  }
+}
+
+systemRouter.get("/logs", async (_req, res) => {
+  const path = auniLog();
+  const lines = await readLogTail(path, 200);
   res.json({ path, lines } satisfies LogsWire);
 });
 

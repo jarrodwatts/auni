@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { theOwner } from "../auth/owner.ts";
+import { lockOwner } from "../auth/owner.ts";
 import { publishMe } from "../conversation/stream.ts";
 import { db } from "../db/client.ts";
 import { owner } from "../db/schema.ts";
@@ -119,7 +119,7 @@ setupRouter.post("/done", async (req, res) => {
     });
 
   await db.transaction(async (tx) => {
-    const me = await theOwner(tx);
+    const me = await lockOwner(tx);
     const nextWatched = watchedResolved
       ? appendWatchedWallet(me.watchedWallets, watchedResolved)
       : undefined;

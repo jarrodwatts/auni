@@ -83,6 +83,8 @@ describe("request_secret", () => {
       "keys:nobody",
       "setting:elfa:apiKey",
       "RPC_URL_BASE",
+      "system:rpc:base",
+      "system:alchemy",
       "WALLET",
       "keys:telegram/../core",
     ]) {

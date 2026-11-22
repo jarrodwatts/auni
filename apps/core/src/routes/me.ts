@@ -9,7 +9,7 @@ import { z } from "zod";
 
 import { brainStatus, preferredBrainId } from "../agent/brain.ts";
 import { reachWire } from "../always-on.ts";
-import { theOwner } from "../auth/owner.ts";
+import { lockOwner, theOwner } from "../auth/owner.ts";
 import { ownerHere } from "../auth/proof.ts";
 import { canBeHome, channelStates, pairedChannels } from "../channels/home.ts";
 import { publishMe } from "../conversation/stream.ts";
@@ -159,7 +159,7 @@ meRouter.post("/watched-wallets", async (req, res) => {
   try {
     const resolved = await resolveWatchedWallet(parsed.data.address, parsed.data.label);
     await db.transaction(async (tx) => {
-      const me = await theOwner(tx);
+      const me = await lockOwner(tx);
       const next = appendWatchedWallet(me.watchedWallets, resolved);
       await tx.update(owner).set({ watchedWallets: next });
       await enqueueSignalsRefresh(tx, { replaceSummary: !me.profileSummary });
@@ -178,7 +178,7 @@ meRouter.post("/watched-wallets", async (req, res) => {
 meRouter.delete("/watched-wallets/:address", async (req, res) => {
   const target = req.params.address.toLowerCase();
   await db.transaction(async (tx) => {
-    const me = await theOwner(tx);
+    const me = await lockOwner(tx);
     const next = me.watchedWallets.filter((w) => w.address.toLowerCase() !== target);
     await tx.update(owner).set({ watchedWallets: next });
     await enqueueSignalsRefresh(tx);

@@ -10,7 +10,6 @@ import {
   type AboutWire,
   type DiagnosticsWire,
   type LogsWire,
-  type NetworkKey,
   type PairingMintWire,
   type RemoteAccessWire,
   type RepairResult,
@@ -160,26 +159,6 @@ export function useRpcs(enabled = true) {
     enabled,
     staleTime: 0,
   });
-}
-
-/**
- * Saves or clears a custom chain RPC URL directly without storing the URL (which may carry an
- * embedded provider key) in TanStack Query's mutation cache.
- */
-export async function saveChainRpc(chain: NetworkKey, url: string | null): Promise<RpcsWire> {
-  return rpcsWireSchema.parse(
-    await requestCore("system/rpcs", { method: "PUT", body: JSON.stringify({ chain, url }) }),
-  );
-}
-
-/**
- * Saves or clears the Alchemy API key directly without storing the secret in TanStack Query's
- * mutation cache.
- */
-export async function saveAlchemyKey(apiKey: string | null): Promise<RpcsWire> {
-  return rpcsWireSchema.parse(
-    await requestCore("system/alchemy", { method: "PUT", body: JSON.stringify({ apiKey }) }),
-  );
 }
 
 export function useDiagnostics(enabled = true) {

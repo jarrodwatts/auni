@@ -499,28 +499,41 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
           </SettingsBadge>
         }
       >
-        <SettingsRow
-          label={data.service.installed ? "User service installed" : "Run as background service"}
-          description={data.service.staysOn.says}
-        >
-          {data.service.supported ? (
-            <button
-              type="button"
-              disabled={installSvc.isPending || uninstallSvc.isPending}
-              onClick={() => void handleToggleService()}
-              className={data.service.installed ? SETTINGS_BUTTON : SETTINGS_PRIMARY_BUTTON}
-            >
-              {installSvc.isPending || uninstallSvc.isPending ? (
-                <LoaderCircle className="size-3.5 animate-spin" />
-              ) : (
-                <Power className="size-3.5" />
-              )}
-              {data.service.installed ? "Remove service" : "Install service"}
-            </button>
-          ) : (
-            <SettingsBadge tone="neutral">Unsupported OS</SettingsBadge>
-          )}
-        </SettingsRow>
+        {data.service.supported &&
+        !data.service.installed &&
+        data.service.runningAs &&
+        data.service.runningAs !== "service" ? (
+          <SettingsRow
+            label="Hand off to the background service"
+            description="Auni is currently running from a terminal or background process. Run this in a terminal so it stops cleanly and the OS service takes over:"
+            stacked
+          >
+            <CopyLine value="auni stop && auni service install" command />
+          </SettingsRow>
+        ) : (
+          <SettingsRow
+            label={data.service.installed ? "User service installed" : "Run as background service"}
+            description={data.service.staysOn.says}
+          >
+            {data.service.supported ? (
+              <button
+                type="button"
+                disabled={installSvc.isPending || uninstallSvc.isPending}
+                onClick={() => void handleToggleService()}
+                className={data.service.installed ? SETTINGS_BUTTON : SETTINGS_PRIMARY_BUTTON}
+              >
+                {installSvc.isPending || uninstallSvc.isPending ? (
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                ) : (
+                  <Power className="size-3.5" />
+                )}
+                {data.service.installed ? "Remove service" : "Install service"}
+              </button>
+            ) : (
+              <SettingsBadge tone="neutral">Unsupported OS</SettingsBadge>
+            )}
+          </SettingsRow>
+        )}
 
         {data.service.lingers === false && data.service.lingerCommand ? (
           <SettingsRow

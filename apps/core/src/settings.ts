@@ -2,7 +2,13 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
-import { NETWORK_KEYS, type AppAbout, type AppSetting, type NetworkKey } from "@auni/shared";
+import {
+  NETWORK_KEYS,
+  NETWORKS,
+  type AppAbout,
+  type AppSetting,
+  type NetworkKey,
+} from "@auni/shared";
 
 import { dataDir, envFile } from "./data-dir.ts";
 import {
@@ -411,6 +417,85 @@ export async function settingFields(): Promise<PrivateField[]> {
       } satisfies PrivateField,
     ];
   });
+}
+
+/** Private field ids for core's step-up-gated network credentials (Alchemy key & per-chain RPCs). */
+export const ALCHEMY_FIELD = "system:alchemy";
+export const rpcField = (chain: NetworkKey) => `system:rpc:${chain}`;
+
+/**
+ * Core's private fields for RPC credentials: Alchemy API key and per-chain custom RPC URLs.
+ * Every one requires owner step-up proof (`proof: true`) and never echoes or caches values.
+ */
+export function networkFields(): PrivateField[] {
+  const fields: PrivateField[] = [];
+  if (setBy("ALCHEMY_API_KEY") !== "environment") {
+    fields.push({
+      id: ALCHEMY_FIELD,
+      label: "Alchemy API key",
+      goes: GOES_TO_SETTINGS,
+      app: "auni",
+      ownerOnly: true,
+      inputs: [
+        {
+          name: "apiKey",
+          label: "Alchemy API key",
+          placeholder: "Paste Alchemy API key",
+          set: setBy("ALCHEMY_API_KEY") !== null,
+        },
+      ],
+      link: null,
+      confirms: false,
+      proof: true,
+      async check(values) {
+        savable(values.apiKey ?? "");
+        return { preview: "", notes: [] };
+      },
+      async accept(values) {
+        saveAlchemyKey(values.apiKey ?? "");
+        return null;
+      },
+      async clear(input) {
+        if (input !== "apiKey") throw new PrivateFieldRefused("Unknown input.");
+        saveAlchemyKey(null);
+      },
+    });
+  }
+  for (const chain of NETWORK_KEYS) {
+    const envVar = `RPC_URL_${chain.toUpperCase()}`;
+    if (setBy(envVar) === "environment") continue;
+    fields.push({
+      id: rpcField(chain),
+      label: `${NETWORKS[chain].name} RPC URL`,
+      goes: GOES_TO_SETTINGS,
+      app: "auni",
+      ownerOnly: true,
+      inputs: [
+        {
+          name: "url",
+          label: `${NETWORKS[chain].name} RPC URL`,
+          placeholder: "Paste custom RPC URL",
+          set: setBy(envVar) !== null,
+        },
+      ],
+      link: null,
+      confirms: false,
+      proof: true,
+      async check(values) {
+        const cleaned = validRpcUrl(values.url ?? "");
+        return { preview: new URL(cleaned).host, notes: [] };
+      },
+      async accept(values) {
+        saveRpcUrl(chain, values.url ?? "");
+        return null;
+      },
+      async clear(input) {
+        if (input !== "url") throw new PrivateFieldRefused("Unknown input.");
+        saveRpcUrl(chain, null);
+      },
+    });
+  }
+  return fields;
 }
 
 /** Each key typed, as it is saved: one left empty is left as it is, but one must be typed. */

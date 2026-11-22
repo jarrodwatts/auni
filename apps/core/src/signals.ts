@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { askFast } from "./agent/brain.ts";
 import { fenced } from "./agent/fence.ts";
-import { theOwner } from "./auth/owner.ts";
+import { lockOwner, theOwner } from "./auth/owner.ts";
 import { publishMe } from "./conversation/stream.ts";
 import { db } from "./db/client.ts";
 import { owner } from "./db/schema.ts";
@@ -428,9 +428,24 @@ export async function refreshOwnerSignals(
   const me = await theOwner();
   const hasSignals = Boolean(me.xHandle) || me.watchedWallets.length > 0;
   if (!hasSignals) {
-    await db.update(owner).set({ profileSignals: null }).where(eq(owner.id, 1));
-    publishMe();
-    await forceRefreshStartingPoints(db);
+    const cleared = await db.transaction(async (tx) => {
+      const latest = await lockOwner(tx);
+      if (Boolean(latest.xHandle) || latest.watchedWallets.length > 0) return false;
+      // Clear profileSummary only if it still matches what signals auto-generated (keep manual notes).
+      const wasGenerated =
+        latest.profileSummary !== null &&
+        latest.profileSummary === latest.profileSignals?.generatedSummary;
+      await tx
+        .update(owner)
+        .set({
+          profileSignals: null,
+          ...(wasGenerated ? { profileSummary: null } : {}),
+        })
+        .where(eq(owner.id, 1));
+      await forceRefreshStartingPoints(tx);
+      return true;
+    });
+    if (cleared) publishMe();
     return null;
   }
 
@@ -506,12 +521,13 @@ export async function refreshOwnerSignals(
     refreshedAt: new Date().toISOString(),
     xBio: xProfile?.bio ?? null,
     xTopics: topics,
+    generatedSummary: synthesizedSummary,
     watchedHoldings,
   };
 
   const snapshotWalletsKey = JSON.stringify(me.watchedWallets);
   const wrote = await db.transaction(async (tx) => {
-    const latest = await theOwner(tx);
+    const latest = await lockOwner(tx);
     // Abort stale write if the owner changed X handle or watched wallets while this run was in flight.
     if (
       latest.xHandle !== me.xHandle ||
@@ -519,11 +535,15 @@ export async function refreshOwnerSignals(
     ) {
       return false;
     }
-    // Never overwrite a manual edit or clear made while this refresh was running.
+    // Only update profileSummary when it hasn't been manually edited (or explicit Refresh while unchanged).
+    const untouchedSinceStart = latest.profileSummary === me.profileSummary;
+    const isAutoManaged =
+      latest.profileSummary === null ||
+      latest.profileSummary === latest.profileSignals?.generatedSummary;
     const canUpdateSummary =
       synthesizedSummary !== null &&
-      (options.replaceSummary || me.profileSummary === null) &&
-      latest.profileSummary === me.profileSummary;
+      untouchedSinceStart &&
+      (options.replaceSummary || isAutoManaged);
     await tx
       .update(owner)
       .set({

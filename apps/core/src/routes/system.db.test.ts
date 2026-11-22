@@ -10,8 +10,10 @@ import { auniCapabilityTools } from "../agent/auni-tools.ts";
 import { db } from "../db/client.ts";
 import { jobs, owner } from "../db/schema.ts";
 import { env } from "../env.ts";
-import { wipe } from "../test/db.ts";
+import { refreshOwnerSignals } from "../signals.ts";
+import { setOwner, wipe } from "../test/db.ts";
 import { serve } from "../test/serve.ts";
+import { privateRouter } from "./private.ts";
 import { systemRouter } from "./system.ts";
 
 const proof = vi.hoisted(() => ({ here: false }));
@@ -19,7 +21,7 @@ vi.mock("../auth/proof.ts", () => ({
   ownerHere: () => proof.here,
 }));
 
-const app = express().use("/system", systemRouter);
+const app = express().use("/system", systemRouter).use("/private", privateRouter);
 const url = serve(app);
 
 let home: string;
@@ -42,11 +44,11 @@ afterEach(() => {
   env.ALCHEMY_API_KEY = undefined;
 });
 
-describe("/system routes", () => {
+describe("/system routes & network private fields", () => {
   it("refuses trust-boundary mutations without owner step-up proof", async () => {
     const endpoints: readonly [string, string, object][] = [
-      ["PUT", "/system/rpcs", { chain: "base", url: "https://rpc.example.com" }],
-      ["PUT", "/system/alchemy", { apiKey: "secret-alchemy-key" }],
+      ["POST", "/private/system%3Arpc%3Abase", { values: { url: "https://rpc.example.com" } }],
+      ["POST", "/private/system%3Aalchemy", { values: { apiKey: "secret-alchemy-key" } }],
       ["POST", "/system/tailscale/enable", { port: 443 }],
       ["POST", "/system/sessions/pair", {}],
       ["POST", "/system/diagnostics/repair", { id: "install-service" }],
@@ -62,32 +64,38 @@ describe("/system routes", () => {
     }
   });
 
-  it("saves custom RPCs and Alchemy key with step-up proof and never returns the key", async () => {
+  it("saves Alchemy key and custom RPC URL via /private/:id and returns host-only status without secrets", async () => {
     proof.here = true;
     const SECRET_KEY = "alc_super_secret_key_999";
 
-    const alchemyRes = await fetch(url("/system/alchemy"), {
-      method: "PUT",
+    const alchemyRes = await fetch(url("/private/system%3Aalchemy"), {
+      method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ apiKey: SECRET_KEY }),
+      body: JSON.stringify({ values: { apiKey: SECRET_KEY } }),
     });
     expect(alchemyRes.status).toBe(200);
-    const alchemyText = await alchemyRes.text();
-    expect(alchemyText).not.toContain(SECRET_KEY);
-    const afterAlchemy = rpcsWireSchema.parse(JSON.parse(alchemyText));
-    expect(afterAlchemy.alchemy).toEqual({ set: true, source: "file" });
+    expect(await alchemyRes.text()).not.toContain(SECRET_KEY);
+
+    const statusAfterAlchemy = await fetch(url("/system/rpcs"));
+    const statusAlchemyText = await statusAfterAlchemy.text();
+    expect(statusAlchemyText).not.toContain(SECRET_KEY);
+    const afterAlchemy = rpcsWireSchema.parse(JSON.parse(statusAlchemyText));
+    expect(afterAlchemy.alchemy).toEqual({ set: true, source: "file", field: "system:alchemy" });
     expect(afterAlchemy.chains.find((c) => c.key === "base")?.source).toBe("alchemy");
 
-    const rpcRes = await fetch(url("/system/rpcs"), {
-      method: "PUT",
+    const rpcRes = await fetch(url("/private/system%3Arpc%3Abase"), {
+      method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        chain: "base",
-        url: "https://user:pass_secret@custom-base.example.com/v2/rpc_key_secret?token=query_secret",
+        values: {
+          url: "https://user:pass_secret@custom-base.example.com/v2/rpc_key_secret?token=query_secret",
+        },
       }),
     });
     expect(rpcRes.status).toBe(200);
-    const rpcText = await rpcRes.text();
+
+    const statusAfterRpc = await fetch(url("/system/rpcs"));
+    const rpcText = await statusAfterRpc.text();
     expect(rpcText).not.toContain("pass_secret");
     expect(rpcText).not.toContain("rpc_key_secret");
     expect(rpcText).not.toContain("query_secret");
@@ -95,9 +103,20 @@ describe("/system routes", () => {
     const base = afterRpc.chains.find((c) => c.key === "base");
     expect(base?.source).toBe("own");
     expect(base?.customHost).toBe("custom-base.example.com");
+    expect(base?.field).toBe("system:rpc:base");
+
+    // Clear via /private/:id/clear restores Alchemy fallback.
+    const clearRes = await fetch(url("/private/system%3Arpc%3Abase/clear"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: "url" }),
+    });
+    expect(clearRes.status).toBe(200);
+    const afterClear = rpcsWireSchema.parse(await (await fetch(url("/system/rpcs"))).json());
+    expect(afterClear.chains.find((c) => c.key === "base")?.customHost).toBeNull();
   });
 
-  it("redacts bearer tokens, pairing codes, API keys, and 64-hex keys from GET /system/logs", async () => {
+  it("redacts bearer tokens, pairing codes, API keys, and 64-hex keys from bounded GET /system/logs", async () => {
     const privKey = "a".repeat(64);
     writeFileSync(
       join(home, "auni.log"),
@@ -130,6 +149,46 @@ describe("/system routes", () => {
   });
 });
 
+describe("refreshOwnerSignals disconnection handling", () => {
+  it("clears auto-generated profileSummary when all sources are disconnected, but keeps manual notes", async () => {
+    // Auto-generated summary matches generatedSummary -> cleared when no sources remain.
+    await setOwner({
+      xHandle: null,
+      watchedWallets: [],
+      profileSummary: "Auto generated summary from X.",
+      profileSignals: {
+        refreshedAt: new Date().toISOString(),
+        xBio: "Old bio",
+        xTopics: ["AI"],
+        generatedSummary: "Auto generated summary from X.",
+        watchedHoldings: [],
+      },
+    });
+    await refreshOwnerSignals();
+    let [row] = await db.select().from(owner);
+    expect(row?.profileSignals).toBeNull();
+    expect(row?.profileSummary).toBeNull();
+
+    // Owner-edited summary differs from generatedSummary -> preserved when sources are removed.
+    await setOwner({
+      xHandle: null,
+      watchedWallets: [],
+      profileSummary: "My custom manual investing preferences.",
+      profileSignals: {
+        refreshedAt: new Date().toISOString(),
+        xBio: "Old bio",
+        xTopics: ["AI"],
+        generatedSummary: "Auto generated summary from X.",
+        watchedHoldings: [],
+      },
+    });
+    await refreshOwnerSignals();
+    [row] = await db.select().from(owner);
+    expect(row?.profileSignals).toBeNull();
+    expect(row?.profileSummary).toBe("My custom manual investing preferences.");
+  });
+});
+
 describe("auniCapabilityTools", () => {
   it("inspect_auni exposes live config and structured health checks without leaking secrets or raw doctor text", async () => {
     env.ALCHEMY_API_KEY = "alc_never_leak_this_to_agent";
@@ -140,7 +199,6 @@ describe("auniCapabilityTools", () => {
     expect(text).toContain("/app?settings=diagnostics");
     expect(text).not.toContain("alc_never_leak_this_to_agent");
     expect(text).not.toContain(env.TURN_TOKEN_SECRET);
-    // Structured health checks carry check/status/hasAutoRepair only, never free-form `says`.
     const structured = out.structuredContent as {
       health?: { checks?: { says?: unknown }[] };
     };

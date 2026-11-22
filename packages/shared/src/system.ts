@@ -91,6 +91,8 @@ export const rpcChainWireSchema = z.object({
   source: z.enum(["own", "alchemy", "public"]),
   /** Hostname (and port) of a custom override when set; path, query, and credentials are stripped. */
   customHost: z.string().nullable(),
+  /** Private field id to set/replace/clear this chain's custom RPC (`POST /private/:id`); null when env-locked. */
+  field: z.string().nullable(),
   envVar: z.string(),
   /** True when set by the host shell environment rather than ~/.auni/.env. */
   envLocked: z.boolean(),
@@ -101,20 +103,13 @@ export const rpcsWireSchema = z.object({
   alchemy: z.object({
     set: z.boolean(),
     source: z.enum(["environment", "file"]).nullable(),
+    /** Private field id for Alchemy API key (`POST /private/:id`); null when env-locked. */
+    field: z.string().nullable(),
   }),
   chains: z.array(rpcChainWireSchema),
   settingsFile: z.string(),
 });
 export type RpcsWire = z.infer<typeof rpcsWireSchema>;
-
-export const updateRpcRequestSchema = z.object({
-  chain: z.enum(NETWORK_KEYS),
-  url: z.string().trim().max(500).nullable(),
-});
-
-export const updateAlchemyRequestSchema = z.object({
-  apiKey: z.string().trim().max(300).nullable(),
-});
 
 /** Live `auni doctor` finding (`GET /system/diagnostics`). */
 export const doctorFindingWireSchema = z.object({

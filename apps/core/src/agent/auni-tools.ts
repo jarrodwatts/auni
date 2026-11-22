@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { inspectTailscale, staysOn } from "../always-on.ts";
 import { appsWire } from "../app-list.ts";
-import { theOwner } from "../auth/owner.ts";
+import { lockOwner, theOwner } from "../auth/owner.ts";
 import { briefWhen } from "../automations/brief.ts";
 import { SCHEDULE_SHAPES, scheduleSchema } from "../automations/schedule.ts";
 import { canBeHome, channelStates, pairedChannels } from "../channels/home.ts";
@@ -207,7 +207,6 @@ const updateAuniPreferencesTool = defineTool({
   },
   async handler(input) {
     try {
-      const me = await theOwner();
       const changes: string[] = [];
       let signalsChanged = false;
       let pointsChanged = false;
@@ -259,55 +258,13 @@ const updateAuniPreferencesTool = defineTool({
         signalsChanged = true;
       }
 
-      let watchedWallets = me.watchedWallets;
-      let watchedUpdated = false;
-      if (input.add_watched_wallet) {
-        const resolved = await resolveWatchedWallet(
-          input.add_watched_wallet.address,
-          input.add_watched_wallet.label,
-        );
-        watchedWallets = appendWatchedWallet(watchedWallets, resolved);
-        watchedUpdated = true;
-        signalsChanged = true;
-        changes.push(`watching ${resolved.label ?? resolved.address} (${resolved.chain})`);
-      }
-      if (input.remove_watched_wallet) {
-        const target = input.remove_watched_wallet.toLowerCase();
-        const next = watchedWallets.filter(
-          (w) => w.address.toLowerCase() !== target && w.label?.toLowerCase() !== target,
-        );
-        if (next.length !== watchedWallets.length) {
-          watchedWallets = next;
-          watchedUpdated = true;
-          signalsChanged = true;
-          changes.push(`stopped watching ${input.remove_watched_wallet}`);
-        }
-      }
+      const resolvedWallet = input.add_watched_wallet
+        ? await resolveWatchedWallet(
+            input.add_watched_wallet.address,
+            input.add_watched_wallet.label,
+          )
+        : null;
 
-      let profileSummary: string | null | undefined;
-      if (input.profile_summary !== undefined) {
-        profileSummary = input.profile_summary || null;
-        pointsChanged = true;
-        changes.push(
-          profileSummary ? "updated your profile summary" : "cleared your profile summary",
-        );
-      } else if (input.append_profile_note) {
-        const existing = me.profileSummary?.trim() ?? "";
-        const note = input.append_profile_note.trim();
-        profileSummary = existing ? `${existing} ${note}`.slice(0, 2_000) : note;
-        pointsChanged = true;
-        changes.push("remembered your preference");
-      }
-
-      const patch: Partial<typeof owner.$inferInsert> = {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.look !== undefined ? { look: input.look === "light" ? null : input.look } : {}),
-        ...(homeChannel !== undefined ? { homeChannel } : {}),
-        ...(input.brief !== undefined ? { brief: input.brief } : {}),
-        ...(xHandle !== undefined ? { xHandle } : {}),
-        ...(watchedUpdated ? { watchedWallets } : {}),
-        ...(profileSummary !== undefined ? { profileSummary } : {}),
-      };
       if (input.name !== undefined)
         changes.push(input.name ? `name set to ${input.name}` : "cleared name");
       if (input.look !== undefined) changes.push(`theme set to ${input.look ?? "light"}`);
@@ -316,8 +273,70 @@ const updateAuniPreferencesTool = defineTool({
           input.brief ? `daily brief set to ${briefWhen(input.brief)}` : "turned off daily brief",
         );
 
-      if (Object.keys(patch).length > 0 || signalsChanged || pointsChanged) {
+      const hasDbWork =
+        input.name !== undefined ||
+        input.look !== undefined ||
+        homeChannel !== undefined ||
+        input.brief !== undefined ||
+        xHandle !== undefined ||
+        resolvedWallet !== null ||
+        Boolean(input.remove_watched_wallet) ||
+        input.profile_summary !== undefined ||
+        Boolean(input.append_profile_note);
+
+      if (hasDbWork) {
         await db.transaction(async (tx) => {
+          const locked = await lockOwner(tx);
+          let watchedWallets = locked.watchedWallets;
+          let watchedUpdated = false;
+          if (resolvedWallet) {
+            watchedWallets = appendWatchedWallet(watchedWallets, resolvedWallet);
+            watchedUpdated = true;
+            signalsChanged = true;
+            changes.push(
+              `watching ${resolvedWallet.label ?? resolvedWallet.address} (${resolvedWallet.chain})`,
+            );
+          }
+          if (input.remove_watched_wallet) {
+            const target = input.remove_watched_wallet.toLowerCase();
+            const next = watchedWallets.filter(
+              (w) => w.address.toLowerCase() !== target && w.label?.toLowerCase() !== target,
+            );
+            if (next.length !== watchedWallets.length) {
+              watchedWallets = next;
+              watchedUpdated = true;
+              signalsChanged = true;
+              changes.push(`stopped watching ${input.remove_watched_wallet}`);
+            }
+          }
+
+          let profileSummary: string | null | undefined;
+          if (input.profile_summary !== undefined) {
+            profileSummary = input.profile_summary || null;
+            pointsChanged = true;
+            changes.push(
+              profileSummary ? "updated your profile summary" : "cleared your profile summary",
+            );
+          } else if (input.append_profile_note) {
+            const existing = locked.profileSummary?.trim() ?? "";
+            const note = input.append_profile_note.trim();
+            profileSummary = existing ? `${existing} ${note}`.slice(0, 2_000) : note;
+            pointsChanged = true;
+            changes.push("remembered your preference");
+          }
+
+          const patch: Partial<typeof owner.$inferInsert> = {
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.look !== undefined
+              ? { look: input.look === "light" ? null : input.look }
+              : {}),
+            ...(homeChannel !== undefined ? { homeChannel } : {}),
+            ...(input.brief !== undefined ? { brief: input.brief } : {}),
+            ...(xHandle !== undefined ? { xHandle } : {}),
+            ...(watchedUpdated ? { watchedWallets } : {}),
+            ...(profileSummary !== undefined ? { profileSummary } : {}),
+          };
+
           if (Object.keys(patch).length > 0) {
             await tx.update(owner).set(patch);
           }

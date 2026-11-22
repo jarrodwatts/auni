@@ -104,11 +104,22 @@ export const startingPointsKind = jobKind("starting-points", z.object({}), () =>
  */
 const STARTING_POINTS_FRESH_MS = 60 * 60_000;
 
-/** Whether a starting-points generation job is currently queued or running. */
-async function hasPendingStartingPoints(executor: Executor): Promise<boolean> {
-  const rows = await executor.execute(
-    sql`select 1 from jobs where kind = ${startingPointsKind.name} and finished_at is null limit 1`,
-  );
+/**
+ * Whether a starting-points generation job is queued or running for points newer than `savedAt`.
+ * Comparing against `savedAt` eliminates the brief gap between `save()` publishing SSE and the
+ * runner marking `finished_at` on the job row.
+ */
+async function hasPendingStartingPoints(
+  executor: Executor,
+  savedAt: Date | null = null,
+): Promise<boolean> {
+  const rows = savedAt
+    ? await executor.execute(
+        sql`select 1 from jobs where kind = ${startingPointsKind.name} and finished_at is null and greatest(created_at, run_at) > ${savedAt.toISOString()}::timestamptz limit 1`,
+      )
+    : await executor.execute(
+        sql`select 1 from jobs where kind = ${startingPointsKind.name} and finished_at is null limit 1`,
+      );
   return rows.length > 0;
 }
 
@@ -121,7 +132,7 @@ export async function refreshStartingPoints(
   executor: Executor,
   savedAt: Date | null,
 ): Promise<boolean> {
-  if (await hasPendingStartingPoints(executor)) return true;
+  if (await hasPendingStartingPoints(executor, savedAt)) return true;
   if (savedAt && Date.now() - savedAt.getTime() < STARTING_POINTS_FRESH_MS) return false;
   await startingPointsKind.enqueue(
     executor,

@@ -44,7 +44,7 @@ export function ClientDataProvider({
     const refresh = () => void queryClient.invalidateQueries({ queryKey: ME_KEY });
     const live = listenLive((message) => {
       if (message.topic === "me") refresh();
-    });
+    }, refresh);
     return live.close;
   }, [queryClient]);
 

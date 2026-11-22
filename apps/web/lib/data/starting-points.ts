@@ -52,7 +52,7 @@ function useRead() {
     const refresh = () => void client.invalidateQueries({ queryKey: KEY });
     const live = listenLive((message) => {
       if (message.topic === "starting-points") refresh();
-    });
+    }, refresh);
     return live.close;
   }, [client]);
   return useQuery({

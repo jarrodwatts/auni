@@ -1,7 +1,7 @@
 import type { WatchedWallet } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { appendWatchedWallet, normalizeXHandle } from "./signals.ts";
+import { appendWatchedWallet, normalizeXHandle, resolveWatchedWallet } from "./signals.ts";
 
 describe("normalizeXHandle", () => {
   it("normalizes @handles, bare handles, and x.com / twitter.com URLs", () => {
@@ -45,5 +45,19 @@ describe("appendWatchedWallet", () => {
     list = appendWatchedWallet(list, wallet(5, "Vault"));
     expect(list).toHaveLength(5);
     expect(list[4]?.label).toBe("Vault");
+  });
+});
+
+describe("resolveWatchedWallet", () => {
+  it("accepts valid 32-byte Solana public keys and rejects malformed Base58 strings", async () => {
+    await expect(
+      resolveWatchedWallet("So11111111111111111111111111111111111111112", "Sol"),
+    ).resolves.toEqual({
+      address: "So11111111111111111111111111111111111111112",
+      chain: "solana",
+      label: "Sol",
+    });
+    // 44 Base58 '1's decode to 44 zero bytes, not a 32-byte Ed25519 public key.
+    await expect(resolveWatchedWallet("1".repeat(44))).rejects.toThrow(/valid EVM address/iu);
   });
 });

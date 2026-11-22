@@ -1,4 +1,5 @@
 import { EVM_CHAIN_KEYS, NETWORKS, type OwnerSignals, type WatchedWallet } from "@auni/shared";
+import { isAddress as isSolanaAddress } from "@solana/kit";
 import { eq } from "drizzle-orm";
 import { erc20Abi, formatUnits, getAddress, isAddress, type Address } from "viem";
 import { z } from "zod";
@@ -22,8 +23,6 @@ const MAX_WATCHED_WALLETS = 5;
 const FETCH_TIMEOUT_MS = 8_000;
 const SYNTHESIS_TIMEOUT_MS = 35_000;
 
-/** Base58 Solana public key (32-44 chars, no 0/O/I/l). */
-const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/u;
 const X_HANDLE = /^[A-Za-z0-9_]{1,15}$/u;
 
 /** Normalizes `@handle` or `x.com/handle` to bare lowercase handle, or null if invalid. */
@@ -60,7 +59,7 @@ export async function resolveWatchedWallet(input: string, label?: string): Promi
       label: cleanLabel ?? trimmed.toLowerCase(),
     };
   }
-  if (SOLANA_ADDRESS.test(trimmed)) {
+  if (isSolanaAddress(trimmed)) {
     return { address: trimmed, chain: "solana", label: cleanLabel };
   }
   throw new Error("Enter a valid EVM address (0x...), ENS name (.eth), or Solana address.");

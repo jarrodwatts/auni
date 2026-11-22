@@ -55,7 +55,7 @@ export const startingPointsJob = defineJob({
 });
 
 const save = async (points: StartingPoint[]) => {
-  await db.update(owner).set({ startingPoints: points, startingPointsAt: sql`now()` });
+  await db.update(owner).set({ startingPoints: points, startingPointsAt: sql`clock_timestamp()` });
   publishStartingPoints();
 };
 

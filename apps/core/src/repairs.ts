@@ -131,6 +131,17 @@ export async function runUiRepair(id: RepairId): Promise<{
       };
     }
     if (id === "install-service" || id === "rewrite-service") {
+      // Installing and starting a service while this process holds the DB runner lock causes the
+      // newly started service to exit as a duplicate; require an external stop-and-start handoff.
+      const running = await runningAuni().catch(() => null);
+      if (running && running.as !== "service") {
+        return {
+          ok: false,
+          message:
+            "Auni is currently running from a terminal or background process. Stop it and run `auni stop && auni service install` so the OS service takes over cleanly.",
+          sudoCommand: null,
+        };
+      }
       notes.push(installService());
       return {
         ok: true,

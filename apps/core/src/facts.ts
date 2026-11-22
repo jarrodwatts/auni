@@ -105,11 +105,11 @@ function personalFacts(
     const value = dollars(h.usdValue);
     const asset = knownAsset(h.symbol);
     out.push({
-      text: `In a watch-only external wallet, the owner holds ${value} of ${h.name} (${h.symbol}) on ${h.chain}.`,
+      text: `A watched external wallet holds ${value} of ${h.name} (${h.symbol}) on ${h.chain} (watch-only; not in Auni's wallet).`,
       source: { app: AUNI, label: `Watched ${h.symbol}`, link: "/app?settings=personalization" },
       image: asset?.logoUrl ?? null,
       starts: startFrom(
-        `I hold about ${value} of ${h.name} in my external wallet on ${h.chain}. What's your take on it right now, and are there smart ways to hedge or complement it?`,
+        `A wallet I'm watching holds about ${value} of ${h.name} on ${h.chain}. What's your take on ${h.name} right now, and are there smart angles around it?`,
         [
           { statement: `Watched ${h.symbol}: ${value}.`, action: "Any angles?" },
           { statement: `You watch ${h.name}.`, action: "Any angles?" },

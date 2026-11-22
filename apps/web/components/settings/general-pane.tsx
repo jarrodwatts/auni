@@ -30,13 +30,17 @@ const WEEKDAYS: readonly ("mon" | "tue" | "wed" | "thu" | "fri")[] = [
   "fri",
 ];
 
-type BriefMode = "daily" | "weekdays" | "monthly" | "off";
+type BriefMode = "daily" | "weekdays" | "custom" | "monthly" | "off";
+
+function isWeekdays(days: readonly string[]): boolean {
+  return days.length === WEEKDAYS.length && WEEKDAYS.every((d) => days.includes(d));
+}
 
 function briefModeOf(brief: BriefSchedule | null): BriefMode {
   if (!brief) return "off";
   if (brief.every === "day") return "daily";
   if (brief.every === "month") return "monthly";
-  return "weekdays";
+  return isWeekdays(brief.every) ? "weekdays" : "custom";
 }
 
 function browserTimeZone(): string | null {
@@ -89,7 +93,9 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
           ? { every: "day", at }
           : mode === "monthly"
             ? { every: "month", day: me.brief?.every === "month" ? me.brief.day : 1, at }
-            : { every: [...WEEKDAYS], at };
+            : mode === "custom" && me.brief && Array.isArray(me.brief.every)
+              ? { every: me.brief.every, at }
+              : { every: [...WEEKDAYS], at };
     const updated = await updateMe.mutateAsync({ brief: next });
     setOwner(updated);
     flashSaved("brief");
@@ -195,6 +201,7 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
               options={[
                 { value: "daily", name: "Every day" },
                 { value: "weekdays", name: "Weekdays" },
+                ...(briefMode === "custom" ? [{ value: "custom", name: "Custom days" }] : []),
                 ...(briefMode === "monthly" ? [{ value: "monthly", name: "Monthly" }] : []),
                 { value: "off", name: "Off" },
               ]}

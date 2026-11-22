@@ -628,6 +628,8 @@ export const ownerSessions = pgTable(
     label: text("label"),
     userAgent: text("user_agent"),
     lastSeenAt: timestamp("last_seen_at", TIMESTAMPTZ),
+    // Browser-issued pairing links pair a normal session but never grant or renew step-up proof.
+    browserIssued: boolean("browser_issued").default(false).notNull(),
     expiresAt: timestamp("expires_at", TIMESTAMPTZ).notNull(),
     createdAt: timestamp("created_at", TIMESTAMPTZ).defaultNow().notNull(),
   },

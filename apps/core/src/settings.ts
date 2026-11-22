@@ -244,7 +244,8 @@ function validRpcUrl(raw: string): string {
   const loopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
   if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && loopback))
     throw new PrivateFieldRefused("RPC URLs must use HTTPS (or localhost HTTP for a local node).");
-  return parsed.toString().replace(/\/+$/u, "");
+  // Preserve the owner's exact path/query without stripping trailing slashes required by some RPCs.
+  return trimmed;
 }
 
 /**

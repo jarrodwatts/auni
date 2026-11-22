@@ -57,13 +57,17 @@ function theRow([row]: readonly OwnerRow[]): OwnerRow {
 }
 
 /** A fresh one-time code; codes past their 15 minutes are cleared on the way. */
-export async function mintPairingCode(label?: string | null): Promise<string> {
+export async function mintPairingCode(
+  label?: string | null,
+  options: { readonly browserIssued?: boolean } = {},
+): Promise<string> {
   const code = newToken();
   await db.delete(ownerSessions).where(lt(ownerSessions.expiresAt, sql`now()`));
   await db.insert(ownerSessions).values({
     tokenHash: hashOf(code),
     kind: "pairing",
     label: label?.trim() ? label.trim().slice(0, 64) : null,
+    browserIssued: options.browserIssued ?? false,
     expiresAt: new Date(Date.now() + PAIRING_TTL_MS),
   });
   return code;
@@ -90,7 +94,11 @@ export async function pair(
           gt(ownerSessions.expiresAt, sql`now()`),
         ),
       )
-      .returning({ id: ownerSessions.id, label: ownerSessions.label });
+      .returning({
+        id: ownerSessions.id,
+        label: ownerSessions.label,
+        browserIssued: ownerSessions.browserIssued,
+      });
     if (!spent) return null;
     const session = newToken();
     const now = new Date();
@@ -99,6 +107,7 @@ export async function pair(
       kind: "session",
       label: meta.label ?? spent.label ?? null,
       userAgent: meta.userAgent?.slice(0, 240) ?? null,
+      browserIssued: spent.browserIssued,
       lastSeenAt: now,
       expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     });
@@ -108,8 +117,9 @@ export async function pair(
 
 /**
  * The live session a token holds, or null when the token isn't live: whether its browser paired
- * in the last 15 minutes. The database judges that by its own clock, which also stamped the
- * pairing, so no other clock's drift, and nothing a request says, can make a session fresh.
+ * from the terminal in the last 15 minutes. Browser-issued pairing links never grant step-up
+ * proof, so the terminal stays the single root of trust. The database judges freshness by its
+ * own clock, which also stamped the pairing, so no other clock's drift can make a session fresh.
  */
 export async function sessionOf(
   token: string,
@@ -117,7 +127,7 @@ export async function sessionOf(
   const [session] = await db
     .select({
       id: ownerSessions.id,
-      freshlyPaired: sql<boolean>`${ownerSessions.createdAt} > now() - ${FRESH_PAIRING}`,
+      freshlyPaired: sql<boolean>`not ${ownerSessions.browserIssued} and ${ownerSessions.createdAt} > now() - ${FRESH_PAIRING}`,
       lastSeenAt: ownerSessions.lastSeenAt,
     })
     .from(ownerSessions)
@@ -149,7 +159,7 @@ export async function listSessions(currentSessionId?: string): Promise<OwnerSess
       userAgent: ownerSessions.userAgent,
       createdAt: ownerSessions.createdAt,
       lastSeenAt: ownerSessions.lastSeenAt,
-      freshlyPaired: sql<boolean>`${ownerSessions.createdAt} > now() - ${FRESH_PAIRING}`,
+      freshlyPaired: sql<boolean>`not ${ownerSessions.browserIssued} and ${ownerSessions.createdAt} > now() - ${FRESH_PAIRING}`,
     })
     .from(ownerSessions)
     .where(and(eq(ownerSessions.kind, "session"), gt(ownerSessions.expiresAt, sql`now()`)))

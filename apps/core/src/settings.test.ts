@@ -384,7 +384,7 @@ describe("local system settings writers", () => {
     expect(() => saveRpcUrl("base", "http://example.com")).toThrow(PrivateFieldRefused);
     expect(() => saveRpcUrl("base", "not-a-url")).toThrow(PrivateFieldRefused);
     saveRpcUrl("base", "https://rpc.example.com/");
-    expect(process.env.RPC_URL_BASE).toBe("https://rpc.example.com");
+    expect(process.env.RPC_URL_BASE).toBe("https://rpc.example.com/");
     saveRpcUrl("base", "http://127.0.0.1:8545");
     expect(process.env.RPC_URL_BASE).toBe("http://127.0.0.1:8545");
     saveRpcUrl("base", null);

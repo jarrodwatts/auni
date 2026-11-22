@@ -232,7 +232,9 @@ systemRouter.post("/sessions/pair", async (req, res) => {
   if (env.TAILSCALE_OWNER) return void res.status(409).json({ error: "pairing_off" });
   if (!ownerHere(req)) return void res.status(403).json({ error: "pair_again" });
   const parsed = mintBody.safeParse(req.body ?? {});
-  const code = await mintPairingCode(parsed.success ? parsed.data.label : undefined);
+  const code = await mintPairingCode(parsed.success ? parsed.data.label : undefined, {
+    browserIssued: true,
+  });
   const url = pairingLink(code);
   const host = new URL(url).hostname;
   const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1";

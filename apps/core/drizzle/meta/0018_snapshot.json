@@ -1,5 +1,5 @@
 {
-  "id": "e4f64da5-e395-4b63-b68f-0a54a9e21bd2",
+  "id": "d669cfc9-78a9-4348-bed2-f27119bb24c9",
   "prevId": "7481a96e-e46b-40e5-9ffd-62c873fb059f",
   "version": "7",
   "dialect": "postgresql",
@@ -226,8 +226,12 @@
           "name": "actions_thread_id_threads_id_fk",
           "tableFrom": "actions",
           "tableTo": "threads",
-          "columnsFrom": ["thread_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "thread_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -235,8 +239,12 @@
           "name": "actions_specialist_id_specialists_id_fk",
           "tableFrom": "actions",
           "tableTo": "specialists",
-          "columnsFrom": ["specialist_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "specialist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -315,7 +323,10 @@
       "compositePrimaryKeys": {
         "app_troubles_app_work_pk": {
           "name": "app_troubles_app_work_pk",
-          "columns": ["app", "work"]
+          "columns": [
+            "app",
+            "work"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -508,8 +519,12 @@
           "name": "arrivals_action_id_actions_id_fk",
           "tableFrom": "arrivals",
           "tableTo": "actions",
-          "columnsFrom": ["action_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -654,8 +669,12 @@
           "name": "automation_fires_automation_id_automations_id_fk",
           "tableFrom": "automation_fires",
           "tableTo": "automations",
-          "columnsFrom": ["automation_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "automation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -663,8 +682,12 @@
           "name": "automation_fires_message_id_messages_id_fk",
           "tableFrom": "automation_fires",
           "tableTo": "messages",
-          "columnsFrom": ["message_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "message_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -837,8 +860,12 @@
           "name": "automations_thread_id_threads_id_fk",
           "tableFrom": "automations",
           "tableTo": "threads",
-          "columnsFrom": ["thread_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "thread_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -846,8 +873,12 @@
           "name": "automations_specialist_id_specialists_id_fk",
           "tableFrom": "automations",
           "tableTo": "specialists",
-          "columnsFrom": ["specialist_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "specialist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1029,8 +1060,12 @@
           "name": "channel_deliveries_thread_id_threads_id_fk",
           "tableFrom": "channel_deliveries",
           "tableTo": "threads",
-          "columnsFrom": ["thread_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "thread_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1038,8 +1073,12 @@
           "name": "channel_deliveries_action_id_actions_id_fk",
           "tableFrom": "channel_deliveries",
           "tableTo": "actions",
-          "columnsFrom": ["action_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1049,7 +1088,9 @@
         "channel_deliveries_grant_hash_unique": {
           "name": "channel_deliveries_grant_hash_unique",
           "nullsNotDistinct": false,
-          "columns": ["grant_hash"]
+          "columns": [
+            "grant_hash"
+          ]
         }
       },
       "policies": {},
@@ -1236,8 +1277,12 @@
           "name": "fills_action_id_actions_id_fk",
           "tableFrom": "fills",
           "tableTo": "actions",
-          "columnsFrom": ["action_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1245,8 +1290,12 @@
           "name": "fills_specialist_id_specialists_id_fk",
           "tableFrom": "fills",
           "tableTo": "specialists",
-          "columnsFrom": ["specialist_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "specialist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1394,7 +1443,9 @@
         "jobs_key_unique": {
           "name": "jobs_key_unique",
           "nullsNotDistinct": false,
-          "columns": ["key"]
+          "columns": [
+            "key"
+          ]
         }
       },
       "policies": {},
@@ -1485,8 +1536,12 @@
           "name": "messages_thread_id_threads_id_fk",
           "tableFrom": "messages",
           "tableTo": "threads",
-          "columnsFrom": ["thread_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "thread_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1494,8 +1549,12 @@
           "name": "messages_supersedes_id_messages_id_fk",
           "tableFrom": "messages",
           "tableTo": "messages",
-          "columnsFrom": ["supersedes_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "supersedes_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1562,7 +1621,10 @@
       "compositePrimaryKeys": {
         "other_tokens_chain_instrument_pk": {
           "name": "other_tokens_chain_instrument_pk",
-          "columns": ["chain", "instrument"]
+          "columns": [
+            "chain",
+            "instrument"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -1753,6 +1815,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "browser_issued": {
+          "name": "browser_issued",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp (3) with time zone",
@@ -1774,7 +1843,9 @@
         "owner_sessions_token_hash_unique": {
           "name": "owner_sessions_token_hash_unique",
           "nullsNotDistinct": false,
-          "columns": ["token_hash"]
+          "columns": [
+            "token_hash"
+          ]
         }
       },
       "policies": {},
@@ -1889,8 +1960,12 @@
           "name": "specialist_updates_specialist_id_specialists_id_fk",
           "tableFrom": "specialist_updates",
           "tableTo": "specialists",
-          "columnsFrom": ["specialist_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "specialist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1898,8 +1973,12 @@
           "name": "specialist_updates_thread_id_threads_id_fk",
           "tableFrom": "specialist_updates",
           "tableTo": "threads",
-          "columnsFrom": ["thread_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "thread_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2122,8 +2201,12 @@
           "name": "threads_specialist_id_specialists_id_fk",
           "tableFrom": "threads",
           "tableTo": "specialists",
-          "columnsFrom": ["specialist_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "specialist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2205,8 +2288,12 @@
           "name": "value_snapshots_specialist_id_specialists_id_fk",
           "tableFrom": "value_snapshots",
           "tableTo": "specialists",
-          "columnsFrom": ["specialist_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "specialist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2325,8 +2412,12 @@
           "name": "signed_txs_action_id_actions_id_fk",
           "tableFrom": "signed_txs",
           "tableTo": "actions",
-          "columnsFrom": ["action_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

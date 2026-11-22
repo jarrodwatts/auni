@@ -12,6 +12,7 @@ import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { auniCapabilityTools } from "../agent/auni-tools.ts";
+import { pair, sessionOf } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
 import { jobs, owner } from "../db/schema.ts";
 import { env } from "../env.ts";
@@ -163,6 +164,23 @@ describe("/system routes & network private fields", () => {
     const about = aboutWireSchema.parse(await res.json());
     expect(about.version).toMatch(/^v\d+/u);
     expect(about.dataDir.length).toBeGreaterThan(0);
+  });
+
+  it("browser-issued pairing links create a normal session that never grants step-up proof", async () => {
+    proof.here = true;
+    const res = await fetch(url("/system/sessions/pair"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ label: "Phone" }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { url: string };
+    const code = new URL(body.url).hash.replace(/^#pair=/u, "");
+    const token = await pair(code);
+    expect(token).toBeTruthy();
+    const session = await sessionOf(token!);
+    expect(session).not.toBeNull();
+    expect(session?.freshlyPaired).toBe(false);
   });
 });
 

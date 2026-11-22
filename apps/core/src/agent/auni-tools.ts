@@ -330,9 +330,7 @@ const updateAuniPreferencesTool = defineTool({
 
           const patch: Partial<typeof owner.$inferInsert> = {
             ...(input.name !== undefined ? { name: input.name } : {}),
-            ...(input.look !== undefined
-              ? { look: input.look === "light" ? null : input.look }
-              : {}),
+            ...(input.look !== undefined ? { look: input.look } : {}),
             ...(homeChannel !== undefined ? { homeChannel } : {}),
             ...(input.brief !== undefined ? { brief: input.brief } : {}),
             ...(xHandle !== undefined ? { xHandle } : {}),

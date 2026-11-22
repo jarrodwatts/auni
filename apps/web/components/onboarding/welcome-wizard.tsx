@@ -72,16 +72,18 @@ export function WelcomeWizard() {
   const settingsOpen = searchParams.get(SETTINGS_DIALOG_PARAM) !== null;
   const reopened = searchParams.get(WIZARD_PARAM) === "1";
 
-  if ((!firstRun && !reopened) || settingsOpen) return null;
-  return <WizardSurface firstRun={firstRun} reopened={reopened} />;
+  if (!firstRun && !reopened) return null;
+  return <WizardSurface firstRun={firstRun} reopened={reopened} hidden={settingsOpen} />;
 }
 
 function WizardSurface({
   firstRun,
   reopened,
+  hidden,
 }: {
   readonly firstRun: boolean;
   readonly reopened: boolean;
+  readonly hidden: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -145,7 +147,14 @@ function WizardSurface({
   };
 
   return (
-    <div id="main-content" className="fixed inset-0 z-40 flex flex-col overflow-y-auto bg-floor">
+    <div
+      id={hidden ? undefined : "main-content"}
+      aria-hidden={hidden || undefined}
+      className={cn(
+        "fixed inset-0 z-40 flex flex-col overflow-y-auto bg-floor",
+        hidden && "hidden",
+      )}
+    >
       {/* Top header bar */}
       <header className="flex flex-none items-center justify-between gap-4 px-5 py-4 sm:px-8 sm:py-5">
         <Lockup height={20} priority />

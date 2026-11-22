@@ -61,11 +61,12 @@ systemRouter.use(express.json({ limit: "16kb" }));
 
 async function diagnosticsWire(): Promise<DiagnosticsWire> {
   const findings = await doctor();
+  const extraSecrets = appSecrets();
   return {
     findings: findings.map((f) => ({
       check: f.check,
       status: f.status,
-      says: f.says,
+      says: redactLogLine(f.says, extraSecrets),
       repair: f.repair
         ? {
             id: f.repair.id,
@@ -282,6 +283,7 @@ systemRouter.post("/diagnostics/repair", async (req, res) => {
   publishMe();
   res.json({
     ...outcome,
+    message: redactLogLine(outcome.message, appSecrets()),
     diagnostics: await diagnosticsWire(),
   } satisfies RepairResult);
 });

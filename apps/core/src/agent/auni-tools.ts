@@ -323,7 +323,13 @@ const updateAuniPreferencesTool = defineTool({
           } else if (input.append_profile_note) {
             const existing = locked.profileSummary?.trim() ?? "";
             const note = input.append_profile_note.trim();
-            profileSummary = existing ? `${existing} ${note}`.slice(0, 2_000) : note;
+            const combined = existing ? `${existing} ${note}` : note;
+            if (combined.length > 2_000) {
+              throw new Error(
+                "Profile summary is at its 2,000-character limit, so that note couldn't be appended. Condense the summary with profile_summary first.",
+              );
+            }
+            profileSummary = combined;
             pointsChanged = true;
             changes.push("remembered your preference");
           }

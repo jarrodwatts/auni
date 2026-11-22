@@ -62,28 +62,13 @@ export async function readFacts(): Promise<Fact[]> {
     theOwner(),
   ]);
   const held = await heldNow(portfolio);
-  const watchedHoldings = me.profileSignals?.watchedHoldings ?? [];
-  const seenSymbols = new Set(held.map(({ holding }) => holding.symbol.toUpperCase()));
   const seen: OwnerSeen = {
-    holdings: [
-      ...held.map(({ holding, name, image }) => ({
-        symbol: holding.symbol,
-        name,
-        usdValue: holding.usdValue!,
-        image,
-      })),
-      // Watched external wallet holdings also feed app facts (Elfa news, price movers),
-      // so even a brand-new owner with $0 in Auni gets tailored prompts immediately.
-      ...watchedHoldings
-        .filter((w) => w.symbol !== "USDC" && !seenSymbols.has(w.symbol.toUpperCase()))
-        .slice(0, 4)
-        .map((w) => ({
-          symbol: w.symbol,
-          name: w.name,
-          usdValue: w.usdValue,
-          image: knownAsset(w.symbol)?.logoUrl ?? null,
-        })),
-    ],
+    holdings: held.map(({ holding, name, image }) => ({
+      symbol: holding.symbol,
+      name,
+      usdValue: holding.usdValue!,
+      image,
+    })),
   };
   return [
     ...moneyFacts(portfolio),

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import type { OwnerSessionWire } from "@auni/shared";
-import { and, desc, eq, gt, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lt, ne, or, sql } from "drizzle-orm";
 
 import { db, type Tx } from "../db/client.ts";
 import { owner, ownerSessions, type OwnerRow } from "../db/schema.ts";
@@ -185,13 +185,24 @@ export async function revokeSession(id: string, currentSessionId?: string): Prom
   return deleted.length > 0;
 }
 
-/** Revokes every paired browser session except the caller's current one; returns how many were revoked. */
+/**
+ * Revokes every paired browser session except the caller's current one, plus any outstanding
+ * browser-issued pairing links; returns how many active sessions were revoked.
+ */
 export async function revokeOtherSessions(currentSessionId?: string): Promise<number> {
-  const where = currentSessionId
+  const sessionsWhere = currentSessionId
     ? and(eq(ownerSessions.kind, "session"), ne(ownerSessions.id, currentSessionId))
     : eq(ownerSessions.kind, "session");
-  const deleted = await db.delete(ownerSessions).where(where).returning({ id: ownerSessions.id });
-  return deleted.length;
+  const deleted = await db
+    .delete(ownerSessions)
+    .where(
+      or(
+        sessionsWhere,
+        and(eq(ownerSessions.kind, "pairing"), eq(ownerSessions.browserIssued, true)),
+      ),
+    )
+    .returning({ id: ownerSessions.id, kind: ownerSessions.kind });
+  return deleted.filter((row) => row.kind === "session").length;
 }
 
 /**
@@ -208,9 +219,14 @@ export async function lastPaired(): Promise<Date | null> {
   return session?.at ?? null;
 }
 
-/** Signs every browser out, for a lost or shared device; pairing again lets the owner back in. */
+/**
+ * Signs every browser out and revokes any unused browser-issued pairing links, for a lost or
+ * shared device; pairing again from the terminal lets the owner back in.
+ */
 export async function signOutEverywhere(): Promise<void> {
-  await db.delete(ownerSessions).where(eq(ownerSessions.kind, "session"));
+  await db
+    .delete(ownerSessions)
+    .where(or(eq(ownerSessions.kind, "session"), eq(ownerSessions.browserIssued, true)));
 }
 
 /** The cookie that carries a session: host-only, never readable by script, never sent cross-site. */

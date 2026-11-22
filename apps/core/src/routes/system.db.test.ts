@@ -12,7 +12,7 @@ import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { auniCapabilityTools } from "../agent/auni-tools.ts";
-import { pair, sessionOf } from "../auth/owner.ts";
+import { pair, sessionOf, signOutEverywhere } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
 import { jobs, owner } from "../db/schema.ts";
 import { env } from "../env.ts";
@@ -166,21 +166,37 @@ describe("/system routes & network private fields", () => {
     expect(about.dataDir.length).toBeGreaterThan(0);
   });
 
-  it("browser-issued pairing links create a normal session that never grants step-up proof", async () => {
+  it("browser-issued pairing links never grant step-up proof and are revoked by signOutEverywhere", async () => {
     proof.here = true;
-    const res = await fetch(url("/system/sessions/pair"), {
+    const res1 = await fetch(url("/system/sessions/pair"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ label: "Phone" }),
     });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { url: string };
-    const code = new URL(body.url).hash.replace(/^#pair=/u, "");
-    const token = await pair(code);
+    expect(res1.status).toBe(200);
+    const code1 = new URL(((await res1.json()) as { url: string }).url).hash.replace(
+      /^#pair=/u,
+      "",
+    );
+    const token = await pair(code1);
     expect(token).toBeTruthy();
     const session = await sessionOf(token!);
     expect(session).not.toBeNull();
     expect(session?.freshlyPaired).toBe(false);
+
+    // Mint a second unused browser link, then sign out everywhere -> link becomes unusable too.
+    const res2 = await fetch(url("/system/sessions/pair"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ label: "Tablet" }),
+    });
+    const code2 = new URL(((await res2.json()) as { url: string }).url).hash.replace(
+      /^#pair=/u,
+      "",
+    );
+    await signOutEverywhere();
+    expect(await sessionOf(token!)).toBeNull();
+    expect(await pair(code2)).toBeNull();
   });
 });
 
@@ -248,6 +264,31 @@ describe("refreshOwnerSignals disconnection handling", () => {
       fetchSpy.mockRestore();
     }
   });
+
+  it("preserves existing X signals and summary when public X endpoints fail transiently", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("transient outage"));
+    try {
+      await setOwner({
+        xHandle: "alice",
+        watchedWallets: [],
+        profileSummary: "Follows AI infra and ETH.",
+        profileSignals: {
+          refreshedAt: new Date().toISOString(),
+          xBio: "Building AI infra",
+          xTopics: ["AI infra", "Ethereum"],
+          generatedSummary: "Follows AI infra and ETH.",
+          watchedHoldings: [],
+        },
+      });
+      await refreshOwnerSignals();
+      const [row] = await db.select().from(owner);
+      expect(row?.profileSignals?.xBio).toBe("Building AI infra");
+      expect(row?.profileSignals?.xTopics).toEqual(["AI infra", "Ethereum"]);
+      expect(row?.profileSummary).toBe("Follows AI infra and ETH.");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });
 
 describe("auniCapabilityTools", () => {
@@ -304,6 +345,17 @@ describe("auniCapabilityTools", () => {
     });
     expect(out.isError).toBe(true);
     expect(process.env.BRAIN).toBeUndefined();
+  });
+
+  it("update_auni_preferences refuses append_profile_note when it would exceed the 2,000-character limit", async () => {
+    await setOwner({ profileSummary: "x".repeat(1_990) });
+    const [, updatePrefs] = auniCapabilityTools();
+    const out = await updatePrefs!.handler({
+      append_profile_note: "This note cannot fit without truncation.",
+    });
+    expect(out.isError).toBe(true);
+    const [row] = await db.select().from(owner);
+    expect(row?.profileSummary).toBe("x".repeat(1_990));
   });
 
   it("tracks manual starting-points refreshes as pending on GET and deduplicates repeat clicks", async () => {

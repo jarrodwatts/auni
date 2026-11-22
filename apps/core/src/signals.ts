@@ -338,11 +338,12 @@ function stripHtml(html: string): string {
 
 /**
  * Best-effort public reader for an X/Twitter handle: tries public FxTwitter profile API + public
- * X syndication timeline (zero API keys needed). Never throws; returns null pieces if blocked.
+ * X syndication timeline (zero API keys needed). Returns null if neither endpoint could be reached.
  */
-async function readPublicXProfile(handle: string): Promise<XSnapshot> {
+async function readPublicXProfile(handle: string): Promise<XSnapshot | null> {
   let bio: string | null = null;
   let name: string | null = null;
+  let reached = false;
   const posts: string[] = [];
 
   try {
@@ -351,6 +352,7 @@ async function readPublicXProfile(handle: string): Promise<XSnapshot> {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (res.ok) {
+      reached = true;
       const json = (await res.json()) as {
         user?: { name?: string; description?: string };
       };
@@ -370,6 +372,7 @@ async function readPublicXProfile(handle: string): Promise<XSnapshot> {
       },
     );
     if (res.ok) {
+      reached = true;
       const html = await res.text();
       const nextData = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/u.exec(html)?.[1];
       if (nextData) {
@@ -405,7 +408,7 @@ async function readPublicXProfile(handle: string): Promise<XSnapshot> {
     // Graceful fallback.
   }
 
-  return { bio, name, posts };
+  return reached ? { bio, name, posts } : null;
 }
 
 const synthesisSchema = z.object({
@@ -504,7 +507,10 @@ export async function refreshOwnerSignals(
     }
   }
 
-  // Deterministic fallback when no brain answered yet so the UI still reflects what was found.
+  // Deterministic fallback when no brain answered yet so fetched signals still produce a summary.
+  if (!synthesizedSummary && xProfile?.bio) {
+    synthesizedSummary = xProfile.bio.trim().slice(0, 280) || null;
+  }
   if (!synthesizedSummary && watchedHoldings.length > 0) {
     const top = watchedHoldings
       .slice(0, 3)
@@ -516,11 +522,21 @@ export async function refreshOwnerSignals(
     topics = [...new Set(watchedHoldings.slice(0, 4).map((h) => h.name))];
   }
 
+  // If the owner still has an X handle connected, but public X endpoints were unreachable on this
+  // refresh, preserve the previous X-derived bio/topics/summary rather than wiping learned data.
+  const xFetchFailed = Boolean(me.xHandle && !xProfile);
+  const prevSignals = me.profileSignals;
+  const effectiveXBio = xProfile?.bio ?? (xFetchFailed ? (prevSignals?.xBio ?? null) : null);
+  const effectiveTopics =
+    topics.length > 0 ? topics : xFetchFailed ? (prevSignals?.xTopics ?? []) : [];
+  const effectiveSummary =
+    synthesizedSummary ?? (xFetchFailed ? (prevSignals?.generatedSummary ?? null) : null);
+
   const nextSignals: OwnerSignals = {
     refreshedAt: new Date().toISOString(),
-    xBio: xProfile?.bio ?? null,
-    xTopics: topics,
-    generatedSummary: synthesizedSummary,
+    xBio: effectiveXBio,
+    xTopics: effectiveTopics,
+    generatedSummary: effectiveSummary,
     watchedHoldings,
   };
 
@@ -535,21 +551,22 @@ export async function refreshOwnerSignals(
       return false;
     }
     // Keep auto-managed profileSummary in sync with generatedSummary (including clearing stale text
-    // when a removed signal produces no replacement), while always preserving manual owner edits.
+    // when a removed signal produces no replacement), while preserving manual owner edits and
+    // surviving transient X fetch failures.
     const untouchedSinceStart = latest.profileSummary === me.profileSummary;
     const isAutoManaged =
       latest.profileSummary === null ||
       latest.profileSummary === latest.profileSignals?.generatedSummary;
     const canUpdateSummary =
       untouchedSinceStart &&
-      (synthesizedSummary !== null
+      (effectiveSummary !== null
         ? options.replaceSummary || isAutoManaged
-        : isAutoManaged && latest.profileSummary !== null);
+        : !xFetchFailed && isAutoManaged && latest.profileSummary !== null);
     await tx
       .update(owner)
       .set({
         profileSignals: nextSignals,
-        ...(canUpdateSummary ? { profileSummary: synthesizedSummary } : {}),
+        ...(canUpdateSummary ? { profileSummary: effectiveSummary } : {}),
       })
       .where(eq(owner.id, 1));
     await forceRefreshStartingPoints(tx);

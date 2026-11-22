@@ -15,7 +15,7 @@ import { fenced } from "../agent/fence.ts";
 import type { MarketFace } from "../apps/contract.ts";
 import { lockOwner, theOwner } from "../auth/owner.ts";
 import { homeChannel } from "../channels/home.ts";
-import { chatOfMove, specialistThread, mainChat } from "../conversation/places.ts";
+import { chatOfMove, mainChat } from "../conversation/places.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { publishThreadEvent } from "../conversation/stream.ts";
 import { answered } from "../conversation/tidy.ts";
@@ -96,7 +96,7 @@ interface News {
 }
 
 /** A thread a card can go to. */
-type Place = { readonly id: string; readonly specialistId: string | null };
+type Place = { readonly id: string };
 
 /** A card left or landed in a thread, shown live once its transaction commits (see showPosted). */
 export interface Posted {
@@ -241,7 +241,7 @@ function foundReason(
 /**
  * What a statement recorded that no move was just doing, one entry: the
  * action it is under, what it did, and each of its lines as recorded, with
- * the specialist it went to, or none.
+ * the thread it went to, or none.
  */
 export interface StatementNews {
   readonly actionId: string;
@@ -256,15 +256,14 @@ export interface StatementNews {
   readonly venue: string;
   /** The market as the portfolio names and pictures it. */
   readonly face: MarketFace;
-  readonly owned: readonly (Fill & { readonly specialistId: string | null })[];
+  readonly owned: readonly (Fill & { readonly threadId: string | null })[];
 }
 
 /**
  * Tells them what a venue's statement just recorded that they didn't just
  * ask for, in the transaction that records it, as arrivals are told: a card
- * in the chat of each specialist it touched, saying that specialist's share of
- * it, and for what no specialist held, in the chat of the move it is under (a
- * stop Auni set lands where the position was opened), else their latest chat.
+ * in each thread it touched, saying that thread's share of it, else the chat
+ * of the move it is under, else their latest chat.
  * A thread told of something no order of Auni's did, or of a fill that left
  * something unfinished, is woken once for all of it, since there is a decision
  * to make; one told only of Auni's own orders filling gets its card.
@@ -276,13 +275,11 @@ export async function tellStatement(tx: Tx, news: readonly StatementNews[]): Pro
   >();
   for (const one of news) {
     const total = one.owned.reduce((sum, fill) => sum + units(fill), 0n);
-    const shares = Map.groupBy(one.owned, (fill) => fill.specialistId);
-    for (const [specialistId, theirs] of shares) {
+    const shares = Map.groupBy(one.owned, (fill) => fill.threadId);
+    for (const [threadId, theirs] of shares) {
       const share = theirs.reduce((sum, fill) => sum + units(fill), 0n);
       const pnl = (signedUsdToCents(one.happened.closedPnlUsd) * share) / total;
-      const place =
-        (specialistId && (await specialistThread(specialistId, tx))) ||
-        (await chatOfMove(one.threadId, tx));
+      const place = await chatOfMove(threadId ?? one.threadId, tx);
       const told = byPlace.get(place.id) ?? { place, cards: [], unfinished: false };
       told.cards.push(venueEventCard(one, Number(centsToUsd(pnl))));
       byPlace.set(place.id, { ...told, unfinished: told.unfinished || !!one.unfinished });
@@ -310,23 +307,20 @@ export interface PayoutNews {
   /** The chat the shares were bought in; null for shares no chat of Auni's bought. */
   readonly threadId: string | null;
   readonly logoUrl: string | null;
-  /** What each holder was paid: a specialist, or none for the owner's own. */
-  readonly paid: readonly { readonly specialistId: string | null; readonly usdValue: string }[];
+  /** What each holder was paid: a thread, or none for unattributed shares. */
+  readonly paid: readonly { readonly threadId: string | null; readonly usdValue: string }[];
 }
 
 /**
  * Tells them a market paid out, in the transaction that records the payout, as a stop that fired
- * is told: a card in the chat of each specialist that held its shares, saying what that one was
- * paid, and for the owner's own in the chat the shares were bought in, else their latest chat.
- * Nothing is asked of them, so no thread is woken.
+ * is told: a card in each thread that held its shares, saying what was paid, else the chat the
+ * shares were bought in, else their latest chat. Nothing is asked of them, so no thread is woken.
  */
 export async function tellPayout(tx: Tx, news: PayoutNews): Promise<Posted[]> {
   const posted: Posted[] = [];
-  for (const [specialistId, theirs] of Map.groupBy(news.paid, (one) => one.specialistId)) {
+  for (const [threadId, theirs] of Map.groupBy(news.paid, (one) => one.threadId)) {
     const micros = theirs.reduce((sum, one) => sum + parseUnits(one.usdValue, 6), 0n);
-    const place =
-      (specialistId && (await specialistThread(specialistId, tx))) ||
-      (await chatOfMove(news.threadId, tx));
+    const place = await chatOfMove(threadId ?? news.threadId, tx);
     const card: VenueEventCardWire = {
       kind: "venue_event",
       id: randomUUID() as VenueEventCardWire["id"],
@@ -350,7 +344,7 @@ function decisionReason(cards: readonly VenueEventCardWire[]): string {
   return [
     ...cards.map(sentence),
     cards.some((card) => card.outside)
-      ? "No move of Auni's did this, and Auni's records now show it. Tell them plainly what it means for this specialist and what they could do now, without pushing a move."
+      ? "No move of Auni's did this, and Auni's records now show it. Tell them plainly what it means for this position and what they could do now, without pushing a move."
       : "An order of Auni's filled, and something its card showed is not in place, as said above. Tell them plainly, and put up the card that sets it right.",
   ]
     .join(" ")
@@ -581,7 +575,7 @@ async function wakeWaiting(tx: Tx, deposits: readonly ArrivalRow[]): Promise<Pla
         gt(threads.awaitingDepositSince, new Date(latest - DEPOSIT_WAIT_MS)),
       ),
     )
-    .returning({ id: threads.id, specialistId: threads.specialistId, at: threads.updatedAt });
+    .returning({ id: threads.id, at: threads.updatedAt });
   if (woken.length === 0) return [];
   // A token names itself, so what landed is fenced as data, as another's words are.
   const reason = [
@@ -591,7 +585,7 @@ async function wakeWaiting(tx: Tx, deposits: readonly ArrivalRow[]): Promise<Pla
   for (const thread of woken) await wakeThread(thread.id, reason, { tx });
   return woken
     .toSorted((a, b) => b.at.getTime() - a.at.getTime())
-    .map(({ id, specialistId }) => ({ id, specialistId }));
+    .map(({ id }) => ({ id }));
 }
 
 /** A message holding a deposit card still waiting, as jsonb containment finds it. */

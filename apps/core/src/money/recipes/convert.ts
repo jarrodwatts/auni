@@ -5,7 +5,7 @@ import { z } from "zod";
 import { APPROVED_PROCEEDS } from "../approved.ts";
 import { chainName } from "../chains.ts";
 import { EVM_NATIVE, QUANTITY_DECIMALS, tokenKey, WRAPPED_SOL } from "../fill-key.ts";
-import { looseNow } from "../portfolio.ts";
+import { heldNow } from "../portfolio.ts";
 import { tradedToken, type ActionPreview, type Recipe } from "../recipe.ts";
 import { dollars } from "../summaries.ts";
 import { centsToUsd, formatUnits, parseUnits } from "../usd.ts";
@@ -53,17 +53,13 @@ type Conversion = z.infer<z.ZodObject<typeof input>>;
 /** How far under its quote a conversion may fill. */
 const SLIPPAGE_BPS = 100n;
 
-/**
- * Refuses a conversion of more than no specialist holds, read fresh: what it
- * sells is written to no specialist (see attributed in record.ts), so it
- * never takes a specialist's share of a token the owner also holds loose.
- */
-async function assertLoose({ chain, token, amount }: Conversion): Promise<void> {
-  const loose = await looseNow(tokenKey(chain, token));
-  if (loose === null) throw new Error(`The ${chainName(chain)} wallet couldn't be read.`);
-  if (parseUnits(amount, QUANTITY_DECIMALS) > loose)
+/** Refuses a conversion of more than the wallet holds, read fresh. */
+async function assertHeld({ chain, token, amount }: Conversion): Promise<void> {
+  const held = await heldNow(tokenKey(chain, token));
+  if (held === null) throw new Error(`The ${chainName(chain)} wallet couldn't be read.`);
+  if (parseUnits(amount, QUANTITY_DECIMALS) > held)
     throw new Error(
-      `Only ${formatUnits(loose, QUANTITY_DECIMALS)} of it on ${chainName(chain)} is outside your specialists now. Nothing was sent.`,
+      `Only ${formatUnits(held, QUANTITY_DECIMALS)} of it on ${chainName(chain)} is held now. Nothing was sent.`,
     );
 }
 
@@ -87,6 +83,9 @@ function solanaSwapOf({ token, amount }: Conversion) {
   };
 }
 
+/** A card without its own face, so the plain one core makes says what it does. */
+const withoutFace = ({ card: _, ...preview }: ActionPreview): ActionPreview => preview;
+
 /**
  * A swap into USDC as a conversion's card shows it. Its amountUsd is the
  * least USDC it can land: a fresh quote under what the card says it gets at
@@ -95,9 +94,6 @@ function solanaSwapOf({ token, amount }: Conversion) {
  * person, so one that loses past its venue's limit the moment it fills is
  * refused: a card never pays with a bad trade.
  */
-/** A card without its own face, so the plain one core makes says what it does. */
-const withoutFace = ({ card: _, ...preview }: ActionPreview): ActionPreview => preview;
-
 export function asConversion(chain: NetworkKey, swap: ActionPreview): ActionPreview {
   const details = swap.details ?? {};
   const { sell, returnsUsd } = details;
@@ -117,13 +113,13 @@ export function asConversion(chain: NetworkKey, swap: ActionPreview): ActionPrev
 export const convertToCash: Recipe<typeof input> = {
   tool: "convert_to_cash",
   description:
-    "Turns a holding no specialist holds into USDC on its own chain, to pay for a card's picks. Code puts it on a card; the agent never calls it.",
+    "Turns a wallet holding into USDC on its own chain, to pay for a card's picks. Code puts it on a card; the agent never calls it.",
   input,
   venue: "auni",
   readies: ({ chain }) => chain,
   about: ({ details }) => tradedToken(details, 0),
   async describe(conversion) {
-    await assertLoose(conversion);
+    await assertHeld(conversion);
     const swap =
       conversion.chain === "solana"
         ? await previewSolanaSwap(solanaSwapOf(conversion), {
@@ -135,8 +131,8 @@ export const convertToCash: Recipe<typeof input> = {
     return asConversion(conversion.chain, swap);
   },
   async execute({ action, input: conversion, wallets }) {
-    // What no specialist holds may have left the wallet since the card was made.
-    await assertLoose(conversion);
+    // What was there may have left the wallet since the card was made.
+    await assertHeld(conversion);
     return conversion.chain === "solana"
       ? executeSolanaSwap(solanaSwapOf(conversion), wallets, action)
       : executeEvmSwap(evmSwapOf(conversion), wallets, action);

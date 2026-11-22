@@ -6,7 +6,7 @@ import { nothingThinks, readyBrain } from "./first-run";
 const row = (id: string, state: "ready" | "signed-out"): BrainsWire["rows"][number] => ({
   row:
     state === "ready"
-      ? { id, name: id, state, login: "your login" }
+      ? { id, name: id, state, login: "your login", models: [] }
       : { id, name: id, state, fix: "sign in" },
   task: null,
   canInstall: true,

@@ -17,7 +17,6 @@ import {
   tradedToken,
   type ActionPreview,
   type SentTx,
-  type SpecialistHolds,
   type ExecuteResult,
   type ReadBack,
   type Recipe,
@@ -35,7 +34,6 @@ import {
   toBaseUnits,
   tradeCosts,
   usd,
-  wholeSale,
 } from "../swaps/shared.ts";
 import type {
   SolanaQuote,
@@ -65,9 +63,7 @@ const input = {
     .number()
     .positive()
     .optional()
-    .describe(
-      "Tokens to buy or sell, as the portfolio shows them. To sell everything, leave this and amountUsd out; for a specialist, that is everything it holds.",
-    ),
+    .describe("Tokens to buy or sell, as the portfolio shows them. Leave this and amountUsd out to sell everything."),
   slippageBps: z.number().int().min(10).max(500).optional().describe("Defaults to 100 (1%)."),
 };
 
@@ -174,12 +170,11 @@ interface SwapPlan {
 
 /**
  * `owner` is the wallet a sell naming no amount sells from, null while there is
- * none to hold anything; see `wholeSale` for how much.
+ * none to hold anything.
  */
 async function plan(
   swap: SolanaSwapInput,
   owner: () => Promise<string | null>,
-  specialistHolds: SpecialistHolds | undefined,
 ): Promise<SwapPlan> {
   const sellsAll =
     swap.side === "sell" && swap.amountUsd === undefined && swap.tokenAmount === undefined;
@@ -190,7 +185,7 @@ async function plan(
   if (token.mint === SOLANA_USDC.mint)
     throw new Error("Pick the token to trade against USDC, not USDC itself.");
   // A route prices an xStock per wallet share, which its multiplier scales up
-  // from the raw units the portfolio, fills and specialist holds all count in.
+  // from the raw units the portfolio and fills count in.
   const price = await solanaPrice(token.mint);
   const usdPrice = price.usdPrice * price.multiplier;
   const slippageBps = swap.slippageBps ?? 100;
@@ -208,11 +203,8 @@ async function plan(
     const balance = holder
       ? await solanaTokenBalance(address(holder), token.mint, token.tokenProgram)
       : 0n;
-    amountIn = wholeSale(balance, solanaMintKey(token.mint), token.decimals, specialistHolds);
-    if (amountIn === 0n)
-      throw new Error(
-        `No ${token.symbol} held on Solana ${specialistHolds ? "for this specialist " : ""}to sell.`,
-      );
+    amountIn = balance;
+    if (amountIn === 0n) throw new Error(`No ${token.symbol} held on Solana to sell.`);
   } else {
     amountIn = toBaseUnits(swap.tokenAmount ?? (swap.amountUsd ?? 0) / usdPrice, token.decimals);
   }
@@ -355,14 +347,13 @@ export async function previewSolanaSwap(
   swap: SolanaSwapInput,
   options: {
     readonly owner: () => Promise<string | null>;
-    readonly specialistHolds?: SpecialistHolds | undefined;
     readonly maxLossPct?: number;
     readonly stock?: XStock;
   },
 ): Promise<ActionPreview> {
   // A wallet with no Solana key trades nothing there, said before any route is asked.
   if (!(await options.owner())) throw new Error(noAddressOn("Solana"));
-  const planned = await plan(swap, options.owner, options.specialistHolds);
+  const planned = await plan(swap, options.owner);
   const best = await bestQuote(quoteRequest(planned));
   const topUp = await solForSwap(planned, best.via.route, options.owner);
   return preview(planned, best, options.maxLossPct ?? MAX_BUY_IMPACT_PCT, {
@@ -417,12 +408,11 @@ export async function executeSolanaSwap(
   swap: SolanaSwapInput,
   wallets: Signer,
   approved: Approved,
-  options: { readonly specialistHolds?: SpecialistHolds | undefined } = {},
 ): Promise<ExecuteResult> {
   const taker = address(wallets.solanaAddress);
   const { route } = pinnedRoute(approved);
   const pinned = { ...swap, token: pinnedToken(approved, "mint") };
-  let planned = await plan(pinned, async () => taker, options.specialistHolds);
+  let planned = await plan(pinned, async () => taker);
 
   if (planned.side === "buy") {
     const usdc = await solanaTokenBalance(taker, SOLANA_USDC.mint, SOLANA_USDC.tokenProgram);
@@ -552,14 +542,12 @@ export const solanaSwap: Recipe<typeof input> = {
   input,
   venue: "solana-swap",
   mark: "swap",
-  describe: (swap, { specialistHolds }) =>
-    previewSolanaSwap(swap, { owner: solanaAddress, specialistHolds }),
+  describe: (swap) => previewSolanaSwap(swap, { owner: solanaAddress }),
   direction: (swap) => swap.side,
   fundedFrom: ({ input: swap }) => (swap.side === "buy" ? "solana" : null),
   about: ({ input: swap, details, amountUsd }) =>
     tradedToken(details, swap.side === "buy" ? Number(amountUsd) : 0),
-  execute: ({ input: swap, wallets, action, specialistHolds }) =>
-    executeSolanaSwap(swap, wallets, action, { specialistHolds }),
+  execute: ({ input: swap, wallets, action }) => executeSolanaSwap(swap, wallets, action),
   readBack: ({ action, input: swap, solanaAddress: owner }) =>
     readBackSolanaSwap(action, swap.side, owner),
 };

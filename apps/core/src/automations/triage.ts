@@ -10,7 +10,7 @@ import { triageKind, wakeThread } from "../jobs/kinds.ts";
 import { defineJob } from "../jobs/queue.ts";
 import type { BrainTurn } from "../apps/contract.ts";
 import { sourceById } from "../apps/registry.ts";
-import { promptPortfolio } from "../specialists/context.ts";
+import { promptPortfolio } from "../conversation/context.ts";
 import { briefWhen } from "./brief.ts";
 
 // Before a fire wakes a full turn, the active brain's fast model judges it: wake the agent now,

@@ -1,7 +1,7 @@
 "use client";
 
 import { AutoHeight } from "@/components/motion/auto-height";
-import { LogoImage, Monogram } from "@/components/specialist/marks";
+import { LogoImage, Monogram } from "@/components/brand/marks";
 import type { PickWeighed } from "@/lib/tool-results";
 
 import styles from "./card-taking-shape.module.css";

@@ -18,7 +18,7 @@ import { recipeForTool } from "./recipes/index.ts";
  * simulation showed it sending, or getting too unless `sendsOnly`; null when
  * it was drawn without one, so it could move anything there.
  */
-export function rawMoves(
+function rawMoves(
   row: Pick<ActionRow, "tool" | "input" | "details">,
   holding: FillKey,
   sendsOnly: boolean,
@@ -36,7 +36,7 @@ export function rawMoves(
  * transaction by what it moves, else true or false when what it's about says,
  * and null when code can't tell. A swap is about what it buys.
  */
-export function tradesHolding(
+function tradesHolding(
   row: Pick<ActionRow, "tool" | "input" | "details" | "amountUsd">,
   holding: FillKey,
 ): boolean | null {
@@ -53,8 +53,7 @@ export function tradesHolding(
 
 /**
  * The owner's moves, but `except`, that may change this holding and that a read
- * begun at `readStartedAt` may not show (see stillSettling). A move between
- * specialists changes no balance, so none of them is one.
+ * begun at `readStartedAt` may not show (see stillSettling).
  */
 export async function settling(
   q: Pick<Tx, "select">,
@@ -65,12 +64,6 @@ export async function settling(
   const rows = await q
     .select()
     .from(actions)
-    .where(
-      and(
-        ne(actions.tool, "move_holding"),
-        except ? ne(actions.id, except) : undefined,
-        stillSettling(readStartedAt),
-      ),
-    );
+    .where(and(except ? ne(actions.id, except) : undefined, stillSettling(readStartedAt)));
   return rows.filter((row) => tradesHolding(row, holding) !== false);
 }

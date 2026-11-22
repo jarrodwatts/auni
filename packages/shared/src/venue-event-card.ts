@@ -1,16 +1,15 @@
 import { z } from "zod";
 
+import { cardLogoUrlSchema } from "./action-card.ts";
 import { cardBaseSchema } from "./card-base.ts";
-import { cardLogoUrlSchema } from "./specialist-proposal-card.ts";
 import { actionRecordIdSchema } from "./shared.ts";
 
 /**
  * Something a venue did to a position that core read from its statement
- * afterwards, posted into the chat of each specialist it touched: the venue
- * acting by itself, or a trade made outside Auni ("Hyperliquid closed your
- * STRK long"), or an order Auni placed earlier filling ("Your stop-loss
- * closed your STRK long"), or a market paying out by itself ("Polymarket paid
- * out $1 for ..."). Code writes every word.
+ * afterwards, posted into the thread that opened it (or the latest thread):
+ * the venue acting by itself, or a trade made outside Auni ("Hyperliquid closed
+ * your STRK long"), or an order Auni placed earlier filling ("Your stop-loss
+ * closed your STRK long"), or a market paying out by itself.
  */
 export const venueEventCardSchema = cardBaseSchema.extend({
   kind: z.literal("venue_event"),

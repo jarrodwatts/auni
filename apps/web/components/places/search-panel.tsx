@@ -267,7 +267,6 @@ function Row({
     <PlaceLink
       {...shared}
       href={item.href}
-      specialist={item.specialist}
       thread={item.thread}
       onClick={(event) => {
         item.onClick?.(event);

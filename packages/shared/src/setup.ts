@@ -1,9 +1,27 @@
 import { z } from "zod";
 
+/** One model a brain CLI offers on this machine, with the reasoning efforts it supports. */
+export const brainModelSchema = z.object({
+  id: z.string().min(1).max(120),
+  name: z.string().min(1).max(120),
+  efforts: z.array(z.string().min(1).max(40)),
+  defaultEffort: z.string().min(1).max(40).optional(),
+  isDefault: z.boolean().optional(),
+});
+export type BrainModelWire = z.infer<typeof brainModelSchema>;
+
+/** Explicit brain, model and effort chosen for a thread or as the owner's default. */
+export const modelSelectionSchema = z.object({
+  brain: z.string().min(1).max(64),
+  model: z.string().min(1).max(120).optional(),
+  effort: z.string().min(1).max(40).optional(),
+});
+export type ModelSelectionWire = z.infer<typeof modelSelectionSchema>;
+
 /**
- * One brain app on this machine, as the first step of setup shows it. A ready one says the
- * credential it thinks on (`login`: "your Claude Max subscription") and, where its CLI names one,
- * the account it is signed in to (`signedInAs`: an email), which only the owner's screens show.
+ * One brain app on this machine, as the first step of setup and the model picker show it. A
+ * ready one says the credential it thinks on (`login`: "your Claude Max subscription"), its
+ * available models, and, where its CLI names one, the account it is signed in to (`signedInAs`).
  */
 const brainRowWireSchema = z.discriminatedUnion("state", [
   z.object({
@@ -12,6 +30,7 @@ const brainRowWireSchema = z.discriminatedUnion("state", [
     state: z.literal("ready"),
     login: z.string(),
     signedInAs: z.string().optional(),
+    models: z.array(brainModelSchema).default([]),
   }),
   /** Ready, but at its usage limit until `until`. */
   z.object({
@@ -20,6 +39,7 @@ const brainRowWireSchema = z.discriminatedUnion("state", [
     state: z.literal("resting"),
     login: z.string(),
     signedInAs: z.string().optional(),
+    models: z.array(brainModelSchema).default([]),
     until: z.iso.datetime({ offset: true }),
   }),
   /** Not ready, and the command the owner runs themselves to fix it. */

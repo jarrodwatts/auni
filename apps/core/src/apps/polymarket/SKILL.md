@@ -146,5 +146,5 @@ A refusal fails the move in a sentence the owner also reads. What each means, an
 It can't leave an order resting at a price, split, merge or convert shares, redeem by hand
 (Polymarket does that), bring cash home to any wallet but the owner's own, or trade a market
 whose protocol it can't tell: Polymarket runs two side by side, and Auni refuses one its ids
-and its book disagree about. A specialist set to act on its own may buy and sell predictions
-at the market within its pot without asking.
+and its book disagree about. A thread set to act on its own may buy and sell predictions
+at the market within its budget without asking.

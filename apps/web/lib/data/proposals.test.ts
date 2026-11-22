@@ -6,7 +6,6 @@ import { toLiveProposal } from "./proposals";
 const leg = (id: string, phase: string | null) => ({
   id,
   threadId: null,
-  specialistId: null,
   proposalId: "7d0c0000-0000-4000-8000-0000000000aa",
   status: phase === null ? "done" : "running",
   phase,

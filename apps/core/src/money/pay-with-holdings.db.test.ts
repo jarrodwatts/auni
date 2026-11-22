@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, arrivals, specialists, fills } from "../db/schema.ts";
-import { insertAction, insertSpecialist, wipe } from "../test/db.ts";
+import { actions, arrivals, fills, threads } from "../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { explainedHoldings } from "./pay-with-holdings.ts";
 
-beforeEach(() => wipe(specialists, actions, fills, arrivals));
+beforeEach(() => wipe(threads, actions, fills, arrivals));
 
 const LINK = "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196";
 const whole = (units: string) => BigInt(units) * 10n ** 18n;
 
 describe("explainedHoldings", () => {
-  it("counts what came in as priced deposits, and every loose buy of Auni's, which no sale cancels", async () => {
-    const ai = await insertSpecialist();
+  it("counts what came in as priced deposits, and every buy of Auni's, which no sale cancels", async () => {
+    const ai = await insertThread();
     const arrived = (kind: "deposit" | "landing", usdValue: string | null, index: number) => ({
       chain: "base",
       txHash: `0x${index}`,
@@ -36,12 +36,12 @@ describe("explainedHoldings", () => {
       ]);
     const fill = (
       actionId: string,
-      specialistId: string | null,
+      threadId: string | null,
       side: "buy" | "sell",
       quantity: string,
     ) => ({
       actionId,
-      specialistId,
+      threadId,
       chain: "base",
       instrument: LINK,
       side,
@@ -60,8 +60,8 @@ describe("explainedHoldings", () => {
         fill(converted.id, null, "sell", "4"),
       ]);
     const { bought, deposited } = await explainedHoldings();
-    // A sale before a buy, or a move of it into a specialist, leaves the buy meant to stay.
-    expect(bought).toEqual(new Map([[`base:${LINK.toLowerCase()}`, whole("3")]]));
+    // Every buy of Auni's counts, and no sale cancels it.
+    expect(bought).toEqual(new Map([[`base:${LINK.toLowerCase()}`, whole("8")]]));
     expect(deposited).toEqual(new Map([[`base:${LINK.toLowerCase()}`, whole("4")]]));
   });
 });

@@ -23,7 +23,13 @@ brainsRouter.use(express.json({ limit: "4kb" }));
 export const LOGIN_SEEN_MS = 3_000;
 
 export function brainRowWire(row: BrainRow): BrainRowWire {
-  return row.state === "resting" ? { ...row, until: row.until.toISOString() } : row;
+  if (row.state === "resting") {
+    return { ...row, models: [...(row.models ?? [])], until: row.until.toISOString() };
+  }
+  if (row.state === "ready") {
+    return { ...row, models: [...(row.models ?? [])] };
+  }
+  return row;
 }
 
 async function brainsWire(): Promise<BrainsWire> {

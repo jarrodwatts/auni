@@ -5,34 +5,34 @@ import { askStanding } from "./ask-standing";
 
 describe("askStanding", () => {
   it("waits for a tap until it's decided", () => {
-    expect(askStanding("update_specialist", "awaiting_permission", null)).toEqual({
+    expect(askStanding("set_thread_autonomy", "awaiting_permission", null)).toEqual({
       kind: "waiting",
     });
   });
 
   it("says what an allowed ask did", () => {
-    expect(askStanding("start_specialist", "done", null)).toMatchObject({ label: "Started" });
-    expect(askStanding("update_specialist", "done", null)).toEqual({
+    expect(askStanding("save_routine", "done", null)).toMatchObject({ label: "Saved" });
+    expect(askStanding("set_thread_autonomy", "done", null)).toEqual({
       kind: "ended",
-      label: "Changed",
+      label: "Updated",
       tone: "done",
     });
   });
 
   it("says why one couldn't apply, and when it was declined, replaced or taken back", () => {
     expect(
-      askStanding("update_specialist", "failed", "It retired before you allowed this."),
+      askStanding("set_thread_autonomy", "failed", "The thread was archived before you allowed this."),
     ).toMatchObject({
-      label: "It retired before you allowed this.",
+      label: "The thread was archived before you allowed this.",
       tone: "quiet",
     });
-    expect(askStanding("update_specialist", "cancelled", null)).toMatchObject({
+    expect(askStanding("set_thread_autonomy", "cancelled", null)).toMatchObject({
       label: "You said not now",
     });
-    expect(askStanding("update_specialist", "replaced", null)).toMatchObject({
+    expect(askStanding("set_thread_autonomy", "replaced", null)).toMatchObject({
       label: "Replaced by a newer card",
     });
-    expect(askStanding("update_specialist", "retracted", RETRACTED.stale)).toMatchObject({
+    expect(askStanding("set_thread_autonomy", "retracted", RETRACTED.stale)).toMatchObject({
       label: RETRACTED.stale,
     });
   });

@@ -95,11 +95,12 @@ bundles) and `codex/` (JSON-RPC to `codex app-server`).
   brain (a shell with or without the internet) and whose models think (`../agent/prompt.ts`), so
   the agent never claims a shell it lacks.
 
-`turn.role` is deep, everyday or fast. Claude Code maps each to a model alias (opus, sonnet,
-haiku); Codex has one default model per login, so it maps each to a reasoning effort.
-`turn.mcp` is null for a turn with no tools at all (`askFast` in `../agent/brain.ts`, as triage of
-a watch's fires asks), which also sets `outputSchema` and expects `done.output` to be the parsed
-object.
+`turn.role` is deep, everyday or fast, and `turn.model` / `turn.effort` override it when the owner
+picks a specific model and thinking effort for a thread (or as their default). Claude Code maps
+roles to model aliases (opus, sonnet, haiku); Codex maps each to a reasoning effort or explicit
+model. `turn.mcp` is null for a turn with no tools at all (`askFast` in `../agent/brain.ts`, as
+triage of a watch's fires asks), which also sets `outputSchema` and expects `done.output` to be the
+parsed object.
 
 ## The box (`../agent/box.ts`)
 
@@ -165,8 +166,8 @@ committed, so the recorder keeps only what the replay reads: it redacts the turn
 account ids (`redactor`), and cuts any frame carrying the owner's own setup (their config, model
 catalogue, skills or commands) down to the fields `run.ts` and `events.ts` use. The scenarios are the
 same for every brain (`../agent/live.ts`): `card` (a sealed card), `skill` (load_skill) and `triage`
-(structured output); Claude Code also keeps `start` and `routine`, Auni's chat asking on a card to
-start a specialist and to save a routine. A `limit` fixture is written by hand from the CLI's types
+(structured output); Claude Code also keeps `routine`, a thread asking on a card to save a routine.
+A `limit` fixture is written by hand from the CLI's types
 and named `limit.synthetic.jsonl`, and `signed-out` replays a refused login (Claude Code's
 recorded with a made-up key). Record with
 `TEST_DATABASE_URL=postgres://…/<name>_test pnpm --filter @auni/core exec node src/apps/<id>/record.ts <scenario>`.

@@ -73,7 +73,7 @@ describe("picksChosen", () => {
       }),
     } as Part;
     const proposal = {
-      type: "tool-propose_specialist_portfolio",
+      type: "tool-propose_actions",
       toolCallId: "p1",
       state: "input-available",
       input: { legs: [{ tool: "stock_trade", input: { stock: "CCJx" }, name: "Cameco" }] },
@@ -97,9 +97,7 @@ describe("towardsACard", () => {
     expect(towardsACard(turn(step("get_portfolio")))).toBeNull();
     expect(towardsACard(turn(step("WebSearch")))).toBe("researching");
     expect(towardsACard(turn(step("find_instruments")))).toBe("researching");
-    expect(towardsACard(turn(step("WebSearch"), step("propose_specialist_portfolio")))).toBe(
-      "making",
-    );
+    expect(towardsACard(turn(step("WebSearch"), step("propose_actions")))).toBe("making");
   });
 });
 

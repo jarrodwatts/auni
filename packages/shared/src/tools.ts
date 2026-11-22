@@ -23,7 +23,6 @@ export const MONEY_TOOL_NAMES = [
   "send_evm_transaction",
   "send_solana_transaction",
   "withdraw_usdc",
-  "move_holding",
   ...APP_MONEY_TOOLS,
 ] as const;
 export type MoneyToolName = (typeof MONEY_TOOL_NAMES)[number];
@@ -69,8 +68,7 @@ export const RAW_TRANSACTION_TOOLS: readonly string[] = [
  * for the owner's Allow like a money card, and applies only on it (see asks.ts in core).
  */
 export const ASK_TOOL_NAMES = [
-  "start_specialist",
-  "update_specialist",
+  "set_thread_autonomy",
   "save_routine",
   "connect_app",
   "request_secret",
@@ -85,7 +83,7 @@ export function isAsk(tool: string): tool is AskToolName {
 export const AUNI_TOOL_NAMES = [
   ...MONEY_TOOL_NAMES,
   ...APP_READ_TOOLS,
-  // Reading
+  // Reading & money planning
   "find_instruments",
   "get_portfolio",
   "get_action",
@@ -94,15 +92,12 @@ export const AUNI_TOOL_NAMES = [
   "add_token",
   "propose_actions",
   "retract_cards",
-  // Specialists
-  "start_specialist",
-  "propose_specialist_portfolio",
-  "update_specialist",
-  "get_specialist",
   // Watching
   "watch",
   "list_watches",
-  // Working
+  // Thread & working
+  "set_thread_autonomy",
+  "update_thread_notes",
   "settle_quietly",
   "set_notices",
   "show_brief",

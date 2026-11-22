@@ -64,6 +64,7 @@ describe("toolCopy", () => {
       [
         "suggest_replies",
         "name_chat",
+        "update_thread_notes",
         "load_skill",
         "read_chain",
         "fetch_url",

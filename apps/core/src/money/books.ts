@@ -8,11 +8,10 @@ import { unitUsd } from "./format.ts";
 import type { Holding, OnItsWay, Portfolio } from "./portfolio.ts";
 import { centsToUsd, formatUnits, parseUnits, signedUnits, sumUsd, usdToCents } from "./usd.ts";
 
-// The books: who holds what by the fills Auni recorded, how a read is split between the
-// specialists, what a sale or a shared fill leaves each, and what the fills paid. All pure but
-// for allFills, the one read they start from.
+// The books: who holds what by the fills Auni recorded, what a sale or a shared fill leaves
+// each thread, and what the fills paid. All pure but for allFills, the one read they start from.
 
-/** A recorded fill, as the books and a specialist's pot read it. */
+/** A recorded fill, as the books and a thread's budget read it. */
 export interface PotFill {
   readonly chain: string;
   readonly instrument: string;
@@ -35,12 +34,12 @@ export function signedQuantity(fill: Pick<PotFill, "side" | "quantity">): bigint
 }
 
 /**
- * Positions the way the portfolio attributes them, keyed by `fillIdentity`: a
- * fill with the position (or from none) adds its dollars to that position's
- * cost; a fill against it closes that share of the quantity, releases the same
- * share of the cost, and books the difference as realized, in cents. A fill
- * past zero opens the other way with what is left of it, for a perp; anything
- * else sold past what it held has closed, and the rest is realized.
+ * Positions keyed by `fillIdentity`: a fill with the position (or from none)
+ * adds its dollars to that position's cost; a fill against it closes that share
+ * of the quantity, releases the same share of the cost, and books the
+ * difference as realized, in cents. A fill past zero opens the other way with
+ * what is left of it, for a perp; anything else sold past what it held has
+ * closed, and the rest is realized.
  */
 export function walkPositions(fills: readonly PotFill[]): {
   positions: Map<string, Position>;
@@ -90,18 +89,18 @@ function abs(value: bigint): bigint {
   return value < 0n ? -value : value;
 }
 
-type Owned<T> = T & { readonly specialistId: string | null };
+type Owned<T> = T & { readonly threadId: string | null };
 
 /**
- * A money move's fills as its specialist owns them. Taking savings out to pay
- * for picks sells only what the specialist itself held there; the rest is
- * the owner's own cash changing places, recorded outside the specialist
+ * A money move's fills as its thread owns them. Taking savings out to pay
+ * for picks sells only what the thread itself held there; the rest is
+ * the owner's own cash changing places, recorded outside the thread
  * (null), so it never reads as a sale, as money taken out, or as a return.
  */
 export function ownedMoveFills<T extends PotFill>(
   moved: readonly T[],
-  specialistId: string,
-  /** The specialist's recorded fills, oldest first. */
+  threadId: string,
+  /** The thread's recorded fills, oldest first. */
   recorded: readonly PotFill[],
 ): Owned<T>[] {
   const { positions } = walkPositions(recorded);
@@ -109,10 +108,10 @@ export function ownedMoveFills<T extends PotFill>(
     const position = positions.get(fillIdentity(fill));
     const held =
       fill.side === "sell" && position && position.quantity > 0n ? position.quantity : 0n;
-    if (!position || held === 0n) return [{ ...fill, specialistId: null }];
+    if (!position || held === 0n) return [{ ...fill, threadId: null }];
     const size = parseUnits(fill.quantity, QUANTITY_DECIMALS);
     position.quantity -= held < size ? held : size;
-    if (held >= size) return [{ ...fill, specialistId }];
+    if (held >= size) return [{ ...fill, threadId }];
     const cents = usdToCents(fill.usdValue);
     const owned = (cents * held) / size;
     return [
@@ -120,23 +119,23 @@ export function ownedMoveFills<T extends PotFill>(
         ...fill,
         quantity: formatUnits(held, QUANTITY_DECIMALS),
         usdValue: centsToUsd(owned),
-        specialistId,
+        threadId,
       },
       {
         ...fill,
         quantity: formatUnits(size - held, QUANTITY_DECIMALS),
         usdValue: centsToUsd(cents - owned),
-        specialistId: null,
+        threadId: null,
       },
     ];
   });
 }
 
 /**
- * Whose a sale of `size` units of a holding was, so every specialist's books
- * keep matching the wallet whichever thread sells: the place that sold first,
- * then Other, then each other specialist as the portfolio orders them. What it
- * sold past all they held is the selling place's, as any oversold sale is.
+ * Whose a sale of `size` units of a holding was, so every thread's books
+ * keep matching the wallet whichever thread sells: the thread that sold first,
+ * then unattributed holdings (null), then each other thread in order of first
+ * fill. What it sold past all they held is the selling place's.
  */
 export function saleOwners(
   size: bigint,
@@ -145,11 +144,11 @@ export function saleOwners(
   held: Holders,
 ): (readonly [string | null, bigint])[] {
   const own = (owner: string | null) =>
-    owner === null ? held.other : (held.specialists.find(([id]) => id === owner)?.[1] ?? 0n);
+    owner === null ? held.other : (held.threads.find(([id]) => id === owner)?.[1] ?? 0n);
   const order: (readonly [string | null, bigint])[] = [
     [place, own(place)],
     ...(place === null ? [] : [[null, held.other] as const]),
-    ...held.specialists.filter(([id]) => id !== place),
+    ...held.threads.filter(([id]) => id !== place),
   ];
   const taken = new Map<string | null, bigint>();
   let left = size;
@@ -163,16 +162,14 @@ export function saleOwners(
 }
 
 /**
- * A fill shared between owners by weight: its quantity, dollars and what it locked in each in
- * proportion, the last piece taking what rounding leaves, so the pieces add up to it exactly. A
- * sale is shared by whose units it sold, and what it brought in by the same weights, so a
- * holding swapped for another stays its owner's money rather than reading as cash it got back.
+ * A fill shared between threads by weight: its quantity, dollars and what it locked in each in
+ * proportion, the last piece taking what rounding leaves, so the pieces add up to it exactly.
  */
 export function sharedFill<T extends PotFill & { readonly pnlUsd?: string }>(
   fill: T,
   weights: readonly (readonly [string | null, bigint])[],
 ): Owned<T>[] {
-  if (weights.length === 1) return [{ ...fill, specialistId: weights[0]?.[0] ?? null }];
+  if (weights.length === 1) return [{ ...fill, threadId: weights[0]?.[0] ?? null }];
   const total = weights.reduce((sum, [, weight]) => sum + weight, 0n);
   const whole = {
     quantity: parseUnits(fill.quantity, QUANTITY_DECIMALS),
@@ -180,7 +177,7 @@ export function sharedFill<T extends PotFill & { readonly pnlUsd?: string }>(
     pnl: fill.pnlUsd === undefined ? 0n : signedUnits(fill.pnlUsd, PNL_DECIMALS),
   };
   const left = { ...whole };
-  return weights.map(([specialistId, weight], index) => {
+  return weights.map(([threadId, weight], index) => {
     const last = index === weights.length - 1;
     const part = (key: keyof typeof whole) => {
       const piece = last ? left[key] : (whole[key] * weight) / total;
@@ -192,7 +189,7 @@ export function sharedFill<T extends PotFill & { readonly pnlUsd?: string }>(
       quantity: formatUnits(part("quantity"), QUANTITY_DECIMALS),
       usdValue: centsToUsd(part("cents")),
       ...(fill.pnlUsd === undefined ? {} : { pnlUsd: formatUnits(part("pnl"), PNL_DECIMALS) }),
-      specialistId,
+      threadId,
     };
   });
 }
@@ -200,14 +197,11 @@ export function sharedFill<T extends PotFill & { readonly pnlUsd?: string }>(
 /** The places a fill's profit or loss is kept to (see fills.pnlUsd). */
 export const PNL_DECIMALS = 6;
 
-/**
- * Every fill, oldest first, which is the order attribution reads them in;
- * when each was recorded says how a past reading was split.
- */
+/** Every fill, oldest first. */
 export function allFills(q: Pick<Tx, "select">) {
   return q
     .select({
-      specialistId: fills.specialistId,
+      threadId: fills.threadId,
       chain: fills.chain,
       instrument: fills.instrument,
       side: fills.side,
@@ -220,44 +214,41 @@ export function allFills(q: Pick<Tx, "select">) {
 }
 
 type BookFill = Pick<
-  PotFill & { specialistId: string | null },
-  "specialistId" | "chain" | "instrument" | "side" | "quantity"
+  PotFill & { threadId: string | null },
+  "threadId" | "chain" | "instrument" | "side" | "quantity"
 >;
 
 /**
- * Each specialist's net filled quantity of each holding, keyed by
- * `fillIdentity` in QUANTITY_DECIMALS units, in the order holdings are split
- * between them: by each one's first fill.
+ * Each thread's net filled quantity of each holding, keyed by `fillIdentity`
+ * in QUANTITY_DECIMALS units, ordered by each thread's first fill.
  */
-export function specialistBooks(from: readonly BookFill[]): Map<string, Map<string, bigint>> {
+export function threadBooks(from: readonly BookFill[]): Map<string, Map<string, bigint>> {
   const books = new Map<string, Map<string, bigint>>();
   for (const fill of from) addToBooks(books, fill);
   return books;
 }
 
-/** Adds one more fill, the newest, to specialistBooks' books. */
+/** Adds one more fill, the newest, to threadBooks' books. */
 export function addToBooks(books: Map<string, Map<string, bigint>>, fill: BookFill): void {
-  if (!fill.specialistId) return;
-  const book = books.get(fill.specialistId) ?? new Map<string, bigint>();
+  if (!fill.threadId) return;
+  const book = books.get(fill.threadId) ?? new Map<string, bigint>();
   const key = fillIdentity(fill);
   book.set(key, (book.get(key) ?? 0n) + signedQuantity(fill));
-  books.set(fill.specialistId, book);
+  books.set(fill.threadId, book);
 }
 
-/** Who holds how much of something: each specialist a share, and Other the rest. */
+/** Who holds how much of something: each thread a share, and unattributed holdings the rest. */
 interface Holders {
-  readonly specialists: readonly (readonly [specialistId: string, units: bigint])[];
+  readonly threads: readonly (readonly [threadId: string, units: bigint])[];
   readonly other: bigint;
 }
 
 /**
  * Who holds how much of `total` units of a holding the wallet holds: each
- * specialist its books, in order, as far as the wallet goes, and Other the
- * rest. The one rule the portfolio splits a holding by, and a sale is written
- * by; a sale's own specialist goes `first`, since what it sold is its own
- * before anyone else's. `total` is signed as the books are, so a short is
- * negative and held by the specialists whose sells opened it; what each holds
- * comes back unsigned.
+ * thread its books, in order, as far as the wallet goes, and unattributed the
+ * rest. A sale's own thread goes `first`, since what it sold is its own before
+ * anyone else's. `total` is signed as the books are, so a short is negative;
+ * what each holds comes back unsigned.
  */
 export function holdersOf(
   total: bigint,
@@ -267,62 +258,56 @@ export function holdersOf(
 ): Holders {
   const sign = total < 0n ? -1n : 1n;
   let remaining = total * sign;
-  const specialists: (readonly [string, bigint])[] = [];
+  const threads: (readonly [string, bigint])[] = [];
   const ordered = [...books].sort(([a], [b]) => Number(b === first) - Number(a === first));
-  for (const [specialistId, book] of ordered) {
+  for (const [threadId, book] of ordered) {
     const owned = (book.get(key) ?? 0n) * sign;
     if (owned <= 0n || remaining === 0n) continue;
     const units = owned < remaining ? owned : remaining;
     remaining -= units;
-    specialists.push([specialistId, units]);
+    threads.push([threadId, units]);
   }
-  return { specialists, other: remaining };
-}
-
-/** Something specialists' records say they hold more of than is held (see holdingGaps). */
-export interface HoldingGap {
-  /** The holding, by fillIdentity. */
-  readonly key: string;
-  /** What is held, signed as books are (a short below zero), in QUANTITY_DECIMALS units. */
-  readonly held: bigint;
-  /** What the specialists' records add up to, the same way. */
-  readonly recorded: bigint;
+  return { threads, other: remaining };
 }
 
 /**
- * Each holding the specialists' records give them more of than is held, the
- * same way, long or short, on a chain that was read; one held none of at all
- * too. attribute caps each specialist at what is held, so without this a
- * position gone with nothing recorded of it would only quietly shrink, as a
- * liquidated perp long once hid for nine days.
+ * The share of each live holding that belongs to one thread by its fills,
+ * capped at what the wallet really holds, for the thread inspector and agent context.
  */
-export function holdingGaps(input: {
-  holdings: readonly Holding[];
-  fills: readonly BookFill[];
-  unread: (chain: string) => boolean;
-}): HoldingGap[] {
-  const books = [...specialistBooks(input.fills).values()];
-  const held = new Map<string, bigint>();
-  for (const holding of input.holdings) {
-    const key = fillIdentity(holding);
-    const units = parseUnits(holding.quantity, QUANTITY_DECIMALS);
-    held.set(key, (held.get(key) ?? 0n) + (holding.short ? -units : units));
-  }
-  const filled = new Map(input.fills.map((fill) => [fillIdentity(fill), fill]));
-  return [...filled].flatMap(([key, fill]) => {
-    const { chain } = fill;
-    if (input.unread(chain)) return [];
-    const total = held.get(key) ?? 0n;
-    // Of something not held, only a perp may be recorded short.
-    const ways = total !== 0n ? [total < 0n ? -1n : 1n] : isMargined(fill) ? [1n, -1n] : [1n];
-    return ways.flatMap((way) => {
-      const recorded = books.reduce((sum, book) => {
-        const units = (book.get(key) ?? 0n) * way;
-        return units > 0n ? sum + units : sum;
-      }, 0n);
-      return recorded > total * way ? [{ key, held: total, recorded: recorded * way }] : [];
+export function holdingsOfThread(
+  threadId: string,
+  holdings: readonly Holding[],
+  everyFill: readonly BookFill[],
+): Holding[] {
+  const books = threadBooks(everyFill);
+  if (!books.has(threadId)) return [];
+  const mine: Holding[] = [];
+  for (const holding of holdings) {
+    const total = parseUnits(holding.quantity, QUANTITY_DECIMALS);
+    if (total === 0n) continue;
+    const { threads } = holdersOf(
+      holding.short ? -total : total,
+      books,
+      fillIdentity(holding),
+      threadId,
+    );
+    const share = threads.find(([id]) => id === threadId)?.[1] ?? 0n;
+    if (share <= 0n) continue;
+    if (share === total) {
+      mine.push(holding);
+      continue;
+    }
+    const cents = holding.usdValue === null ? null : usdToCents(holding.usdValue);
+    mine.push({
+      ...holding,
+      quantity: formatUnits(
+        share / 10n ** BigInt(QUANTITY_DECIMALS - holding.decimals),
+        holding.decimals,
+      ),
+      usdValue: cents === null ? null : centsToUsd((cents * share) / total),
     });
-  });
+  }
+  return mine;
 }
 
 /** Cents carried 18 places further, so the cost left after selling most of something stays exact. */
@@ -356,37 +341,28 @@ function purchases(from: readonly PotFill[]): Map<string, { held: bigint; cost: 
 
 /**
  * Where the venue keeps no book (coins and stocks in a wallet), a holding's
- * average cost comes from Auni's own fills behind it: a specialist's share
- * from that specialist's fills, the rest from fills outside any specialist,
- * the whole from them all. Only when they bought at least what is held: one
- * that came partly from elsewhere stays unknown rather than half known.
+ * average cost comes from Auni's own fills behind it. Only when they bought at
+ * least what is held: one that came partly from elsewhere stays unknown rather
+ * than half known.
  */
-export function withFillCosts(
-  portfolio: Portfolio,
-  everyFill: readonly (PotFill & { specialistId: string | null })[],
-): Portfolio {
-  const costed = (holdings: readonly Holding[], from: readonly PotFill[]): Holding[] => {
-    const books = purchases(from);
-    return holdings.map((holding) => {
-      if (holding.cash || holding.averageCostUsd) return holding;
-      const book = books.get(fillIdentity(holding));
-      if (!book || book.held <= 0n) return holding;
-      if (parseUnits(holding.quantity, QUANTITY_DECIMALS) > book.held) return holding;
-      const units = Number(formatUnits(book.held, QUANTITY_DECIMALS));
-      const cents = Number(formatUnits(book.cost, 18));
-      return { ...holding, averageCostUsd: unitUsd(cents / 100 / units) };
-    });
-  };
-  const fillsOf = (specialistId: string | null) =>
-    everyFill.filter((fill) => fill.specialistId === specialistId);
+export function withFillCosts(portfolio: Portfolio, everyFill: readonly PotFill[]): Portfolio {
+  const books = purchases(everyFill);
+  const costed = portfolio.holdings.map((holding) => {
+    if (holding.cash || holding.averageCostUsd) return holding;
+    const book = books.get(fillIdentity(holding));
+    if (!book || book.held <= 0n) return holding;
+    if (parseUnits(holding.quantity, QUANTITY_DECIMALS) > book.held) return holding;
+    const units = Number(formatUnits(book.held, QUANTITY_DECIMALS));
+    const cents = Number(formatUnits(book.cost, 18));
+    return { ...holding, averageCostUsd: unitUsd(cents / 100 / units) };
+  });
+  const assets = costed.filter((holding) => !holding.cash || holding.heldForOrders);
+  const cash = costed.filter((holding) => holding.cash && !holding.heldForOrders);
   return {
     ...portfolio,
-    holdings: costed(portfolio.holdings, everyFill),
-    specialists: portfolio.specialists.map((bucket) => ({
-      ...bucket,
-      holdings: costed(bucket.holdings, fillsOf(bucket.id)),
-    })),
-    other: { ...portfolio.other, holdings: costed(portfolio.other.holdings, fillsOf(null)) },
+    holdings: costed,
+    assets: { usdValue: worthUsd(assets), holdings: assets },
+    cash: { usdValue: worthUsd(cash), holdings: cash },
   };
 }
 
@@ -395,67 +371,19 @@ export function worthUsd(holdings: readonly Holding[]): string {
   return sumUsd(holdings.flatMap((holding) => holding.usdValue ?? []));
 }
 
-/** Splits what was read between the specialists, Other and Cash (see Holding). */
-export function attribute(input: {
+/** Groups what was read into non-cash assets, free Cash, and money on its way. */
+export function buildPortfolio(input: {
   observedAt: Date;
   holdings: readonly Holding[];
-  fills: readonly {
-    specialistId: string | null;
-    chain: string;
-    instrument: string;
-    side: "buy" | "sell";
-    quantity: string;
-  }[];
-  specialists: readonly { id: string; purpose: string; status: string }[];
   onItsWay: readonly OnItsWay[];
   unavailable: readonly string[];
   looking: readonly string[];
-  /** Whether what is held on `chain` may be missing from the read. */
-  unread: (chain: string) => boolean;
 }): Portfolio {
-  const books = specialistBooks(input.fills);
-
-  const buckets = new Map<string, Holding[]>(
-    input.specialists.map((specialist) => [specialist.id, []]),
-  );
-  const other: Holding[] = [];
+  const assets: Holding[] = [];
   const cash: Holding[] = [];
   for (const holding of input.holdings) {
-    const total = parseUnits(holding.quantity, QUANTITY_DECIMALS);
-    const cents = holding.usdValue === null ? null : usdToCents(holding.usdValue);
-    const share = (units: bigint): Holding => ({
-      ...holding,
-      quantity: formatUnits(
-        units / 10n ** BigInt(QUANTITY_DECIMALS - holding.decimals),
-        holding.decimals,
-      ),
-      usdValue: cents === null || total === 0n ? null : centsToUsd((cents * units) / total),
-    });
-    const holders = holdersOf(holding.short ? -total : total, books, fillIdentity(holding));
-    for (const [specialistId, units] of holders.specialists)
-      buckets.get(specialistId)?.push(share(units));
-    if (holders.other > 0n)
-      (holding.cash && !holding.heldForOrders ? cash : other).push(
-        holders.other === total ? holding : share(holders.other),
-      );
+    (holding.cash && !holding.heldForOrders ? cash : assets).push(holding);
   }
-
-  const specialistBuckets = input.specialists
-    .map((specialist) => {
-      const holdings = buckets.get(specialist.id) ?? [];
-      return {
-        id: specialist.id,
-        purpose: specialist.purpose,
-        status: specialist.status,
-        usdValue: worthUsd(holdings),
-        holdings,
-        // It holds only what it has fills of, so a chain it never filled on can't be short.
-        whole: !input.fills.some(
-          (fill) => fill.specialistId === specialist.id && input.unread(fill.chain),
-        ),
-      };
-    })
-    .filter((bucket) => bucket.status === "active" || bucket.holdings.length > 0);
   const onTheWay = centsToUsd(
     input.onItsWay.reduce((acc, move) => acc + usdToCents(move.usdValue), 0n),
   );
@@ -466,8 +394,7 @@ export function attribute(input: {
     unavailable: input.unavailable,
     looking: input.looking,
     holdings: input.holdings,
-    specialists: specialistBuckets,
-    other: { usdValue: worthUsd(other), holdings: other },
+    assets: { usdValue: worthUsd(assets), holdings: assets },
     cash: { usdValue: worthUsd(cash), holdings: cash },
     onTheWay: { usdValue: onTheWay, moves: input.onItsWay },
   };

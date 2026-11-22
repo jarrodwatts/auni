@@ -22,7 +22,12 @@ export {
   type ProposalWire,
   proposalWireSchema,
 } from "./action.ts";
-export { type ActionCardWire, actionCardSchema } from "./action-card.ts";
+export {
+  type ActionCardWire,
+  actionCardSchema,
+  cardLogoUrlSchema,
+  type MoneyFlow,
+} from "./action-card.ts";
 export {
   APP_JOBS,
   type AppJob,
@@ -43,6 +48,7 @@ export {
   type ActionPlanCardWire,
   type ActionPlanLeg,
   actionPlanCardSchema,
+  type PlanMove,
 } from "./action-plan-card.ts";
 export { type ArrivalCardWire, arrivalCardSchema } from "./arrival-card.ts";
 export { ASK_DONE, ASK_LINE, type AskCardWire, askCardSchema } from "./ask-card.ts";
@@ -79,29 +85,6 @@ export {
   type FilledFace,
   SUMMARY_VERBS,
 } from "./card-face.ts";
-export {
-  type SpecialistRulesWire,
-  specialistKindSchema,
-  specialistNameSchema,
-  specialistNotesSchema,
-  specialistPurposeSchema,
-  specialistRulesWireSchema,
-  specialistStatusSchema,
-  type SpecialistWire,
-  specialistWireSchema,
-  type HoldingWire,
-  holdingWireSchema,
-  type UpdateSpecialistRequest,
-  updateSpecialistRequestSchema,
-} from "./specialist.ts";
-export {
-  cardLogoUrlSchema,
-  type SpecialistProposalCardWire,
-  type SpecialistProposalLeg,
-  type SpecialistProposalMove,
-  specialistProposalCardSchema,
-  type MoneyFlow,
-} from "./specialist-proposal-card.ts";
 export { type AppCardWire, appCardSchema } from "./app-card.ts";
 export { type PickDetailWire, pickDetailWireSchema } from "./pick-detail.ts";
 export { ETHEREUM, type KnownAsset, knownAsset, MONAD, POLYGON, SOLANA } from "./known-assets.ts";
@@ -120,14 +103,6 @@ export {
   NETWORKS,
   SOLANA_CAIP2,
 } from "./networks.ts";
-export {
-  specialistUpdateCardSchema,
-  type SpecialistUpdateCardWire,
-  type SpecialistUpdateField,
-  specialistUpdateFieldSchema,
-  type SpecialistUpdateWire,
-  specialistUpdateWireSchema,
-} from "./specialist-update-card.ts";
 export {
   type AddWatchedWalletRequest,
   addWatchedWalletRequestSchema,
@@ -184,10 +159,14 @@ export {
   handoverStatusSchema,
 } from "./handover.ts";
 export {
+  type BrainModelWire,
+  brainModelSchema,
   type BrainRowWire,
   type BrainsWire,
   brainsWireSchema,
   type BrainTaskWire,
+  type ModelSelectionWire,
+  modelSelectionSchema,
   type SignInView,
   type PrivateCheckWire,
   privateCheckWireSchema,
@@ -242,6 +221,8 @@ export { splitKeys } from "./wallet-keys.ts";
 export { type StartChatRequest, startChatRequestSchema, startedChatWireSchema } from "./places.ts";
 export {
   type DepositWire,
+  type HoldingWire,
+  holdingWireSchema,
   type OtherTokensWire,
   otherTokensWireSchema,
   portfolioWireSchema,
@@ -254,8 +235,6 @@ export {
 export {
   type ActionRecordId,
   type AutomationRuleId,
-  type SpecialistId,
-  specialistIdSchema,
   type MessageId,
   type ThreadId,
   threadIdSchema,
@@ -265,11 +244,18 @@ export {
   type LiveMessage,
   messageMetadataWireSchema,
   messageWireSchema,
+  type ThreadActMode,
+  threadActModeSchema,
+  threadNotesSchema,
   threadSearchResultWireSchema,
+  type ThreadStateWire,
+  threadStateWireSchema,
   type ThreadStreamEvent,
   type ThreadWire,
   type TurnProgressStage,
   threadWireSchema,
+  type UpdateThreadRequest,
+  updateThreadRequestSchema,
 } from "./thread.ts";
 export {
   ACTION_TOOL_NAMES,

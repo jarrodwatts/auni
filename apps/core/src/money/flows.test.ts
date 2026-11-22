@@ -62,7 +62,7 @@ describe("perp flows on the venue's margin basis", () => {
 
 describe("recorded fills as flows", () => {
   const recorded = (chain: string, instrument: string) => ({
-    specialistId: null,
+    threadId: null,
     side: "buy" as const,
     usdValue: "500",
     quantity: "0.005",

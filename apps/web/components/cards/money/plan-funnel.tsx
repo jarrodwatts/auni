@@ -7,7 +7,7 @@ import { AutoHeight } from "@/components/motion/auto-height";
 
 import { MoneyButton, MoneyButtons } from "./money-card-parts";
 import styles from "./money-card.module.css";
-import funnel from "./specialist-funnel.module.css";
+import funnel from "./plan-funnel.module.css";
 
 /**
  * The steps at the foot of a money card, from a first look to the

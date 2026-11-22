@@ -218,9 +218,9 @@ describe("auni demo", () => {
     });
     await says(unheard, /Closed\. Your Fed position is as it was/u);
 
-    // A scene whose tool refuses (this one is said to a specialist, not in a chat) says what
+    // A scene whose tool refuses (closing a sliver is below Hyperliquid's minimum) says what
     // Auni answered, rather than speak of a card that isn't there.
-    const again = await type("demo: pot");
+    const again = await type("Take a sliver of my bitcoin long");
     expect(await cards(again)).toEqual([]);
     expect(await words(again)).toMatch(/wouldn't make that card/u);
   }, 180_000);
@@ -253,21 +253,6 @@ describe("auni demo", () => {
       return asked!.input!.options[0]!.label;
     };
     const tap = async (thread: string) => say(thread, await docked(thread));
-    /** The thread of the specialist named Peptides that isn't `known`, once it has said something. */
-    const peptidesBut = (known?: string) =>
-      vi.waitFor(
-        async () => {
-          const { specialists } = await ask<{ specialists: { id: string; name: string }[] }>(
-            "/specialists",
-          );
-          const { id } = specialists.find(({ id, name }) => name === "Peptides" && id !== known)!;
-          const { threads } = await ask<{ threads: { id: string; specialistId: string | null }[] }>(
-            "/threads",
-          );
-          return { id, thread: threads.find(({ specialistId }) => specialistId === id)!.id };
-        },
-        { timeout: 30_000, interval: 250 },
-      );
     /** What the demo had said before the tour began. */
     const began = said.length;
 
@@ -288,48 +273,41 @@ describe("auni demo", () => {
     const tour = await type(points[0]!.prompt);
     await says(tour, stop(1));
 
-    // A view said, looked into, and a specialist asked for. Allowed, it plans in its own
-    // thread, where the tour's words follow it; once its buys land, the tour's chat is woken.
+    // A view said, looked into, and proposed straight onto one plan card in the same thread.
     await tap(tour);
     await says(tour, stop(2));
     expect(await words(tour)).toMatch(/"tool-find_instruments".*Eli Lilly.*Novo Nordisk/su);
-    // It names the card's button in the card's own words, which core sets (asks.ts).
-    const button = /"ask":"start_specialist"[^]*?"action":"([^"]+)"/u.exec(await words(tour))![1];
-    expect(await words(tour)).toContain(`Tap **${button}**`);
     await allowAll(tour);
-    const { id: started, thread: peptides } = await peptidesBut();
-    await says(peptides, stop(3));
-    await allowAll(peptides);
-    await says(peptides, stop(4));
-    await says(tour, stop(5));
-    expect(await words(peptides)).not.toMatch(/tool-suggest_replies/u);
+    await says(tour, stop(3));
+    await tap(tour);
+    await says(tour, stop(4));
 
     // A watch, which the demo's Solana trips a few seconds on: Auni speaks up unasked.
     await tap(tour);
     await says(tour, /Solana just dropped/u);
-    await says(tour, stop(6));
+    await says(tour, stop(5));
 
     // A move that fails once allowed, and says so.
     await tap(tour);
     await allowAll(tour, "failed");
-    await says(tour, stop(7));
+    await says(tour, stop(6));
 
     // A service no app covers, on the card of a transaction the brain built; landed, Auni
     // offers to ask for an app, which is the next stop.
     await tap(tour);
     await allowAll(tour);
-    await says(tour, stop(8));
+    await says(tour, stop(7));
     await tap(tour);
-    await says(tour, stop(9));
+    await says(tour, stop(8));
 
     // An app offered for the key it needs, and declined.
     await tap(tour);
     const offer = (await cards(tour)).find(({ status }) => status === "awaiting_permission")!;
     await ask(`/actions/${offer.id}/decline`, {});
-    await says(tour, stop(10));
+    await says(tour, stop(9));
 
-    // The last four are places to look, and then it is over.
-    for (const next of [11, 12, 13]) {
+    // The last three are places to look, and then it is over.
+    for (const next of [10, 11, 12]) {
       await tap(tour);
       await says(tour, stop(next));
     }
@@ -340,26 +318,23 @@ describe("auni demo", () => {
     await tap(tour);
     await says(tour, /Needs you/u);
     // Docked again are only those not asked yet, so the next tap is never the same question.
-    expect(await docked(tour)).toBe("Show me a specialist");
+    expect(await docked(tour)).toBe("Show me an Auto thread");
     await tap(tour);
-    await says(tour, /under \*\*Team\*\*/u);
+    await says(tour, /AI buildout/u);
     expect(await docked(tour)).toBe("How do I run it for real?");
     await say(tour, "demo: funding");
     await expect(docked(tour)).rejects.toThrow();
 
-    // A second tour, left by its other door: the specialist's plan turned down. Nothing was
-    // bought, so the tour passes the stop that shows a position and carries on in its own chat.
+    // A second tour, left by its other door: the plan card turned down. Nothing was
+    // bought, so the tour passes the stop that shows the panel and carries on at the watch.
     const second = await type(points[0]!.prompt);
     await tap(second);
     await says(second, stop(2));
-    await allowAll(second);
-    const { thread: other } = await peptidesBut(started);
-    await says(other, stop(3));
-    const [plan] = (await cards(other)).filter(({ status }) => status === "awaiting_permission");
+    const [plan] = (await cards(second)).filter(({ status }) => status === "awaiting_permission");
     await ask(`/proposals/${plan!.proposalId}/decline`, {});
-    await says(second, stop(5));
-    expect(await words(other)).toMatch(/Nothing was bought/u);
-    expect(await words(other)).not.toMatch(stop(4));
+    await says(second, stop(4));
+    expect(await words(second)).toMatch(/Nothing was bought/u);
+    expect(await words(second)).not.toMatch(stop(3));
     expect(said.slice(began)).not.toMatch(/which refused|has no scene for/u);
   }, 300_000);
 

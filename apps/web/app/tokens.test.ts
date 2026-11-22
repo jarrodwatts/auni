@@ -16,7 +16,7 @@ const APPS = join(WEB, "../core/src/apps");
  * no longer in its file fails the test too, so this list never outlives what it allows.
  */
 const WRITTEN_IN: Readonly<Record<string, { readonly why: string; readonly colours: string[] }>> = {
-  "components/specialist/marks.tsx": {
+  "components/brand/marks.tsx": {
     why: "the deep colours initials sit on when a holding has no logo: a mark's own, as a logo's",
     colours: ["#0b5cab", "#5a2d8c", "#1b1f27", "#1f6f5c", "#9c3d24", "#34405a"],
   },

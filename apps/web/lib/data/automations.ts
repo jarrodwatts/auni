@@ -4,7 +4,6 @@ import {
   type AutomationFireWire,
   type AutomationRuleId,
   type AutomationWire,
-  type SpecialistId,
   type ThreadId,
 } from "@auni/shared";
 import { z } from "zod";
@@ -12,16 +11,16 @@ import { z } from "zod";
 import { requestCore } from "@/lib/core";
 
 /**
- * What Auni watches for a thread or a specialist, when those watches fired
+ * What Auni watches for a thread, when those watches fired
  * and what Auni said, and pausing or deleting one.
  */
 
-export type WatchScope = { readonly threadId: ThreadId } | { readonly specialistId: SpecialistId };
+export interface WatchScope {
+  readonly threadId: ThreadId;
+}
 
 function filter(scope: WatchScope): string {
-  return "threadId" in scope
-    ? `thread_id=${scope.threadId}`
-    : `specialist_id=${scope.specialistId}`;
+  return `thread_id=${scope.threadId}`;
 }
 
 const watchesSchema = z.object({ automations: z.array(automationWireSchema) });

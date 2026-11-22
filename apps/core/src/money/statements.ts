@@ -204,7 +204,6 @@ async function recordEntries(
             await tx
               .select({
                 id: actions.id,
-                specialistId: actions.specialistId,
                 threadId: actions.threadId,
                 endedAt: actions.endedAt,
               })
@@ -221,7 +220,7 @@ async function recordEntries(
       const action = actionsOf.get(actionId);
       const owned = entry.fills.flatMap((fill) => {
         const at = booksAt(fill.at);
-        const parts = sharedFill(fill, lineOwners(fill, at, action?.specialistId ?? null));
+        const parts = sharedFill(fill, lineOwners(fill, at, action?.threadId ?? null));
         for (const part of parts) addToBooks(at, part);
         return parts;
       });

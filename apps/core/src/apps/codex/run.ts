@@ -1,6 +1,6 @@
 import type { BrainEvent, BrainTurn } from "../contract.ts";
 import { startAppServer, type AppServer, type RpcMessage, type WireLine } from "./app-server.ts";
-import { account, defaultModel, hello, loginOf } from "./check.ts";
+import { account, hello, loginOf, pickModel } from "./check.ts";
 import { codexEvents, isUsageLimit, LOGIN_FIX, startState } from "./events.ts";
 import {
   childEnv,
@@ -102,7 +102,7 @@ export async function* runCodex(
     const disabled = await othersOff(server);
     const owner = await account(server);
     if (!owner) throw new Error(`Codex isn't logged in here: ${LOGIN_FIX}`);
-    const model = await defaultModel(server);
+    const model = await pickModel(server, turn.model);
     if (!model) throw new Error("Codex offers this login no model.");
     const thread = await server.request<{
       thread: { id: string };
@@ -126,7 +126,7 @@ export async function* runCodex(
       const started = await server.request<{ turn: { id: string } }>("turn/start", {
         threadId,
         input: text(input),
-        effort: effortFor(turn.role, model),
+        effort: effortFor(turn.role, model, turn.effort),
         summary: "concise",
         ...(turn.outputSchema ? { outputSchema: turn.outputSchema } : {}),
       });

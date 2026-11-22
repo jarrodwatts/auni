@@ -1,11 +1,4 @@
-import type {
-  SpecialistId,
-  SpecialistWire,
-  HoldingWire,
-  ThreadId,
-  ThreadWire,
-  UsdcMoneyWire,
-} from "@auni/shared";
+import type { HoldingWire, ThreadId, ThreadWire, UsdcMoneyWire } from "@auni/shared";
 
 /**
  * What the screens show of core's data: its wire shapes (in @auni/shared),
@@ -18,41 +11,6 @@ export interface Holding extends Pick<HoldingWire, "id" | "name" | "detail" | "l
   readonly value: UsdcMoneyWire;
   /** Signed USDC base units over the last 24 hours; null when no price history was readable. */
   readonly todayChangeBaseUnits: string | null;
-}
-
-export interface Specialist extends Pick<
-  SpecialistWire,
-  | "id"
-  | "kind"
-  | "name"
-  | "purpose"
-  | "pulse"
-  | "notes"
-  | "report"
-  | "status"
-  | "rules"
-  | "potUsd"
-  | "startedIn"
-> {
-  /** Picks the glyph a large orb carries; unknown themes fall back to a neutral one. */
-  readonly theme: string;
-  readonly startedAt: string;
-  /** When it retired; null while it works. */
-  readonly retiredAt: string | null;
-  readonly value: UsdcMoneyWire;
-  /** Signed: what it has made, net of the money its trades put in or took out. */
-  readonly made: UsdcMoneyWire;
-  /** Signed USDC base units since the start of today, net the same way. */
-  readonly todayChangeBaseUnits: string;
-  readonly holdings: readonly Holding[];
-}
-
-/** Money outside every specialist: what one-off chats left behind, and idle cash. */
-export interface LooseHoldings {
-  readonly other: readonly Holding[];
-  readonly cash: Holding;
-  /** How many tokens sit in their wallets that Auni doesn't count: anyone can send one. */
-  readonly otherTokens: number;
 }
 
 /** One point of a value over time, as the charts draw it. */
@@ -69,14 +27,12 @@ export interface ValueHistory {
   readonly points: readonly BalanceHistoryPoint[];
 }
 
-/** A conversation as the sidebar and places show it. */
+/** A conversation as the sidebar, thread inspector, and composer show it. */
 export interface Thread {
   readonly id: ThreadId;
-  /** The specialist this conversation belongs to; null for a chat. */
-  readonly specialistId: SpecialistId | null;
   readonly title: string;
   readonly state: "needs_user" | "running" | "done";
-  /** What the thread waits on the person for, in one line: "Waiting for your OK · $150". */
+  /** What the thread waits on the person for, in one line. */
   readonly moneyLine: string | null;
   /** Auni's last answer asks the person something they haven't answered. */
   readonly asking: boolean;
@@ -88,10 +44,32 @@ export interface Thread {
    * person reads the thread.
    */
   readonly moving: ThreadWire["moving"];
-  /** Archived by the person: out of History, found by search, back once they or Auni say something new there. */
+  /** Whether this thread asks before every move or acts on its own within its budget. */
+  readonly actMode: ThreadWire["actMode"];
+  /** Dollar spending limit when actMode is "within_limits". */
+  readonly budgetUsd: string;
+  /** Working notes Auni keeps for this thread. */
+  readonly notes: string | null;
+  /** Per-thread brain, model, and effort override; null inherits the owner's default. */
+  readonly modelSelection: ThreadWire["modelSelection"];
+  /** Pinned at the top of the sidebar. */
+  readonly pinned: boolean;
+  readonly pinnedAt: string | null;
+  /** Active watches attached to this thread. */
+  readonly watchCount: number;
+  /** Completed money moves opened in this thread. */
+  readonly moveCount: number;
+  /** Archived by the person: out of Threads, found by search, back once they or Auni say something new there. */
   readonly archived: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+/** Live holdings opened in one thread and its remaining auto-spend budget. */
+export interface ThreadState {
+  readonly budgetUsd: string;
+  readonly freeBudgetUsd: string;
+  readonly holdings: readonly Holding[];
 }
 
 export interface ThreadSearchResult {

@@ -48,6 +48,7 @@ vi.mock("../agent/brain.ts", async (original) => ({
           state: "ready",
           login: "your plan",
           signedInAs: "sam@example.com",
+          models: [],
         }
       : { id: "cli", name: "The CLI", state: "signed-out", fix: "cli login" },
   ],
@@ -128,6 +129,7 @@ describe("signing the owner's AI in from the web app", () => {
           state: "ready",
           login: "your plan",
           signedInAs: "sam@example.com",
+          models: [],
         },
         task: null,
         canInstall: false,

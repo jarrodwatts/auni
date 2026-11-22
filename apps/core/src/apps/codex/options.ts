@@ -158,6 +158,9 @@ export function codexArgs(turn: BrainTurn, install: string): string[] {
 /** A model's reasoning efforts, as model/list gives them. */
 export interface ModelChoice {
   readonly model: string;
+  readonly displayName?: string;
+  readonly hidden?: boolean;
+  readonly isDefault?: boolean;
   readonly supportedReasoningEfforts: readonly { readonly reasoningEffort: string }[];
   readonly defaultReasoningEffort: string;
 }
@@ -165,9 +168,11 @@ export interface ModelChoice {
 /**
  * Codex has one default model per login and thinks harder or faster with effort, so a role is
  * an effort: fast is its lowest, everyday its default, deep high (or the default without one).
+ * An explicit effort picked by the owner wins whenever the model supports it.
  */
-export function effortFor(role: Role, model: ModelChoice): string {
+export function effortFor(role: Role, model: ModelChoice, explicit?: string): string {
   const efforts = model.supportedReasoningEfforts.map((option) => option.reasoningEffort);
+  if (explicit && efforts.includes(explicit)) return explicit;
   if (role === "fast") return efforts[0] ?? model.defaultReasoningEffort;
   if (role === "deep" && efforts.includes("high")) return "high";
   return model.defaultReasoningEffort;

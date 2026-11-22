@@ -1,11 +1,11 @@
 import type { VenueEventCardWire } from "@auni/shared";
 
-import { AssetLogo } from "@/components/specialist/marks";
+import { AssetLogo } from "@/components/brand/marks";
 import { cn } from "@/lib/utils";
 
 /**
- * Something a venue did to a position, as core leaves it in the chat of the
- * specialist it touched: the venue acting by itself, ringed so it reads as
+ * Something a venue did to a position, as core leaves it in the thread
+ * it touched: the venue acting by itself, ringed so it reads as
  * something to look at, or an order Auni placed earlier filling.
  */
 export function VenueEventCard({ card }: { readonly card: VenueEventCardWire }) {

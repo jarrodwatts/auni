@@ -2,11 +2,11 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, fills, jobs, specialists } from "../db/schema.ts";
+import { actions, fills, jobs, threads } from "../db/schema.ts";
 import { landingJob } from "../jobs/action.ts";
-import { insertAction, insertSpecialist, wipe } from "../test/db.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { fillIdentity, QUANTITY_DECIMALS } from "./fill-key.ts";
-import { specialistPot } from "./pot.ts";
+import { threadPot } from "./pot.ts";
 import type { Fill } from "./recipe.ts";
 import { finish, LANDING_WINDOW_MS } from "./record.ts";
 import { parseUnits } from "./usd.ts";
@@ -39,7 +39,7 @@ beforeEach(async () => {
       });
     }),
   );
-  await wipe(specialists, actions, fills, jobs);
+  await wipe(threads, actions, fills, jobs);
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -52,7 +52,7 @@ const run = (actionId: string) =>
 const fillsOf = (actionId: string) =>
   db
     .select({
-      specialistId: fills.specialistId,
+      threadId: fills.threadId,
       side: fills.side,
       quantity: fills.quantity,
       usdValue: fills.usdValue,
@@ -61,11 +61,11 @@ const fillsOf = (actionId: string) =>
     .where(eq(fills.actionId, actionId));
 
 /** $10 of cash on Monad sent `ago` milliseconds ago to buy WETH on Ethereum, still on its way. */
-const buyingWeth = (specialistId: string | null, ago = 0) =>
+const buyingWeth = (threadId: string | null, ago = 0) =>
   insertAction({
     tool: "bridge_usdc",
     venue: "across",
-    specialistId,
+    threadId,
     input: { from_chain: "monad", to_chain: "1", amount: "10", output_token: WETH.instrument },
     phase: "landing",
     startedAt: new Date(Date.now() - ago),
@@ -79,8 +79,8 @@ const buyingWeth = (specialistId: string | null, ago = 0) =>
   });
 
 describe("a bridge that buys where it lands", () => {
-  it("records what it bought once Across fills it, under its specialist, and only once", async () => {
-    const ai = await insertSpecialist();
+  it("records what it bought once Across fills it, under its thread, and only once", async () => {
+    const ai = await insertThread();
     const action = await buyingWeth(ai.id);
     expect(await run(action.id)).toEqual({ again: 10_000 });
     expect(await fillsOf(action.id)).toEqual([]);
@@ -89,7 +89,7 @@ describe("a bridge that buys where it lands", () => {
     const [row] = await db.select().from(actions).where(eq(actions.id, action.id));
     expect(row).toMatchObject({ status: "done", error: null, run: { delivered: "0xfill" } });
     const bought = [
-      { specialistId: ai.id, side: "buy", quantity: "0.003000000000000000", usdValue: "10.00" },
+      { threadId: ai.id, side: "buy", quantity: "0.003000000000000000", usdValue: "10.00" },
     ];
     expect(await fillsOf(action.id)).toEqual(bought);
     // Watched again, or finished again after a write that landed unacknowledged: nothing more.
@@ -99,7 +99,7 @@ describe("a bridge that buys where it lands", () => {
   });
 
   it("gives what it bought to whoever its own sale was written to, in the same shares", async () => {
-    const [ai, energy] = [await insertSpecialist(), await insertSpecialist()];
+    const [ai, energy] = [await insertThread(), await insertThread()];
     const action = await buyingWeth(ai.id);
     await db.update(actions).set({ amountUsd: "9" }).where(eq(actions.id, action.id));
     const sale = {
@@ -109,8 +109,8 @@ describe("a bridge that buys where it lands", () => {
       side: "sell" as const,
     };
     await db.insert(fills).values([
-      { ...sale, specialistId: ai.id, quantity: "2", usdValue: "6" },
-      { ...sale, specialistId: energy.id, quantity: "1", usdValue: "3" },
+      { ...sale, threadId: ai.id, quantity: "2", usdValue: "6" },
+      { ...sale, threadId: energy.id, quantity: "1", usdValue: "3" },
     ]);
     across.status = "filled";
     await run(action.id);
@@ -118,9 +118,9 @@ describe("a bridge that buys where it lands", () => {
     expect(bought).toHaveLength(2);
     expect(bought).toEqual(
       expect.arrayContaining([
-        { specialistId: ai.id, side: "buy", quantity: "0.002000000000000000", usdValue: "6.00" },
+        { threadId: ai.id, side: "buy", quantity: "0.002000000000000000", usdValue: "6.00" },
         {
-          specialistId: energy.id,
+          threadId: energy.id,
           side: "buy",
           quantity: "0.001000000000000000",
           usdValue: "3.00",
@@ -158,9 +158,9 @@ describe("a bridge that buys where it lands", () => {
   });
 
   it("counts a buy on its way as spoken for, then as held, never as free cash between", async () => {
-    const ai = await insertSpecialist({ potUsd: "100" });
+    const ai = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
     const action = await buyingWeth(ai.id);
-    const pot = () => db.transaction((tx) => specialistPot(tx, ai));
+    const pot = () => db.transaction((tx) => threadPot(tx, ai));
     const before = await pot();
     expect(before.freeCashCents).toBe(9_000n);
     expect(before.holds.get(fillIdentity(WETH))).toBeUndefined();

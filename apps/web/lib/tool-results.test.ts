@@ -21,7 +21,6 @@ const portfolio = (cash: string, total: string, promised?: string) =>
       totalUsd: total,
       unavailable: [],
       holdings: [{ symbol: "<SOL>", usdValue: "180.00" }],
-      specialists: [],
       other: { usdValue: "0.00", holdings: [] },
       cash: { usdValue: cash, holdings: [] },
       onTheWay: { usdValue: "0.00", moves: [] },
@@ -83,7 +82,7 @@ describe("toolResult", () => {
   });
 
   it("says nothing for a tool it has no words for", () => {
-    expect(toolResult("get_specialist", JSON.stringify({ candidates: [] }))).toBeNull();
+    expect(toolResult("update_thread_notes", JSON.stringify({ candidates: [] }))).toBeNull();
   });
 
   it("says nothing for output it can't read", () => {

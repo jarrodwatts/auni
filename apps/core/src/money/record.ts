@@ -4,19 +4,18 @@ import type { FailureKind } from "@auni/shared";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { db, type Tx } from "../db/client.ts";
-import { actions, fills, type ActionRow } from "../db/schema.ts";
+import { actions, fills, threads, type ActionRow } from "../db/schema.ts";
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { fillIdentity, QUANTITY_DECIMALS, type FillKey } from "./fill-key.ts";
 import { settling } from "./holding-trades.ts";
 import { noted, step } from "./life.ts";
 import { type OnItsWay } from "./portfolio.ts";
 import { askForReading } from "./readings.ts";
-import { specialistBooks, allFills, holdersOf } from "./books.ts";
-import { specialistFills } from "./pot.ts";
-import { ownedMoveFills, saleOwners, sharedFill } from "./books.ts";
+import { allFills, holdersOf, ownedMoveFills, saleOwners, sharedFill, threadBooks } from "./books.ts";
+import { potLeaving, threadFills } from "./pot.ts";
 import type { ExecuteResult, Fill, KeptTx, Landed, Recipe } from "./recipe.ts";
 import { recipeForTool } from "./recipes/index.ts";
-import { centsToUsd, normalizeUsd, parseUnits } from "./usd.ts";
+import { centsToUsd, normalizeUsd, parseUnits, usdToCents } from "./usd.ts";
 import { evmAddress } from "./wallets.ts";
 
 // Writing down what an action moved. Every write here is safe to repeat.
@@ -60,19 +59,41 @@ export async function recordResult(
         .update(actions)
         .set({ run: noted(filled) })
         .where(mine);
-    await insertFills(tx, action.id, await attributed(tx, action, result.fills, heldBefore));
+    const owned = await attributed(tx, action, result.fills, heldBefore);
+    // When a sale outside an auto thread closes part of its holding, lower that thread's budget
+    // so cashing out manually never refills its automatic spending allowance.
+    const leaving = owned.filter(
+      (fill) => fill.side === "sell" && fill.threadId !== null && fill.threadId !== action.threadId,
+    );
+    if (leaving.length > 0) {
+      const byThread = Map.groupBy(leaving, (fill) => fill.threadId!);
+      for (const otherId of [...byThread.keys()].sort()) {
+        const [other] = await tx.select().from(threads).where(eq(threads.id, otherId)).for("update");
+        if (!other || usdToCents(other.budgetUsd) <= 0n) continue;
+        const history = [...(await threadFills(tx, otherId))];
+        let budgetUsd = other.budgetUsd;
+        for (const sale of byThread.get(otherId) ?? []) {
+          budgetUsd = potLeaving(budgetUsd, history, sale);
+          history.push(sale);
+        }
+        if (budgetUsd !== other.budgetUsd) {
+          await tx.update(threads).set({ budgetUsd }).where(eq(threads.id, otherId));
+        }
+      }
+    }
+    await insertFills(tx, action.id, owned);
   });
 }
 
 /**
- * Writes an action's fills, each with the specialist it belongs to, or none;
+ * Writes an action's fills, each with the thread it belongs to, or none;
  * one read from a venue's statement with its line and when the venue made it.
  */
 export async function insertFills(
   tx: Tx,
   actionId: string,
   owned: readonly (Fill & {
-    readonly specialistId: string | null;
+    readonly threadId: string | null;
     readonly ref?: string;
     readonly at?: Date;
     readonly pnlUsd?: string;
@@ -81,7 +102,7 @@ export async function insertFills(
   await tx.insert(fills).values(
     owned.map((fill) => ({
       actionId,
-      specialistId: fill.specialistId,
+      threadId: fill.threadId,
       instrument: fill.instrument,
       chain: fill.chain,
       side: fill.side,
@@ -136,25 +157,28 @@ export interface HeldBefore {
 
 /**
  * The holding a recorded action sells, whose wallet amount is read just
- * before it runs, so its sale is written to whoever held it. None for a move
- * of the owner's own cash between places, which is never a sale.
+ * before it runs, so its sale is written to whichever thread held it. None for
+ * a move of the owner's own cash between places, except convert_to_cash which
+ * sells a wallet holding into USDC.
  */
 export function soldHolding(action: Pick<ActionRow, "tool" | "input" | "details">): FillKey | null {
   const sold = action.details[APPROVED_SALE_OF];
-  if (!sold || recipeForTool(action.tool)?.readies?.(action.input as never)) return null;
+  if (
+    !sold ||
+    (action.tool !== "convert_to_cash" && recipeForTool(action.tool)?.readies?.(action.input as never))
+  )
+    return null;
   // The chain may itself hold a colon (eip155:1), so the instrument is what follows the last.
   const at = sold.lastIndexOf(":");
   return { chain: sold.slice(0, at) as FillKey["chain"], instrument: sold.slice(at + 1) };
 }
 
 /**
- * Each fill with the specialist it belongs to. A move that only gathers the
- * owner's cash for a specialist's picks owns no more than the specialist held,
- * and a holding converted to pay for them was no specialist's: a conversion
- * sells only what none holds (see convert.ts).
- * A sale is whoever's it sold, when what was there just before it sold could
- * be read and nothing else of it has run since, and what it brought in is
- * theirs in the same shares: one thread may sell another's holding, and the
+ * Each fill with the thread it belongs to. A move that only gathers the
+ * owner's cash for picks owns no more than its thread held. A sale is written
+ * to whichever thread held what it sold when what was there just before it
+ * could be read and nothing else of it has run since, and what it brought in
+ * is theirs in the same shares: one thread may sell another's holding, and the
  * books follow it.
  */
 async function attributed(
@@ -162,14 +186,16 @@ async function attributed(
   action: ActionRow,
   moved: readonly Fill[],
   heldBefore: HeldBefore | null,
-): Promise<(Fill & { readonly specialistId: string | null })[]> {
-  const { specialistId } = action;
-  if (action.tool === "convert_to_cash")
-    return moved.map((fill) => ({ ...fill, specialistId: null }));
-  if (specialistId && recipeForTool(action.tool)?.readies?.(action.input as never))
-    return ownedMoveFills(moved, specialistId, await specialistFills(tx, specialistId));
+): Promise<(Fill & { readonly threadId: string | null })[]> {
+  const place = action.tool === "convert_to_cash" ? null : action.threadId;
+  if (
+    place &&
+    action.tool !== "convert_to_cash" &&
+    recipeForTool(action.tool)?.readies?.(action.input as never)
+  )
+    return ownedMoveFills(moved, place, await threadFills(tx, place));
   const sold = soldHolding(action);
-  if (!sold || heldBefore === null) return moved.map((fill) => ({ ...fill, specialistId }));
+  if (!sold || heldBefore === null) return moved.map((fill) => ({ ...fill, threadId: place }));
   const key = fillIdentity(sold);
   const sale = (fill: Fill) => fill.side === "sell" && fillIdentity(fill) === key;
   const size = moved
@@ -178,13 +204,14 @@ async function attributed(
   // Another move of it since the read, or too soon before it to show, leaves the read
   // untrustworthy: written where it was made, as before.
   const meanwhile = await settling(tx, sold, heldBefore.readAt, action.id);
-  if (size === 0n || meanwhile.length > 0) return moved.map((fill) => ({ ...fill, specialistId }));
-  const books = specialistBooks(await allFills(tx));
-  const held = holdersOf(heldBefore.units, books, key, specialistId);
-  const owners = saleOwners(size, specialistId, held);
+  if (size === 0n || meanwhile.length > 0)
+    return moved.map((fill) => ({ ...fill, threadId: place }));
+  const books = threadBooks(await allFills(tx));
+  const held = holdersOf(heldBefore.units, books, key, place);
+  const owners = saleOwners(size, place, held);
   // What it brought in is theirs in the same shares; a fee or other leg stays where it was made.
   return moved.flatMap((fill) =>
-    sale(fill) || fill.side === "buy" ? sharedFill(fill, owners) : [{ ...fill, specialistId }],
+    sale(fill) || fill.side === "buy" ? sharedFill(fill, owners) : [{ ...fill, threadId: place }],
   );
 }
 
@@ -225,23 +252,23 @@ export async function finish(
 
 /**
  * What a move bought once it landed belongs to whoever its own sale was written to, in the
- * same shares (see attributed); with no sale, to its specialist.
+ * same shares (see attributed); with no sale, to its thread.
  */
 async function landedOwners(
   tx: Tx,
   action: ActionRow,
   bought: readonly Fill[],
-): Promise<(Fill & { readonly specialistId: string | null })[]> {
+): Promise<(Fill & { readonly threadId: string | null })[]> {
   const sold = await tx
-    .select({ specialistId: fills.specialistId, quantity: fills.quantity })
+    .select({ threadId: fills.threadId, quantity: fills.quantity })
     .from(fills)
     .where(and(eq(fills.actionId, action.id), eq(fills.side, "sell")));
   const weights = sold.map(
-    (fill) => [fill.specialistId, parseUnits(fill.quantity, QUANTITY_DECIMALS)] as const,
+    (fill) => [fill.threadId, parseUnits(fill.quantity, QUANTITY_DECIMALS)] as const,
   );
   return weights.length > 0
     ? bought.flatMap((fill) => sharedFill(fill, weights))
-    : bought.map((fill) => ({ ...fill, specialistId: action.specialistId }));
+    : bought.map((fill) => ({ ...fill, threadId: action.threadId }));
 }
 
 /**

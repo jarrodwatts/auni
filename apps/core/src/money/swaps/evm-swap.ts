@@ -19,7 +19,6 @@ import {
   NothingMoved,
   tradedToken,
   type ActionPreview,
-  type SpecialistHolds,
   type ExecuteResult,
   type Fill,
   type ReadBack,
@@ -50,7 +49,6 @@ import {
   toBaseUnits,
   tradeCosts,
   usd,
-  wholeSale,
 } from "./shared.ts";
 import { tokenCalled } from "../holdings.ts";
 import { stockName } from "./stock-index.ts";
@@ -69,9 +67,7 @@ const input = {
     .number()
     .positive()
     .optional()
-    .describe(
-      "Amount of sellToken to sell, as the wallet shows it. To sell all of it, leave this and amountUsd out; for a specialist, that is all it holds.",
-    ),
+    .describe("Amount of sellToken to sell, as the wallet shows it. Leave this and amountUsd out to sell all of it."),
   amountUsd: z.number().positive().optional().describe("Dollar value of sellToken to sell."),
   slippageBps: z.number().int().min(10).max(500).optional().describe("Defaults to 100 (1%)."),
 };
@@ -80,7 +76,6 @@ export type EvmSwapInput = z.infer<z.ZodObject<typeof input>>;
 
 /** How a caller quotes and judges a swap; evm_swap takes every default. */
 export interface EvmSwapOptions {
-  readonly specialistHolds?: SpecialistHolds | undefined;
   /** Where the route comes from: the routes that trade any pair by default, every route for a stock. */
   readonly quote?: (request: EvmQuoteRequest) => Promise<EvmRoute>;
   /** The dollar price of the swap's token that isn't USDC, when the caller knows it better than a token feed. */
@@ -135,17 +130,10 @@ async function plan(
   // into base units can land a crumb short of it.
   let sellAmount: bigint;
   if (sellsAll) {
-    sellAmount = wholeSale(
-      spendable,
-      evmTokenKey(swap.chain, sell.address),
-      sell.decimals,
-      options.specialistHolds,
-    );
+    sellAmount = spendable;
     if (sellAmount === 0n && spendable === 0n && held > 0n) throw reserved();
     if (sellAmount === 0n)
-      throw new Error(
-        `No ${sell.symbol} on ${NETWORKS[swap.chain].name} ${options.specialistHolds ? "for this specialist " : ""}to sell.`,
-      );
+      throw new Error(`No ${sell.symbol} on ${NETWORKS[swap.chain].name} to sell.`);
   } else if (swap.sellAmount !== undefined) {
     sellAmount = toBaseUnits(swap.sellAmount, sell.decimals);
   } else {
@@ -507,7 +495,7 @@ export const evmSwap: Recipe<typeof input> = {
   input,
   venue: "evm-swap",
   mark: "swap",
-  describe: (swap, { specialistHolds }) => previewEvmSwap(swap, evmAddress, { specialistHolds }),
+  describe: (swap) => previewEvmSwap(swap, evmAddress),
   // From USDC it buys, into USDC it sells; one holding for another asks.
   direction: (swap) =>
     isEvmUsdc(swap.chain, swap.sellToken)
@@ -518,7 +506,6 @@ export const evmSwap: Recipe<typeof input> = {
   fundedFrom: ({ input: swap }) => (isEvmUsdc(swap.chain, swap.sellToken) ? swap.chain : null),
   about: ({ input: swap, details, amountUsd }) =>
     tradedToken(details, isEvmUsdc(swap.chain, swap.sellToken) ? Number(amountUsd) : 0),
-  execute: ({ input: swap, wallets, action, specialistHolds }) =>
-    executeEvmSwap(swap, wallets, action, { specialistHolds }),
+  execute: ({ input: swap, wallets, action }) => executeEvmSwap(swap, wallets, action),
   readBack: ({ action, evmAddress }) => readBackEvmSwap(action, evmAddress),
 };

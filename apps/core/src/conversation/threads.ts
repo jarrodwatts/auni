@@ -1,9 +1,16 @@
-import type { messageWireSchema, threadWireSchema } from "@auni/shared";
-import { and, asc, desc, eq, exists, inArray, or, sql } from "drizzle-orm";
+import { ASK_TOOL_NAMES, type messageWireSchema, type threadWireSchema } from "@auni/shared";
+import { and, asc, desc, eq, exists, inArray, notInArray, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import { db } from "../db/client.ts";
-import { actions, messages, threads, type MessageRow, type ThreadRow } from "../db/schema.ts";
+import {
+  actions,
+  automations,
+  messages,
+  threads,
+  type MessageRow,
+  type ThreadRow,
+} from "../db/schema.ts";
 import { cardMoneys } from "../money/recipes/index.ts";
 import { askLine } from "../money/summaries.ts";
 import { replyTargets } from "./history.ts";
@@ -25,13 +32,15 @@ type MessageWire = z.input<typeof messageWireSchema>;
 /** Money allowed in a thread, by legs: how many went through and how many didn't, of all of them. */
 type Moving = NonNullable<ThreadWire["moving"]>;
 
-/** What a thread's row says beyond the thread itself: what waits on the person, and what moves. */
+/** What a thread's row says beyond the thread itself: what waits on the person, what moves, and counts. */
 interface RowFacts {
   /** The newest card still waiting on them, in one line. */
   readonly money?: string | null;
   /** Auni's last answer ends on a question nobody has answered. */
   readonly question?: boolean;
   readonly moving?: Moving | null;
+  readonly watchCount?: number;
+  readonly moveCount?: number;
 }
 
 /** A thread with a card still waiting on the person needs them. */
@@ -40,9 +49,15 @@ export function threadWire(thread: ThreadRow, facts: RowFacts = {}): ThreadWire 
   const money = facts.money ?? null;
   return {
     id: thread.id,
-    specialistId: thread.specialistId,
     title: thread.title,
     status: running ? "running" : money ? "needs_user" : "idle",
+    actMode: thread.actMode,
+    budgetUsd: thread.budgetUsd,
+    notes: thread.notes?.trim() ? thread.notes : null,
+    modelSelection: thread.modelSelection,
+    watchCount: facts.watchCount ?? 0,
+    moveCount: facts.moveCount ?? 0,
+    pinnedAt: thread.pinnedAt?.toISOString() ?? null,
     archivedAt: thread.archivedAt?.toISOString() ?? null,
     moneyLine: money,
     asking: !running && (facts.question ?? false),
@@ -138,11 +153,7 @@ async function openQuestions(threadIds: readonly string[]): Promise<Set<string>>
  * Each thread's money in motion, its cards' legs counted together: every
  * allowed card (a proposal, or a lone action) with a leg still running, and
  * every one that started since the person last read the thread, so how it
- * went stays on the row until they have read Auni's word on it. A card counts
- * from its last leg's start, which never moves once claimed, unlike the rows'
- * updated_at that later bookkeeping touches. A declined card never ran, so it
- * never counts, and a held move is no longer in motion: it waits on the person
- * (see waitingAsks).
+ * went stays on the row until they have read Auni's word on it.
  */
 async function movingMoney(threadIds: readonly string[]): Promise<Map<string, Moving>> {
   if (threadIds.length === 0) return new Map();
@@ -178,16 +189,54 @@ async function movingMoney(threadIds: readonly string[]): Promise<Map<string, Mo
   return moving;
 }
 
+/** Count of active watches attached to each thread. */
+async function activeWatchCounts(threadIds: readonly string[]): Promise<Map<string, number>> {
+  if (threadIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      threadId: automations.threadId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(automations)
+    .where(and(inArray(automations.threadId, [...threadIds]), eq(automations.status, "active")))
+    .groupBy(automations.threadId);
+  return new Map(rows.map((row) => [row.threadId, row.count]));
+}
+
+/** Count of settled or running money cards in each thread (so the inspector knows when there is activity). */
+async function moneyMoveCounts(threadIds: readonly string[]): Promise<Map<string, number>> {
+  if (threadIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      threadId: sql<string>`${actions.threadId}`,
+      count: sql<number>`count(distinct coalesce(${actions.proposalId}, ${actions.id}))::int`,
+    })
+    .from(actions)
+    .where(
+      and(
+        inArray(actions.threadId, [...threadIds]),
+        inArray(actions.status, ["running", "done"]),
+        notInArray(actions.tool, [...ASK_TOOL_NAMES]),
+      ),
+    )
+    .groupBy(actions.threadId);
+  return new Map(rows.map((row) => [row.threadId, row.count]));
+}
+
 async function rowFacts(threadIds: readonly string[]) {
-  const [money, questions, moving] = await Promise.all([
+  const [money, questions, moving, watches, moves] = await Promise.all([
     waitingAsks(threadIds),
     openQuestions(threadIds),
     movingMoney(threadIds),
+    activeWatchCounts(threadIds),
+    moneyMoveCounts(threadIds),
   ]);
   return (id: string): RowFacts => ({
     money: money.get(id) ?? null,
     question: questions.has(id),
     moving: moving.get(id) ?? null,
+    watchCount: watches.get(id) ?? 0,
+    moveCount: moves.get(id) ?? 0,
   });
 }
 
@@ -221,8 +270,7 @@ export async function readThreadWire(threadId: string): Promise<ThreadWire | und
 
 /**
  * Tells the owner's open tabs a thread's row changed (a turn began or ended,
- * an action was allowed, a title arrived). Best effort: a lost update costs
- * the live row only, and the next read of the list is still right.
+ * an action was allowed, a title arrived, autonomy or model changed). Best effort.
  */
 export async function publishThread(threadId: string): Promise<void> {
   try {

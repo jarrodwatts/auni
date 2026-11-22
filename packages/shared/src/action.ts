@@ -2,13 +2,7 @@ import { z } from "zod";
 
 import { dollarsSchema } from "./money.ts";
 import { CASH_KEYS } from "./networks.ts";
-import {
-  actionRecordIdSchema,
-  specialistIdSchema,
-  proposalIdSchema,
-  threadIdSchema,
-  timestampSchema,
-} from "./shared.ts";
+import { actionRecordIdSchema, proposalIdSchema, threadIdSchema, timestampSchema } from "./shared.ts";
 
 /**
  * Where a money action is. Cancelled: the owner declined it. Replaced: a newer card took its
@@ -86,14 +80,12 @@ export const CARD_WAITS_MS = 24 * 60 * 60_000;
 
 /**
  * Why Auni took back a card still waiting for the owner's tap, in the words its card, its
- * channel message and the agent all read: it waited a day (CARD_WAITS_MS), the agent no longer
- * stands behind it, its specialist was retired, or what it sells has moved to another place.
+ * channel message and the agent all read: it waited a day (CARD_WAITS_MS) or Auni no longer
+ * stands behind it.
  */
 export const RETRACTED = {
   stale: "Taken back after a day without a tap. Ask again if you still want it.",
   agent: "Taken back by Auni: it no longer fits.",
-  retired: "Taken back: its specialist was retired.",
-  moved: "Taken back: what it sells has moved.",
 } as const;
 
 /** How a held move the owner closed reads afterwards: when its money had moved, and when nothing showed it had. */
@@ -143,7 +135,6 @@ export const actionWireSchema = z.object({
   id: actionRecordIdSchema,
   /** Null for a withdrawal started from Settings, outside every conversation. */
   threadId: threadIdSchema.nullable(),
-  specialistId: specialistIdSchema.nullable(),
   /** Legs of one proposal card share it. */
   proposalId: proposalIdSchema.nullable(),
   status: actionStatusSchema,
@@ -214,10 +205,5 @@ export const proposalWireSchema = z.object({
       needUsd: dollarsSchema,
     })
     .nullable(),
-  /**
-   * The specialist's first money going in: no earlier card of it put any in.
-   * Its success is the moment worth celebrating; a rebalance or top-up isn't.
-   */
-  opens: z.boolean(),
 });
 export type ProposalWire = z.infer<typeof proposalWireSchema>;

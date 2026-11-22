@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { Thread } from "@/lib/data/views";
@@ -12,33 +13,20 @@ import { PlaceLink } from "./open-place";
 import { ATTENTION_LABEL, ChatStatusMark } from "./place-marks";
 import { ROW_ACTIVE_CLASS_NAME, ROW_CLASS_NAME, ROW_LINE_CLASS_NAME } from "./sidebar-rows";
 
-/**
- * A chat's "…" shows once the pointer rests on its row or focus moves in, and stays while its
- * menu is open. A touch screen has no resting pointer, so there the open chat keeps it, and a
- * long press on any row opens its menu.
- */
 const REVEAL_ACTIONS =
   "group-hover/chat:opacity-100 group-hover/chat:pointer-events-auto group-focus-within/chat:opacity-100 group-focus-within/chat:pointer-events-auto group-data-menu/chat:opacity-100 group-data-menu/chat:pointer-events-auto pointer-coarse:group-data-active/chat:opacity-100 pointer-coarse:group-data-active/chat:pointer-events-auto";
 
-/** What the "…" covers: the mark steps aside, and the title fades out sooner. */
 const MAKE_ROOM =
   "group-hover/chat:pr-10 group-focus-within/chat:pr-10 group-data-menu/chat:pr-10 pointer-coarse:group-data-active/chat:pr-12";
 const STEP_ASIDE =
   "group-hover/chat:hidden group-focus-within/chat:hidden group-data-menu/chat:hidden pointer-coarse:group-data-active/chat:hidden";
 
-/**
- * A title Auni is working under catches a sheen, soft enough to stay readable.
- * With less motion it holds still, greyed.
- */
 const WORKING_TITLE =
   "shimmer shimmer-color-ink/50 motion-reduce:shimmer-none motion-reduce:text-muted-foreground";
 
 /**
- * A chat: just its words, no money and no date, since the list runs newest
- * first. Its title shimmers while Auni works in it and is heavier while a
- * reply waits unread; trailing it, "Your turn" when something waits on you,
- * or the ring of money moving. A long title fades out rather than breaking
- * mid-word. Its "…" renames it in place, archives it or deletes it.
+ * One thread row in the sidebar: title, subtle active badge (Your turn, money
+ * ring, Auto zap, or Watching eye), and inline rename / pin / archive / delete.
  */
 export function ChatRow({
   active,
@@ -70,6 +58,9 @@ export function ChatRow({
     refocus.current = byKey;
     setEditing(false);
   };
+
+  const auto = thread.actMode === "within_limits";
+  const watching = thread.watchCount > 0;
 
   return (
     <li
@@ -106,7 +97,25 @@ export function ChatRow({
             </span>
             {status.working ? <span className="sr-only">Working</span> : null}
             {status.unread ? <span className="sr-only">{ATTENTION_LABEL.unread}</span> : null}
-            <ChatStatusMark mark={status.mark} className={STEP_ASIDE} />
+            {status.mark ? (
+              <ChatStatusMark mark={status.mark} className={STEP_ASIDE} />
+            ) : auto ? (
+              <span
+                title="Auto within budget"
+                className={cn("flex flex-none items-center text-primary", STEP_ASIDE)}
+              >
+                <Zap aria-hidden className="size-3.5" />
+                <span className="sr-only">Auto within budget</span>
+              </span>
+            ) : watching ? (
+              <span
+                title="Watching"
+                className={cn("flex flex-none items-center text-faint", STEP_ASIDE)}
+              >
+                <Eye aria-hidden className="size-3.5" />
+                <span className="sr-only">Watching</span>
+              </span>
+            ) : null}
           </PlaceLink>
           <div
             className={cn(
@@ -128,7 +137,6 @@ export function ChatRow({
   );
 }
 
-/** The title, editable where it sits: Enter or leaving keeps it, Escape puts it back. */
 function TitleField({
   title,
   onDone,
@@ -153,7 +161,7 @@ function TitleField({
   return (
     <input
       ref={inputRef}
-      aria-label="Chat title"
+      aria-label="Thread title"
       defaultValue={title}
       maxLength={MAX_TITLE_CHARS}
       spellCheck={false}

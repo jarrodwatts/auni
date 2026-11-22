@@ -35,7 +35,7 @@ import { useFirstRun } from "@/components/first-run/use-first-run";
 import { ME_KEY, useMe, useRefreshMe } from "@/components/personalization/use-me";
 import { SecretInput, SecretNote, secretRefusal } from "@/components/private-input/secret-input";
 import { SETTINGS_INPUT, SettingsBadge } from "@/components/settings/settings-layout";
-import { usePortfolio } from "@/components/specialist/use-specialists";
+import { usePortfolio } from "@/components/portfolio/use-portfolio";
 import { ChoicePills } from "@/components/ui/choice-pills";
 import { dialogClosedHref, SETTINGS_DIALOG_PARAM, WIZARD_PARAM } from "@/lib/app-links";
 import { browserWallet, connect } from "@/lib/browser-wallet";

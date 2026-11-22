@@ -1,23 +1,15 @@
 import type { Status } from "@/components/motion/status-mark";
-import type { Specialist, Thread } from "@/lib/data/views";
+import type { Thread } from "@/lib/data/views";
 
 /**
- * What a place's dot says: a card or a question waits on the person, or Auni
+ * What a thread's dot says: a card or a question waits on the person, or Auni
  * answered since they last looked. Null when there's nothing new.
  */
 export type PlaceAttention = "waiting" | "unread" | null;
 
-/**
- * A place's dot, from its thread. A closed specialist's question waits on no
- * one, as closing it answered whatever it asked; a card there still would.
- */
-export function attentionOf(
-  thread: Thread | undefined,
-  specialist?: Pick<Specialist, "status">,
-): PlaceAttention {
+export function attentionOf(thread: Thread | undefined): PlaceAttention {
   if (!thread || thread.state === "running") return null;
-  const asks = thread.asking && specialist?.status !== "retired";
-  if (thread.state === "needs_user" || asks) return "waiting";
+  if (thread.state === "needs_user" || thread.asking) return "waiting";
   return thread.unread ? "unread" : null;
 }
 
@@ -38,11 +30,11 @@ export function moneyProgress(moving: Thread["moving"]): MoneyProgress | null {
   return { done, total, status };
 }
 
-/** What trails a chat's title: your turn, in words, or the ring of its money. */
+/** What trails a thread's title: your turn, in words, or the ring of its money. */
 export type ChatMark =
   { readonly kind: "turn" } | ({ readonly kind: "money" } & MoneyProgress) | null;
 
-/** How a chat's row reads: do I need to look, and is anything happening. */
+/** How a thread's row reads: do I need to look, and is anything happening. */
 export interface ChatStatus {
   /** Auni is writing in it: its title shimmers. */
   readonly working: boolean;
@@ -52,7 +44,7 @@ export interface ChatStatus {
 }
 
 /**
- * A chat's row, from its thread. Something waiting on the person outranks
+ * A thread's row, from its live state. Something waiting on the person outranks
  * money already on its way, which needs nothing from them.
  */
 export function chatStatus(thread: Thread): ChatStatus {

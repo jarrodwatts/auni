@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { useBrandColors } from "@/components/specialist/brand-colors";
-import { AssetLogo, Change } from "@/components/specialist/marks";
+import { useBrandColors } from "@/components/brand/brand-colors";
+import { AssetLogo, Change } from "@/components/brand/marks";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Holding } from "@/lib/data/views";
 import { changePercent, formatUsdcBalance } from "@/lib/money";
@@ -13,11 +13,6 @@ function share(holding: Holding, total: bigint): number {
   return total > 0n ? Number((BigInt(holding.value.baseUnits) * 1000n) / total) / 10 : 0;
 }
 
-/**
- * A holding's color, eased toward white so the strip reads as proportion,
- * not as the loudest thing on the page. Core reads the colors from each
- * logo; one it couldn't read in time is read here instead.
- */
 function useHoldingTint(holding: Holding): string {
   const colors = useBrandColors(holding.logoUrl);
   if (!colors) return "var(--border)";
@@ -42,7 +37,6 @@ function Segment({
   return (
     <Tooltip onOpenChange={(open) => onHover(open ? holding.id : null)}>
       <TooltipTrigger asChild>
-        {/* The hit area is taller than the strip, so a 6px line is easy to land on. */}
         <span
           className="flex h-full cursor-default items-center py-2"
           style={{ width: `${width}%` }}
@@ -64,10 +58,6 @@ function Segment({
   );
 }
 
-/**
- * Where the money sits: a quiet proportion strip, each holding in its own
- * softened color. Under the pointer a segment names itself and the rest step back.
- */
 function BrandBar({ holdings }: { readonly holdings: readonly Holding[] }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const total = holdings.reduce((sum, holding) => sum + BigInt(holding.value.baseUnits), 0n);
@@ -89,7 +79,7 @@ function BrandBar({ holdings }: { readonly holdings: readonly Holding[] }) {
   );
 }
 
-/** The strip over one row per holding. */
+/** The proportion bar over one row per holding opened in this thread. */
 export function PaneHoldings({ holdings }: { readonly holdings: readonly Holding[] }) {
   const total = holdings.reduce((sum, holding) => sum + BigInt(holding.value.baseUnits), 0n);
   return (
@@ -104,7 +94,6 @@ export function PaneHoldings({ holdings }: { readonly holdings: readonly Holding
   );
 }
 
-/** One holding: its logo, its name and share keyed to the strip, its value and today's move. */
 function HoldingRow({ holding, total }: { readonly holding: Holding; readonly total: bigint }) {
   const tint = useHoldingTint(holding);
   const value = BigInt(holding.value.baseUnits);
@@ -128,7 +117,6 @@ function HoldingRow({ holding, total }: { readonly holding: Holding; readonly to
         <p className="text-[15px] font-semibold text-ink tabular-nums">
           {formatUsdcBalance(value)}
         </p>
-        {/* Nothing when core had no price history for it. */}
         {change === null ? null : (
           <Change
             pct={changePercent(change, value)}

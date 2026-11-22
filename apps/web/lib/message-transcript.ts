@@ -26,7 +26,7 @@ interface MessageTranscriptActivity {
  * card sits under the reply, and the words are what say why it is there.
  */
 const ENDS_THE_ANSWER: ReadonlySet<CardWire["kind"]> = new Set([
-  "specialist_proposal",
+  "action_plan",
   "deposit",
   "ask",
   "app",
@@ -56,19 +56,6 @@ function retriedCardIds(cards: readonly CardWire[]): ReadonlySet<string> {
     if (card.status === "done") for (const id of failed.get(shape) ?? []) retried.add(id);
   }
   return retried;
-}
-
-/**
- * A proposal the agent replaced within the same answer never reached the person as a choice,
- * so only each specialist's latest one is drawn.
- */
-function latestProposals(cards: readonly CardWire[]): CardWire[] {
-  const latest = new Map<string, string>();
-  for (const card of cards)
-    if (card.kind === "specialist_proposal") latest.set(card.specialistId, card.id);
-  return cards.filter(
-    (card) => card.kind !== "specialist_proposal" || latest.get(card.specialistId) === card.id,
-  );
 }
 
 export function messageTranscript(message: AuniUiMessage): {
@@ -135,7 +122,7 @@ export function messageTranscript(message: AuniUiMessage): {
   });
   return {
     activities,
-    trailingCards: latestProposals([...remainingCards.values()]),
+    trailingCards: [...remainingCards.values()],
     retried: retriedCardIds(allCards),
     watches: allCards.flatMap((card) => (card.kind === "automation" ? [card.automationId] : [])),
   };

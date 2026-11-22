@@ -9,8 +9,6 @@ import {
   automations,
   channelLinks,
   owner,
-  specialistUpdates,
-  specialists,
   threads,
   otherTokens,
   valueSnapshots,
@@ -22,10 +20,8 @@ import {
  * paired would otherwise still read as paired in the next.
  */
 const OWNERS_RECORDS = [
-  specialists,
   threads,
   actions,
-  specialistUpdates,
   automations,
   valueSnapshots,
   arrivals,
@@ -72,20 +68,6 @@ export async function setOwner(fields: Partial<typeof owner.$inferInsert> = {}) 
     .values({ welcomedAt: new Date("2026-01-01T00:00:00Z"), ...fields })
     .returning();
   return row!;
-}
-
-export async function insertSpecialist(fields: Partial<typeof specialists.$inferInsert> = {}) {
-  const [specialist] = await db
-    .insert(specialists)
-    .values({
-      kind: "take",
-      name: "AI",
-      purpose: "AI keeps eating software",
-      potUsd: "100",
-      ...fields,
-    })
-    .returning();
-  return specialist!;
 }
 
 export async function insertThread(fields: Partial<typeof threads.$inferInsert> = {}) {

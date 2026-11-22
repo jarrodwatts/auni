@@ -6,12 +6,11 @@ import { cn } from "@/lib/utils";
 export type ComposerLoadingPhase = "loading" | "ready";
 
 /**
- * A slim floating pill at rest: the go-ahead chip, the words, and send on
- * one line, 52px tall, growing only as the words wrap. White with a soft
- * shadow and a hairline ring, since it floats over the conversation.
+ * Floating rounded composer card with a quiet interior bar for model selection
+ * and send, echoing T3 Code's layout in Auni's calm visual language.
  */
 export const COMPOSER_SURFACE_CLASS_NAME =
-  "relative flex flex-none flex-col rounded-[26px] bg-card p-1.5 shadow-[0_6px_20px_--alpha(var(--color-shade)/8%),0_0_0_1px_--alpha(var(--foreground)/7%)]";
+  "relative flex flex-none flex-col rounded-[22px] bg-card px-3 pt-2.5 pb-2 shadow-[0_6px_20px_--alpha(var(--color-shade)/8%),0_0_0_1px_--alpha(var(--foreground)/7%)]";
 
 /** Where the composer rests under a conversation; the talk above dissolves into it rather than being cut. */
 export const COMPOSER_DOCK_CLASS_NAME =
@@ -19,7 +18,7 @@ export const COMPOSER_DOCK_CLASS_NAME =
 
 /** The draft's text box, the same in the live composer and its loading veil. */
 export const COMPOSER_INPUT_CLASS_NAME =
-  "min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2.5 py-2 text-reading leading-6 text-foreground outline-none placeholder:text-faint";
+  "min-h-[36px] w-full resize-none bg-transparent px-1 py-1 text-reading leading-6 text-foreground outline-none placeholder:text-faint";
 
 /** Exact content geometry used by both the composer veil and navigation preview. */
 export function ComposerLoadingLayout({
@@ -36,9 +35,8 @@ export function ComposerLoadingLayout({
   return (
     <div
       aria-hidden={capture ? undefined : true}
-      className={cn("flex items-center gap-1", className)}
+      className={cn("flex flex-col gap-1.5", className)}
     >
-      <span aria-hidden className="auni-loading-sheen h-10 w-[104px] flex-none rounded-full" />
       {capture ? (
         <textarea
           rows={1}
@@ -49,13 +47,16 @@ export function ComposerLoadingLayout({
           className={COMPOSER_INPUT_CLASS_NAME}
         />
       ) : (
-        <span className="flex h-10 min-w-0 flex-1 items-center px-2.5">
+        <span className="flex h-9 min-w-0 items-center px-1">
           <span className="auni-loading-sheen h-3 w-[min(68%,220px)] rounded-full" />
         </span>
       )}
-      <span aria-hidden className="flex size-10 flex-none items-center justify-center">
-        <span className="size-9 rounded-full bg-foreground/[0.07]" />
-      </span>
+      <div className="flex items-center justify-end gap-2">
+        <span aria-hidden className="auni-loading-sheen h-7 w-28 rounded-full" />
+        <span aria-hidden className="flex size-9 flex-none items-center justify-center">
+          <span className="size-8 rounded-full bg-foreground/[0.07]" />
+        </span>
+      </div>
     </div>
   );
 }
@@ -63,8 +64,14 @@ export function ComposerLoadingLayout({
 /** Noninteractive composer with the same box model as the live form. */
 export function ComposerLoadingSurface() {
   return (
-    <div className={COMPOSER_SURFACE_CLASS_NAME}>
-      <ComposerLoadingLayout />
+    <div className="flex flex-col">
+      <div className={COMPOSER_SURFACE_CLASS_NAME}>
+        <ComposerLoadingLayout />
+      </div>
+      <div aria-hidden className="mt-2 flex h-7 items-center justify-between px-2">
+        <span className="auni-loading-sheen h-4 w-28 rounded-md" />
+        <span className="auni-loading-sheen h-4 w-20 rounded-md" />
+      </div>
     </div>
   );
 }

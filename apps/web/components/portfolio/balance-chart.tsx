@@ -28,8 +28,8 @@ export interface ChartPoint {
 
 /**
  * A line needs two readings. Today and the week are drawn on a grid, and a
- * month or more is offered only to an older history, so two is a specialist
- * that held money within one day: its line is how that day went.
+ * month or more is offered only to an older history, so two readings within
+ * one day show how that day went.
  */
 const MIN_POINTS = 2;
 

@@ -3,14 +3,14 @@
 import { MoreHorizontal } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
-import { LogoImage } from "@/components/specialist/marks";
+import { LogoImage } from "@/components/brand/marks";
 import { StatusMark } from "@/components/motion/status-mark";
 import { TextSwap } from "@/components/motion/text-swap";
 import { durations, easings, reducedMotion } from "@/lib/motion";
 import { useMediaQuery } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
 
-import type { Leg } from "./specialist-legs";
+import type { Leg } from "./plan-legs";
 import {
   failedStep,
   onlyWhileNewest,

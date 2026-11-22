@@ -3,17 +3,32 @@ import {
   NETWORKS,
   otherTokensWireSchema,
   portfolioWireSchema,
+  valueHistoryWireSchema,
   type DepositWire,
+  type HoldingWire,
   type NetworkKey,
   type OtherTokensWire,
   type UsdcMoneyWire,
+  type ValueRange,
 } from "@auni/shared";
 
 import { requestCore } from "@/lib/core";
 
-import { toHolding } from "./specialists";
 import { dollarsToBaseUnits, usdc } from "./usdc";
-import type { LooseHoldings } from "./views";
+import type { Holding, ValueHistory } from "./views";
+
+/** Turns core's holding wire shape into the screen's base-unit Holding. */
+export function toHolding(holding: HoldingWire): Holding {
+  return {
+    id: holding.id,
+    name: holding.name,
+    detail: holding.detail,
+    logoUrl: holding.logoUrl,
+    value: usdc(dollarsToBaseUnits(holding.usdValue)),
+    todayChangeBaseUnits:
+      holding.todayChangeUsd === null ? null : dollarsToBaseUnits(holding.todayChangeUsd).toString(),
+  };
+}
 
 /** What the screens read of the account's money. */
 export interface Portfolio {
@@ -27,8 +42,12 @@ export interface Portfolio {
   readonly looking: boolean;
   /** Every source read, every wallet looked through, and nothing in any of them. */
   readonly empty: boolean;
-  /** Money outside every specialist: what one-off chats left behind, and idle cash. */
-  readonly loose: LooseHoldings;
+  /** All non-cash holdings across wallets and venues, plus money on the way. */
+  readonly holdings: readonly Holding[];
+  /** US dollars ready to use across wallets, savings, and free margin. */
+  readonly cash: Holding;
+  /** How many tokens sit in their wallets that Auni doesn't count: anyone can send one. */
+  readonly otherTokens: number;
   /** Money sent in lately, newest first, for a screen waiting on it to see land. */
   readonly deposits: readonly DepositWire[];
 }
@@ -57,20 +76,36 @@ export async function getPortfolio(
     partial,
     looking,
     empty: total === 0n && !partial && !looking,
-    loose: {
-      other: body.other.map(toHolding),
-      cash: {
-        id: "cash",
-        name: "Cash",
-        detail: "US dollars, ready to use",
-        logoUrl: "/brand/tokens/usdc.svg",
-        value: usdc(dollarsToBaseUnits(body.cashUsd)),
-        // Cash holds its value.
-        todayChangeBaseUnits: "0",
-      },
-      otherTokens: body.otherTokens,
+    holdings: body.holdings.map(toHolding),
+    cash: {
+      id: "cash",
+      name: "Cash",
+      detail: "US dollars, ready to use",
+      logoUrl: "/brand/tokens/usdc.svg",
+      value: usdc(dollarsToBaseUnits(body.cashUsd)),
+      // Cash holds its value.
+      todayChangeBaseUnits: "0",
     },
+    otherTokens: body.otherTokens,
     deposits: body.deposits,
+  };
+}
+
+/** Total portfolio history over one range (`GET /portfolio/history`). */
+export async function getValueHistory(
+  range: ValueRange,
+  signal?: AbortSignal,
+): Promise<ValueHistory> {
+  const body = valueHistoryWireSchema.parse(
+    await requestCore(`portfolio/history?range=${range}`, { method: "GET", signal }),
+  );
+  return {
+    startedAt: body.startedAt,
+    points: body.points.map(({ takenAt, usdValue, madeUsd }) => ({
+      observedAt: takenAt,
+      totalUsd: usdc(dollarsToBaseUnits(usdValue)),
+      made: usdc(dollarsToBaseUnits(madeUsd)),
+    })),
   };
 }
 

@@ -152,7 +152,7 @@ function issuesAt(schema: Schema, path: Path, input: unknown) {
 // Every tool core and the shipped apps register (with the one key some need), as the MCP server
 // checks it, and every watch source's condition, as the watch tool reads it.
 process.env.ELFA_AUTO_API_KEY = "elfa-test";
-const tools = toolsFor({ thread: { id: "t", specialistId: null } as ThreadRow });
+const tools = toolsFor({ thread: { id: "t" } as ThreadRow });
 const inputs: { readonly name: string; readonly schema: Schema }[] = [
   ...tools.map((tool) => ({ name: tool.name, schema: toolInput(tool.inputSchema) })),
   ...sources().map(({ about, source }) => ({
@@ -169,16 +169,22 @@ describe("a tool's input sent as text", () => {
   it("covers every tool, and every kind of field a model sends as text", () => {
     expect(tools.map((tool) => tool.name).toSorted()).toEqual([...AUNI_TOOL_NAMES].toSorted());
     expect(new Set(rows.map(({ field }) => field.kind))).toEqual(
-      new Set(["boolean", "number", "literal", "array", "object", "record"]),
+      new Set(["boolean", "number", "array", "object", "record"]),
     );
     expect(rows.map(({ name, at }) => `${name} ${at}`)).toEqual(
       expect.arrayContaining([
-        "update_specialist retired",
+        "set_thread_autonomy budget_usd",
         "polymarket_order amountUsd",
         "propose_actions legs",
         "send_evm_transaction calls",
         "suggest_replies multiple",
       ]),
+    );
+    // Non-string literals (e.g. z.literal(true)) are also parsed from text and refused plainly.
+    const literal = toolInput({ confirm: z.literal(true) });
+    expect(literal.parse({ confirm: "true" })).toEqual({ confirm: true });
+    expect(literal.safeParse({ confirm: "yes" }).error?.issues[0]?.message).toBe(
+      'confirm must be true, without quotes, and it was sent as text ("yes")',
     );
   });
 
@@ -251,7 +257,7 @@ describe("a tool's input sent as text", () => {
 describe("the tools a wallet with no Solana key is offered", () => {
   it("leaves out what moves only on Solana, and gives stock_trade no Solana route", () => {
     const offered = toolsFor(
-      { thread: { id: "t", specialistId: null } as ThreadRow },
+      { thread: { id: "t" } as ThreadRow },
       {
         solana: false,
       },

@@ -5,12 +5,12 @@ import type {
   MoveRun,
   AutomationStatus,
   CardFace,
-  OwnerSignals,
-  SpecialistRulesWire,
-  SpecialistWire,
   FailureKind,
   FireVerdict,
+  ModelSelectionWire,
+  OwnerSignals,
   StartingPoint,
+  ThreadActMode,
   WatchedWallet,
 } from "@auni/shared";
 import { sql } from "drizzle-orm";
@@ -58,15 +58,17 @@ export const owner = pgTable(
     // the web).
     homeChannel: text("home_channel"),
     lastChannel: text("last_channel"),
+    // The owner's default brain, model and effort for new threads; null for automatic.
+    defaultModelSelection: jsonb("default_model_selection").$type<ModelSelectionWire | null>(),
     // When they last looked at their activity: what didn't come from them since is unread.
     activitySeenAt: timestamp("activity_seen_at", TIMESTAMPTZ).defaultNow().notNull(),
     // First run (setup.ts): when they said they saved their wallet's spare key somewhere safe,
-    // or that they'd save it later, and when they sent their first take, which finishes first run.
+    // or that they'd save it later, and when they sent their first message, which finishes first run.
     backupSavedAt: timestamp("backup_saved_at", TIMESTAMPTZ),
     backupLaterAt: timestamp("backup_later_at", TIMESTAMPTZ),
     welcomedAt: timestamp("welcomed_at", TIMESTAMPTZ),
-    // A new chat's starting points (conversation/starting-points.ts), kept so they show at once,
-    // and when they were written: a day later the next chat opened asks for new ones.
+    // A new thread's starting points (conversation/starting-points.ts), kept so they show at once,
+    // and when they were written: a day later the next thread opened asks for new ones.
     startingPoints: jsonb("starting_points").$type<StartingPoint[]>(),
     startingPointsAt: timestamp("starting_points_at", TIMESTAMPTZ),
     // When they answered the web's ask for a star on GitHub (github-star.ts), from any device:
@@ -84,44 +86,6 @@ export const owner = pgTable(
   },
   (table) => [check("owner_one_row_check", sql`${table.id} = 1`)],
 );
-
-export const specialists = pgTable(
-  "specialists",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    // A take works a belief ("Nuclear makes a comeback"); a role does an ongoing job ("Keep my
-    // idle cash earning"). Both have a pot and rules; only what they're for differs.
-    kind: text("kind").$type<SpecialistWire["kind"]>().notNull(),
-    /** What lists call it: "Nuclear". */
-    name: text("name").notNull(),
-    /** What it is for, in the owner's words: the belief, or the job. */
-    purpose: text("purpose").notNull(),
-    /** The glyph its orb carries, from the web's fixed set; null shows a neutral one. */
-    theme: text("theme"),
-    potUsd: numeric("pot_usd", { precision: 14, scale: 2 }).notNull(),
-    // How Auni acts; the dialog, the chip and chat all edit it. Ask first waits
-    // for a tap on every move; within_limits acts on its own within its pot:
-    // buys that fit its free cash, and sells of no more than it holds.
-    actMode: text("act_mode").$type<SpecialistActMode>().default("ask_first").notNull(),
-    /** The agent's one-line read on how it is going, shown on its tile and its pane. */
-    pulse: text("pulse"),
-    /** Its own working notes, which it rewrites as it goes; no receipt, like pulse. */
-    notes: text("notes"),
-    /** What it wrote when it retired; null if the owner retired an empty one. */
-    report: text("report"),
-    // Retired: it holds nothing and does nothing more, and its history stays.
-    status: text("status").$type<SpecialistWire["status"]>().default("active").notNull(),
-    createdAt: timestamp("created_at", TIMESTAMPTZ).defaultNow().notNull(),
-    retiredAt: timestamp("retired_at", TIMESTAMPTZ),
-  },
-  (table) => [
-    check("specialists_kind_check", sql`${table.kind} in ('take', 'role')`),
-    check("specialists_status_check", sql`${table.status} in ('active', 'retired')`),
-    check("specialists_act_mode_check", sql`${table.actMode} in ('ask_first', 'within_limits')`),
-  ],
-);
-
-export type SpecialistActMode = SpecialistRulesWire["actMode"];
 
 /** What a thread's latest turn has left on record as it went (conversation/turn-record.ts). */
 export interface TurnRecord {
@@ -141,8 +105,17 @@ export const threads = pgTable(
   "threads",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    specialistId: uuid("specialist_id").references(() => specialists.id),
     title: text("title"),
+    // How Auni acts on moves in this thread: ask_first waits for a tap on every move;
+    // within_limits acts on its own within budgetUsd for buys and sells of what this thread bought.
+    actMode: text("act_mode").$type<ThreadActMode>().default("ask_first").notNull(),
+    budgetUsd: numeric("budget_usd", { precision: 14, scale: 2 }).default("0.00").notNull(),
+    // Working notes Auni rewrites as an ongoing thread evolves, shown in the thread inspector.
+    notes: text("notes"),
+    // Explicit brain, model and effort chosen for this thread; null uses owner/auto default.
+    modelSelection: jsonb("model_selection").$type<ModelSelectionWire | null>(),
+    // Pinned by the owner to the top of the sidebar.
+    pinnedAt: timestamp("pinned_at", TIMESTAMPTZ),
     // Set when the agent asks to be woken by the next deposit; cleared when one lands. A day
     // on it wakes nothing (DEPOSIT_WAIT_MS).
     awaitingDepositSince: timestamp("awaiting_deposit_since", TIMESTAMPTZ),
@@ -153,7 +126,7 @@ export const threads = pgTable(
       .array()
       .default(sql`'{}'`)
       .notNull(),
-    // Put away by the owner: out of History, still found by search. An answer brings it back.
+    // Put away by the owner: out of the sidebar, still found by search. An answer brings it back.
     archivedAt: timestamp("archived_at", TIMESTAMPTZ),
     // Set while a turn is queued or running; its presence is the thread's "running" status.
     turnStartedAt: timestamp("turn_started_at", TIMESTAMPTZ),
@@ -166,11 +139,8 @@ export const threads = pgTable(
     createdAt: timestamp("created_at", TIMESTAMPTZ).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", TIMESTAMPTZ).defaultNow().notNull(),
   },
-  // Each specialist has one conversation; chats (no specialist) are as many as the owner starts.
   (table) => [
-    uniqueIndex("threads_specialist_unique")
-      .on(table.specialistId)
-      .where(sql`${table.specialistId} is not null`),
+    check("threads_act_mode_check", sql`${table.actMode} in ('ask_first', 'within_limits')`),
   ],
 );
 
@@ -234,7 +204,6 @@ export const actions = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     // Null for a withdrawal started from Settings, outside every conversation.
     threadId: uuid("thread_id").references(() => threads.id),
-    specialistId: uuid("specialist_id").references(() => specialists.id),
     // Legs of one proposal card share this id; one Allow covers them all.
     proposalId: uuid("proposal_id"),
     summary: text("summary").notNull(),
@@ -299,7 +268,6 @@ export const actions = pgTable(
   (table) => [
     index("actions_thread_idx").on(table.threadId),
     index("actions_proposal_idx").on(table.proposalId),
-    index("actions_specialist_status_idx").on(table.specialistId, table.status),
     check(
       "actions_status_check",
       sql`${table.status} in ('awaiting_permission', 'running', 'done', 'failed', 'cancelled', 'replaced', 'retracted')`,
@@ -323,7 +291,7 @@ export const fills = pgTable(
     actionId: uuid("action_id")
       .notNull()
       .references(() => actions.id),
-    specialistId: uuid("specialist_id").references(() => specialists.id),
+    threadId: uuid("thread_id").references(() => threads.id, { onDelete: "set null" }),
     instrument: text("instrument").notNull(),
     chain: text("chain").notNull(),
     side: text("side").$type<"buy" | "sell">().notNull(),
@@ -336,8 +304,8 @@ export const fills = pgTable(
     pnlUsd: numeric("pnl_usd", { precision: 20, scale: 6 }),
     /**
      * The line of the venue's statement it was read from (see statements.ts):
-     * "<venue>:<address>:<trade id>". A line split between owners is a row
-     * per owner, each recorded once. Null for a fill Auni worked out itself.
+     * "<venue>:<address>:<trade id>". A line split between threads is a row
+     * per thread, each recorded once. Null for a fill Auni worked out itself.
      */
     venueRef: text("venue_ref"),
     /** When it happened: as the venue dates it, for one read from its statement. */
@@ -345,40 +313,13 @@ export const fills = pgTable(
   },
   (table) => [
     index("fills_action_idx").on(table.actionId),
-    index("fills_specialist_idx").on(table.specialistId),
+    index("fills_thread_idx").on(table.threadId),
     uniqueIndex("fills_venue_ref_idx").on(
       table.venueRef,
-      sql`coalesce(${table.specialistId}, '00000000-0000-0000-0000-000000000000')`,
+      sql`coalesce(${table.threadId}, '00000000-0000-0000-0000-000000000000')`,
     ),
     check("fills_side_check", sql`${table.side} in ('buy', 'sell')`),
   ],
-);
-
-/** A specialist's editable fields, as one chat edit found or left them. */
-export type SpecialistFields = Partial<{
-  purpose: string;
-  name: string;
-  potUsd: string;
-  actMode: SpecialistActMode;
-}>;
-
-// One chat edit to a specialist, kept so its one-line receipt can be undone.
-export const specialistUpdates = pgTable(
-  "specialist_updates",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    specialistId: uuid("specialist_id")
-      .notNull()
-      .references(() => specialists.id),
-    threadId: uuid("thread_id")
-      .notNull()
-      .references(() => threads.id),
-    before: jsonb("before").$type<SpecialistFields>().notNull(),
-    after: jsonb("after").$type<SpecialistFields>().notNull(),
-    undoneAt: timestamp("undone_at", TIMESTAMPTZ),
-    createdAt: timestamp("created_at", TIMESTAMPTZ).defaultNow().notNull(),
-  },
-  (table) => [index("specialist_updates_specialist_idx").on(table.specialistId)],
 );
 
 // A watch: what to look out for, in its source's own words, and the thread it wakes when it
@@ -390,7 +331,6 @@ export const automations = pgTable(
     threadId: uuid("thread_id")
       .notNull()
       .references(() => threads.id),
-    specialistId: uuid("specialist_id").references(() => specialists.id),
     // The app that watches, and its own id for the watch when it keeps one (RemoteWatching).
     source: text("source").notNull(),
     sourceRef: text("source_ref"),
@@ -401,8 +341,6 @@ export const automations = pgTable(
     // The line the owner sees ("ETH falls below $2,000"), and the agent's note on why it matters.
     description: text("description").notNull(),
     note: text("note").notNull(),
-    // The one watch that tests the specialist's belief itself, shown first.
-    thesis: boolean("thesis").default(false).notNull(),
     // Null fires once; otherwise the least time between fires that wake the thread ("0", "1h").
     repeat: text("repeat"),
     status: text("status").$type<AutomationStatus>().default("active").notNull(),
@@ -413,7 +351,6 @@ export const automations = pgTable(
   },
   (table) => [
     index("automations_thread_idx").on(table.threadId),
-    index("automations_specialist_idx").on(table.specialistId),
     uniqueIndex("automations_source_ref_idx").on(table.source, table.sourceRef),
     check(
       "automations_status_check",
@@ -493,17 +430,14 @@ export const valueSnapshots = pgTable(
   "value_snapshots",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    specialistId: uuid("specialist_id").references(() => specialists.id),
     usdValue: numeric("usd_value", { precision: 14, scale: 2 }).notNull(),
-    // The plain cash within usd_value (money/made.ts), on the total's rows; a
-    // specialist holds none, so it is null on theirs.
+    // The plain cash within usd_value (money/made.ts).
     cashUsd: numeric("cash_usd", { precision: 14, scale: 2 }),
-    // What the reading held, on the total's rows, so value between readings
-    // can be priced from it. Null on specialist rows.
+    // What the reading held, so value between readings can be priced from it.
     holdings: jsonb("holdings").$type<readonly ReadingHolding[]>(),
     takenAt: timestamp("taken_at", TIMESTAMPTZ).defaultNow().notNull(),
   },
-  (table) => [index("value_snapshots_specialist_taken_idx").on(table.specialistId, table.takenAt)],
+  (table) => [index("value_snapshots_taken_idx").on(table.takenAt)],
 );
 
 // One transfer into or out of the wallet, read from its transaction on the
@@ -746,8 +680,6 @@ export type ChannelLinkRow = typeof channelLinks.$inferSelect;
 export type ChannelDeliveryRow = typeof channelDeliveries.$inferSelect;
 
 export type OwnerRow = typeof owner.$inferSelect;
-export type SpecialistRow = typeof specialists.$inferSelect;
-export type SpecialistUpdateRow = typeof specialistUpdates.$inferSelect;
 export type ThreadRow = typeof threads.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type ActionRow = typeof actions.$inferSelect;

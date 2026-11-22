@@ -112,7 +112,6 @@ function cardOf(
   return {
     id: "00000000-0000-4000-8000-0000000000c4",
     threadId: null,
-    specialistId: null,
     proposalId: null,
     summary: preview.summary,
     amountUsd: preview.amountUsd,

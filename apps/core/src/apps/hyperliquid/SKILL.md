@@ -239,5 +239,5 @@ position's margin without trading, use cross margin, trade Hyperliquid's spot ma
 stop that fills only at a limit price, trails the market, or closes only part of a position,
 set a stop before any order or position exists for it, fund a market that margins in
 anything but USDC, move cash in from any chain but Arbitrum, withdraw by CCTP, or withdraw to
-any address but the owner's own on Arbitrum. From there, cash leaves Auni the usual way. A
-specialist set to act on its own still asks before every perp move.
+any address but the owner's own on Arbitrum. From there, cash leaves Auni the usual way. Even a
+thread set to act on its own still asks before every perp move.

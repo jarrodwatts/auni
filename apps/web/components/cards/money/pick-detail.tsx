@@ -6,7 +6,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "
 import { createPortal } from "react-dom";
 
 import { AuniNote } from "@/components/cards/auni-note";
-import { LogoImage } from "@/components/specialist/marks";
+import { LogoImage } from "@/components/brand/marks";
 import { DawnChart } from "@/components/portfolio/dawn-chart";
 import { RollingNumber } from "@/components/portfolio/rolling-number";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,7 +14,7 @@ import { readPickDetail } from "@/lib/data/actions";
 import { formatAssetPrice } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-import type { Leg } from "./specialist-legs";
+import type { Leg } from "./plan-legs";
 import { chartLevels } from "./pick-levels";
 
 /** A pick's line moves slowly; a reopened card reads it from cache. */

@@ -49,8 +49,6 @@ const appAccountWireSchema = z.object({
   usd: dollarsSchema.nullable(),
   /** Largest first. */
   holdings: z.array(appHoldingWireSchema),
-  /** The specialists that hold something there, by name. */
-  specialists: z.array(z.string()),
   /**
    * How money gets there and how it comes back: null when a move of the app's does it, which
    * Auni makes a card for when asked; else the app's own words on it.

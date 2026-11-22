@@ -50,10 +50,9 @@ export function WaitingDot({
 }
 
 /**
- * What trails a chat's title, in one slot: "Your turn" while a card or a
+ * What trails a thread's title, in one slot: "Your turn" while a card or a
  * question waits on the person, or its money's ring while that moves and
- * until how it went is read. A change hands over, the old mark shrinking
- * away as the new one pops in; a ring's count moves on in place.
+ * until how it went is read.
  */
 export function ChatStatusMark({
   mark,
@@ -98,7 +97,7 @@ export function ChatStatusMark({
   );
 }
 
-/** What a chat's money ring says, for anyone who can't see it. */
+/** What a thread's money ring says, for anyone who can't see it. */
 const MONEY_LABEL: Record<
   "now" | "done" | "failed",
   (count: { readonly done: number; readonly total: number }) => string
@@ -108,7 +107,7 @@ const MONEY_LABEL: Record<
   failed: ({ done, total }) => `${done} of ${total} went through`,
 };
 
-/** Portfolio's mark: a plain glyph, so the only color in the list is the specialists'. */
+/** Portfolio's mark: a plain glyph. */
 export function PortfolioMark({
   size = 18,
   className,
@@ -129,17 +128,12 @@ export function PortfolioMark({
 const TAG_CLASS_NAME =
   "flex h-5 min-w-5 flex-none items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums";
 
-/** Something waits on the person: "Your turn" on a chat, "1 needs your OK" on a card. */
+/** Something waits on the person: "Your turn" on a thread, "1 needs your OK" on a card. */
 export function TurnTag({ children }: { readonly children: ReactNode }) {
   return <span className={cn(TAG_CLASS_NAME, "bg-primary/[0.1] text-primary")}>{children}</span>;
 }
 
-/** "New": a specialist the agent just made, until it is opened. */
-export function NewTag() {
-  return <span className={cn(TAG_CLASS_NAME, "bg-primary/[0.09] text-primary")}>New</span>;
-}
-
-/** How many places wait on the person: a count points, so it wears the app's blue. */
+/** How many threads wait on the person: a count points, so it wears the app's blue. */
 export function WaitingCount({ count }: { readonly count: number }) {
   return (
     <span

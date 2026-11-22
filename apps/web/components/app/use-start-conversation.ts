@@ -10,14 +10,15 @@ import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
 import { useThreads } from "@/components/app/use-threads";
 import { START_FAILURE } from "@/components/app/thread-failure";
 import { isModifiedClick } from "@/components/places/open-place";
-import { startChat, threadHref } from "@/lib/data/places";
+import { startChat, threadHref, type StartChatOptions } from "@/lib/data/places";
 import { threadSession } from "@/lib/data/thread-session";
 import type { CarriedTake } from "@/lib/first-message";
 
 /**
- * Something new, typed in a new chat or carried in from first run's landing: the chat starts,
- * the message carries into it, and the answer streams there. The launch stage holds the words
- * on screen throughout, and a carried take's chat waits for the landing's dive to land in it.
+ * Something new, typed in a new thread or carried in from first run's landing: the thread starts
+ * with any picked model and autonomy budget, the message carries into it, and the answer streams
+ * there. The launch stage holds the words on screen throughout, and a carried take's thread waits
+ * for the landing's dive to land in it.
  */
 export function useStartConversation() {
   const router = useRouter();
@@ -27,7 +28,11 @@ export function useStartConversation() {
   const [error, setError] = useState<string | null>(null);
   const [, startNavigation] = useTransition();
   const start = useCallback(
-    async (prompt: string, carried?: CarriedTake): Promise<void> => {
+    async (
+      prompt: string,
+      carried?: CarriedTake,
+      options?: StartChatOptions,
+    ): Promise<void> => {
       const content = prompt.trim();
       if (!content || launch) return;
 
@@ -36,7 +41,7 @@ export function useStartConversation() {
       if (!started) return;
 
       try {
-        const thread = await startChat(content);
+        const thread = await startChat(content, options);
         rememberThread(thread);
         continueToThread(started.id, thread);
         // The tab's session sends it, so navigating can't cut it off.
@@ -47,18 +52,18 @@ export function useStartConversation() {
         const href = threadHref(thread);
         router.prefetch(href);
         await carried?.landed;
-        // The blank chat this started from becomes the conversation, so Back skips it;
+        // The blank thread this started from becomes the conversation, so Back skips it;
         // started from anywhere else, Back returns there.
         startNavigation(() => (pathname === "/app/new" ? router.replace(href) : router.push(href)));
       } catch {
         await carried?.landed;
         cancel(started.id);
-        // Asked in the new chat's own box: the reason shows under it.
+        // Asked in the new thread's own box: the reason shows under it.
         if (pathname === "/app/new") {
           setError(START_FAILURE);
           return;
         }
-        // Asked from elsewhere (search), so the words go into the new chat's box with the reason.
+        // Asked from elsewhere (search), so the words go into the new thread's box with the reason.
         toast.error(START_FAILURE);
         if (pathname !== "/app/new") router.push("/app/new");
         requestComposerFocus("new", content);
@@ -70,7 +75,7 @@ export function useStartConversation() {
   return { busy: launch !== null, error, start } as const;
 }
 
-/** The click behind a link to /app/new: a blank chat, its box ready for the next thing. */
+/** The click behind a link to /app/new: a blank thread, its box ready for the next thing. */
 export function useStartNew() {
   const closeMobileMenu = useCloseMobileThreadMenu();
   return useCallback(

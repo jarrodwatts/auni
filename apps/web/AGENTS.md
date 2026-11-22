@@ -43,10 +43,13 @@ network on purpose, as a later `-H` wins.
   `components/feedback/` (`feedback-body.tsx`, shared by `feedback-card.tsx` and the report a
   failed card or an app's sheet opens, `report-dialog.tsx`).
 - Tool names the web knows: `packages/shared/src/tools.ts` (an app's from `apps.generated.ts`).
-- The Team list (Auni, specialists, History): `components/places/place-list.tsx`, `team.ts`
-  (`teamOf`, `teamLine`); Auni's row is the latest open chat, as core's `mainChat` picks.
-- A specialist's page (`/app/s/<id>`): `components/places/specialist-place.tsx` (its chat),
-  `specialist-pane.tsx` and `pane-sections.tsx` (pot, positions, watches, notes, record).
+- Threads sidebar and workspace (`/app/chat/<id>`): `components/places/place-list.tsx`,
+  `components/places/chat-place.tsx` (chat + on-demand right-hand inspector pane
+  `components/places/thread-inspector-pane.tsx`), and `components/places/pane-sections.tsx`
+  (Auto budget, positions, watches, working notes, record).
+- Composer controls: model and thinking effort picker (`components/app/model-picker.tsx`),
+  machine/environment status strip (`components/app/environment-picker.tsx`), and per-thread Auto
+  budget control (`components/app/autonomy-picker.tsx`).
 - Apps (`/app/apps`): `components/apps/`, on core's `GET /apps` (`lib/data/apps.ts`): the list
   (`apps-screen.tsx`) and each app's sheet (`app-sheet.tsx`): what is held there, its keys
   (`app-keys.tsx`, each a `SecretInput` to its private field), its switch, and for one Auni

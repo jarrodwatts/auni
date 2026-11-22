@@ -23,17 +23,10 @@ import { markBriefed } from "../automations/brief.ts";
 import { homeChannel } from "../channels/home.ts";
 import { declinedOffers } from "../connect.ts";
 import { db, type Tx } from "../db/client.ts";
-import {
-  actions,
-  specialists,
-  messages,
-  threads,
-  type MessageRow,
-  type TurnRecord,
-} from "../db/schema.ts";
+import { actions, messages, threads, type MessageRow, type TurnRecord } from "../db/schema.ts";
 import { env } from "../env.ts";
 import { deliverKind } from "../jobs/kinds.ts";
-import { auniContext, specialistContext, waitingCardsContext } from "../specialists/context.ts";
+import { threadContext, waitingCardsContext } from "./context.ts";
 import { step } from "../money/life.ts";
 import { arrivalsPromptContext, landLate } from "../money/news.ts";
 import { walletAddresses } from "../money/wallets.ts";
@@ -318,12 +311,8 @@ async function runBegunTurn(
   const progress = (stage: TurnProgressStage) =>
     publishThreadEvent(threadId, { kind: "progress", turnId, stage });
 
-  const [context] = await db
-    .select({ thread: threads, specialist: specialists })
-    .from(threads)
-    .leftJoin(specialists, eq(specialists.id, threads.specialistId))
-    .where(eq(threads.id, threadId));
-  if (!context) throw new Error(`Thread ${threadId} not found.`);
+  const [thread] = await db.select().from(threads).where(eq(threads.id, threadId));
+  if (!thread) throw new Error(`Thread ${threadId} not found.`);
 
   const visible = visibleMessages(await threadMessages(threadId));
   const prompt = renderTurnPrompt(visible, trigger);
@@ -335,12 +324,9 @@ async function runBegunTurn(
 
   progress("workspace");
 
-  const role = chooseRole(
-    context.thread,
-    visible.filter((message) => message.role === "user").length,
-  );
+  const role = chooseRole();
   const [place, waiting, arrived, wallets, me] = await Promise.all([
-    context.specialist ? specialistContext(context.specialist) : auniContext(),
+    threadContext(thread),
     waitingCardsContext(threadId),
     arrivalsPromptContext(),
     // A lookup that fails only costs the agent the addresses, never the turn.
@@ -367,8 +353,10 @@ async function runBegunTurn(
     ...(fires ? { fires } : {}),
   };
 
-  const picked = await pickBrain();
+  const selection = thread.modelSelection ?? me.defaultModelSelection;
+  const picked = await pickBrain(selection?.brain);
   const brain = "about" in picked ? picked.about.id : undefined;
+  const sameBrain = brain !== undefined && selection?.brain === brain;
   // No brain could think, and one the owner can make ready from the app would: the web app asks
   // for it there (its sign-in), and sends the message again once one is ready.
   const noBrain = "fixes" in picked && !picked.blocked;
@@ -391,6 +379,8 @@ async function runBegunTurn(
           }),
         ),
         role,
+        ...(sameBrain && selection?.model ? { model: selection.model } : {}),
+        ...(sameBrain && selection?.effort ? { effort: selection.effort } : {}),
         box: await brainBox(),
         // The API serves MCP on this machine; the CLI that calls it runs outside its own sandbox.
         mcp: {

@@ -1,4 +1,4 @@
-import { isNull, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../db/client.ts";
@@ -37,8 +37,7 @@ export async function readingOverdue(): Promise<boolean> {
     .select({
       overdue: sql<boolean>`coalesce(max(${valueSnapshots.takenAt}) < now() - make_interval(hours => ${BACKSTOP_AFTER_HOURS}), true)`,
     })
-    .from(valueSnapshots)
-    .where(isNull(valueSnapshots.specialistId));
+    .from(valueSnapshots);
   return last?.overdue ?? true;
 }
 

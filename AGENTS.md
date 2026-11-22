@@ -60,12 +60,11 @@ One name per thing: the owner (never "the user"), the agent (never a bare "Claud
 - **brain**: the owner's own AI CLI, Claude Code or Codex, on their login (`agent/brain.ts`).
 - **box**: the brain's sandbox, which hides the keys, logins and this machine (`agent/box.ts`).
 - **turn**: one wake of the agent in a thread (`conversation/turn.ts`, run by `jobs/turn.ts`).
-- **thread**: one conversation (`conversation/`); **Auni's chat** is the owner's own with Auni.
-- **specialist**: an agent for one take or role, with its own thread (`specialists/`).
-- **pot**: the money a specialist may use; set to act on its own, it trades within it unasked.
+- **thread**: one conversation (`conversation/`), with optional model/effort choice, working notes,
+  pinning, and **Auto** mode with a dollar **budget** it may spend within unasked (`money/pot.ts`).
 - **card**: what the owner taps; shown only when core sealed it (`agent/card-seal.ts`).
 - **move**: a card that moves money, an action row run once (`money/actions.ts`).
-- **ask**: a card that changes Auni, not money: a specialist, a routine, an app (`asks.ts`).
+- **ask**: a card that changes Auni, not money: thread autonomy, a routine, an app (`asks.ts`).
 - **recipe**: a money tool; `describe` makes its card, `execute` sends it (`money/recipe.ts`).
 - **app**: one outside service, as one folder `apps/<id>/` (never "module"); it only proposes,
   core never names one, and none imports another (`apps/registry.ts`, `eslint.config.mjs`).

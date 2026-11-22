@@ -9,8 +9,8 @@ import { useEffect } from "react";
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { useStartConversation } from "@/components/app/use-start-conversation";
 import { useMoney } from "@/components/money/money-provider";
+import { LogoImage, preloadLogo } from "@/components/brand/marks";
 import { useMe } from "@/components/personalization/use-me";
-import { LogoImage, preloadLogo } from "@/components/specialist/marks";
 import {
   useRefreshStartingPoints,
   useStartingPoints,

@@ -13,13 +13,12 @@ import {
   fills,
   jobs,
   messages,
-  specialists,
   threads,
 } from "../db/schema.ts";
 import { turnKind } from "../jobs/kinds.ts";
 import { readActivity } from "../money/activity.ts";
 import { threadsRouter } from "../routes/threads.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { serve } from "../test/serve.ts";
 import { mainChat, startChat } from "./places.ts";
 import { conversationTools } from "./tools.ts";
@@ -96,22 +95,41 @@ async function watch(threadId: string, status: "active" | "paused" | "triggered"
   return row!;
 }
 
-describe("renaming a chat", () => {
-  it("keeps the owner's name, and leaves a specialist's to its page", async () => {
+describe("renaming and configuring a thread", () => {
+  it("keeps the owner's name, pinning, autonomy budget, and model selection", async () => {
     const thread = await chat("hey");
     expect((await call("PATCH", thread.id, { title: "Nvidia buys" })).status).toBe(200);
     expect((await listed()).find(({ id }) => id === thread.id)?.title).toBe("Nvidia buys");
 
-    const specialist = await insertSpecialist();
-    const its = await chat("Pearl", 5, { specialistId: specialist.id });
-    const refused = await call("PATCH", its.id, { title: "Other" });
-    expect(refused).toMatchObject({ status: 409, body: { error: "specialist_record" } });
+    expect(
+      (
+        await call("PATCH", thread.id, {
+          pinned: true,
+          actMode: "within_limits",
+          budgetUsd: "500",
+          modelSelection: { brain: "claude-code", model: "opus", effort: "high" },
+        })
+      ).status,
+    ).toBe(200);
+    const [updated] = await db.select().from(threads).where(eq(threads.id, thread.id));
+    expect(updated).toMatchObject({
+      actMode: "within_limits",
+      budgetUsd: "500.00",
+      modelSelection: { brain: "claude-code", model: "opus", effort: "high" },
+    });
+    expect(updated?.pinnedAt).toBeInstanceOf(Date);
+
+    expect((await call("PATCH", thread.id, { pinned: false, actMode: "ask_first" })).status).toBe(
+      200,
+    );
+    const [reset] = await db.select().from(threads).where(eq(threads.id, thread.id));
+    expect(reset).toMatchObject({ actMode: "ask_first", pinnedAt: null });
   });
 });
 
 describe("Auni naming a chat", () => {
   const nameChat = (threadId: string, name: string) =>
-    conversationTools({ threadId, specialistId: null })
+    conversationTools({ threadId })
       .find((tool) => tool.name === "name_chat")!
       .handler({ name });
   const titleOf = async (threadId: string) =>
@@ -196,21 +214,6 @@ describe("archiving a chat", () => {
     expect(still?.archivedAt).not.toBeNull();
   });
 
-  it("archives a specialist's chat only once it is retired: archiving is not retiring", async () => {
-    const specialist = await insertSpecialist();
-    const thread = await chat("Pearl", 5, { specialistId: specialist.id });
-    const refused = await call("PATCH", thread.id, { archived: true });
-    expect(refused).toMatchObject({ status: 409, body: { error: "specialist_at_work" } });
-
-    await db
-      .update(specialists)
-      .set({ status: "retired" })
-      .where(eq(specialists.id, specialist.id));
-    expect((await call("PATCH", thread.id, { archived: true })).status).toBe(200);
-    const [still] = await db.select().from(specialists).where(eq(specialists.id, specialist.id));
-    expect(still?.status).toBe("retired");
-  });
-
   it("moves where Auni speaks up unasked (the brief, news) to the latest chat still listed", async () => {
     const older = await chat("How am I doing?", 30);
     const latest = await chat("Buy $250 of Nvidia", 5);
@@ -261,7 +264,14 @@ describe("deleting a chat", () => {
     expect(kept).toHaveLength(3);
     expect(kept.every(({ threadId }) => threadId === null)).toBe(true);
     expect(await db.select().from(fills)).toHaveLength(1);
-    expect(await readActivity(null)).toEqual(before);
+    expect(await readActivity(null)).toEqual({
+      ...before,
+      items: before.items.map((item) => ({
+        ...item,
+        threadId: null,
+        subtitle: item.subtitle.replace("Buy $250 of Nvidia", "Auni"),
+      })),
+    });
   });
 
   it("is refused while a card waits there, or a move is still landing", async () => {
@@ -311,14 +321,5 @@ describe("deleting a chat", () => {
     // Once the turn has run, the chat can go.
     await db.update(jobs).set({ finishedAt: sql`now()`, outcome: "done" });
     expect((await call("DELETE", woken.id)).status).toBe(204);
-  });
-
-  it("never deletes a specialist's chat, retired or not: it is the specialist's record", async () => {
-    const specialist = await insertSpecialist({ status: "retired" });
-    const thread = await chat("Pearl", 5, { specialistId: specialist.id });
-    expect(await call("DELETE", thread.id)).toMatchObject({
-      status: 409,
-      body: { error: "specialist_record" },
-    });
   });
 });

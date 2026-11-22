@@ -88,7 +88,7 @@ export function flowsOf(fills: readonly FillFlow[]): Flow[] {
 export async function fillsWithLeverage(where?: SQL) {
   const rows = await db
     .select({
-      specialistId: fills.specialistId,
+      threadId: fills.threadId,
       side: fills.side,
       usdValue: fills.usdValue,
       quantity: fills.quantity,

@@ -1,9 +1,4 @@
-import { and, desc, ilike, isNull } from "drizzle-orm";
-
 import type { BrainEvent } from "../apps/contract.ts";
-import { db } from "../db/client.ts";
-import { threads } from "../db/schema.ts";
-import { wakeThread } from "../jobs/kinds.ts";
 import type { Stage } from "./brain.ts";
 
 // The tour: a walk through everything Auni does, in about ten minutes, which a person follows by
@@ -13,7 +8,7 @@ import type { Stage } from "./brain.ts";
 // the next thing is always one tap away. What the tap says is what an owner would type, so the
 // scene it plays is the real one (scenes.ts): the tour only adds its words around it.
 //
-// Where a thread stands on the tour is read from the thread itself: the last "Stop 3 of 13" the
+// Where a thread stands on the tour is read from the thread itself: the last "Stop 3 of 12" the
 // brain said there. So the tour keeps nothing of its own, a person can walk off and come back,
 // and a second tour starts from its first stop.
 //
@@ -47,10 +42,6 @@ interface Stop {
   readonly reply?: string;
   /** The reply only says they have looked: no scene plays for it, and the tour goes on. */
   readonly looked?: true;
-  /** Said in a thread the tour passes through (a specialist's), not in its own chat. */
-  readonly away?: true;
-  /** What such a thread is woken with, which starts the tour there at this stop. */
-  readonly opens?: RegExp;
   /** Speaks of what the stop before it left on the screen, so a skip of that one passes it too. */
   readonly follows?: true;
   readonly beats?: readonly Beat[];
@@ -69,17 +60,8 @@ export const TOUR_POINT = {
   facts: [1],
 };
 
-/** What the take the tour starts tells its specialist, so the tour carries on in its thread. */
-export const ON_TOUR = "They are on the demo's tour.";
-
 /** An event core wakes a thread with, by words of it. */
 const event = (words: string) => new RegExp(`Background event:[^]*${words}`, "u");
-
-/** Where the way back goes in a stop said away from the tour's chat: filled in as it is said. */
-const HOME = "{the tour's chat}";
-
-/** The way back from a thread the tour passes through: one tap, to where the next stop waits. */
-const BACK = `The next stop is waiting in my own chat: [back to the tour](${HOME}).`;
 
 const STOPS: readonly Stop[] = [
   {
@@ -89,19 +71,11 @@ const STOPS: readonly Stop[] = [
     beats: [{ hears: REPLY, on: true }],
   },
   {
-    title: "A first card",
+    title: "The plan card",
     follows: true,
     does:
-      "This card changes me, not your money. It starts a specialist for this one view, with a pot it can never spend past, which asks you before every move. Tap **Start with $1,500**, then **Open**.\n\n" +
-      "Before I answered I looked both stocks up and read your cash. Scroll up and tap **Worked for** to see it.",
-  },
-  {
-    title: "The plan card",
-    away: true,
-    opens: /The owner just started you[^]*on the demo's tour/u,
-    does:
-      "This page is the specialist's own, and the card is its plan. I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money.\n\n" +
-      "Tap a row to see why it is there. Then tap **Start with $1,350** and watch each row land.",
+      "I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money. Before answering I looked both stocks up and read your cash. Scroll up and tap **Worked for** to see it.\n\n" +
+      "Tap a row to see why it is there. Then tap **Buy both for $1,350** and watch each buy land.",
     beats: [
       {
         hears: event("finished as done"),
@@ -111,17 +85,17 @@ const STOPS: readonly Stop[] = [
       },
       {
         hears: event("The owner declined"),
-        notice: `Nothing was bought, and the specialist's pot is untouched. ${BACK}`,
+        notice: "Nothing was bought, and your cash is untouched.",
         past: true,
       },
     ],
   },
   {
-    title: "The position",
-    away: true,
-    does:
-      "This page now holds the position: its pot, what it owns and its record, beside this chat or, on a small screen, behind its value at the top. From here the specialist keeps watching the view, and comes back to you with a card when it would change something.\n\n" +
-      BACK,
+    title: "This thread's panel",
+    follows: true,
+    does: "Everything tied to this thread sits beside the chat: the positions opened here, its notes, watches, and its record. You can also switch any thread between **Ask first** and **Auto** within a dollar budget from the strip under the box.",
+    reply: "I see the panel",
+    looked: true,
   },
   {
     title: "A watch",
@@ -203,8 +177,8 @@ const STOPS: readonly Stop[] = [
   },
   {
     title: "Your money",
-    does: "Open [Portfolio](/app). One number for everything, wherever it sits. **Needs you** lists every card still waiting for a tap, and the new specialist is there among the others.",
-    reply: "I found Peptides there",
+    does: "Open [Portfolio](/app). One number for everything, wherever it sits. **Needs you** lists every card still waiting for a tap, and Eli Lilly and Novo Nordisk sit right there in your holdings.",
+    reply: "I found them there",
     looked: true,
   },
   {
@@ -233,8 +207,8 @@ const AFTER: readonly { readonly reply: string; readonly says: string }[] = [
     says: "Every card still waiting for your tap is under **Needs you** on [Portfolio](/app). Open one, read it, and allow it or turn it down: either way you see what a real one does.",
   },
   {
-    reply: "Show me a specialist",
-    says: "Each has a page of its own, under **Team**. AI buildout is a good first one: it acts on its own within its pot, so its record shows moves nobody had to tap.",
+    reply: "Show me an Auto thread",
+    says: "Open **AI buildout** in the sidebar. It is set to act on its own within a $4,000 budget, with its positions, notes and budget bar right in the panel beside the chat.",
   },
   {
     reply: "How do I run it for real?",
@@ -254,12 +228,6 @@ function stopOf(before: readonly string[]): number | null {
   const last = [...before.join("\n").matchAll(/Stop (\d+) of \d+\.|That is the tour\./gu)].at(-1);
   if (!last) return null;
   return last[1] ? Number(last[1]) : STOPS.length + 1;
-}
-
-/** Whether a thread is on the tour: a scene that hands on to another thread says so there. */
-export function touring(stage: Stage): boolean {
-  const at = stopOf(stage.before);
-  return at !== null && at <= STOPS.length;
 }
 
 /** Whether words start a tour, however they are capitalised. */
@@ -286,36 +254,12 @@ async function* offer(stage: Stage, replies: readonly string[]): AsyncGenerator<
 /** Docks a stop's reply, with a way past it. */
 const dock = (stage: Stage, number: number) => offer(stage, [replyFor(number), SKIP]);
 
-/** The tour's own chat: the newest that began with its start. */
-async function home(): Promise<string | undefined> {
-  const [found] = await db
-    .select({ id: threads.id })
-    .from(threads)
-    .where(and(ilike(threads.title, `${START}%`), isNull(threads.specialistId)))
-    .orderBy(desc(threads.updatedAt))
-    .limit(1);
-  return found?.id;
-}
-
-/** Wakes the tour's chat, so it says the stop the tour has reached somewhere else. */
-async function goHome(number: number): Promise<void> {
-  const chat = await home();
-  if (chat) await wakeThread(chat, `The demo's tour carries on at stop ${number}.`);
-}
-
-/** Words as they are said: the way back to the tour's own chat given that chat's address. */
-async function placed(words: string): Promise<string> {
-  if (!words.includes(HOME)) return words;
-  const chat = await home();
-  return words.replaceAll(HOME, chat ? `/app/chat/${chat}` : "/app");
-}
-
 /**
- * The stop a skip of this one leads to: the next said in the tour's chat that needs nothing a
+ * The stop a skip of this one leads to: the next that needs nothing a
  * stop before it left on the screen, or one past the last.
  */
 function pastStop(at: number): number {
-  const next = STOPS.findIndex(({ away, follows }, index) => index >= at && !away && !follows);
+  const next = STOPS.findIndex(({ follows }, index) => index >= at && !follows);
   return next < 0 ? STOPS.length + 1 : next + 1;
 }
 
@@ -328,16 +272,12 @@ async function* end(stage: Stage): AsyncGenerator<BrainEvent> {
   yield* stage.say(END);
 }
 
-/** Says a stop, and docks its reply where the tour's own chat is the one hearing it. */
-async function* arrive(stage: Stage, number: number, isHome: boolean): AsyncGenerator<BrainEvent> {
+/** Says a stop, and docks its reply when it has one. */
+async function* arrive(stage: Stage, number: number): AsyncGenerator<BrainEvent> {
   const stop = STOPS[number - 1];
-  // A stop of the tour's own chat, reached in a thread it passes through, is said back there.
-  if (!isHome && !stop?.away) return void (await goHome(number));
   if (!stop) return yield* end(stage);
-  if (isHome && stop.reply) yield* dock(stage, number);
-  yield* stage.say(await placed(caption(number, stop)));
-  // The last stop said in a thread the tour passes through: the rest are back in its chat.
-  if (!isHome && !STOPS[number]?.away) await goHome(number + 1);
+  if (stop.reply) yield* dock(stage, number);
+  yield* stage.say(caption(number, stop));
 }
 
 /**
@@ -348,22 +288,14 @@ export async function* tour(stage: Stage, scene: Play): AsyncGenerator<BrainEven
   const { heard, before } = stage;
   if (before.length === 0 && starts(heard)) {
     yield* stage.say(WELCOME);
-    return yield* arrive(stage, 1, true);
-  }
-  const carriesOn = /The demo's tour carries on at stop (\d+)/u.exec(heard);
-  if (carriesOn) return yield* arrive(stage, Number(carriesOn[1]), true);
-  const opened = STOPS.findIndex(({ opens }) => opens?.test(heard));
-  if (opened >= 0) {
-    if (yield* scene(stage)) yield* arrive(stage, opened + 1, false);
-    return;
+    return yield* arrive(stage, 1);
   }
 
   const at = stopOf(before);
-  if (at === null) return void (yield* scene(stage));
-  const isHome = wasStarted(before);
+  if (at === null || !wasStarted(before)) return void (yield* scene(stage));
   if (at > STOPS.length) {
     // Over, its chat is a chat like any other, but for the things its last words offered.
-    const next = isHome ? AFTER.find(({ reply }) => reply === heard) : undefined;
+    const next = AFTER.find(({ reply }) => reply === heard);
     if (!next) return void (yield* scene(stage));
     // Docked again are those not yet asked, so the one to tap is never the one just answered.
     const asked = (reply: string) =>
@@ -375,16 +307,16 @@ export async function* tour(stage: Stage, scene: Play): AsyncGenerator<BrainEven
   const stop = STOPS[at - 1]!;
   // A tap that says they have looked goes on to the next stop. A skip also passes the stops
   // that follow from this one.
-  if (isHome && stop.looked && heard === stop.reply) return yield* arrive(stage, at + 1, true);
-  if (isHome && /^(skip|next)\b/iu.test(heard)) return yield* arrive(stage, pastStop(at), true);
+  if (stop.looked && heard === stop.reply) return yield* arrive(stage, at + 1);
+  if (/^(skip|next)\b/iu.test(heard)) return yield* arrive(stage, pastStop(at));
   // A scene a tool cut short has shown nothing for the tour to speak of.
   const played = yield* scene(stage);
   const beat = played
     ? stop.beats?.find(({ hears }) => (hears === REPLY ? heard === stop.reply : hears.test(heard)))
     : undefined;
-  if (beat?.notice) yield* stage.say(await placed(beat.notice));
-  if (beat?.on) yield* arrive(stage, at + 1, isHome);
-  else if (beat?.past) yield* arrive(stage, pastStop(at), isHome);
+  if (beat?.notice) yield* stage.say(beat.notice);
+  if (beat?.on) yield* arrive(stage, at + 1);
+  else if (beat?.past) yield* arrive(stage, pastStop(at));
   // Anything else said in the tour's chat is answered, and the stop's reply docked again.
-  else if (!beat && isHome) yield* dock(stage, at);
+  else if (!beat) yield* dock(stage, at);
 }

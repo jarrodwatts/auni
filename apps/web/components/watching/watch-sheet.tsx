@@ -3,8 +3,8 @@
 import type { AutomationFireWire, AutomationWire } from "@auni/shared";
 import { Trash2 } from "lucide-react";
 
+import { useThreads } from "@/components/app/use-threads";
 import { Mascot } from "@/components/brand/mascot";
-import { useSpecialists } from "@/components/specialist/use-specialists";
 import { AuniSheet } from "@/components/ui/auni-sheet";
 import { Switch } from "@/components/ui/switch";
 import type { WatchScope } from "@/lib/data/automations";
@@ -62,8 +62,7 @@ export function WatchSheet({
   const wide = useMediaQuery("(min-width: 1024px)");
   const watches = useWatches(scope).data ?? [];
   const fires = useWatchFires(scope, open).data ?? [];
-  const specialistId = watches[0]?.specialistId;
-  const specialist = useSpecialists().data?.find(({ id }) => id === specialistId);
+  const thread = useThreads().threads.find(({ id }) => id === scope.threadId);
   const live = liveWatches(watches);
   const on = live.filter(({ status }) => status === "active").length;
   const shown = watches.filter((watch) => live.includes(watch) || watch.status === "failed");
@@ -88,9 +87,7 @@ export function WatchSheet({
           {on > 0 ? `Watching ${things(on)}` : "Not watching right now"}
         </h2>
         <p className="mt-1 px-1 text-[14.5px] text-muted-foreground">
-          {specialist ? (
-            <span className="block font-medium text-ink">{specialist.purpose}</span>
-          ) : null}
+          {thread ? <span className="block font-medium text-ink">{thread.title}</span> : null}
           {spokeThisMonth(fires)}
         </p>
 

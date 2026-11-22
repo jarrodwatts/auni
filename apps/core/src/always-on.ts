@@ -574,13 +574,18 @@ export async function reachFindings(): Promise<ReachFinding[]> {
   ];
 }
 
-/** How the owner reaches Auni, as Settings shows it (`GET /me`). */
+/** How the owner reaches Auni, as the environment switcher and Settings show it (`GET /me`). */
 export async function reachWire(): Promise<Me["reach"]> {
   const { stays, laptop, says } = await staysOn();
+  const tailscaleName =
+    env.TAILSCALE_OWNER && URL.canParse(env.WEB_ORIGIN)
+      ? new URL(env.WEB_ORIGIN).hostname.split(".")[0]
+      : null;
   return {
     through: env.TAILSCALE_OWNER ? "tailscale" : "this-computer",
     address: env.WEB_ORIGIN,
     owner: env.TAILSCALE_OWNER ?? null,
+    machine: tailscaleName || hostname().split(".")[0] || "this computer",
     staysOn: { stays, laptop, says },
   };
 }

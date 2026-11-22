@@ -51,16 +51,14 @@ export interface Recipe<Shape extends ZodRawShape = ZodRawShape> {
    * swap's. Without one it wears Auni's. An app's move names none: its card wears its app's.
    */
   readonly mark?: "stocks" | "swap";
-  /** The specialist a call names for itself, whatever thread asks; such a call is its own card. */
-  filesUnder?(input: z.infer<z.ZodObject<Shape>>): string | undefined;
   /** Sends nothing: execute changes only Auni's records, at once, so one left running moved nothing. */
   readonly offChain?: true;
   /**
-   * Which way the call moves a specialist's money, for acting on its own:
+   * Which way the call moves money, for a thread acting on its own within a budget:
    * "buy" puts amountUsd of its cash into a holding, "sell" turns a holding
    * back into cash (the preview's `sells` names which). Absent or null for
    * anything else, which always asks: moving cash between accounts, swapping
-   * one holding for another, and leveraged perps, since a pot can budget none
+   * one holding for another, and leveraged perps, since a budget can weigh none
    * of them.
    */
   direction?(input: z.infer<z.ZodObject<Shape>>): "buy" | "sell" | null;
@@ -68,7 +66,6 @@ export interface Recipe<Shape extends ZodRawShape = ZodRawShape> {
   describe(
     input: z.infer<z.ZodObject<Shape>>,
     context: {
-      readonly specialistHolds?: SpecialistHolds;
       /**
        * The card a failed step was approved at, when it is priced again for a
        * retry: a recipe whose execute holds its price to that card describes
@@ -334,18 +331,9 @@ export interface Sale extends FillKey {
   readonly quantity: string;
 }
 
-/**
- * What the specialist a move is for holds by its own fills, keyed by
- * `fillIdentity` in `QUANTITY_DECIMALS` units; absent outside a specialist.
- * A sell naming no amount sells only this, so one specialist's "everything"
- * never takes another's shares of the same token unseen.
- */
-export type SpecialistHolds = ReadonlyMap<string, bigint>;
-
 interface ExecuteContext<Input> {
   readonly action: ActionRow;
   readonly input: Input;
-  readonly specialistHolds?: SpecialistHolds;
   /** Signs and sends with the owner's wallet, through the wallet app. */
   readonly wallets: Signer;
   /**

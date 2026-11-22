@@ -1,5 +1,6 @@
 import type {
   ActionToolName,
+  BrainModelWire,
   EvmChainKey,
   AppAbout,
   FailureKind,
@@ -906,9 +907,14 @@ export type BrainCheck =
   /**
    * `login` names the credential, as the owner knows it: "your Claude Max subscription", and
    * `signedInAs` the account, where the CLI names one (an email), which only the owner's screens
-   * show, never the agent.
+   * show, never the agent. `models` lists the models and reasoning efforts this brain offers.
    */
-  | { readonly ready: true; readonly login: string; readonly signedInAs?: string }
+  | {
+      readonly ready: true;
+      readonly login: string;
+      readonly signedInAs?: string;
+      readonly models?: readonly BrainModelWire[];
+    }
   /**
    * Why it can't think yet: its CLI (or what its box needs) isn't installed, the owner isn't
    * signed in, the sign-in it keeps has expired, or it fails some other way. `fix` is the
@@ -923,6 +929,10 @@ export interface BrainTurn {
   /** The history, one block per message, then this turn's context and message. */
   readonly prompt: readonly string[];
   readonly role: Role;
+  /** Explicit model chosen by the owner for this thread; falls back to `role` when unset. */
+  readonly model?: string;
+  /** Explicit reasoning effort chosen by the owner for this thread; falls back to `role` when unset. */
+  readonly effort?: string;
   /** What the brain's tools may touch on this machine. */
   readonly box: Box;
   /** Auni's tools: core's MCP server and this turn's token for it; null for no tools at all. */

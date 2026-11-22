@@ -1,5 +1,5 @@
 import { RAW_TRANSACTION_TOOLS, type actionWireSchema } from "@auni/shared";
-import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { toolInput } from "../agent/tool.ts";
@@ -7,7 +7,7 @@ import { appById, closedHere } from "../apps/registry.ts";
 import { applyAsk, isAsk } from "../asks.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
-import { actions, specialists, threads, type ActionRow } from "../db/schema.ts";
+import { actions, threads, type ActionRow } from "../db/schema.ts";
 import { actionKind, wakeThread } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";
@@ -27,13 +27,11 @@ import { shownHoldings } from "./raw-transaction.ts";
 import { heldNow } from "./portfolio.ts";
 import { recordOwnFills } from "./statements.ts";
 import { assertStepUp } from "./step-up.ts";
-import { specialistFills, specialistPot, lockCards } from "./pot.ts";
-import { walkPositions } from "./books.ts";
+import { lockCards, threadPot } from "./pot.ts";
 import {
   MayHaveSent,
   NothingMoved,
   type ActionPreview,
-  type SpecialistHolds,
   type ExecuteResult,
   type KeptTx,
   type Later,
@@ -44,13 +42,6 @@ import { recipeForTool, toolRecipe } from "./recipes/index.ts";
 import { Refused } from "./refused.ts";
 import { replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
 import { errorWords } from "../safe-words.ts";
-import {
-  createSpecialist,
-  outdatePulse,
-  retireUnstartedTakes,
-  specialistRetired,
-  type SpecialistStart,
-} from "../specialists/specialists.ts";
 import { settleFromReceipts } from "./reconcile.ts";
 import {
   dropMark,
@@ -70,26 +61,17 @@ import { normalizeUsd, parseUnits } from "./usd.ts";
 import { signerFor } from "./wallets.ts";
 import { chainKey } from "./chains.ts";
 
-interface ActionContext {
+export interface ActionContext {
   /** Null for a move started outside every conversation (a withdrawal from Settings). */
   readonly threadId: string | null;
-  readonly specialistId: string | null;
-}
-
-/** Moves that begin a new take, made with them (propose_specialist_portfolio's take). */
-interface NewTakeContext {
-  readonly threadId: string;
-  readonly starts: SpecialistStart;
 }
 
 interface ProposeOutcome {
-  /** Running: its specialist acts on its own, and its job is queued to run it. */
+  /** Running: its thread acts on its own within its budget, and its job is queued to run it. */
   readonly status: "awaiting_permission" | "running";
   readonly action: ActionRow;
   /** The waiting cards it took the place of (see replaceCards). */
   readonly replaced: readonly WaitingCard[];
-  /** What the preview said it sells, so its card can say whose holding that is. */
-  readonly sells: ActionPreview["sells"];
 }
 
 /** A recipe call checked and priced, not yet recorded. */
@@ -107,7 +89,7 @@ export function plannedCash({ recipe, input, preview }: PreparedLeg) {
 /**
  * Refuses a card that can't go through for the cash where it spends, before
  * the person sees it, telling the agent what's short so it can bring their cash
- * from wherever else it sits.
+ * from wherever else it sits or use propose_actions so the card offers Add money.
  */
 export async function mustBePaid(legs: readonly ReturnType<typeof plannedCash>[]): Promise<void> {
   const short = await unpaid(legs);
@@ -116,27 +98,19 @@ export async function mustBePaid(legs: readonly ReturnType<typeof plannedCash>[]
     `Nothing was recorded, and the owner saw nothing: ${short}. Money still on its way there ` +
       "counts once it lands. Cash they hold elsewhere can pay for it on the same card: " +
       "propose_actions with the moves that bring it first (get_portfolio shows where it sits), " +
-      "which also pays with what they hold that came in as a deposit, or tell them what's short.",
+      "which also converts eligible holdings or shows an Add money button when cash is short.",
   );
 }
 
 export async function prepareLeg(
   recipe: Recipe,
   rawInput: unknown,
-  {
-    specialistId,
-    heldTo,
-  }: Pick<ActionContext, "specialistId"> & {
-    readonly heldTo?: Pick<ActionRow, "details">;
-  },
+  { heldTo }: { readonly heldTo?: Pick<ActionRow, "details"> } = {},
 ): Promise<PreparedLeg> {
   const input = toolInput(recipe.input).parse(rawInput);
   const closed = await buyClosedHere(recipe, input);
   if (closed) throw new Error(closed);
-  const described = await recipe.describe(input, {
-    specialistHolds: await specialistHolds(specialistId),
-    heldTo,
-  });
+  const described = await recipe.describe(input, { heldTo });
   // Where the wallet is short of the chain's coin for what the card would send, the card buys
   // it first, or there is no card (see fee-coin.ts). A move pins one purchase, so that coin
   // takes the place of any SOL it buys, which another move on its card then buys for it, or
@@ -197,23 +171,14 @@ export async function keepingFees(legs: readonly PreparedLeg[]): Promise<Prepare
 /** The stage a leg runs in, by its cash, as buying a card's SOL once weighs it. */
 const solStage = (leg: PreparedLeg) => stageOf(plannedCash(leg));
 
-/** What a specialist holds by its own fills, for a sell naming no amount; absent outside one. */
-async function specialistHolds(specialistId: string | null): Promise<SpecialistHolds | undefined> {
-  if (!specialistId) return undefined;
-  const { positions } = walkPositions(await specialistFills(db, specialistId));
-  return new Map([...positions].map(([key, { quantity }]) => [key, quantity]));
-}
-
 /**
  * Checks and prices every leg of a card one tap allows, one at a time: venue
- * quote APIs (a Solana route's) rate-limit a burst of parallel quotes. Money leaving
- * the owner, a move that can need the owner's proof, and one filed under a
- * specialist it names are each their own card, never a leg. Problems name each leg that can't go,
- * by its label.
+ * quote APIs (a Solana route's) rate-limit a burst of parallel quotes. Money
+ * leaving the owner or a move that can need the owner's proof is its own card,
+ * never a leg. Problems name each leg that can't go, by its label.
  */
 export async function prepareLegs(
   legs: readonly { readonly tool: string; readonly input: unknown; readonly label: string }[],
-  context: Pick<ActionContext, "specialistId">,
 ): Promise<{ prepared: PreparedLeg[]; problems: string[] }> {
   const prepared: PreparedLeg[] = [];
   const problems: string[] = [];
@@ -221,9 +186,7 @@ export async function prepareLegs(
     try {
       const recipe = toolRecipe(leg.tool);
       if (!recipe) throw new Error(`${leg.tool} is not a money tool.`);
-      if (recipe.filesUnder)
-        throw new Error(`This one is its own card: call ${recipe.tool} on its own.`);
-      const ready = await prepareLeg(recipe, leg.input, context);
+      const ready = await prepareLeg(recipe, leg.input);
       // A card's one Allow carries no proof for a leg, so a leg that could need one is its own card.
       if (approval(ready.preview.effect, []).kind !== "tap")
         throw new Error(
@@ -240,11 +203,10 @@ export async function prepareLegs(
 }
 
 /**
- * Records a recipe call as an action, under the specialist it names or else
- * the thread's, and applies the permission gate. Unless a specialist's rules
- * let it act on its own, in its own thread, the row waits for the owner's
- * Allow. Otherwise its job is queued with it, and the thread is woken once it
- * settles.
+ * Records a recipe call as an action and applies the permission gate. Unless
+ * the thread is set to act on its own within a budget that fits, the row waits
+ * for the owner's Allow. Otherwise its job is queued with it, and the thread
+ * is woken once it settles.
  */
 export async function proposeAction(
   context: ActionContext,
@@ -252,21 +214,14 @@ export async function proposeAction(
   rawInput: unknown,
   replaces?: readonly string[],
 ): Promise<ProposeOutcome> {
-  const prepared = await prepareLeg(recipe, rawInput, context);
+  const prepared = await prepareLeg(recipe, rawInput);
   const [leg = prepared] = await keepingFees([prepared]);
   await mustBePaid([plannedCash(leg)]);
-  const { sells } = leg.preview;
-  const specialistId = recipe.filesUnder?.(leg.input) ?? context.specialistId;
-  const { rows, replaced } = await recordActions(
-    { ...context, specialistId },
-    [leg],
-    null,
-    replaces,
-  );
+  const { rows, replaced } = await recordActions(context, [leg], null, replaces);
   const [action] = rows;
   if (!action) throw new Error("Failed to record the action.");
   const status = action.status === "awaiting_permission" ? action.status : "running";
-  return { status, action, replaced, sells };
+  return { status, action, replaced };
 }
 
 /**
@@ -275,44 +230,34 @@ export async function proposeAction(
  * Running legs are queued in the same transaction, a proposal's first stage
  * or a lone move, so a move that runs always has a job. The cards of this
  * thread the agent names in `replaces` are replaced, which it must say while
- * any wait (see replaceCards), and so are a specialist's older proposals anywhere.
+ * any wait (see replaceCards).
  */
 export async function recordActions(
-  context: ActionContext | NewTakeContext,
+  context: ActionContext,
   legs: readonly PreparedLeg[],
   proposalId: string | null,
   replaces?: readonly string[],
 ): Promise<{ rows: ActionRow[]; replaced: WaitingCard[] }> {
   return db.transaction(async (tx) => {
     await lockCards(tx);
-    const filedUnder =
-      "starts" in context ? await createSpecialist(tx, context.starts) : context.specialistId;
-    // The lock serializes a specialist's gate checks, so two plans acting on
-    // their own can't both spend the same free cash.
-    const [specialist] = filedUnder
-      ? await tx.select().from(specialists).where(eq(specialists.id, filedUnder)).for("update")
-      : [];
-    if (filedUnder && !specialist) throw new Error("Specialist not found.");
-    const specialistId = specialist?.id ?? null;
+    // Lock the thread row so two plans in an auto thread can't both spend its free cash.
     const [thread] = context.threadId
       ? await tx
-          .select({ id: threads.id, specialistId: threads.specialistId })
+          .select()
           .from(threads)
           .where(eq(threads.id, context.threadId))
+          .for("update")
       : [];
-    // Read under the lock: a specialist retired since the caller read it never moves without a tap.
-    // It acts on its own only in its own thread: a move another thread files under it (Auni's
-    // chat, or another specialist's) asks, as every move there does.
     const actsOnItsOwn =
-      specialist?.status !== "retired" &&
-      specialist?.actMode === "within_limits" &&
-      thread?.specialistId === specialist.id;
+      thread?.archivedAt === null &&
+      thread.actMode === "within_limits" &&
+      Number(thread.budgetUsd) > 0;
     const decision = permissionDecision({
-      specialist: specialist
+      thread: thread
         ? {
             actsOnItsOwn,
             ...(actsOnItsOwn
-              ? await specialistPot(tx, specialist)
+              ? await threadPot(tx, thread)
               : { freeCashCents: 0n, holds: new Map<string, bigint>() }),
           }
         : null,
@@ -326,21 +271,12 @@ export async function recordActions(
       })),
     });
     const runs = decision === "run";
-    const replaced = await replaceCards(
-      tx,
-      thread?.id ?? null,
-      replaces,
-      // A specialist has one plan on offer.
-      proposalId && specialistId
-        ? and(eq(actions.specialistId, specialistId), isNotNull(actions.proposalId))
-        : undefined,
-    );
+    const replaced = await replaceCards(tx, thread?.id ?? null, replaces, undefined);
     const rows = await tx
       .insert(actions)
       .values(
         legs.map((leg) => ({
           threadId: context.threadId,
-          specialistId,
           proposalId,
           summary: leg.preview.summary,
           amountUsd: leg.preview.amountUsd,
@@ -434,7 +370,7 @@ export async function executeAction(actionId: string): Promise<ActionRow> {
       recordSent,
       draws ? { chain: draws, usdc: parseUnits(claimed.amountUsd, 6) } : null,
     );
-    // Read just before a sale, so it is written to whoever held what it sold.
+    // Read just before a sale, so it is written to whichever thread held what it sold.
     const readAt = Date.now();
     const units = sale ? await heldNow(sale) : null;
     heldBefore = units === null ? null : { units, readAt };
@@ -444,7 +380,6 @@ export async function executeAction(actionId: string): Promise<ActionRow> {
       wallets,
       recordSent,
       posting,
-      specialistHolds: await specialistHolds(claimed.specialistId),
     });
   } catch (error) {
     const kind = failureKind(error);
@@ -500,36 +435,6 @@ export async function proposalActions(
     .orderBy(actions.createdAt);
 }
 
-/** A leg that puts money into something: not a cash move, a sell, or a free change like stops. */
-function invests(row: Pick<ActionRow, "tool" | "input" | "amountUsd">): boolean {
-  const recipe = recipeForTool(row.tool);
-  const input = row.input as never;
-  return (
-    Number(row.amountUsd) > 0 && !recipe?.readies?.(input) && recipe?.direction?.(input) !== "sell"
-  );
-}
-
-/**
- * Whether a proposal is its specialist's first money in: it buys something,
- * and no other card of that specialist ever bought anything. Two cards
- * running at once can't both claim it: whichever lands second sees the first.
- */
-export async function opensSpecialist(legs: readonly ActionRow[]): Promise<boolean> {
-  const [first] = legs;
-  if (!first?.specialistId || !first.proposalId || !legs.some(invests)) return false;
-  const others = await db
-    .select({ tool: actions.tool, input: actions.input, amountUsd: actions.amountUsd })
-    .from(actions)
-    .where(
-      and(
-        eq(actions.specialistId, first.specialistId),
-        eq(actions.status, "done"),
-        or(isNull(actions.proposalId), ne(actions.proposalId, first.proposalId)),
-      ),
-    );
-  return !others.some(invests);
-}
-
 /** One action, or every leg of one proposal card. */
 type ActionTarget = { readonly actionId: string } | { readonly proposalId: string };
 
@@ -538,16 +443,13 @@ type ActionTarget = { readonly actionId: string } | { readonly proposalId: strin
  * Rows no longer waiting are left alone, so a repeated tap moves nothing.
  * Allowed rows are queued in the same transaction (a proposal's first stage),
  * so an allowed move is never left running with nothing to run it; declined
- * ones wake their thread in it, so the agent always hears of a no. Allowing a
- * buy into a retired specialist brings it back; selling what it still holds leaves
- * it retired.
+ * ones wake their thread in it, so the agent always hears of a no.
  */
 export async function decideActions(
   target: ActionTarget,
   decision: "allow" | "decline",
 ): Promise<ActionRow[]> {
   let stale: string[] = [];
-  let retired: { readonly id: string; readonly name: string }[] = [];
   const rows = await db.transaction(async (tx) => {
     // A card past its day is taken back first, so no tap allows one (see retractStale).
     stale = await retractStale(tx);
@@ -558,19 +460,6 @@ export async function decideActions(
         ? eq(actions.id, target.actionId)
         : eq(actions.proposalId, target.proposalId),
     );
-    const buyingInto = decided.flatMap((row) =>
-      decision === "allow" &&
-      row.specialistId &&
-      recipeForTool(row.tool)?.direction?.(row.input) === "buy"
-        ? [row.specialistId]
-        : [],
-    );
-    // An allowed buy into a retired specialist brings it back, and its report no longer stands.
-    if (buyingInto.length > 0)
-      await tx
-        .update(specialists)
-        .set({ status: "active", retiredAt: null, report: null })
-        .where(and(inArray(specialists.id, buyingInto), eq(specialists.status, "retired")));
     if (decision === "allow") {
       // An ask is one row, applied as it's allowed: nothing to queue, nothing left running.
       const [ask] = decided.filter((row) => isAsk(row.tool));
@@ -578,12 +467,10 @@ export async function decideActions(
       if ("proposalId" in target) await startProposal(tx, decided);
       else await queueExecution(tx, decided);
     } else {
-      retired = await retireUnstartedTakes(tx, decided);
-      await wakeOnDecline(tx, target, decided, retired);
+      await wakeOnDecline(tx, target, decided);
     }
     return decided;
   });
-  for (const { id } of retired) await specialistRetired(id);
   // The thread stops needing the owner the moment its last waiting row moves.
   const threadIds = new Set([...stale, ...rows.flatMap((row) => row.threadId ?? [])]);
   await Promise.all([...threadIds].map(publishThread));
@@ -595,22 +482,16 @@ async function wakeOnDecline(
   tx: Tx,
   target: ActionTarget,
   declined: readonly ActionRow[],
-  retired: readonly { readonly name: string }[],
 ): Promise<void> {
   const [first] = declined;
   if (!first?.threadId) return;
-  const said =
+  const reason =
     "actionId" in target
       ? `The owner declined action ${first.id} (${first.summary}).`
       : `The owner declined proposal ${target.proposalId}: ${declined.map((row) => row.summary).join("; ")}.`.slice(
           0,
           2_000,
         );
-  const reason = [
-    said,
-    ...retired.map(({ name }) => `The take ${name} had nothing else, so it is retired with it.`),
-  ].join(" ");
-  await outdatePulse(tx, first.threadId);
   await wakeThread(first.threadId, reason, { tx });
 }
 
@@ -621,8 +502,7 @@ async function wakeOnDecline(
  * perps order sets its market's leverage before it places. Core's own moves
  * name theirs (see Recipe.lane): stock trades on Monad, since each sets an
  * exact allowance and reads what it got from the wallet's balance, which
- * another trade at the same time would upset; and moves of holdings between
- * specialists, each weighing what is held where. Everything else runs in its
+ * another trade at the same time would upset. Everything else runs in its
  * own lane, its id. An app's id is never another lane's (a uuid, or one with a
  * prefix such as `holding:` or `thread:`).
  */
@@ -659,7 +539,7 @@ export function executionKeys(
 
 /**
  * The holdings a recorded move trades, by what its card showed: the sale it
- * shows, which is written to whoever held what it sold (see soldHolding);
+ * shows, which is written to whichever thread held what it sold (see soldHolding);
  * what a raw transaction sends, by its simulation, which isn't; and what
  * it's about, or what a raw transaction gets. Its lanes take the first of
  * each (see executionKeys).
@@ -834,7 +714,6 @@ export function actionWire(row: ActionRow): z.input<typeof actionWireSchema> {
   return {
     id: row.id,
     threadId: row.threadId,
-    specialistId: row.specialistId,
     proposalId: row.proposalId,
     status: row.status,
     phase: row.phase,

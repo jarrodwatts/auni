@@ -3,12 +3,12 @@ import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, specialists, fills, messages, threads } from "../db/schema.ts";
+import { actions, fills, messages, threads } from "../db/schema.ts";
 import type { Account, Payout } from "../apps/contract.ts";
 import { standIn } from "../apps/registry.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import type { FillKey } from "./fill-key.ts";
-import { specialistFlows, madeUsd } from "./made.ts";
+import { madeUsd, walletFlows } from "./made.ts";
 import { readActivity } from "./activity.ts";
 import { payoutSweeps } from "./payouts.ts";
 
@@ -44,7 +44,7 @@ beforeAll(() =>
 afterAll(() => standIn((real) => real));
 
 beforeEach(async () => {
-  await wipe(specialists, actions, fills, messages, threads);
+  await wipe(actions, fills, messages, threads);
   market.paid = [];
   market.payouts.mockReset();
   market.payouts.mockImplementation(
@@ -62,30 +62,28 @@ function paying(paidMicros: bigint, shares: Payout["markets"][number]["shares"])
   ];
 }
 
-/** A done buy at the market, filled for `specialistId` or loose. */
+/** A done buy at the market, filled for `threadId` or loose. */
 async function bought(
-  specialistId: string | null,
+  threadId: string | null,
   key: FillKey,
   quantity: string,
   usdValue: string,
-  threadId: string | null = null,
 ) {
   const action = await insertAction({
     tool: "fakemarket_order",
     venue: "fakemarket",
     status: "done",
-    specialistId,
     threadId,
   });
   await db
     .insert(fills)
-    .values({ actionId: action.id, specialistId, side: "buy", quantity, usdValue, ...key });
+    .values({ actionId: action.id, threadId, side: "buy", quantity, usdValue, ...key });
 }
 
 function payoutFills() {
   return db
     .select({
-      specialistId: fills.specialistId,
+      threadId: fills.threadId,
       instrument: fills.instrument,
       side: fills.side,
       quantity: fills.quantity,
@@ -98,8 +96,8 @@ function payoutFills() {
 }
 
 describe("recording what a prediction market paid out", () => {
-  it("closes a specialist's position at its payout, as a done move with its hash", async () => {
-    const rain = await insertSpecialist();
+  it("closes a thread's position at its payout, as a done move with its hash", async () => {
+    const rain = await insertThread();
     await bought(rain.id, YES, "10", "6.00");
     paying(10_000_000n, [{ key: YES, burned: 10n * 10n ** 18n, paidMicros: 10_000_000n }]);
 
@@ -114,7 +112,7 @@ describe("recording what a prediction market paid out", () => {
     });
     expect(await payoutFills()).toEqual([
       {
-        specialistId: rain.id,
+        threadId: rain.id,
         instrument: YES.instrument,
         side: "sell",
         quantity: "10.000000000000000000",
@@ -122,12 +120,11 @@ describe("recording what a prediction market paid out", () => {
       },
     ]);
     // Bought for $6, paid $10, and nothing left: $4 made.
-    const flows = (await specialistFlows([rain.id])).get(rain.id) ?? [];
-    expect(madeUsd(0, 0, flows)).toBe("4.00");
+    expect(madeUsd(0, 0, await walletFlows())).toBe("4.00");
   });
 
   it("records a payout once, however often it is read or by how many at once", async () => {
-    const rain = await insertSpecialist();
+    const rain = await insertThread();
     await bought(rain.id, YES, "10", "6.00");
     paying(10_000_000n, [{ key: YES, burned: 10n * 10n ** 18n, paidMicros: 10_000_000n }]);
 
@@ -141,7 +138,7 @@ describe("recording what a prediction market paid out", () => {
   it("tells a payout once, in the chat the shares were bought in", async () => {
     // Live, 2026-11-16: a $1 bet on Bitcoin's hour paid out, and nothing was said.
     const chat = await insertThread({ title: "Bitcoin's hour" });
-    await bought(null, YES, "1.004", "1.00", chat.id);
+    await bought(chat.id, YES, "1.004", "1.00");
     paying(1_004_000n, [{ key: YES, burned: 1_004_000n * SHARE, paidMicros: 1_004_000n }]);
 
     await Promise.all([record(), record()]);
@@ -171,7 +168,7 @@ describe("recording what a prediction market paid out", () => {
   });
 
   it("closes losing shares at nothing", async () => {
-    const rain = await insertSpecialist();
+    const rain = await insertThread();
     await bought(rain.id, NO, "5", "2.00");
     paying(0n, [{ key: NO, burned: 5_000_000n * SHARE, paidMicros: 0n }]);
 
@@ -192,7 +189,7 @@ describe("recording what a prediction market paid out", () => {
     // Live, 2026-11-16: the 8PM bet's shares lost, were never redeemed, and sat in the
     // portfolio with nothing said (finding 99). The market reads it as lost, with no transaction.
     const chat = await insertThread({ title: "Bitcoin's hour" });
-    await bought(null, NO, "1.9607", "1.03", chat.id);
+    await bought(chat.id, NO, "1.9607", "1.03");
     market.paid = [
       {
         hash: null,
@@ -254,8 +251,8 @@ describe("recording what a prediction market paid out", () => {
     );
   });
 
-  it("shares a payout between whoever held the shares: a specialist, and the loose rest", async () => {
-    const rain = await insertSpecialist();
+  it("shares a payout between whoever held the shares: a thread, and the loose rest", async () => {
+    const rain = await insertThread();
     await bought(rain.id, YES, "6", "3.00");
     await bought(null, YES, "4", "2.00");
     paying(10_000_000n, [{ key: YES, burned: 10_000_000n * SHARE, paidMicros: 10_000_000n }]);
@@ -264,12 +261,12 @@ describe("recording what a prediction market paid out", () => {
 
     expect(await payoutFills()).toEqual([
       expect.objectContaining({
-        specialistId: null,
+        threadId: null,
         quantity: "4.000000000000000000",
         usdValue: "4.00",
       }),
       expect.objectContaining({
-        specialistId: rain.id,
+        threadId: rain.id,
         quantity: "6.000000000000000000",
         usdValue: "6.00",
       }),
@@ -282,7 +279,7 @@ describe("recording what a prediction market paid out", () => {
   });
 
   it("asks only about the outcomes still open, since the first was bought", async () => {
-    const rain = await insertSpecialist();
+    const rain = await insertThread();
     await bought(rain.id, YES, "10", "6.00");
     await record();
     const [owner, open, since] = market.payouts.mock.calls[0]!;

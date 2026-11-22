@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { drawCard } from "../channels/draw.ts";
 import { readThreadWire } from "../conversation/threads.ts";
 import { db } from "../db/client.ts";
-import { actions, fills, jobs, specialists } from "../db/schema.ts";
+import { actions, fills, jobs, threads } from "../db/schema.ts";
 import { actionJob, reconcileJob } from "../jobs/action.ts";
 import { wakeThread } from "../jobs/kinds.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { actionWire, executeAction, settleStopped } from "./actions.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";
 import { evmClient } from "./chains.ts";
@@ -16,7 +16,7 @@ import { retryRefusal } from "./failure.ts";
 import { evmTokenKey, fillIdentity } from "./fill-key.ts";
 import { checkHeld, closeHeld } from "./held.ts";
 import { walletFlows } from "./made.ts";
-import { specialistPot } from "./pot.ts";
+import { threadPot } from "./pot.ts";
 import { MayHaveSent, type Fill, type KeptTx, type ReadBack } from "./recipe.ts";
 import { recipeForTool } from "./recipes/index.ts";
 import { recordResult } from "./record.ts";
@@ -81,7 +81,7 @@ const chainSays = (status: "success" | "reverted" | "unknown" | "down") =>
 const rowOf = async (id: string) => (await db.select().from(actions).where(eq(actions.id, id)))[0]!;
 const fillsOf = (id: string) =>
   db
-    .select({ side: fills.side, quantity: fills.quantity, specialistId: fills.specialistId })
+    .select({ side: fills.side, quantity: fills.quantity, threadId: fills.threadId })
     .from(fills)
     .where(eq(fills.actionId, id));
 const jobsOf = async (kind: string) =>
@@ -249,8 +249,8 @@ describe("every way into being held, and what settles without it", () => {
   it("records a trade it read back as its run would have, and says how it was learned", async () => {
     chainSays("success");
     readBack.mockResolvedValue({ fills: [bought] });
-    const specialist = await insertSpecialist();
-    const move = await stopped({ ...swap, txs: hashed, specialistId: specialist.id });
+    const thread = await insertThread();
+    const move = await stopped({ ...swap, txs: hashed, threadId: thread.id });
     await reconcile();
     expect(await rowOf(move.id)).toMatchObject({
       status: "done",
@@ -258,7 +258,7 @@ describe("every way into being held, and what settles without it", () => {
       run: { settledBy: "read back" },
     });
     expect(await fillsOf(move.id)).toEqual([
-      { side: "buy", quantity: "0.250000000000000000", specialistId: specialist.id },
+      { side: "buy", quantity: "0.250000000000000000", threadId: thread.id },
     ]);
   });
 
@@ -424,76 +424,76 @@ describe("a held move", () => {
   });
 });
 
-describe("a specialist's pot while one of its moves is held", () => {
+describe("a thread's budget while one of its moves is held", () => {
   const potOf = async (id: string) =>
     db.transaction(async (tx) => {
-      const [specialist] = await tx.select().from(specialists).where(eq(specialists.id, id));
-      return specialistPot(tx, specialist!);
+      const [thread] = await tx.select().from(threads).where(eq(threads.id, id));
+      return threadPot(tx, thread!);
     });
   const nvda = fillIdentity(evmTokenKey("monad", NVDA));
 
   it("counts a held buy as spent, and a close of one that went through keeps it spent", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100" });
-    const held = await heldMove("unrecorded", { specialistId: specialist.id, amountUsd: "40" });
-    expect((await potOf(specialist.id)).freeCashCents).toBe(6_000n);
+    const thread = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const held = await heldMove("unrecorded", { threadId: thread.id, amountUsd: "40" });
+    expect((await potOf(thread.id)).freeCashCents).toBe(6_000n);
     await closeHeld(held.id);
-    // What it bought is the owner's outside the specialist now, so its pot is lower by that.
-    const [after] = await db.select().from(specialists).where(eq(specialists.id, specialist.id));
-    expect(after?.potUsd).toBe("60.00");
-    expect((await potOf(specialist.id)).freeCashCents).toBe(6_000n);
+    // What it bought is the owner's outside the thread's budget now, so its budget is lower by that.
+    const [after] = await db.select().from(threads).where(eq(threads.id, thread.id));
+    expect(after?.budgetUsd).toBe("60.00");
+    expect((await potOf(thread.id)).freeCashCents).toBe(6_000n);
   });
 
   it("keeps a held buy spent when it is closed with nothing showing whether it went", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100" });
-    const held = await heldMove("unanswered", { specialistId: specialist.id, amountUsd: "40" });
-    expect((await potOf(specialist.id)).freeCashCents).toBe(6_000n);
+    const thread = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const held = await heldMove("unanswered", { threadId: thread.id, amountUsd: "40" });
+    expect((await potOf(thread.id)).freeCashCents).toBe(6_000n);
     await closeHeld(held.id);
-    // If the order did fill, its $40 is gone; the specialist never spends it a second time.
-    expect((await potOf(specialist.id)).freeCashCents).toBe(6_000n);
+    // If the order did fill, its $40 is gone; the thread never spends it a second time.
+    expect((await potOf(thread.id)).freeCashCents).toBe(6_000n);
   });
 
-  it("takes a closed sale's holding out of what the specialist may sell, and frees nothing", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100" });
-    const earlier = await insertAction({ status: "done", specialistId: specialist.id });
+  it("takes a closed sale's holding out of what the thread may sell, and frees nothing", async () => {
+    const thread = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const earlier = await insertAction({ status: "done", threadId: thread.id });
     await db.insert(fills).values({
       ...bought,
       quantity: "2",
       usdValue: "80",
       actionId: earlier.id,
-      specialistId: specialist.id,
+      threadId: thread.id,
     });
     const held = await heldMove("unrecorded", {
       tool: "evm_swap",
       input: { chain: "monad", sellToken: NVDA, buyToken: "USDC" },
-      specialistId: specialist.id,
+      threadId: thread.id,
       amountUsd: "20",
       details: { [APPROVED_SALE]: "0.5", [APPROVED_SALE_OF]: nvda },
     });
-    expect((await potOf(specialist.id)).holds.get(nvda)).toBe(1_500_000_000_000_000_000n);
+    expect((await potOf(thread.id)).holds.get(nvda)).toBe(1_500_000_000_000_000_000n);
     await closeHeld(held.id);
-    const after = await potOf(specialist.id);
+    const after = await potOf(thread.id);
     expect(after.holds.get(nvda)).toBe(1_500_000_000_000_000_000n);
-    // What the sale brought in is the owner's, outside the specialist: free cash is as it was.
+    // What the sale brought in is the owner's, outside the thread: free cash is as it was.
     expect(after.freeCashCents).toBe(2_000n);
     // Closed again by another tap, it leaves the books once.
     await closeHeld(held.id);
-    expect((await potOf(specialist.id)).holds.get(nvda)).toBe(1_500_000_000_000_000_000n);
+    expect((await potOf(thread.id)).holds.get(nvda)).toBe(1_500_000_000_000_000_000n);
   });
 
   it("moves a closed sale's holding to the owner's books, so what the wallet made is as it was", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100" });
-    const earlier = await insertAction({ status: "done", specialistId: specialist.id });
+    const thread = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const earlier = await insertAction({ status: "done", threadId: thread.id });
     await db.insert(fills).values({
       ...bought,
       quantity: "2",
       usdValue: "80",
       actionId: earlier.id,
-      specialistId: specialist.id,
+      threadId: thread.id,
     });
     const held = await heldMove("unanswered", {
       tool: "evm_swap",
       input: { chain: "monad", sellToken: NVDA, buyToken: "USDC" },
-      specialistId: specialist.id,
+      threadId: thread.id,
       amountUsd: "20",
       details: { [APPROVED_SALE]: "0.5", [APPROVED_SALE_OF]: nvda },
     });
@@ -502,30 +502,30 @@ describe("a specialist's pot while one of its moves is held", () => {
     await closeHeld(held.id);
     // Auni never read what the sale got, so closing it puts no money in or out of the wallet.
     expect(await putIn()).toBe(80);
-    expect((await potOf(specialist.id)).holds.get(nvda)).toBe(1_500_000_000_000_000_000n);
+    expect((await potOf(thread.id)).holds.get(nvda)).toBe(1_500_000_000_000_000_000n);
   });
 
   it("holds back only what a held sell may have sold, not everything it holds", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100" });
-    const earlier = await insertAction({ status: "done", specialistId: specialist.id });
+    const thread = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const earlier = await insertAction({ status: "done", threadId: thread.id });
     const other = evmTokenKey("monad", "0x2222222222222222222222222222222222222222");
     await db.insert(fills).values([
-      { ...bought, quantity: "2", actionId: earlier.id, specialistId: specialist.id },
-      { ...bought, ...other, quantity: "3", actionId: earlier.id, specialistId: specialist.id },
+      { ...bought, quantity: "2", actionId: earlier.id, threadId: thread.id },
+      { ...bought, ...other, quantity: "3", actionId: earlier.id, threadId: thread.id },
     ]);
     const sale = {
       tool: "evm_swap",
       input: { chain: "monad", sellToken: NVDA, buyToken: "USDC" },
-      specialistId: specialist.id,
+      threadId: thread.id,
       details: { [APPROVED_SALE]: "0.5", [APPROVED_SALE_OF]: nvda },
     };
     // Still settling, a sell holds back every holding: what it sold isn't counted yet.
     const settling = await stopped({ ...sale, txs: hashed });
-    expect((await potOf(specialist.id)).holds.size).toBe(0);
+    expect((await potOf(thread.id)).holds.size).toBe(0);
     await db.delete(actions).where(eq(actions.id, settling.id));
     // Held, it takes only what its card approved selling out of what may be sold.
     await heldMove("unrecorded", sale);
-    expect(Object.fromEntries((await potOf(specialist.id)).holds)).toEqual({
+    expect(Object.fromEntries((await potOf(thread.id)).holds)).toEqual({
       [nvda]: 1_500_000_000_000_000_000n,
       [fillIdentity(other)]: 3_000_000_000_000_000_000n,
     });

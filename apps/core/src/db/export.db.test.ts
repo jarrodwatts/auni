@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { dataDir } from "../data-dir.ts";
 import { env } from "../env.ts";
-import { insertAction, insertSpecialist, insertThread } from "../test/db.ts";
+import { insertAction, insertThread } from "../test/db.ts";
 import { db } from "./client.ts";
 import { ExportRefused, exportDatabase, importDatabase } from "./export.ts";
 import { migrateDatabase } from "./migrations.ts";
@@ -61,9 +61,9 @@ afterAll(async () => {
 
 describe("an export", () => {
   it("loads into an empty database as exactly what was kept, routines and all", async () => {
-    const specialist = await insertSpecialist({ name: "Nuclear", potUsd: "1234.56" });
     const thread = await insertThread({
-      specialistId: specialist.id,
+      title: "Nuclear",
+      budgetUsd: "1234.56",
       expectedTokens: ["base:0xabc"],
     });
     const [first] = await db
@@ -81,11 +81,11 @@ describe("an export", () => {
       parts: [{ type: "text", text: "Buy more" }],
       supersedesId: first!.id,
     });
-    const action = await insertAction({ threadId: thread.id, specialistId: specialist.id });
+    const action = await insertAction({ threadId: thread.id });
     // More digits than a JavaScript number keeps.
     await db.insert(fills).values({
       actionId: action.id,
-      specialistId: specialist.id,
+      threadId: thread.id,
       instrument: "native",
       chain: "solana",
       side: "buy",

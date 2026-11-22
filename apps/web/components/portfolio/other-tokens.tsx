@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Coins } from "lucide-react";
 
 import { MoneyButton } from "@/components/cards/money/money-card-parts";
-import { useRefreshSpecialists } from "@/components/specialist/use-specialists";
+import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { shortAddress } from "@/components/money/portal/deposit-addresses";
 import { NetworkMark } from "@/components/money/portal/network-mark";
 import {
@@ -108,7 +108,7 @@ function TokenList() {
 
 function TokenRow({ token }: { readonly token: OtherToken }) {
   const queryClient = useQueryClient();
-  const refresh = useRefreshSpecialists();
+  const refresh = useRefreshMoney();
   const add = useMutation({
     mutationFn: () => addToken(token),
     onSuccess: () => {

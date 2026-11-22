@@ -1,10 +1,10 @@
 "use client";
 
-import type { SpecialistId, UsdcMoneyWire } from "@auni/shared";
+import type { UsdcMoneyWire } from "@auni/shared";
 import { useMemo, useState } from "react";
 
-import { useValueHistory } from "@/components/specialist/use-specialists";
 import { useMoney } from "@/components/money/money-provider";
+import { useValueHistory } from "@/components/portfolio/use-portfolio";
 
 import { chartPoints, type ChartPoint } from "./balance-chart";
 import { madeChange, type MadeReading } from "./made-change";
@@ -17,12 +17,6 @@ import {
 } from "./chart-ranges";
 import { endingLive, type LiveValue } from "./live-end";
 
-/**
- * The number on screen, its value and what it has made, as its line's end
- * (see endingLive); none while some source couldn't be read, as the number
- * then leaves that money out and a line ending in it would draw a drop that
- * didn't happen, so the line ends where core's readings do.
- */
 export function useLiveEnd(
   value: UsdcMoneyWire | undefined,
   made: UsdcMoneyWire | undefined,
@@ -38,21 +32,15 @@ export function useLiveEnd(
 }
 
 /**
- * One chart's period and scrub, for the account (no specialist) or one
- * specialist: the periods its history covers, the line core draws for the
- * chosen one, and the reading under the pointer, if any. The number above
- * the chart follows the scrub; its move is what was made since the first
- * drawn point, named for the period, the scrubbed day, or where that point
- * is (see moveLabel). The line ends in `live` (see useLiveEnd).
+ * Total portfolio chart period and scrub: the periods its history covers, the
+ * line core draws for the chosen one, and the reading under the pointer.
  */
-export function useChartWindow(specialistId: SpecialistId | null, live: LiveValue | null) {
+export function useChartWindow(live: LiveValue | null) {
   const [range, setRange] = useState<ChartRange>("1W");
   const [scrub, setScrub] = useState<ChartPoint | null>(null);
-  const history = useValueHistory(specialistId, range);
+  const history = useValueHistory(range);
   const startedAt = history.data?.startedAt ?? null;
-  // Not memoised: which periods show everything moves on at midnight, though startedAt doesn't.
   const ranges = chartRanges(startedAt);
-  // The week is the first look; once its history says it is younger than that, Today.
   if (history.data && !history.isPlaceholderData && ranges.length > 0 && !ranges.includes(range))
     setRange(defaultChartRange(ranges));
   const points = useMemo(() => endingLive(history.data?.points ?? [], live), [history.data, live]);
@@ -73,11 +61,9 @@ export function useChartWindow(specialistId: SpecialistId | null, live: LiveValu
     points,
     scrub,
     setScrub,
-    /** What was made up to the scrubbed point, or the line's end; null when it can't be told. */
     move: scrub
       ? madeChange(measured.filter((reading) => reading.at <= Date.parse(scrub.observedAt)))
       : madeChange(measured),
-    /** The scrubbed reading's date, or what the move is over (see moveLabel). */
     label: scrub ? dayLabel(scrub.observedAt, true) : moveLabel(range, drawn[0]?.observedAt),
   };
 }

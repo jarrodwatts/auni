@@ -1,10 +1,9 @@
 import type { ValueHistoryWire, ValueRange } from "@auni/shared";
-import { and, asc, desc, eq, gte, isNotNull, isNull, lt, min, ne, sql } from "drizzle-orm";
+import { and, asc, desc, gte, isNotNull, lt, min, ne, sql } from "drizzle-orm";
 
 import { theOwner } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
 import { valueSnapshots } from "../db/schema.ts";
-import { fillIdentity, QUANTITY_DECIMALS } from "./fill-key.ts";
 import type { Flow } from "./flows.ts";
 import {
   movedUsd,
@@ -16,10 +15,9 @@ import {
   type PricePoint,
   type Step,
 } from "./history.ts";
-import { specialistFlows, madeUsd, unpricedOf, walletFlows } from "./made.ts";
+import { madeUsd, unpricedOf, walletFlows } from "./made.ts";
 import { type ReadingHolding } from "./portfolio.ts";
-import { addToBooks, allFills, holdersOf } from "./books.ts";
-import { centsToUsd, parseUnits } from "./usd.ts";
+import { centsToUsd } from "./usd.ts";
 
 /**
  * Value over time, like a stocks app: what is held is measured at each
@@ -31,12 +29,12 @@ import { centsToUsd, parseUnits } from "./usd.ts";
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
-/** A reading as a line is drawn from it, of the total or of one specialist. */
+/** A reading as a line is drawn from it. */
 export interface Reading {
   readonly at: number;
   /** What it was worth. */
   readonly usd: number;
-  /** The plain cash within it (money/made.ts); a specialist holds none. */
+  /** The plain cash within it (money/made.ts). */
   readonly cashUsd: number;
   /** What it held of each holding with a price to move it by; the rest holds its value. */
   readonly held: readonly Held[];
@@ -182,21 +180,9 @@ interface TotalRow {
   readonly holdings: readonly ReadingHolding[] | null;
 }
 
-type FillRow = Awaited<ReturnType<typeof allFills>>[number];
+const keptReadings = () => isNotNull(valueSnapshots.holdings);
 
-/**
- * The readings a line is drawn from: one specialist's, or the total's that
- * kept what they held. A total read before then can't be moved by prices,
- * split between specialists or say what it had made, so each line, its move
- * and the periods offered start at the same reading.
- */
-function readingsOf(specialistId: string | null) {
-  return specialistId
-    ? eq(valueSnapshots.specialistId, specialistId)
-    : and(isNull(valueSnapshots.specialistId), isNotNull(valueSnapshots.holdings));
-}
-
-/** The total's readings from `from` on, and the last before it, oldest first. */
+/** Readings from `from` on, and the last before it, oldest first. */
 async function totalReadings(from: number): Promise<TotalRow[]> {
   const columns = {
     takenAt: valueSnapshots.takenAt,
@@ -204,7 +190,7 @@ async function totalReadings(from: number): Promise<TotalRow[]> {
     cashUsd: valueSnapshots.cashUsd,
     holdings: valueSnapshots.holdings,
   };
-  const kept = readingsOf(null);
+  const kept = keptReadings();
   const [before, since] = await Promise.all([
     db
       .select(columns)
@@ -221,70 +207,27 @@ async function totalReadings(from: number): Promise<TotalRow[]> {
   return [...before, ...since];
 }
 
-/** A reading of the total, with each specialist's share of each holding in it. */
-interface SplitReading {
-  readonly row: TotalRow;
-  /** By holding, in the reading's order: each specialist's share of it, from 0 to 1. */
-  readonly shares: readonly ReadonlyMap<string, number>[];
-}
-
-/**
- * The total's readings, each holding split between specialists by their
- * fills recorded by then, the one rule the portfolio splits holdings by (see
- * holdersOf). A reading is kept only once every move before it is recorded,
- * so this is the split it was read with; specialist rows keep no holdings,
- * and a share of the total's value would move a specialist with holdings it
- * never had. Readings and fills are both oldest first, so the books are
- * built once, adding each fill as the readings pass it.
- */
-function splitReadings(totals: readonly TotalRow[], userFills: readonly FillRow[]): SplitReading[] {
-  const books = new Map<string, Map<string, bigint>>();
-  let added = 0;
-  return totals.map((row) => {
-    for (; added < userFills.length && userFills[added]!.createdAt <= row.takenAt; added += 1)
-      addToBooks(books, userFills[added]!);
-    const shares = (row.holdings ?? []).map((holding) => {
-      const total = parseUnits(holding.quantity, QUANTITY_DECIMALS);
-      const { specialists } = holdersOf(
-        holding.short ? -total : total,
-        books,
-        fillIdentity(holding),
-      );
-      return new Map(
-        total > 0n ? specialists.map(([id, units]) => [id, Number(units) / Number(total)]) : [],
-      );
-    });
-    return { row, shares };
-  });
-}
-
-/** The readings as the total (null), or as one specialist's share of each holding. */
-function readingsAs(split: readonly SplitReading[], specialistId: string | null): Reading[] {
-  return split.map(({ row, shares }) => {
-    const parts = (row.holdings ?? []).map((holding, index) => ({
-      holding,
-      share: specialistId ? (shares[index]!.get(specialistId) ?? 0) : 1,
-    }));
-    const held = parts.flatMap(({ holding, share }): Held[] => {
+function asReadings(rows: readonly TotalRow[]): Reading[] {
+  return rows.map((row) => {
+    const holdings = row.holdings ?? [];
+    const held = holdings.flatMap((holding): Held[] => {
       const key = priceKey(holding);
-      if (!key || share === 0 || holding.usdValue === null) return [];
+      if (!key || holding.usdValue === null) return [];
       return [
         {
           key,
-          usd: Number(holding.usdValue) * share,
-          perp: perpSize(holding, share),
+          usd: Number(holding.usdValue),
+          perp: perpSize(holding),
           from: holding.price ?? null,
         },
       ];
     });
     return {
       at: row.takenAt.getTime(),
-      usd: specialistId
-        ? parts.reduce((sum, { holding, share }) => sum + Number(holding.usdValue ?? 0) * share, 0)
-        : Number(row.usdValue),
-      cashUsd: specialistId ? 0 : Number(row.cashUsd ?? 0),
+      usd: Number(row.usdValue),
+      cashUsd: Number(row.cashUsd ?? 0),
       held,
-      unpriced: unpricedOf(parts.flatMap(({ holding, share }) => (share > 0 ? [holding] : []))),
+      unpriced: unpricedOf(holdings),
     };
   });
 }
@@ -308,7 +251,7 @@ function tellGap() {
   };
 }
 
-/** The first point with money in it on: a specialist formed a week before it was funded draws no week of $0. */
+/** The first point with money in it on: draws no leading stretch of $0. */
 function funded<T extends { readonly usdValue: string }>(points: readonly T[]): T[] {
   const first = points.findIndex((point) => Number(point.usdValue) !== 0);
   return first === -1 ? [] : points.slice(first);
@@ -318,24 +261,17 @@ const STEP_MS: Readonly<Record<Step, number>> = { "15m": 15 * MINUTE_MS, "1h": 6
 
 /**
  * Today (from their midnight, every 15 minutes) or the week (every hour), and
- * now, from the readings in it and the one before. It starts at the first
- * reading when that is later, with a point there, so its first point is what
- * "today" on a specialist's tile counts from. Every reading in it is a point
- * too, so money that came and went between two steps still shows.
+ * now, from the readings in it and the one before. Every reading in it is a
+ * point too, so money that came and went between two steps still shows.
  */
 async function estimatedLine(
-  specialistId: string | null,
   range: "Today" | "1W",
   flows: readonly Flow[],
 ): Promise<ValuePoint[]> {
   const now = Date.now();
   const from = range === "Today" ? startOfDay((await theOwner()).timeZone, now) : now - 7 * DAY_MS;
   const step = range === "Today" ? "15m" : "1h";
-  const [totals, userFills] = await Promise.all([
-    totalReadings(from),
-    specialistId ? allFills(db) : [],
-  ]);
-  const readings = readingsAs(splitReadings(totals, userFills), specialistId);
+  const readings = asReadings(await totalReadings(from));
   const first = readings[0];
   if (!first) return [];
   const start = Math.max(from, first.at);
@@ -348,9 +284,7 @@ async function estimatedLine(
   );
   const times = [...new Set([...steps, ...read])].sort((a, b) => a - b);
   const paths = await readPaths(pathKeys(readings), step, now);
-  // Told of on the total's line alone: a specialist's gap is a share of the same one.
-  const onGap = specialistId ? undefined : tellGap();
-  return funded(valueSeries({ readings, times, paths, flows, onGap }));
+  return funded(valueSeries({ readings, times, paths, flows, onGap: tellGap() }));
 }
 
 const RANGE_DAYS: Readonly<Record<"1M" | "3M" | "1Y", number>> = { "1M": 30, "3M": 90, "1Y": 365 };
@@ -358,18 +292,14 @@ const RANGE_DAYS: Readonly<Record<"1M" | "3M" | "1Y", number>> = { "1M": 30, "3M
 /**
  * The readings over a month or longer: the first and last of each of their
  * days, so years of them stay a few hundred points while money put in during
- * a day is still weighed from that day, not from its end (a return weighs
- * what was put in by when); and the first with money in it, as a specialist
- * bought and sold within a day ends that day at zero and would otherwise
- * draw nothing. A specialist holds no plain cash.
+ * a day is still weighed from that day, not from its end.
  */
 async function dailyReadings(
-  specialistId: string | null,
   range: "1M" | "3M" | "1Y" | "All",
   flows: readonly Flow[],
 ): Promise<ValuePoint[]> {
   const inRange = and(
-    readingsOf(specialistId),
+    keptReadings(),
     range === "All"
       ? undefined
       : gte(valueSnapshots.takenAt, new Date(Date.now() - RANGE_DAYS[range] * DAY_MS)),
@@ -412,8 +342,7 @@ async function dailyReadings(
   return funded(
     rows.map((row) => {
       const at = row.takenAt.getTime();
-      const cash = specialistId ? 0 : Number(row.cashUsd ?? 0);
-      // Only the total's row keeps its holdings, so only its line knows what it held unpriced.
+      const cash = Number(row.cashUsd ?? 0);
       const unpriced = unpricedOf(row.holdings ?? []);
       return {
         at,
@@ -424,32 +353,27 @@ async function dailyReadings(
   );
 }
 
-/** When the total or one specialist first held money, by its readings; null if it never did. */
-async function startedAt(specialistId: string | null): Promise<Date | null> {
+/** When the portfolio first held money, by its readings; null if it never did. */
+async function startedAt(): Promise<Date | null> {
   const [first] = await db
     .select({ at: min(valueSnapshots.takenAt) })
     .from(valueSnapshots)
-    .where(and(readingsOf(specialistId), ne(valueSnapshots.usdValue, "0")));
+    .where(and(keptReadings(), ne(valueSnapshots.usdValue, "0")));
   return first?.at ?? null;
 }
 
 /**
- * The total (specialist null) or one specialist over `range`, from the first
- * reading with money in it. Each point says what had been made by then
- * (money/made.ts), so a chart's move leaves out money added or taken out.
+ * The portfolio total over `range`, from the first reading with money in it.
+ * Each point says what had been made by then (money/made.ts), so a chart's
+ * move leaves out money added or taken out.
  */
-export async function valueHistory(
-  specialistId: string | null,
-  range: ValueRange,
-): Promise<ValueHistoryWire> {
-  const flows = await (specialistId
-    ? specialistFlows([specialistId]).then((byId) => byId.get(specialistId) ?? [])
-    : walletFlows());
+export async function valueHistory(range: ValueRange): Promise<ValueHistoryWire> {
+  const flows = await walletFlows();
   const [started, points] = await Promise.all([
-    startedAt(specialistId),
+    startedAt(),
     range === "Today" || range === "1W"
-      ? estimatedLine(specialistId, range, flows)
-      : dailyReadings(specialistId, range, flows),
+      ? estimatedLine(range, flows)
+      : dailyReadings(range, flows),
   ]);
   return {
     startedAt: started?.toISOString() ?? null,
@@ -459,33 +383,4 @@ export async function valueHistory(
       madeUsd: point.madeUsd,
     })),
   };
-}
-
-/**
- * What each of these specialists had made at the start of the person's day,
- * by id, measured as Today's line is (its first point): so a tile's "today"
- * and the line under it agree. One with no reading yet is left out.
- */
-export async function madeAtStartOfDay(
-  flows: ReadonlyMap<string, readonly Flow[]>,
-): Promise<Map<string, string>> {
-  if (flows.size === 0) return new Map();
-  const midnight = startOfDay((await theOwner()).timeZone);
-  const [totals, userFills] = await Promise.all([totalReadings(midnight), allFills(db)]);
-  const first = totals[0];
-  if (!first) return new Map();
-  const at = Math.max(midnight, first.takenAt.getTime());
-  const split = splitReadings(totals, userFills);
-  const bySpecialist = [...flows.keys()].map((id) => [id, readingsAs(split, id)] as const);
-  const paths = await readPaths(
-    bySpecialist.flatMap(([, readings]) => pathKeys(readings)),
-    "15m",
-    Date.now(),
-  );
-  return new Map(
-    bySpecialist.flatMap(([id, readings]) => {
-      const [point] = valueSeries({ readings, times: [at], paths, flows: flows.get(id) ?? [] });
-      return point ? [[id, point.madeUsd]] : [];
-    }),
-  );
 }

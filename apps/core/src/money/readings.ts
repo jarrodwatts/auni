@@ -1,16 +1,13 @@
-import { and, eq, gt, inArray, isNull, max, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, gt, max, or, sql, type SQL } from "drizzle-orm";
 
 import { db, type Tx } from "../db/client.ts";
-import { actions, arrivals, fills, firstLooks, otherTokens, valueSnapshots } from "../db/schema.ts";
+import { actions, arrivals, firstLooks, otherTokens, valueSnapshots } from "../db/schema.ts";
 import { readingKind } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { isSavings } from "../apps/registry.ts";
-import type { HoldingGap } from "./books.ts";
-import { QUANTITY_DECIMALS } from "./fill-key.ts";
 import { livePrices, priceKey } from "./history.ts";
 import type { Holding, Portfolio, ReadingHolding } from "./portfolio.ts";
 import { TOLD_SQL } from "./told.ts";
-import { formatUnits } from "./usd.ts";
 
 // Readings: when a read of the portfolio may still miss a move, when one is kept, and keeping it.
 
@@ -49,23 +46,6 @@ export function stillSettling(readStartedAt: number): SQL {
 }
 
 /**
- * The actions in these specialists' records: those filed under one, and a
- * move filed elsewhere whose fills are one's, like a holding moved out of it.
- */
-export function inRecordOf(specialistIds: readonly string[]): SQL {
-  return or(
-    inArray(actions.specialistId, [...specialistIds]),
-    inArray(
-      actions.id,
-      db
-        .select({ id: fills.actionId })
-        .from(fills)
-        .where(inArray(fills.specialistId, [...specialistIds])),
-    ),
-  )!;
-}
-
-/**
  * How long a read missing a source stands: while a venue is down, every open
  * app's poll would otherwise read every venue again, a venue's rate
  * budget shared with placing orders, yet it comes back soon after the venue does.
@@ -97,35 +77,14 @@ function priceOf(prices: ReadonlyMap<string, number>, holding: Holding): { price
   return price === undefined ? {} : { price };
 }
 
-/** When the gap in each holding was last reported, so each is reported once a day. */
-const reportedGaps = new Map<string, number>();
-const GAP_REPORTED_EVERY_MS = 24 * 60 * 60_000;
-
-/** Tells of each gap, once a day: never left to hide (see holdingGaps). */
-export function reportGaps(gaps: readonly HoldingGap[]): void {
-  const now = Date.now();
-  for (const [id, at] of reportedGaps)
-    if (now - at >= GAP_REPORTED_EVERY_MS) reportedGaps.delete(id);
-  for (const gap of gaps) {
-    if (reportedGaps.has(gap.key)) continue;
-    reportedGaps.set(gap.key, now);
-    console.warn(
-      `Specialists' records hold more ${gap.key} than the portfolio holds: ` +
-        `${formatUnits(gap.recorded, QUANTITY_DECIMALS)} recorded, ` +
-        `${formatUnits(gap.held, QUANTITY_DECIMALS)} held`,
-    );
-  }
-}
-
 /** A live read is kept as a reading at most this often, unless an action finished since the last. */
 const READING_EVERY_MS = 15 * 60_000;
 
 /**
  * Keeps a live read as a reading: the total's row, with what it held and its
- * plain cash, and one row per specialist. Only when one is due (see
- * readingDue), and only a whole read: a source that couldn't be read would
- * show as a false dip. Readings are kept one at a time, so two reads at once
- * keep one. True when it was kept.
+ * plain cash. Only when one is due (see readingDue), and only a whole read: a
+ * source that couldn't be read would show as a false dip. Readings are kept one
+ * at a time, so two reads at once keep one. True when it was kept.
  */
 export async function saveReading(portfolio: Portfolio): Promise<boolean> {
   if (portfolio.unavailable.length > 0 || portfolio.looking.length > 0) return false;
@@ -135,30 +94,22 @@ export async function saveReading(portfolio: Portfolio): Promise<boolean> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('auni:reading'))`);
     if (!(await readingDue(tx, takenAt))) return false;
-    await tx.insert(valueSnapshots).values([
-      {
-        specialistId: null,
-        usdValue: portfolio.totalUsd,
-        cashUsd: plainCashUsd(portfolio).toFixed(2),
-        holdings: portfolio.holdings.map((holding): ReadingHolding => ({
-          chain: holding.chain,
-          instrument: holding.instrument,
-          priceId: holding.priceId,
-          quantity: holding.quantity,
-          decimals: holding.decimals,
-          usdValue: holding.usdValue,
-          cash: holding.cash,
-          ...(holding.short ? { short: true } : {}),
-          ...priceOf(prices, holding),
-        })),
-        takenAt,
-      },
-      ...portfolio.specialists.map((specialist) => ({
-        specialistId: specialist.id,
-        usdValue: specialist.usdValue,
-        takenAt,
+    await tx.insert(valueSnapshots).values({
+      usdValue: portfolio.totalUsd,
+      cashUsd: plainCashUsd(portfolio).toFixed(2),
+      holdings: portfolio.holdings.map((holding): ReadingHolding => ({
+        chain: holding.chain,
+        instrument: holding.instrument,
+        priceId: holding.priceId,
+        quantity: holding.quantity,
+        decimals: holding.decimals,
+        usdValue: holding.usdValue,
+        cash: holding.cash,
+        ...(holding.short ? { short: true } : {}),
+        ...priceOf(prices, holding),
       })),
-    ]);
+      takenAt,
+    });
     return true;
   });
 }
@@ -171,10 +122,7 @@ export async function saveReading(portfolio: Portfolio): Promise<boolean> {
  */
 export async function readingDue(q: Pick<Tx, "select">, readAt: Date): Promise<boolean> {
   if (await changedSince(q, settledBefore(readAt))) return false;
-  const [last] = await q
-    .select({ takenAt: max(valueSnapshots.takenAt) })
-    .from(valueSnapshots)
-    .where(isNull(valueSnapshots.specialistId));
+  const [last] = await q.select({ takenAt: max(valueSnapshots.takenAt) }).from(valueSnapshots);
   if (!last?.takenAt || readAt.getTime() - last.takenAt.getTime() >= READING_EVERY_MS) return true;
   return changedSince(q, last.takenAt);
 }

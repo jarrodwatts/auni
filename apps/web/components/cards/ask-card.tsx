@@ -2,13 +2,11 @@
 
 import type { AskCardWire } from "@auni/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { TOOL_ICONS } from "@/components/conversation/generic-activity-copy";
-import { useRefreshSpecialists } from "@/components/specialist/use-specialists";
-import { specialistHref } from "@/lib/app-links";
+import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { actionKey, decideAction, useLiveAction } from "@/lib/data/actions";
 import { cn } from "@/lib/utils";
 
@@ -20,11 +18,10 @@ import { SecretCard } from "./secret-card";
 
 /**
  * Auni asking to change Auni itself, not money. It is drawn from a money card's parts: a mark,
- * what the tap agrees to, the one number it is about (a specialist's pot), every other line the
- * tap agrees to, and two buttons, the main one named for what it does. Once it has ended it
- * rests as a one-line receipt, and one that started a specialist is the way to it. It reads its
- * action live, as a money card does; an ask applies the moment it's allowed, so it goes straight
- * from waiting to how it ended.
+ * what the tap agrees to, the one number it is about (a thread's auto budget), every other line
+ * the tap agrees to, and two buttons, the main one named for what it does. Once it has ended it
+ * rests as a one-line receipt. It reads its action live, as a money card does; an ask applies the
+ * moment it's allowed, so it goes straight from waiting to how it ended.
  */
 export function AskCard({ card }: { readonly card: AskCardWire }) {
   // An offer of an app is a card of its own, its mark beside its switch; so is a secret asked
@@ -38,7 +35,7 @@ export function AskCard({ card }: { readonly card: AskCardWire }) {
 
 function PlainAsk({ card }: { readonly card: AskCardWire }) {
   const queryClient = useQueryClient();
-  const refreshSpecialists = useRefreshSpecialists();
+  const refreshMoney = useRefreshMoney();
   const [pending, setPending] = useState<"allow" | "decline" | null>(null);
   const [failed, setFailed] = useState(false);
   const queryKey = actionKey(card.actionReference);
@@ -55,8 +52,12 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
     setFailed(false);
     try {
       queryClient.setQueryData(queryKey, await decideAction(card.actionReference, decision));
-      // What it changed shows wherever specialists are listed.
-      if (decision === "allow") refreshSpecialists();
+      // Refresh threads, budget state, and portfolio wherever the change shows.
+      if (decision === "allow") {
+        refreshMoney();
+        void queryClient.invalidateQueries({ queryKey: ["threads"] });
+        void queryClient.invalidateQueries({ queryKey: ["thread-state"] });
+      }
     } catch {
       setFailed(true);
     } finally {
@@ -66,8 +67,6 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
 
   if (standing.kind === "ended") {
     const done = standing.tone === "done";
-    // A started specialist is where its work goes on: the receipt is the door to it.
-    const started = card.ask === "start_specialist" && done ? live.data?.specialistId : null;
     return (
       <MoneyCardFrame
         auni={live.data && done ? { kind: "landed" } : null}
@@ -84,15 +83,6 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
               {standing.label}
             </p>
           </div>
-          {started ? (
-            <Link
-              href={specialistHref(started)}
-              className="flex h-9 flex-none items-center gap-1 rounded-full bg-foreground px-4 text-[13.5px] font-semibold text-background transition-colors duration-200 ease-settle hover:bg-foreground/85"
-            >
-              Open
-              <ArrowRight aria-hidden className="size-3.5" strokeWidth={2.4} />
-            </Link>
-          ) : null}
         </div>
       </MoneyCardFrame>
     );

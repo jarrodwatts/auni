@@ -1,9 +1,9 @@
 import { CASH_KEYS, isCash, NETWORK_KEYS, NETWORKS, type NetworkKey } from "@auni/shared";
-import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, gt, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../db/client.ts";
-import { actions, arrivals, fills } from "../db/schema.ts";
+import { arrivals, fills } from "../db/schema.ts";
 import { firstBridge } from "../apps/registry.ts";
 import { plannedCash, prepareLeg, type PreparedLeg } from "./actions.ts";
 import { chainName, RESERVES } from "./chains.ts";
@@ -343,7 +343,6 @@ export type PayWith = NonNullable<z.infer<typeof payWithInput>>[number];
  * tool proposed it.
  */
 export async function payingHoldings(
-  context: { readonly specialistId: string | null },
   prepared: readonly PreparedLeg[],
   cash: {
     readonly spendable: ReadonlyMap<FundingChain, bigint>;
@@ -364,7 +363,7 @@ export async function payingHoldings(
   let payable: Payable[];
   try {
     const [portfolio, explained] = await Promise.all([readPortfolioShared(), explainedHoldings()]);
-    payable = payableHoldings(portfolio.other.holdings, explained, {
+    payable = payableHoldings(portfolio.assets.holdings, explained, {
       ...(payWith ? { named: payWith.map(({ chain, token }) => tokenKey(chain, token)) } : {}),
       selling: prepared.flatMap(({ preview }) => (preview.sells ? [preview.sells] : [])),
     });
@@ -376,29 +375,23 @@ export async function payingHoldings(
     convert: (holding, units, to) => {
       const amount = formatUnits(units, holding.decimals);
       if (isCash(holding.chain))
-        return prepareLeg(
-          convertToCash,
-          { chain: holding.chain, token: holding.instrument, amount },
-          context,
-        );
+        return prepareLeg(convertToCash, { chain: holding.chain, token: holding.instrument, amount });
       return prepareLeg(
         recipe,
         input({ from: holding.chain, to, amount, token: holding.instrument }),
-        context,
       );
     },
-    bridge: (from, to, usd) => prepareLeg(recipe, input({ from, to, amount: usd }), context),
+    bridge: (from, to, usd) => prepareLeg(recipe, input({ from, to, amount: usd })),
   });
 }
 
-/** What explains the loose holdings (see Explained), read from the fills and arrivals. */
+/** What explains wallet holdings (see Explained), read from the fills and arrivals. */
 export async function explainedHoldings(): Promise<Explained> {
   const [buys, deposits] = await Promise.all([
     db
       .select({ chain: fills.chain, instrument: fills.instrument, quantity: fills.quantity })
       .from(fills)
-      .innerJoin(actions, eq(actions.id, fills.actionId))
-      .where(and(isNull(fills.specialistId), eq(fills.side, "buy"))),
+      .where(eq(fills.side, "buy")),
     db
       .select({
         chain: arrivals.chain,

@@ -16,14 +16,13 @@ import {
   jobs,
   messages,
   ownerSessions,
-  specialists,
   threads,
   type ActionRow,
   type ThreadRow,
 } from "../../db/schema.ts";
 import { executeAction } from "../../money/actions.ts";
 import { allowAction } from "../../money/decide.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../../test/db.ts";
+import { insertAction, insertThread, wipe } from "../../test/db.ts";
 import { queued } from "../../test/jobs.ts";
 import { FACE, stubRecipe } from "../../test/recipe.ts";
 import { FAKE_TOKEN, FakeBotApi } from "./fake-bot-api.ts";
@@ -75,7 +74,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await wipe(specialists, threads, messages, actions, channelDeliveries, jobs, ownerSessions);
+  await wipe(threads, messages, actions, channelDeliveries, jobs, ownerSessions);
   signer.calls = 0;
   funding.needUsd = null;
   fake.calls.length = 0;
@@ -119,21 +118,23 @@ const waiting = (fields: Partial<ActionRow> = {}) =>
     ...fields,
   });
 
-/** An ask waiting for the owner: to let a specialist act on its own (see asks.ts). */
+/** An ask waiting for the owner: to let a thread act on its own (see asks.ts). */
 async function waitingAsk(): Promise<ActionRow> {
-  const specialist = await insertSpecialist();
+  const target = await insertThread();
   return waiting({
-    tool: "update_specialist",
+    tool: "set_thread_autonomy",
     venue: null,
     amountUsd: "0",
-    specialistId: specialist.id,
-    input: { specialist_id: specialist.id, act_mode: "within_limits", pot_usd: "100.00" },
-    lines: [{ label: "It may", value: "Buy and sell within its $100.00 pot without asking you." }],
+    threadId: target.id,
+    input: { thread_id: target.id, act_mode: "within_limits", budget_usd: "100.00" },
+    lines: [
+      { label: "How it acts", value: "Buy and sell within its $100.00 budget without asking you." },
+    ],
   });
 }
 
-/** How a specialist acts now: an ask allowed would have changed it. */
-const actModes = async () => (await db.select().from(specialists)).map((row) => row.actMode);
+/** How every thread acts now: an ask allowed would have changed it. */
+const actModes = async () => (await db.select().from(threads)).map((row) => row.actMode);
 
 /** The card core sealed for it, in an answer the owner's Telegram message asked for. */
 async function deliverCard(action: ActionRow): Promise<void> {
@@ -417,10 +418,10 @@ describe("approving a card", () => {
       "Allowed.",
     );
     expect(await statusOf(ask.id)).toBe("done");
-    expect(await actModes()).toEqual(["within_limits"]);
+    expect(await actModes()).toContain("within_limits");
     expect(signer.calls).toBe(0);
     await syncCards();
-    expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(/Changed\nAllowed here\.$/u);
+    expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(/Updated\nAllowed here\.$/u);
   });
 
   it("keeps a routine of the largest size one message, allowed in the app, and shows it saved", async () => {
@@ -684,7 +685,7 @@ describe.each([
   it("what the card would do changed after it was sent, and the grant is pressed", async () => {
     await db
       .update(actions)
-      .set({ input: { ...action.input, pot_usd: "9000.00", usd: "9000" } })
+      .set({ input: { ...action.input, budget_usd: "9000.00", usd: "9000" } })
       .where(eq(actions.id, action.id));
     expect(await press({ from: OWNER }, messageId, `allow:${grant}`)).toMatch(/changed/u);
   });

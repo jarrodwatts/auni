@@ -1,9 +1,9 @@
-import type { SpecialistProposalLeg, MoneyFlow } from "@auni/shared";
+import type { ActionPlanLeg, MoneyFlow } from "@auni/shared";
 
 import { formatExactUsd, formatUsd } from "@/lib/money";
 
 /** A pick's money as its card carries it: how much, and which way. */
-type Money = Pick<SpecialistProposalLeg, "amount" | "flow">;
+type Money = Pick<ActionPlanLeg, "amount" | "flow">;
 
 /** What some picks move one way, in base units: what goes in, or what comes back. */
 export function sum(legs: readonly Money[], flow: MoneyFlow): bigint {
@@ -40,7 +40,7 @@ export function restLabel(legs: readonly Money[]): string | null {
   return going > 0n ? amountLabel(going, decimals, "in") : amountLabel(back, decimals, "back");
 }
 
-type Perp = NonNullable<SpecialistProposalLeg["perp"]>;
+type Perp = NonNullable<ActionPlanLeg["perp"]>;
 
 /** A perp's bet beside its name, always with its direction: "3x long". */
 export function perpTag(perp: Perp): string {
@@ -77,7 +77,7 @@ export function closeResult(perp: Perp): { readonly text: string; readonly down:
  * back, where its amount's sign alone is too quiet: a perp opens or closes,
  * anything else is bought or sold.
  */
-export function pickVerb(leg: Pick<SpecialistProposalLeg, "flow" | "perp">): string {
+export function pickVerb(leg: Pick<ActionPlanLeg, "flow" | "perp">): string {
   if (leg.flow === "back") return leg.perp ? "Close" : "Sell";
   return leg.perp ? "Open" : "Buy";
 }

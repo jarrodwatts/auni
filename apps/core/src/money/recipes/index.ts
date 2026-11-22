@@ -5,7 +5,6 @@ import { appRecipes, offered } from "../../apps/registry.ts";
 import { moneyOf, type Money, type Recipe } from "../recipe.ts";
 import { convertToCash } from "./convert.ts";
 import { sendEvmTransaction } from "./evm.ts";
-import { moveHolding } from "./move-holding.ts";
 import { sendSolanaTransaction } from "./solana.ts";
 import { evmSwap } from "../swaps/evm-swap.ts";
 import { solanaSwap } from "../swaps/solana-swap.ts";
@@ -23,7 +22,6 @@ const CORE_RECIPES: readonly ToolRecipe[] = [
   sendEvmTransaction,
   sendSolanaTransaction,
   withdrawUsdc,
-  moveHolding,
 ] as readonly ToolRecipe[];
 
 /**

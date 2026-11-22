@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { AuniNote } from "@/components/cards/auni-note";
-import { brandHue, useBrandColors } from "@/components/specialist/brand-colors";
+import { brandHue, useBrandColors } from "@/components/brand/brand-colors";
 import { useMinute } from "@/components/places/use-places";
 import { AUNI_HUE, DawnChart, type ChartHue } from "@/components/portfolio/dawn-chart";
 import {

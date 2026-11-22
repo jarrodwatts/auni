@@ -717,7 +717,7 @@ describe("bridge_usdc", () => {
       });
     });
 
-    it("always asks, even in a specialist that acts on its own", async () => {
+    it("always asks, even in a thread set to act on its own", async () => {
       stub(wethQuote);
       const preview = await acrossBridge.describe(buy, context);
       const leg = {
@@ -729,8 +729,8 @@ describe("bridge_usdc", () => {
         feesUsd: null,
       };
       expect(leg.direction).toBe("buy");
-      const specialist = { actsOnItsOwn: true, freeCashCents: 10_000n, holds: new Map() };
-      expect(permissionDecision({ specialist, legs: [leg] })).toBe("ask");
+      const thread = { actsOnItsOwn: true, freeCashCents: 10_000n, holds: new Map() };
+      expect(permissionDecision({ thread, legs: [leg] })).toBe("ask");
     });
 
     it("puts up no card when fees would swallow what it sends", async () => {

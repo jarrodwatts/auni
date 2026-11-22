@@ -4,7 +4,7 @@ import { appListing, type AppWire } from "@auni/shared";
 import { ArrowRight } from "lucide-react";
 import type { CSSProperties } from "react";
 
-import { AssetLogo } from "@/components/specialist/marks";
+import { AssetLogo } from "@/components/brand/marks";
 import { cn } from "@/lib/utils";
 
 import { AppMark, appTint } from "./app-mark";

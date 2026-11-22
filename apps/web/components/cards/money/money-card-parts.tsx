@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 
 import { EDGE_SIZE, EdgeMascot } from "@/components/brand/edge-mascot";
 import { headroom, wantsAuni, type EdgeScene } from "@/components/brand/edge-pose";
-import { LogoImage, Monogram } from "@/components/specialist/marks";
+import { LogoImage, Monogram } from "@/components/brand/marks";
 import { IntegrationMark } from "@/components/integrations/integration-mark";
 import { AutoHeight } from "@/components/motion/auto-height";
 import { TextSwap } from "@/components/motion/text-swap";

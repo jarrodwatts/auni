@@ -47,7 +47,7 @@ short, complete one. The parts that matter:
   makes no card (`../money/fee-coin.ts`), so a recipe never checks fees itself and execute
   changes nothing: the wallet it is handed buys the coin as its first send needs it, once for
   the card. Every drawing of the card says the purchase (`../money/fee-coin-said.ts`), it
-  counts in a specialist's pot and a plan's sums, and a move whose coin never came fails as
+  counts in an Auto thread's budget and a plan's sums, and a move whose coin never came fails as
   `fees`, which Try again runs without buying again.
 - `about`: what the move is about (a `Subject` in `recipe.ts`, or null), which its card's picture
   is drawn from.

@@ -44,13 +44,13 @@ export function picksChosen(message: AuniUiMessage): readonly PickWeighed[] | nu
 }
 
 /** The step that makes a take's card, whose picks the card's outline wears. */
-const PROPOSAL = "propose_specialist_portfolio";
+const PROPOSAL = "propose_actions";
 /** The market search, whose picks the pile lands. */
 const FIND_PICKS = "find_instruments";
 /** The steps that read the web, whose sites the reading pile lands. */
 const WEB_STEPS = new Set(["WebSearch", "WebFetch"]);
 /** The steps that make a position's card. */
-const CARD_STEPS = new Set([PROPOSAL, "propose_actions"]);
+const CARD_STEPS = new Set([PROPOSAL]);
 
 /** Whether a turn is reading the web right now: a search or a page it has asked for and not had. */
 export function readingTheWeb(message: AuniUiMessage): boolean {

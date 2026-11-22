@@ -1,15 +1,14 @@
 "use client";
 
-import type { ActivityItemWire, SpecialistId } from "@auni/shared";
+import type { ActivityItemWire, ThreadId } from "@auni/shared";
 import { ReceiptText } from "lucide-react";
 import { useState } from "react";
 
 import { ThreadFailureNotice } from "@/components/app/thread-failure-notice";
-import { SpecialistOrb } from "@/components/specialist/specialist-orb";
 import { PlaceHeader } from "@/components/places/place-header";
 import { useMinute, usePlaces } from "@/components/places/use-places";
 import { AuniSheet } from "@/components/ui/auni-sheet";
-import type { Specialist } from "@/lib/data/views";
+import type { Thread } from "@/lib/data/views";
 import { useMediaQuery } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
 
@@ -20,18 +19,20 @@ import { useActivity, useSeeActivity } from "./use-activity";
 const READ_FAILURE = { message: "Your activity couldn't load.", action: "reload" } as const;
 
 /**
- * What happened to their money, like a mail app: the list down the left,
- * filtered to one specialist or not, and whatever is picked opened as a
- * receipt on the right, so they can read down it without leaving. Without
- * the room, a tap opens the receipt as a sheet. Looking clears what's unread.
+ * What happened to their money: the list down the left, optionally filtered to
+ * one thread, and the selected item's receipt on the right (or a sheet on
+ * smaller screens).
  */
-export function ActivityScreen({ initialOnly }: { readonly initialOnly: SpecialistId | null }) {
+export function ActivityScreen({ initialOnly }: { readonly initialOnly: ThreadId | null }) {
   const [only, setOnly] = useState(initialOnly);
   const activity = useActivity(only);
   const fresh = useSeeActivity(activity.data);
-  const specialists = usePlaces().specialists.map(({ specialist }) => specialist);
-  const owners = new Map(specialists.map((specialist) => [specialist.id, specialist]));
-  // The receipt sits beside the list where the money pane would; below that, it's a sheet.
+  const { chats, archived } = usePlaces();
+  const allThreads = [...chats, ...archived].map(({ thread }) => thread);
+  const threadsById = new Map(allThreads.map((thread) => [thread.id, thread]));
+  const filterThreads = allThreads.filter(
+    (thread) => thread.moveCount > 0 || thread.id === only,
+  );
   const wide = useMediaQuery("(min-width: 1280px)");
   const roomy = useMediaQuery("(min-width: 1024px)");
   const [picked, setPicked] = useState<string | null>(null);
@@ -39,8 +40,8 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: Speciali
 
   const items = activity.data?.items ?? [];
   const open = items.find(({ id }) => id === picked) ?? (wide ? items[0] : undefined);
-  const ownerOf = (item: ActivityItemWire) =>
-    item.specialistId ? owners.get(item.specialistId) : undefined;
+  const threadOf = (item: ActivityItemWire) =>
+    item.threadId ? threadsById.get(item.threadId) : undefined;
   const pick = (item: ActivityItemWire) => {
     setPicked(item.id);
     if (!wide) setSheetOpen(true);
@@ -58,7 +59,7 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: Speciali
           <div className="mx-auto w-full max-w-[760px] px-4 pt-6 pb-16 sm:px-8">
             <h2 className="text-amount tracking-[-0.02em] text-ink max-sm:hidden">Activity</h2>
             <Chips
-              specialists={specialists}
+              threads={filterThreads}
               only={only}
               onChange={(next) => {
                 setOnly(next);
@@ -81,14 +82,13 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: Speciali
             ) : items.length === 0 ? (
               <p className="py-16 text-center text-[14px] text-muted-foreground">
                 {only
-                  ? `Nothing has happened in ${owners.get(only)?.name ?? "this specialist"} yet.`
+                  ? `Nothing has happened in ${threadsById.get(only)?.title ?? "this thread"} yet.`
                   : "Nothing has happened to your money yet."}
               </p>
             ) : (
               <ActivityList
                 items={items}
                 fresh={fresh}
-                ownerOf={ownerOf}
                 selected={wide ? open?.id : sheetOpen ? picked : null}
                 onPick={pick}
               />
@@ -100,7 +100,7 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: Speciali
             aria-label="Receipt"
             className="auni-scrollbar-none h-full w-[392px] flex-none overflow-y-auto border-l border-foreground/[0.07]"
           >
-            <ActivityReceipt key={open.id} item={open} owner={ownerOf(open)} />
+            <ActivityReceipt key={open.id} item={open} thread={threadOf(open)} />
           </aside>
         ) : null}
       </div>
@@ -112,7 +112,7 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: Speciali
           title={open.title}
         >
           <div className="auni-scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
-            <ActivityReceipt item={open} owner={ownerOf(open)} />
+            <ActivityReceipt item={open} thread={threadOf(open)} />
           </div>
         </AuniSheet>
       ) : null}
@@ -120,20 +120,19 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: Speciali
   );
 }
 
-/** Everything, or one specialist's, each chip wearing its orb. */
 function Chips({
-  specialists,
+  threads,
   only,
   onChange,
 }: {
-  readonly specialists: readonly Specialist[];
-  readonly only: SpecialistId | null;
-  readonly onChange: (only: SpecialistId | null) => void;
+  readonly threads: readonly Thread[];
+  readonly only: ThreadId | null;
+  readonly onChange: (only: ThreadId | null) => void;
 }) {
-  if (specialists.length === 0) return null;
+  if (threads.length === 0) return null;
   const chip = (on: boolean) =>
     cn(
-      "flex h-9 flex-none items-center gap-2 rounded-full border px-4 text-[14px] font-medium transition-colors",
+      "flex h-9 max-w-[220px] flex-none items-center gap-2 rounded-full border px-4 text-[14px] font-medium transition-colors",
       on
         ? "border-foreground bg-foreground text-background"
         : "border-foreground/[0.08] text-ink hover:bg-surface",
@@ -148,16 +147,15 @@ function Chips({
       >
         Everything
       </button>
-      {specialists.map((specialist) => (
+      {threads.slice(0, 8).map((thread) => (
         <button
-          key={specialist.id}
+          key={thread.id}
           type="button"
-          aria-pressed={only === specialist.id}
-          onClick={() => onChange(specialist.id)}
-          className={cn(chip(only === specialist.id), "pl-2.5")}
+          aria-pressed={only === thread.id}
+          onClick={() => onChange(thread.id)}
+          className={chip(only === thread.id)}
         >
-          <SpecialistOrb specialist={specialist} size={18} />
-          {specialist.name}
+          <span className="truncate">{thread.title}</span>
         </button>
       ))}
     </div>
@@ -167,13 +165,11 @@ function Chips({
 function ActivityList({
   items,
   fresh,
-  ownerOf,
   selected,
   onPick,
 }: {
   readonly items: readonly ActivityItemWire[];
   readonly fresh: ReadonlySet<string>;
-  readonly ownerOf: (item: ActivityItemWire) => Specialist | undefined;
   readonly selected: string | null | undefined;
   readonly onPick: (item: ActivityItemWire) => void;
 }) {
@@ -187,7 +183,6 @@ function ActivityList({
             <Row
               item={item}
               fresh={fresh.has(item.id)}
-              owner={ownerOf(item)}
               selected={item.id === selected}
               onPick={() => onPick(item)}
             />
@@ -198,21 +193,14 @@ function ActivityList({
   ));
 }
 
-/**
- * Its mark, what happened over whose and when, and the amount at the edge.
- * Something done to them that leaves them a decision sits on a faint red;
- * what was new when they came to look reads heavier until they leave, as an unread chat does.
- */
 function Row({
   item,
   fresh,
-  owner,
   selected,
   onPick,
 }: {
   readonly item: ActivityItemWire;
   readonly fresh: boolean;
-  readonly owner: Specialist | undefined;
   readonly selected: boolean;
   readonly onPick: () => void;
 }) {
@@ -234,7 +222,7 @@ function Row({
       )}
     >
       <span className="flex flex-none">
-        <ItemMark item={item} owner={owner} size={40} />
+        <ItemMark item={item} size={40} />
       </span>
       <span className="min-w-0 flex-1">
         <span className={cn("block truncate text-ui text-ink", fresh && "font-semibold")}>

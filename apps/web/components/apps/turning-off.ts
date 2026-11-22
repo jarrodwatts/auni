@@ -1,4 +1,4 @@
-import { listed, type AppWire } from "@auni/shared";
+import type { AppWire } from "@auni/shared";
 
 import { formatUsd } from "@/lib/money";
 
@@ -8,7 +8,7 @@ export type TurningOff =
   | { readonly kind: "free" }
   /** Money sits there, so the sheet first says what off means. */
   | { readonly kind: "question"; readonly title: string; readonly says: readonly string[] }
-  /** It can't be turned off now; `fix` is the message that starts a chat to change that. */
+  /** It can't be turned off now; `fix` is the message that starts a thread to change that. */
   | {
       readonly kind: "refused";
       readonly title: string;
@@ -27,16 +27,11 @@ export function turningOff(app: AppWire, name: string): TurningOff {
     };
   const usd = app.account?.usd;
   if (!usd || Number(usd) < 0.01) return { kind: "free" };
-  const team = app.account?.specialists ?? [];
-  const too =
-    team.length === 0
-      ? ""
-      : `, and ${listed(team)}, your ${team.length === 1 ? "specialist" : "specialists"} with money there, will stop too`;
   return {
     kind: "question",
     title: `Turn ${name} off?`,
     says: [
-      `Auni will stop acting there${too}.`,
+      "Auni will stop acting there.",
       `Your ${formatUsd(usd)} stays yours and stays in your portfolio, and anything you already allowed still finishes.`,
     ],
   };

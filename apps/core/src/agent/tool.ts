@@ -7,7 +7,6 @@ import { errorWords } from "../safe-words.ts";
 /** The turn a tool call acts for; loaded server-side from the turn token, never from the agent. */
 export interface ToolTurn {
   readonly threadId: string;
-  readonly specialistId: string | null;
 }
 
 export interface AuniTool<Shape extends ZodRawShape = ZodRawShape> {

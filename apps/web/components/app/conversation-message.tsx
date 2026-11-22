@@ -67,7 +67,7 @@ interface ConversationMessageProps {
 }
 
 /** Cards that move money, whose words stay beside them rather than fold into the work. */
-const MONEY_CARDS = new Set<string>(["action", "action_plan", "specialist_proposal"]);
+const MONEY_CARDS = new Set<string>(["action", "action_plan"]);
 
 export function ConversationMessage({
   answering,

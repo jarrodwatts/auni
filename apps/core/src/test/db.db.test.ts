@@ -18,7 +18,7 @@ it("empties the tables though a query the last test left running deadlocks with 
         async () => {
           const [waiting] = await db.execute<{ count: number }>(
             sql`select count(*)::int as count from pg_stat_activity
-                where wait_event_type = 'Lock' and query like 'truncate specialists, threads, actions, % fills cascade'`,
+                where wait_event_type = 'Lock' and query like 'truncate threads, actions, % fills cascade'`,
           );
           expect(waiting!.count).toBe(1);
         },

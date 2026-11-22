@@ -4,7 +4,6 @@ import type { Approved } from "../approved.ts";
 import {
   tradedToken,
   type ActionPreview,
-  type SpecialistHolds,
   type ExecuteResult,
   type Recipe,
   type Signer,
@@ -42,7 +41,7 @@ const input = {
     .positive()
     .optional()
     .describe(
-      "Shares to buy or sell, as the portfolio shows them. To sell every share held, leave this and amountUsd out; for a specialist, that is every share it holds.",
+      "Shares to buy or sell, as the portfolio shows them. Leave this and amountUsd out to sell every share held.",
     ),
   chain: z
     .enum(["monad", "solana"])
@@ -128,13 +127,11 @@ async function previewOnMonad(
   stock: XStock,
   trade: StockTradeInput,
   owner: () => Promise<string | null>,
-  specialistHolds?: SpecialistHolds,
 ): Promise<ActionPreview> {
   const price = await twinPrice(stock);
   return previewEvmSwap(monadInput(stock, trade, price), owner, {
     ...onMonad(price),
     maxLossPct: MAX_STOCK_LOSS_PCT,
-    specialistHolds,
     stock,
     // Shares named for a sale may be held on Solana; then they sell there.
     mustHold: trade.side === "sell" && trade.chain === undefined,
@@ -164,10 +161,7 @@ function checkSize(trade: StockTradeInput): void {
  * saying what Monad answered, so the agent can judge that path; a trade pinned to Monad gets that
  * answer as its error instead.
  */
-async function describeTrade(
-  trade: StockTradeInput,
-  specialistHolds: SpecialistHolds | undefined,
-): Promise<ActionPreview> {
+async function describeTrade(trade: StockTradeInput): Promise<ActionPreview> {
   checkSize(trade);
   const stock = await findXStock(trade.stock);
   const onSolana = () =>
@@ -175,12 +169,11 @@ async function describeTrade(
       maxLossPct: MAX_STOCK_LOSS_PCT,
       stock,
       owner: solanaAddress,
-      specialistHolds,
     });
   if (trade.chain === "solana") return stockCard(stock, trade, "solana", await onSolana());
 
-  const monad = await previewOnMonad(stock, trade, evmAddress, specialistHolds).catch(
-    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  const monad = await previewOnMonad(stock, trade, evmAddress).catch((error: unknown) =>
+    error instanceof Error ? error.message : String(error),
   );
   if (typeof monad !== "string") return stockCard(stock, trade, "monad", monad);
   const reason = monad + (await marketNote(stock));
@@ -227,16 +220,14 @@ async function executeTrade(
   trade: StockTradeInput,
   wallets: Signer,
   approved: Approved,
-  specialistHolds: SpecialistHolds | undefined,
 ): Promise<ExecuteResult> {
   checkSize(trade);
   const stock = await findXStock(trade.stock);
   if (approved.details.chain !== "monad")
-    return executeSolanaSwap(solanaInput(stock, trade), wallets, approved, { specialistHolds });
+    return executeSolanaSwap(solanaInput(stock, trade), wallets, approved);
   const price = await twinPrice(stock);
   return executeEvmSwap(monadInput(stock, trade, price), wallets, approved, {
     ...onMonad(price),
-    specialistHolds,
     stock,
   });
 }
@@ -274,7 +265,7 @@ export const stockTrade: Recipe<typeof input> = {
   // A Monad trade sets an exact allowance and reads what it got from the wallet's balance, which
   // another at the same time would upset.
   lane: ({ details }) => (details.chain === "monad" ? "monad-stocks" : null),
-  describe: (trade, { specialistHolds }) => describeTrade(trade, specialistHolds),
+  describe: (trade) => describeTrade(trade),
   direction: (trade) => trade.side,
   fundedFrom: ({ input: trade, details }) =>
     trade.side === "buy" && (details.chain === "monad" || details.chain === "solana")
@@ -282,8 +273,7 @@ export const stockTrade: Recipe<typeof input> = {
       : null,
   about: ({ input: trade, details, amountUsd }) =>
     tradedToken(details, trade.side === "buy" ? Number(amountUsd) : 0),
-  execute: ({ input: trade, wallets, action, specialistHolds }) =>
-    executeTrade(trade, wallets, action, specialistHolds),
+  execute: ({ input: trade, wallets, action }) => executeTrade(trade, wallets, action),
   // Read back as the swap it ran as, on the chain its card was approved for.
   readBack: ({ action, input: trade, evmAddress, solanaAddress }) =>
     action.details.chain === "monad"

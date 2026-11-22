@@ -1,36 +1,13 @@
 "use client";
 
-import type { SpecialistId, ThreadId } from "@auni/shared";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import type { ThreadId } from "@auni/shared";
 
 import { COMPOSER_DOCK_CLASS_NAME, ComposerLoadingSurface } from "@/components/app/composer-shell";
 import { ConversationHistoryPreview } from "@/components/app/conversation-history-preview";
 import { ThreadHistoryLoading } from "@/components/app/thread-history-loading";
 import { ThreadPane } from "@/components/app/thread-pane";
-import { useThreads } from "@/components/app/use-threads";
-import { getSpecialistThread } from "@/lib/data/places";
 
-/**
- * A specialist's one thread. The sidebar's list already knows every one that
- * has said something; one that hasn't gets its thread made on first visit.
- */
-export function useSpecialistThread(specialistId: SpecialistId): ThreadId | null {
-  const { loading, rememberThread, threads } = useThreads();
-  const listed = threads.find((thread) => thread.specialistId === specialistId);
-  const made = useQuery({
-    queryKey: ["specialist-thread", specialistId],
-    queryFn: ({ signal }) => getSpecialistThread(specialistId, signal),
-    enabled: !loading && !listed,
-    staleTime: Infinity,
-  });
-  useEffect(() => {
-    if (made.data) rememberThread(made.data);
-  }, [made.data, rememberThread]);
-  return listed?.id ?? made.data?.id ?? null;
-}
-
-/** A place's conversation, or its quiet stand-in while its thread is found. */
+/** A thread's conversation, or its quiet stand-in while its thread is found. */
 export function PlaceConversation({
   threadId,
   placeholder,

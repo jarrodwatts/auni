@@ -69,7 +69,7 @@ describe("a card whose recipe says what it would send", () => {
 
   it("is checked against the chain's fees, and is no card where the wallet is short and nothing can buy the coin", async () => {
     vi.mocked(ownGas).mockResolvedValue({ short: "Too little POL for gas.", fee: 1n });
-    await expect(prepareLeg(recipe(137), {}, { specialistId: null })).rejects.toThrow(
+    await expect(prepareLeg(recipe(137), {})).rejects.toThrow(
       "Too little POL for gas. Right now the wallet holds some of the chain's own coin for fees on Monad",
     );
     expect(ownGas).toHaveBeenLastCalledWith(137, expect.any(String), calls);
@@ -77,10 +77,10 @@ describe("a card whose recipe says what it would send", () => {
 
   it("is drawn as the recipe made it where the wallet can pay, or a sponsor does", async () => {
     vi.mocked(ownGas).mockResolvedValue({ short: null, fee: 1n });
-    const { preview } = await prepareLeg(recipe(137), {}, { specialistId: null });
+    const { preview } = await prepareLeg(recipe(137), {});
     expect(preview.details).toBeUndefined();
     vi.mocked(ownGas).mockClear();
-    await prepareLeg(recipe(NETWORKS.base.viem.id), {}, { specialistId: null });
+    await prepareLeg(recipe(NETWORKS.base.viem.id), {});
     expect(ownGas).not.toHaveBeenCalled();
   });
 });

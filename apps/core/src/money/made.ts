@@ -1,7 +1,7 @@
 import { and, eq, gt, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "../db/client.ts";
-import { arrivals, fills, otherTokens } from "../db/schema.ts";
+import { arrivals, otherTokens } from "../db/schema.ts";
 import { isPlainCash } from "./coins.ts";
 import { fillIdentity, type FillKey } from "./fill-key.ts";
 import { fillsWithLeverage, flowsFrom, type Flow } from "./flows.ts";
@@ -54,8 +54,7 @@ export function unpricedOf(
 
 /**
  * Money the owner's trades moved into holdings, and money that came in or
- * went out from outside Auni, oldest first. A specialist holds only what
- * its fills bought, so money arriving is never one's (see specialistFlows).
+ * went out from outside Auni, oldest first.
  */
 export async function walletFlows(): Promise<Flow[]> {
   const [traded, arrived] = await Promise.all([
@@ -123,11 +122,4 @@ async function arrivalFlows(): Promise<Flow[]> {
       key: fillIdentity(row),
     })),
   ];
-}
-
-/** The same for each of these specialists, by id; one with no trades has none. */
-export async function specialistFlows(ids: readonly string[]): Promise<Map<string, Flow[]>> {
-  const rows =
-    ids.length === 0 ? [] : await fillsWithLeverage(inArray(fills.specialistId, [...ids]));
-  return new Map(ids.map((id) => [id, flowsFrom(rows.filter((fill) => fill.specialistId === id))]));
 }

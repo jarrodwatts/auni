@@ -9,7 +9,7 @@ import {
 import { requestCore } from "@/lib/core";
 
 /**
- * A specialist card's legs, live from core: GET /proposals/:id, one tap that
+ * A plan card's legs, live from core: GET /proposals/:id, one tap that
  * allows or declines every waiting leg (POST /proposals/:id/allow,
  * /decline), and Try again on the ones that didn't go through (/retry).
  */
@@ -37,14 +37,12 @@ export interface LiveProposal {
   readonly legs: readonly LiveLeg[];
   /** Non-null only for a signed-in person whose waiting legs are short of money. */
   readonly funding: ProposalFunding | null;
-  /** The specialist's first money going in, whose success is celebrated. */
-  readonly opens: boolean;
   /** How many runs its legs have had between them, which Try again says it saw. */
   readonly runs: number;
 }
 
 export function toLiveProposal(body: unknown): LiveProposal {
-  const { actions, funding, opens } = proposalWireSchema.parse(body);
+  const { actions, funding } = proposalWireSchema.parse(body);
   return {
     legs: actions.map(({ id, status, error, failureKind, retryable, phase, run }) => ({
       id,
@@ -57,7 +55,6 @@ export function toLiveProposal(body: unknown): LiveProposal {
       filledUsd: filledUsd(run),
     })),
     funding,
-    opens,
     runs: actions.reduce((sum, action) => sum + action.attempts, 0),
   };
 }

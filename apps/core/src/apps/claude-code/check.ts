@@ -4,11 +4,35 @@ import { homedir, platform } from "node:os";
 import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
 
+import type { BrainModelWire } from "@auni/shared";
+
 import { scratchDir } from "../../agent/box.ts";
 import type { BrainCheck } from "../contract.ts";
 import { claudeCli } from "./cli.ts";
 import { loginOf } from "./events.ts";
 import { childEnv } from "./options.ts";
+
+/** Aliases Claude Code resolves to the newest release of each tier the login can use. */
+const CLAUDE_MODELS: readonly BrainModelWire[] = [
+  {
+    id: "opus",
+    name: "Claude Opus",
+    efforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultEffort: "high",
+    isDefault: true,
+  },
+  {
+    id: "sonnet",
+    name: "Claude Sonnet",
+    efforts: ["low", "medium", "high", "max"],
+    defaultEffort: "medium",
+  },
+  {
+    id: "haiku",
+    name: "Claude Haiku",
+    efforts: [],
+  },
+];
 
 /** Where the owner's Claude Code keeps its login: hidden from every brain's box. */
 export function secrets(): readonly string[] {
@@ -67,7 +91,8 @@ export async function check(signal: AbortSignal): Promise<BrainCheck> {
   const status = await authStatus(signal);
   if (!status.loggedIn) return { ready: false, why: "signed-out", fix: loginFix() };
   // A key bills every token, whatever plan the account has.
-  if (status.apiKeySource) return { ready: true, login: loginOf(status.apiKeySource) };
+  if (status.apiKeySource)
+    return { ready: true, login: loginOf(status.apiKeySource), models: CLAUDE_MODELS };
   const plan = status.subscriptionType
     ?.replace(/^claude[\s_]*/iu, "")
     .replace(/^\w/u, (first) => first.toUpperCase());
@@ -75,5 +100,6 @@ export async function check(signal: AbortSignal): Promise<BrainCheck> {
     ready: true,
     login: plan ? `your Claude ${plan} subscription` : "your Claude login",
     ...(status.email ? { signedInAs: status.email } : {}),
+    models: CLAUDE_MODELS,
   };
 }

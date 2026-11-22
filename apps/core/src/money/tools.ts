@@ -12,16 +12,10 @@ import { z } from "zod";
 import { fenced } from "../agent/fence.ts";
 import { firstBridge } from "../apps/registry.ts";
 import { defineTool, failure, result, type AuniTool, type ToolTurn } from "../agent/tool.ts";
+import { waitingElsewhere } from "../conversation/context.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
-import {
-  actionCard,
-  fromSpecialist,
-  moveCards,
-  planAction,
-  pricedLater,
-  rowLine,
-} from "./action-card.ts";
+import { actionCard, moveCards, planAction, pricedLater, rowLine } from "./action-card.ts";
 import { costsLabel, costsTogether } from "./effect.ts";
 import {
   actionById,
@@ -33,14 +27,14 @@ import {
   proposeAction,
   recordActions,
 } from "./actions.ts";
-import { waitingElsewhere } from "../specialists/context.ts";
 import { replacedNote, replacesInput, retractCardsTool } from "./waiting.ts";
 import { feeCoinsSaid, feeCoinTold } from "./fee-coin-said.ts";
 import { fillIdentity } from "./fill-key.ts";
 import { findInstruments } from "./instruments.ts";
 import { namesLabel } from "./format.ts";
 import { recognisedHow } from "./recognised.ts";
-import { walletCash } from "./funding.ts";
+import { idleBridges, largestShortfall, uncoveredAccounts, walletCash } from "./funding.ts";
+import { placeName } from "./chains.ts";
 import {
   payingHoldings,
   payingMoves,
@@ -51,11 +45,11 @@ import {
 } from "./pay-with-holdings.ts";
 import { addToken, readOtherTokens, tokenOn } from "./other-tokens.ts";
 import { readPortfolio } from "./portfolio.ts";
+import { subjectOf, type Reach } from "./recipe.ts";
 import { cardMoneys, recipes, type ToolRecipe } from "./recipes/index.ts";
-import { moneyLine } from "./summaries.ts";
+import { dollars, moneyLine } from "./summaries.ts";
 import { centsToUsd, usdToCents } from "./usd.ts";
 import { needsStepUp } from "./step-up.ts";
-import type { Reach } from "./recipe.ts";
 
 /** How the owner allows a card that takes proof they are there (auth/proof.ts), for the agent to tell them. */
 const CHECKED_TAP =
@@ -66,13 +60,27 @@ const CHECKED_TAP =
 const planLeg = z.object({
   tool: z.string().min(1).describe('A money tool, e.g. "stock_trade" or "evm_swap".'),
   input: z.record(z.string(), z.unknown()).describe("Exactly what you would pass that tool."),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .optional()
+    .describe('Optional short name for a pick row, e.g. "Eli Lilly" or "NVIDIA".'),
+  why: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe('Optional short reason this pick belongs, e.g. "Makes the leading weight-loss drugs".'),
   note: z
     .string()
     .min(1)
     .max(280)
     .optional()
     .describe(
-      "Your take on this move in your own voice, shown when they open it: one or two short sentences on why it's on the card. A buy says why you'd own it; a move that funds the rest says what it's for: \"NVIDIA trades on Monad, so your cash goes there first.\" Write one for every leg.",
+      "Your take on this move in your own voice, shown when they open it: one or two short sentences on why it's on the card. A buy says why you'd own it; a move that funds the rest says what it's for: \"NVIDIA trades on Monad, so your cash goes there first.\"",
     ),
 });
 
@@ -96,21 +104,19 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
     {
       name: "get_portfolio",
       description:
-        "Live holdings across every wallet and venue: total, per specialist, Other (holdings no " +
-        "specialist holds, and cash orders still waiting hold, `heldForOrders`, which is theirs " +
-        "but not free until the orders fill or are cancelled), Cash (dollar stablecoins, " +
-        "including savings and free margin: the Cash the owner's portfolio and Withdraw show; " +
-        "each holding's `venue` says where it is, `wallet` being what a withdrawal sends and an " +
-        "app's id cash kept there), and " +
-        "`onTheWay`, money bridged or moved into or out of a venue's account that hasn't landed yet. " +
-        "Sources listed under `unavailable` could not be read and are missing from the totals. " +
-        "`looking` lists the networks whose wallet Auni is still looking through for the first " +
-        "time: more may show up there, so say so before judging a total. " +
-        "`averageCostUsd` is what one unit cost on average; without it, nothing records what was " +
-        "paid, so say that rather than judge a gain or loss from the price alone. A perp's is its " +
-        "entry price, and its value is the margin in it, not its size. `cashFreeUsd`, when " +
-        "present, is Cash less what cards still waiting in the owner's other threads count on: " +
-        "plan with that.",
+        "Live holdings across every wallet and venue: total, `assets` (all non-cash holdings, plus " +
+        "cash held for open orders `heldForOrders`, which is theirs but not free until those orders " +
+        "fill or are cancelled), `cash` (dollar stablecoins, including savings and free margin: the " +
+        "Cash Portfolio and Withdraw show; each holding's `venue` says where it is, `wallet` being " +
+        "what a withdrawal sends and an app's id cash kept there), and `onTheWay`, money bridged or " +
+        "moved into or out of a venue's account that hasn't landed yet. Sources listed under " +
+        "`unavailable` could not be read and are missing from the totals. `looking` lists the " +
+        "networks whose wallet Auni is still looking through for the first time: more may show up " +
+        "there, so say so before judging a total. `averageCostUsd` is what one unit cost on average; " +
+        "without it, nothing records what was paid, so say that rather than judge a gain or loss " +
+        "from the price alone. A perp's is its entry price, and its value is the margin in it, not " +
+        "its size. `cashFreeUsd`, when present, is Cash less what cards still waiting in the " +
+        "owner's other threads count on: plan with that.",
       inputSchema: {},
       async handler() {
         const [portfolio, waiting] = await Promise.all([
@@ -156,9 +162,9 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
         "this thread when their next deposit lands within a day. A " +
         `deposit counts when it's cash, a network's own coin, or a token Auni recognises (${recognisedHow()}); any other token counts only ` +
         "if you name it here by its address, since anyone can send a token calling itself " +
-        "anything. End your turn after calling it. Never use it to fund a specialist's picks: " +
-        "propose the card anyway; its own Add money button covers the gap, and one more tap on it " +
-        "buys once the money lands.",
+        "anything. End your turn after calling it. When proposing buys that need more cash, " +
+        "propose the card with propose_actions anyway: its own Add money button covers the gap, " +
+        "and one tap buys once the money lands.",
       inputSchema: {
         network: z
           .enum(NETWORK_KEYS)
@@ -280,11 +286,7 @@ function recipeTool(context: ToolTurn, recipe: ToolRecipe, description: string):
       const outcome = await proposeAction(context, recipe, input, replaces as string[] | undefined);
       const action = actionWire(outcome.action);
       // The web draws this action's card where the agent called the tool, in every mode.
-      const card = await actionCard(
-        outcome.action,
-        recipe,
-        await fromSpecialist(context.specialistId, recipe, outcome.action, outcome.sells),
-      );
+      const card = await actionCard(outcome.action, recipe);
       // What it replaced, and what its card says it buys first for fees, said after the outcome.
       const notes = [replacedNote(outcome.replaced), feeCoinTold([outcome.action])];
       const tail = notes.flatMap((note) => (note ? [` ${note}`] : [])).join("");
@@ -298,8 +300,8 @@ function recipeTool(context: ToolTurn, recipe: ToolRecipe, description: string):
           );
         case "running":
           return result(
-            `Running on its own (action ${action.id}): it fits the specialist's uninvested ` +
-              `money. You'll be woken in this thread once it settles.${tail}`,
+            `Running on its own (action ${action.id}): it fits this thread's auto budget. ` +
+              `You'll be woken in this thread once it settles.${tail}`,
             { status: "running", actionId: action.id, action, card },
           );
       }
@@ -308,40 +310,41 @@ function recipeTool(context: ToolTurn, recipe: ToolRecipe, description: string):
 }
 
 /**
- * Several moves outside a specialist as one card and one Allow: closing three
- * positions takes one tap rather than three cards.
+ * Several moves or a basket of picks as one card and one Allow: closing three
+ * positions, building a basket of stocks/tokens/bets, or proposing a buy when
+ * the wallet needs funding first (the card shows an inline Add money step).
  */
 function proposeActions(context: ToolTurn): AuniTool {
   return {
     name: "propose_actions",
     description:
-      "Offer money moves as ONE card the owner allows with a single tap: closing " +
-      "several positions, selling a few holdings, or a buy with the moves that bring its cash from " +
-      "wherever it sits. Each leg is a money tool call (tool plus its exact input). Use it whenever " +
-      "you'd otherwise put up more than one card in a turn, or for a buy their cash doesn't cover; " +
-      "a single move goes through its own tool. For that buy, " +
-      "the card pays with what they hold that came in as a deposit, and any stablecoins, " +
-      "converting just enough to USDC only once they tap, and says so (pays_with changes which " +
-      "holdings). Every leg is checked and priced first; " +
-      "if any fails, or the cash isn't there for them, nothing is recorded and you get each problem " +
-      "back to fix. Money moves run first, in order, each stage once the one before has landed: " +
-      `moves taking cash out of savings or a venue's account to a wallet, then ${firstBridge().bridge.recipe.tool} moving it ` +
-      "between wallets (bridges run together, so one never sends on what another brings), then " +
-      "deposits into a venue's account; the rest run together once the money has landed, so a buy can't spend " +
-      "what a sale on the same card brings back: sell first, and offer the buy once that cash has " +
-      "landed. With a buy on it, the card shows what's bought, and the moves under it as how it's " +
-      "paid for. If a move fails, what its money was for is skipped and the money waits where it got " +
-      "to; everything else still runs. You " +
-      "are woken once when every leg has settled. " +
-      "Money leaving the account for an outside address, or a move whose card can also check it's the owner, is its own card. For a " +
-      "specialist's picks use propose_specialist_portfolio. The card shows each move, so don't " +
+      "Offer money moves or a basket of picks as ONE card the owner allows with a single tap: " +
+      "buying a basket of stocks/tokens/bets, closing several positions, selling a few holdings, " +
+      "or a buy whose cash needs to be bridged, converted, or added first. Each leg is a money " +
+      "tool call (tool plus its exact input, plus optional short `name`, `why`, and `note`). " +
+      "Use it whenever you'd otherwise put up more than one card in a turn, or for a buy when " +
+      "cash is short (the card includes an Add money button that covers the shortfall once " +
+      "deposited). A single fully funded move goes through its own tool. For a buy short on cash, " +
+      "the card first checks spare cash on other chains, then converts eligible deposits or " +
+      "stablecoins only once they tap (pays_with changes which holdings), and shows Add money " +
+      "for whatever is still short. Every leg is checked and priced first; if any fails, nothing " +
+      "is recorded and you get each problem back to fix. Money moves run first, in order, each " +
+      "stage once the one before has landed: moves taking cash out of savings or a venue's " +
+      `account to a wallet, then ${firstBridge().bridge.recipe.tool} moving it between wallets, ` +
+      "then deposits into a venue's account; the rest run together once the money has landed, so " +
+      "a buy can't spend what a sale on the same card brings back: sell first, and offer the buy " +
+      "once that cash has landed. With a buy on it, the card shows the picks, and the cash moves " +
+      "under them as how they are paid for. If a move fails, what its money was for is skipped " +
+      "and the money waits where it got to; everything else still runs. You are woken once when " +
+      "every leg has settled. Money leaving the account for an outside address, or a move whose " +
+      "card can also check it's the owner, is its own card. The card shows each move, so don't " +
       "list them in your reply.",
     inputSchema: {
       title: z
         .string()
         .min(1)
         .max(80)
-        .describe('What the card does, plainly: "Close your Fed rate bets".'),
+        .describe('What the card does, plainly: "Weight-loss drug picks" or "Close your Fed rate bets".'),
       legs: z.array(planLeg).min(1).max(12),
       pays_with: payWithInput,
       replaces: replacesInput,
@@ -349,25 +352,41 @@ function proposeActions(context: ToolTurn): AuniTool {
     async handler(input) {
       const legs = input.legs as z.infer<typeof planLeg>[];
       const { prepared: checked, problems } = await prepareLegs(
-        legs.map((leg) => ({ ...leg, label: leg.tool })),
-        context,
+        legs.map((leg) => ({ ...leg, label: leg.name ?? leg.tool })),
       );
       if (problems.length > 0)
         return failure(
           `Nothing was recorded, and the owner saw nothing: fix or drop these legs quietly and propose again.\n${problems.join("\n")}`,
         );
-      // Short, their own cash comes first, then what they hold, converted on the tap; moves,
-      // past the end of `legs`.
+      // Drop bridges out of an empty wallet so a buy card shows Add money cleanly instead of failing.
       const wallet = await walletCash();
+      const rawCash = checked.map(plannedCash);
+      const hasBuys = rawCash.some((leg) => leg.lands === null && leg.draws !== null);
+      const drop = new Set(hasBuys && wallet ? idleBridges(rawCash, wallet.sendable) : []);
+      const keptChecked = checked.filter((_, index) => !drop.has(index));
+      const keptLegs = legs.filter((_, index) => !drop.has(index));
+      // Short, their own cash comes first, then what they hold, converted on the tap; moves,
+      // past the end of `keptLegs`.
       const paying = wallet
-        ? await payingHoldings(context, checked, wallet, input.pays_with as PayWith[] | undefined)
+        ? await payingHoldings(keptChecked, wallet, input.pays_with as PayWith[] | undefined)
         : [];
-      const prepared = await keepingFees([...checked, ...payingMoves(paying)]);
+      const prepared = await keepingFees([...keptChecked, ...payingMoves(paying)]);
       const cash = prepared.map(plannedCash);
-      await mustBePaid(cash);
-      if (prepared.length === 1)
+      const buys = cash.some((leg) => leg.lands === null && leg.draws !== null);
+      if (buys) {
+        // Ledger accounts cannot be topped up directly by Add money; they need a deposit leg.
+        const account = await uncoveredAccounts(cash);
+        if (account)
+          return failure(
+            `Nothing was recorded, and the owner saw nothing: ${placeName(account.place)} holds ${dollars(account.holdsUsd)} free, ${dollars(account.shortUsd)} short of what this spends there. Add a deposit leg into ${placeName(account.place)} on this card.`,
+          );
+      } else {
+        await mustBePaid(cash);
+      }
+      const shortfall = buys && wallet ? largestShortfall(cash, wallet.spendable) : null;
+      if (prepared.length === 1 && !shortfall)
         return failure(
-          `Nothing was recorded: one move is its own card. Call ${prepared[0]!.recipe.tool} with this input instead.`,
+          `Nothing was recorded: one fully funded move is its own card. Call ${prepared[0]!.recipe.tool} with this input instead.`,
         );
 
       const proposalId = randomUUID();
@@ -377,8 +396,7 @@ function proposeActions(context: ToolTurn): AuniTool {
         proposalId,
         input.replaces as string[] | undefined,
       );
-      // With a buy on it, the moves that bring its cash run under it, as on a specialist's card.
-      const buys = cash.some((leg) => leg.lands === null && leg.draws !== null);
+      // With a buy on it, the moves that bring its cash run under it.
       const isMove = (index: number) => buys && cash[index]!.lands !== null;
       const paysWith = paysWithLines(paying, prepared);
       const buysFirst = feeCoinsSaid(rows);
@@ -390,27 +408,51 @@ function proposeActions(context: ToolTurn): AuniTool {
         shown.map(async (index) => {
           const row = rows[index]!;
           const { recipe, preview } = prepared[index]!;
-          const note = legs[index]?.note;
-          const leg = await actionCard(
-            row,
-            recipe,
-            await fromSpecialist(context.specialistId, recipe, row, preview.sells),
-          );
+          const meta = keptLegs[index];
+          const leg = await actionCard(row, recipe);
+          const subject = subjectOf(recipe, row);
+          const perp =
+            subject?.kind === "perp"
+              ? subject.opens
+                ? {
+                    side: subject.opens.side,
+                    leverage: subject.opens.leverage,
+                    size: dollars(String(subject.opens.sizeUsd)),
+                    ...(subject.opens.liquidationMove !== undefined
+                      ? { liquidationMove: subject.opens.liquidationMove }
+                      : {}),
+                  }
+                : subject.closes
+                  ? {
+                      side: subject.closes.side,
+                      leverage: subject.closes.leverage,
+                      size: dollars(String(subject.closes.sizeUsd)),
+                      closes: { all: subject.closes.all, pnlUsd: subject.closes.pnlUsd },
+                    }
+                  : undefined
+              : undefined;
+          const fillCost =
+            preview.unpriced === "loses on fill" && preview.effect.costs
+              ? costsLabel(preview.effect.costs)
+              : null;
           return {
             actionReference: leg.actionReference,
             tool: leg.tool,
             venue: leg.venue,
             logoUrl: leg.logoUrl,
             logoName: leg.logoName,
+            ...(meta?.name ? { name: meta.name } : {}),
+            ...(meta?.why ? { why: meta.why } : {}),
             summary: leg.summary,
             line: rowLine(leg.card, leg.lines),
-            ...(note ? { note } : {}),
+            ...(meta?.note ? { note: meta.note } : {}),
+            ...(fillCost ? { cost: fillCost } : {}),
+            ...(perp ? { perp } : {}),
             lines: leg.lines,
             details: leg.details,
             card: leg.card,
             amount: leg.amount,
             flow: leg.flow,
-            fromSpecialist: leg.fromSpecialist,
             status: leg.status,
           };
         }),
@@ -432,14 +474,17 @@ function proposeActions(context: ToolTurn): AuniTool {
         legs: planLegs,
       };
       const money = moneyLine(cardMoneys(rows));
-      const counted = `${rows.length} moves${money ? ` (${money})` : ""}`;
+      const counted = `${rows.length} ${rows.length === 1 ? "move" : "moves"}${money ? ` (${money})` : ""}`;
       // One permission decision covers every leg, so they all run or all wait (see recordActions).
       const acting = rows.some((row) => row.status === "running");
       return result(
         [
           acting
-            ? `Running ${counted} now: the specialist acts on its own and they fit its uninvested money.`
+            ? `Running ${counted} now: this thread acts on its own and they fit its remaining budget.`
             : `Proposed ${counted} as one card (proposal ${proposalId}). Nothing has moved.`,
+          shortfall
+            ? `Cash on ${placeName(shortfall.chain)} is ${dollars(shortfall.needUsd)} short, so the card shows Add money first.`
+            : null,
           replacedNote(replaced),
           paysWithNote(paysWith),
           feeCoinTold(rows),

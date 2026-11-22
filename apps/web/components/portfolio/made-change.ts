@@ -9,7 +9,7 @@ export interface MadeReading {
  * What money made from the first reading to the last, and that as a percent
  * of the money at work: the first's value plus each later amount put in or
  * taken out, weighted by the share of the period left after it (Modified
- * Dietz, as specialist returns are). Money added just before the end barely
+ * Dietz). Money added just before the end barely
  * counts, and money taken out was at work until it left. What a reading had
  * put in all told is its value less what it had made.
  */

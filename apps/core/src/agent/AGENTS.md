@@ -13,7 +13,8 @@ model relay: Auni never reads, stores or forwards the login, and the CLI uses it
 owner's terminal. From the web app, on any device, Auni installs a missing CLI into its own tools
 folder or starts the CLI's own sign-in (`agent/sign-in.ts`, `GET /brains`): Codex's page and code,
 or Claude Code's prompt drawn as a terminal, whose typed line goes by a private field to that
-prompt alone. Core picks the brain each turn (`agent/brain.ts`): the one `BRAIN` names first,
+prompt alone. Core picks the brain each turn (`agent/brain.ts`): the thread's or owner's chosen
+`modelSelection` first (carrying brain, model and thinking effort), then the one `BRAIN` names,
 then the first of the others that is logged in. One that reaches its usage limit rests until its
 plan resets; the owner is told when, and which brain answers next. `brainStatus` is what Settings
 shows. Each brain is an app (`apps/claude-code/`, `apps/codex/`).
@@ -26,7 +27,7 @@ shows. Each brain is an app (`apps/claude-code/`, `apps/codex/`).
   `apps/claude-code/run.ts`), Codex by an environment variable its shell never inherits; never
   on a command line, where any process of the owner's could read it.
 - **Its tools**: `toolsFor` in `agent/mcp.ts` decides which a turn has; money tools are
-  `money/tools.ts`, specialist tools `specialists/tools.ts`, watch tools `automations/tools.ts`.
+  `money/tools.ts`, thread tools `conversation/tools.ts`, watch tools `automations/tools.ts`.
   Chain reads (`read_chain`, `money/read-chain.ts`) keep a keyed RPC URL from the agent. Every
   call's input is read by `toolInput` (`agent/tool.ts`) before its tool runs: text that plainly
   means a number, true or false, or a list is read as one, and anything else is refused saying

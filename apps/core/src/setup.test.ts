@@ -9,7 +9,13 @@ const ready: SetupFacts = {
   install: { version: "0.1.0", checkout: false, onPath: true },
   brains: {
     rows: [
-      { id: "claude-code", name: "Claude Code", state: "ready", login: "your Claude Max plan" },
+      {
+        id: "claude-code",
+        name: "Claude Code",
+        state: "ready",
+        login: "your Claude Max plan",
+        models: [],
+      },
       { id: "codex", name: "Codex", state: "not-installed", fix: "npm install -g @openai/codex" },
     ],
     blocked: null,
@@ -123,6 +129,7 @@ describe("nextStep", () => {
             name: "Claude Code",
             state: "resting" as const,
             login: "your Claude Max plan",
+            models: [],
             until: new Date(),
           },
         ],

@@ -59,22 +59,23 @@ export function picksNamed(input: unknown, output: unknown): readonly PickWeighe
 }
 
 /**
- * The picks a proposal (propose_specialist_portfolio) puts on its card, each wearing the logo of
+ * The picks a proposal (propose_actions) puts on its card, each wearing the logo of
  * the candidate it trades (by what its leg names it with), or none; nothing for input it can't read.
  */
 export function picksProposed(input: unknown, found: readonly Candidate[]): readonly PickWeighed[] {
   const proposal = proposalSchema.safeParse(input);
   if (!proposal.success) return [];
-  return proposal.data.legs.map((leg) => {
+  return proposal.data.legs.flatMap((leg) => {
     const said = Object.values(leg.input ?? {}).flatMap((value) =>
       typeof value === "string" ? [value] : [],
     );
     const traded = found.find(
       (candidate) =>
         said.some((value) => names(value, candidate) || sameIdentifier(value, candidate)) ||
-        names(leg.name, candidate),
+        (leg.name ? names(leg.name, candidate) : false),
     );
-    return { name: leg.name, logo: traded?.logoUrl ?? null };
+    const label = leg.name ?? traded?.name;
+    return label ? [{ name: label, logo: traded?.logoUrl ?? null }] : [];
   });
 }
 
@@ -210,6 +211,8 @@ const candidatesSchema = z.object({
 
 const proposalSchema = z.object({
   legs: textAsMeant(
-    z.array(z.object({ name: z.string(), input: z.record(z.string(), z.unknown()).optional() })),
+    z.array(
+      z.object({ name: z.string().optional(), input: z.record(z.string(), z.unknown()).optional() }),
+    ),
   ),
 });

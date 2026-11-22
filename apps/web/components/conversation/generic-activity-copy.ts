@@ -62,9 +62,6 @@ export const TOOL_ICONS: Partial<Record<string, ActivityIcon>> = {
   propose_actions: Wallet,
   retract_cards: Wallet,
   find_instruments: Search,
-  start_specialist: Sparkles,
-  propose_specialist_portfolio: Sparkles,
-  update_specialist: Sparkles,
-  get_specialist: Sparkles,
+  set_thread_autonomy: Sparkles,
   save_routine: BookOpen,
 } satisfies Partial<Record<ConversationToolName, ActivityIcon>>;

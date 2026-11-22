@@ -82,6 +82,7 @@ async function meWire(proved = false): Promise<z.input<typeof meSchema>> {
           ...(brain.restingUntil ? { restingUntil: brain.restingUntil.toISOString() } : {}),
         }
       : { ready: false, fixes: [...brain.fixes] },
+    defaultModelSelection: me.defaultModelSelection ?? null,
     channels,
     home: me.homeChannel,
     welcomed: me.welcomedAt !== null,
@@ -140,6 +141,9 @@ meRouter.patch("/", async (req, res) => {
         ...(xHandle !== undefined ? { xHandle } : {}),
         ...(patch.profile_summary !== undefined
           ? { profileSummary: patch.profile_summary || null }
+          : {}),
+        ...(patch.default_model_selection !== undefined
+          ? { defaultModelSelection: patch.default_model_selection }
           : {}),
       });
       if (patch.brief === null) await releaseHeld(tx);

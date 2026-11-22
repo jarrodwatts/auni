@@ -10,7 +10,7 @@ const GLANCEABLE_USD = new Intl.NumberFormat("en-US", {
 });
 
 /** Whole amounts read as "$80"; anything with cents keeps both digits ("$1,018.40"). */
-export function formatGlanceableUsd(dollars: number): string {
+function formatGlanceableUsd(dollars: number): string {
   return `$${GLANCEABLE_USD.format(dollars)}`;
 }
 

@@ -1,11 +1,10 @@
 "use client";
 
-import type { SpecialistId, ThreadId } from "@auni/shared";
+import type { ThreadId } from "@auni/shared";
 import Link from "next/link";
 import type { ComponentProps, MouseEvent } from "react";
 
 import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
-import { useThreads } from "@/components/app/use-threads";
 import { threadSession } from "@/lib/data/thread-session";
 
 export function isModifiedClick(event: MouseEvent<HTMLAnchorElement>): boolean {
@@ -18,19 +17,14 @@ export function isModifiedClick(event: MouseEvent<HTMLAnchorElement>): boolean {
  * a phone sheet, the sheet closes.
  */
 export function PlaceLink({
-  specialist,
   thread,
   onClick,
   onPointerEnter,
   ...link
 }: ComponentProps<typeof Link> & {
-  readonly specialist?: SpecialistId;
   readonly thread?: ThreadId;
 }) {
   const closeMobileMenu = useCloseMobileThreadMenu();
-  const { threads } = useThreads();
-  const conversation =
-    thread ?? threads.find(({ specialistId }) => specialistId && specialistId === specialist)?.id;
   return (
     <Link
       prefetch
@@ -40,7 +34,7 @@ export function PlaceLink({
         onClick?.(event);
       }}
       onPointerEnter={(event) => {
-        const session = conversation ? threadSession(conversation) : null;
+        const session = thread ? threadSession(thread) : null;
         if (session?.read().history === "loading") void session.resync();
         onPointerEnter?.(event);
       }}

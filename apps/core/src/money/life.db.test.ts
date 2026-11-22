@@ -2,9 +2,9 @@ import { eq, or } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, jobs, specialists, threads } from "../db/schema.ts";
-import { actionJob, reconcileJob, toldSettled } from "../jobs/action.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { actions, jobs } from "../db/schema.ts";
+import { actionJob, reconcileJob } from "../jobs/action.ts";
+import { insertAction, wipe } from "../test/db.ts";
 import { evmClient } from "./chains.ts";
 import { retryRefusal } from "./failure.ts";
 import { begins, step, STEPS, type MoveState, type Step } from "./life.ts";
@@ -141,34 +141,6 @@ const receipts = (status: "success" | "reverted") =>
     .mockReturnValue({ getTransactionReceipt: async () => ({ status }) } as never);
 const landingJobs = async () =>
   (await db.select().from(jobs).where(eq(jobs.kind, "landing"))).length;
-
-describe("a move that settled, told to its thread", () => {
-  // A failed plan's "waiting on your tap" stayed on the team list (2026-11-13): only a decline
-  // cleared a specialist's pulse, and this path, a move failing or going through, cleared none.
-  it("forgets the pulse of the specialist whose card it was, once every leg of the card has settled", async () => {
-    await wipe(specialists, threads);
-    const [own, other] = await Promise.all(
-      ["$3 into NVIDIA proposed, waiting on your tap", "Watching uranium"].map((pulse) =>
-        insertSpecialist({ pulse }),
-      ),
-    );
-    const thread = await insertThread({ specialistId: own!.id });
-    const proposalId = crypto.randomUUID();
-    const leg = (fields: Parameters<typeof insertAction>[0]) =>
-      insertAction({ threadId: thread.id, proposalId, ...fields });
-    const [failed, running] = [await leg({ status: "failed" }), await leg(IN.sending)];
-    const pulses = async () =>
-      Object.fromEntries((await db.select().from(specialists)).map(({ id, pulse }) => [id, pulse]));
-
-    // One leg still runs: the card hasn't settled, so what the agent last said of it stands.
-    await toldSettled(failed);
-    expect(await pulses()).toEqual({ [own!.id]: own!.pulse, [other!.id]: other!.pulse });
-
-    await step(db, "fail", eq(actions.id, running.id));
-    await toldSettled(await rowOf(running.id));
-    expect(await pulses()).toEqual({ [own!.id]: null, [other!.id]: other!.pulse });
-  });
-});
 
 describe("a move whose run was cut off", () => {
   it("runs again when it was still queued: nothing was tried", async () => {

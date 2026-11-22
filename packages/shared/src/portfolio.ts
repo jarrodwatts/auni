@@ -1,8 +1,21 @@
 import { z } from "zod";
 
-import { holdingWireSchema } from "./specialist.ts";
 import { dollarsSchema } from "./money.ts";
 import { NETWORK_KEYS } from "./networks.ts";
+
+/** One holding as a person reads it, on GET /portfolio and in a thread's inspector. */
+export const holdingWireSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Shares, side, or venue: "0.52 shares", "Polymarket, Yes, 12 shares". */
+  detail: z.string(),
+  /** A web-served path or a reviewed https logo; null shows the name's initial. */
+  logoUrl: z.string().nullable(),
+  usdValue: dollarsSchema,
+  /** Since the person's midnight, at today's quantity; null when no price history was readable. */
+  todayChangeUsd: dollarsSchema.nullable(),
+});
+export type HoldingWire = z.infer<typeof holdingWireSchema>;
 
 /**
  * Money sent in from another wallet or exchange that Auni recorded, worth a
@@ -23,7 +36,7 @@ const depositWireSchema = z.object({
 
 export type DepositWire = z.infer<typeof depositWireSchema>;
 
-/** Core's GET /portfolio: the live total, and the money outside every specialist. */
+/** Core's GET /portfolio: the live total, all non-cash holdings, and cash. */
 export const portfolioWireSchema = z.object({
   /** Everything read; a source named in `unavailable` adds nothing to it. */
   totalUsd: dollarsSchema,
@@ -36,9 +49,9 @@ export const portfolioWireSchema = z.object({
    * may not show in the total yet.
    */
   looking: z.array(z.string()),
-  /** Money on its way between networks first ("On the way"), then what one-off chats bought, largest first. */
-  other: z.array(holdingWireSchema),
-  /** Idle dollars outside every specialist. */
+  /** Money on its way between networks first ("On the way"), then every non-cash holding, largest first. */
+  holdings: z.array(holdingWireSchema),
+  /** Free cash across wallets, savings, and venue accounts. */
   cashUsd: dollarsSchema,
   /**
    * How many tokens in their wallets Auni neither recognises nor was told are

@@ -10,20 +10,18 @@ import {
   pauseAutomation,
   resumeAutomation,
 } from "../automations/automations.ts";
+import { publishThread } from "../conversation/threads.ts";
 
 const uuid = z.uuid();
 
 export const automationsRouter = Router();
 
-/** ?thread_id= or ?specialist_id= narrows a list; null when either isn't an id. */
+/** ?thread_id= narrows a list; null when it isn't an id. */
 function listFilter(query: Request["query"]) {
   const threadId = query.thread_id === undefined ? undefined : uuid.safeParse(query.thread_id);
-  const specialistId =
-    query.specialist_id === undefined ? undefined : uuid.safeParse(query.specialist_id);
-  if (threadId?.success === false || specialistId?.success === false) return null;
+  if (threadId?.success === false) return null;
   return {
     ...(threadId ? { threadId: threadId.data } : {}),
-    ...(specialistId ? { specialistId: specialistId.data } : {}),
   };
 }
 
@@ -79,6 +77,7 @@ automationsRouter.patch("/:id", express.json({ limit: "2kb" }), async (req, res)
   }
   try {
     const changed = body.data.paused ? await pauseAutomation(row) : await resumeAutomation(row);
+    void publishThread(changed.threadId);
     res.json({ automation: automationWire(changed) });
   } catch (error) {
     console.error("automation pause change failed", error);
@@ -94,7 +93,9 @@ automationsRouter.delete("/:id", async (req, res) => {
     return;
   }
   try {
-    res.json({ automation: automationWire(await deleteAutomation(row)) });
+    const deleted = await deleteAutomation(row);
+    void publishThread(deleted.threadId);
+    res.json({ automation: automationWire(deleted) });
   } catch (error) {
     console.error("automation delete failed", error);
     res.status(502).json({ error: "automation_delete_failed" });

@@ -6,12 +6,10 @@ import {
   type ActionCardWire,
   type actionCardSchema,
   type CardFace,
-  type specialistProposalCardSchema,
+  type PlanMove,
 } from "@auni/shared";
-import { and, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 
-import { db } from "../db/client.ts";
 import {
   APPROVED_PRICE_AT_LEAST,
   APPROVED_PRICE_AT_MOST,
@@ -19,16 +17,15 @@ import {
   approvedTokens,
 } from "./approved.ts";
 import { isSavings, ledgerAt, appById } from "../apps/registry.ts";
-import { specialists, fills, type ActionRow } from "../db/schema.ts";
+import type { ActionRow } from "../db/schema.ts";
 import { fitted, plainFace } from "./card-face.ts";
 import { LINES } from "./effect.ts";
 import { feeCoinsSaid } from "./fee-coin-said.ts";
 import { goneForGood } from "./gone-for-good.ts";
 import { placeName } from "./chains.ts";
-import { tokenKey, type FillKey } from "./fill-key.ts";
+import { tokenKey } from "./fill-key.ts";
 import { withdrawalFeeUsd } from "./funding.ts";
 import { LOGOS, perpFace, tokenArt, tokenCalled } from "./holdings.ts";
-import { signedQuantity } from "./books.ts";
 import { stagedLeg } from "./proposal-order.ts";
 import { subjectOf, type Money, type Recipe, type Subject } from "./recipe.ts";
 import { recipeForTool, rowMoney } from "./recipes/index.ts";
@@ -37,7 +34,6 @@ import { parseUnits } from "./usd.ts";
 import { stepUpSays } from "./step-up.ts";
 
 type CardVenue = ActionCardWire["venue"];
-type CardMove = z.input<typeof specialistProposalCardSchema>["moves"][number];
 
 /**
  * The mark a money card carries: its app's own where the move is filed under an app that has
@@ -110,9 +106,7 @@ const PRICED = [APPROVED_PROCEEDS, APPROVED_PRICE_AT_MOST, APPROVED_PRICE_AT_LEA
  * What a card of several moves says, before the tap, of the trades on it that wait for its money
  * moves to land: each is priced again when its turn comes, minutes on, and goes only inside what
  * the card shows (see quoteHoldingProceeds and approvedPrice), so one whose market moved past
- * that by then doesn't go. Live, a WETH sale run three minutes after its card, on a thin book,
- * failed its 1% floor, and nothing on the card had said it would be priced again. Null when no
- * priced trade waits.
+ * that by then doesn't go. Null when no priced trade waits.
  */
 export function pricedLater(rows: readonly ActionRow[]): string | null {
   const staged = rows.map(stagedLeg);
@@ -138,16 +132,14 @@ export function pricedLater(rows: readonly ActionRow[]): string | null {
  * The moves that get cash to where a card's picks spend it, in the order they
  * run, so the first that failed is the one that stopped the rest.
  */
-export function moveCards(rows: readonly ActionRow[]): CardMove[] {
+export function moveCards(rows: readonly ActionRow[]): PlanMove[] {
   return rows.toSorted((a, b) => stagedLeg(a).stage - stagedLeg(b).stage).map(moveCard);
 }
 
 /**
  * A move in code's own plain words, never dressed as a pick: "Move $3.73 from Base to Solana".
- * Where from is said in the name, as a card's rows show nothing else: a plan that gathered cash
- * from Base and Arbitrum read "Move $0.99 to Monad" and "Move $0.60 to Monad".
  */
-function moveCard(row: ActionRow): CardMove {
+function moveCard(row: ActionRow): PlanMove {
   const { draws, lands } = stagedLeg(row);
   const amount = dollars(row.amountUsd);
   const [name, from] = fromSavings(row)
@@ -171,7 +163,7 @@ function moveCard(row: ActionRow): CardMove {
               draws && `your ${placeName(draws)} wallet`,
             ];
   return {
-    actionReference: row.id,
+    actionReference: row.id as PlanMove["actionReference"],
     name,
     ...(from ? { from } : {}),
     ...(lands ? { lands } : {}),
@@ -187,7 +179,7 @@ function fromSavings(row: ActionRow): boolean {
 }
 
 /** A move's money as its card carries it, which way it goes included; zero for none. */
-export function cardMoney(money: Money | null): Pick<ActionCardWire, "amount" | "flow"> {
+function cardMoney(money: Money | null): Pick<ActionCardWire, "amount" | "flow"> {
   return {
     amount: {
       baseUnits: parseUnits(money?.usd ?? "0", 6).toString(),
@@ -237,60 +229,6 @@ export async function subjectLogo(
 }
 
 /**
- * The specialist whose holding a move acts on, when it isn't `own`: what it
- * sells, or the perp a close or change of stops works on. One thread may act
- * on another's money, so its card says whose rather than stop it. Null for
- * anything else, or when only `own` holds it.
- */
-export async function fromSpecialist(
-  own: string | null,
-  recipe: Recipe,
-  row: Pick<ActionRow, "input" | "details" | "amountUsd">,
-  sells: FillKey | undefined,
-): Promise<string | null> {
-  const subject = subjectOf(recipe, row);
-  // A perp is held in its app's own ledger, under the app's id (see ledgerAt).
-  const key =
-    sells ??
-    (subject?.kind === "perp" && !subject.opens
-      ? { chain: recipe.venue, instrument: subject.market }
-      : null);
-  if (!key) return null;
-  const rows = await db
-    .select({
-      specialistId: fills.specialistId,
-      name: specialists.name,
-      purpose: specialists.purpose,
-      side: fills.side,
-      quantity: fills.quantity,
-    })
-    .from(fills)
-    .innerJoin(specialists, eq(specialists.id, fills.specialistId))
-    .where(
-      and(
-        eq(fills.chain, key.chain),
-        sql`lower(${fills.instrument}) = ${key.instrument.toLowerCase()}`,
-      ),
-    );
-  // Net filled quantity per specialist, the way the portfolio attributes a holding.
-  const held = new Map<string, { name: string; net: bigint }>();
-  for (const fill of rows) {
-    if (!fill.specialistId) continue;
-    // Its name: its whole purpose would crowd the card's one line.
-    const entry = held.get(fill.specialistId) ?? {
-      name: fill.name.trim() || fill.purpose,
-      net: 0n,
-    };
-    entry.net += signedQuantity(fill);
-    held.set(fill.specialistId, entry);
-  }
-  for (const [id, { name, net }] of held) {
-    if (id !== own && net !== 0n) return name.slice(0, 160);
-  }
-  return null;
-}
-
-/**
  * A face that also says, first among its warnings, where the move sends money nobody could ever
  * spend (see gone-for-good.ts), from where its action pinned money leaving and the tokens its card
  * showed it sending. Whoever wrote the face, it can't leave that out.
@@ -302,12 +240,10 @@ function withLoss(row: Pick<ActionRow, "details">, face: CardFace): CardFace {
   return { ...face, warning: [lost, face.warning].filter(Boolean).join(" ").slice(0, 500) };
 }
 
-/** The web's `action` card for one money action the agent took on its own. */
+/** The web's `action` card for one money action. */
 export async function actionCard(
   row: ActionRow,
   recipe: Recipe,
-  /** What `fromSpecialist` found, if anything. */
-  from: string | null = null,
 ): Promise<z.input<typeof actionCardSchema>> {
   const logo = await subjectLogo(subjectOf(recipe, row), recipe.venue);
   const proofWhy = row.status === "awaiting_permission" ? await stepUpSays(row) : null;
@@ -345,7 +281,6 @@ export async function actionCard(
       ...(row.card ?? fitted(plainFace(said, row.run.lands))),
       ...(buysFirst && { buysFirst }),
     }),
-    ...(from ? { fromSpecialist: from } : {}),
     ...(proofWhy ? { takesProof: true, proofWhy } : {}),
     status: row.status,
     error: row.error?.slice(0, 500) ?? null,

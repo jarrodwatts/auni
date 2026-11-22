@@ -70,7 +70,7 @@ export function failedStep(
 
 /** What closing a held step means, asked once before it does. */
 const CLOSING =
-  "Close it without a record? Auni stops checking, and adds nothing to any specialist's record. Your portfolio still shows what you hold.";
+  "Close it without a record? Auni stops checking, and adds nothing to any thread's record. Your portfolio still shows what you hold.";
 
 /** What a Check again that found nothing new says, in place of why it is held. */
 export const STILL_HELD = "Still no answer. Auni keeps checking by itself.";

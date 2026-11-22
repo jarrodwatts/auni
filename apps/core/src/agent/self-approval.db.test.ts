@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, specialists, threads } from "../db/schema.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { actions, threads } from "../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { toolsFor } from "./mcp.ts";
 
 // No tool the agent holds decides a card, of any kind, in any thread: every Allow and Decline
@@ -28,19 +28,20 @@ beforeAll(() => {
 afterAll(() => vi.restoreAllMocks());
 beforeEach(async () => {
   decided.calls = 0;
-  await wipe(specialists, threads, actions);
+  await wipe(threads, actions);
 });
 
 describe("the agent's tools", () => {
-  it("never decide a card, from Auni's chat or a specialist's", async () => {
-    const specialist = await insertSpecialist();
-    const places = [await insertThread(), await insertThread({ specialistId: specialist.id })];
+  it("never decide a card, in any thread", async () => {
+    const places = [await insertThread(), await insertThread({ actMode: "ask_first" })];
+    const target = places[1]!;
     const asks = await Promise.all(
-      ["stock_trade", "update_specialist"].map((tool) =>
+      ["stock_trade", "set_thread_autonomy"].map((tool) =>
         insertAction({
           tool,
+          threadId: target.id,
           status: "awaiting_permission",
-          input: { specialist_id: specialist.id, act_mode: "within_limits", pot_usd: "100.00" },
+          input: { thread_id: target.id, act_mode: "within_limits", budget_usd: "100.00" },
         }),
       ),
     );
@@ -51,7 +52,7 @@ describe("the agent's tools", () => {
           action_id: id,
           id,
           proposalId: id,
-          specialist_id: specialist.id,
+          thread_id: target.id,
           approve: true,
           decision: "allow",
         };
@@ -70,7 +71,7 @@ describe("the agent's tools", () => {
       const [row] = await db.select().from(actions).where(eq(actions.id, id));
       expect(row?.status).toBe("awaiting_permission");
     }
-    const [row] = await db.select().from(specialists);
+    const [row] = await db.select().from(threads).where(eq(threads.id, target.id));
     expect(row?.actMode).toBe("ask_first");
   });
 });

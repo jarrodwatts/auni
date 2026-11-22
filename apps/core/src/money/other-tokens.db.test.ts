@@ -110,9 +110,7 @@ async function seen() {
 /** One of the agent's tools, called with `input`; what it said. */
 async function tool(name: string, input = {}) {
   const thread = await insertThread();
-  const found = moneyTools({ threadId: thread.id, specialistId: null }).find(
-    (each) => each.name === name,
-  );
+  const found = moneyTools({ threadId: thread.id }).find((each) => each.name === name);
   const outcome = await found!.handler(input);
   return (outcome.content[0] as { text: string }).text;
 }

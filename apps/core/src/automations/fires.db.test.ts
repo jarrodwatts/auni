@@ -243,9 +243,7 @@ describe("a person's watches, bounded", () => {
     const another = () =>
       createAutomation({
         threadId: thread.id,
-        specialistId: null,
         source: "fake",
-        thesis: false,
         condition: { about: "BTC" },
         description: "One more",
         note: "Testing the cap.",
@@ -313,9 +311,7 @@ describe("a source's fires", () => {
       expect(context.watches()).toEqual([]);
       const row = await createAutomation({
         threadId: thread.id,
-        specialistId: null,
         source: "fake",
-        thesis: false,
         condition: { about: "ETH" },
         description: "News on ETH",
         note: "They hold ETH.",

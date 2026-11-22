@@ -31,7 +31,6 @@ describe("executionLane", () => {
     const stock = "stock_trade";
     expect(executionLane(row("a", stock, { chain: "monad" }))).toBe("monad-stocks");
     expect(executionLane(row("b", stock, { chain: "solana" }))).toBe("b");
-    expect(executionLane(row("c", "move_holding"))).toBe("ledger");
     expect(executionLane(row("d", "bridge_usdc"))).toBe("d");
   });
 });

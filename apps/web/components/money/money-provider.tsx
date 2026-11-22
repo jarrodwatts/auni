@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import { useMe } from "@/components/personalization/use-me";
-import { usePortfolio } from "@/components/specialist/use-specialists";
+import { usePortfolio } from "@/components/portfolio/use-portfolio";
 import { depositNetworks, type DepositNetwork, type Portfolio } from "@/lib/data/portfolio";
 
 interface MoneyContextValue {

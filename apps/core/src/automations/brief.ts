@@ -74,12 +74,12 @@ interface HeldFire {
  * reach the owner's chat app on its own, so nothing in it points at what it can't see.
  */
 const WRITE_IT =
-  "short enough to read in a minute: how their money and each specialist stand and moved " +
+  "short enough to read in a minute: how their portfolio and key holdings stand and moved " +
   "since their last brief (read get_portfolio), and what of the items below matters, leading " +
   "with anything that needs them. Greet them, if at all, for the hour it is. It may sit under " +
-  "a chat about something else, or reach their chat app on its own, so name anything it " +
+  "a thread about something else, or reach their chat app on its own, so name anything it " +
   'points to by what it is and where it waits ("the Nvidia buy waiting in your AI Chips ' +
-  'chat"), never as "above" or "below".';
+  'thread"), never as "above" or "below".';
 
 /**
  * What wakes Auni's chat for the brief at `now`. The held reports are others' words, so each

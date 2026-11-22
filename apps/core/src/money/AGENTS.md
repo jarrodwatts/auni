@@ -12,9 +12,9 @@ A move's states and steps, who takes each and what a restart does are one file,
    which asks the recipe's `describe` for the card: a summary, the dollars it spends, and its
    effect (what it gives, gets and grants; `money/effect.ts`).
 2. `recordActions` saves it as an action row and asks `permissionDecision` (`money/permission.ts`).
-   Chats always ask. A specialist set to act on its own runs a buy or sell that fits its pot,
-   with what its card buys for fees, in its own thread only: filed under it from anywhere else,
-   a move asks. One that runs is queued in the same transaction, as an allowed one is (step 4).
+   By default threads ask before every move. An active thread set to Auto (`within_limits`) runs a
+   buy or sell that fits its budget, with what its card buys for fees. One that runs is queued in
+   the same transaction, as an allowed one is (step 4).
 3. Asked: the tool returns a card, which `agent/mcp.ts` seals. The owner taps Allow, which is
    `POST /actions/:id/allow` (`money/routes.ts`): their session alone, plus proof they are
    there (`auth/proof.ts`) when `money/step-up.ts` says so. A tap on a channel's copy of the card
@@ -40,13 +40,12 @@ A move's states and steps, who takes each and what a restart does are one file,
    held: its thread is told once, and its card offers Check again and Close (`money/held.ts`).
    Then the thread wakes to report.
 
-A card that changes Auni itself rather than money (an **ask**: starting a specialist, which only
-Auni's own chat proposes, letting one act on its own or raising its pot, or saving a routine) is an
-action row too, recorded waiting by `recordAsk` (`asks.ts`) with no venue and no dollars, so steps 3
-and 4 decide it on every surface. On Allow, `decideActions` applies it with `applyAsk` in the same
-transaction and marks it done (or failed, with why, when Auni changed since the card), and queues
-nothing but a started specialist's first turn in its own thread; `executeAction` and Try again
-refuse one.
+A card that changes Auni itself rather than money (an **ask**: letting a thread act on its own or
+raising its budget, saving a routine, or turning an app back on) is an action row too, recorded
+waiting by `recordAsk` (`asks.ts`) with no venue and no dollars, so steps 3 and 4 decide it on every
+surface. On Allow, `decideActions` applies it with `applyAsk` in the same transaction and marks it
+done (or failed, with why, when Auni changed since the card); `executeAction` and Try again refuse
+one.
 
 ## Chains
 
@@ -64,7 +63,7 @@ traces, and coin that came in where the wallet spent more of it within one sweep
 
 ## Where things live
 
-- Auni's own recipes (raw transactions, withdraw, move a holding, convert to cash, stock trade):
+- Auni's own recipes (raw transactions, withdraw, convert to cash, stock trade):
   `money/recipes/`. Swaps that ask every route for the best quote: `money/swaps/` (`routes.ts`,
   `evm-swap.ts`; the xStocks catalog in `xstocks.ts`).
 - Cards replaced or taken back: `money/waiting.ts`.
@@ -83,4 +82,4 @@ traces, and coin that came in where the wallet spent more of it within one sweep
   what traded there: `money/statements.ts`, `jobs/statements.ts`.
 - Paying in for fees: `money/pay-in.ts`, which holds the pay-in app's quote to what was asked.
 - What Auni tells a thread unasked of money (a landing, an arrival): `money/news.ts`.
-- A specialist's pot: `money/pot.ts`. The agent's chain reads (`read_chain`): `money/read-chain.ts`.
+- A thread's Auto budget: `money/pot.ts`. The agent's chain reads (`read_chain`): `money/read-chain.ts`.

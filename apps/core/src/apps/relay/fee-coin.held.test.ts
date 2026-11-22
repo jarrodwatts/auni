@@ -429,7 +429,7 @@ describe("the coin a card buys for a chain's fees is held to its card", () => {
     );
   });
 
-  it("is weighed in a specialist's pot with the move it serves, so a pot that fits the move alone asks", async () => {
+  it("is weighed in a thread's budget with the move it serves, so a budget that fits the move alone asks", async () => {
     const shown = await card();
     const leg = {
       direction: "buy" as const,
@@ -440,15 +440,15 @@ describe("the coin a card buys for a chain's fees is held to its card", () => {
       feesUsd: feeCoinUsd(shown.details!),
     };
     expect(leg.feesUsd).toBe("0.25");
-    const pot = (freeCashCents: bigint) =>
+    const budget = (freeCashCents: bigint) =>
       permissionDecision({
-        specialist: { actsOnItsOwn: true, freeCashCents, holds: new Map() },
+        thread: { actsOnItsOwn: true, freeCashCents, holds: new Map() },
         legs: [leg],
       });
     // $2 for the move and a quarter for the coin: $2.25 fits, a cent less asks.
-    expect(pot(225n)).toBe("run");
-    expect(pot(224n)).toBe("ask");
-    expect(pot(200n)).toBe("ask");
+    expect(budget(225n)).toBe("run");
+    expect(budget(224n)).toBe("ask");
+    expect(budget(200n)).toBe("ask");
   });
 
   it("sends the moves of a card that bought none as they are, and no purchase at all", async () => {

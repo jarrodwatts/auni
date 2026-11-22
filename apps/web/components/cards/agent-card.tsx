@@ -6,10 +6,8 @@ import { AskCard } from "./ask-card";
 import type { AskAgentHandler } from "./ask-agent";
 import { ActionCard } from "./money/action-card";
 import { ActionPlanCard } from "./money/action-plan-card";
-import { SpecialistUpdateCard } from "./specialist-update-card";
 import { DepositCard } from "./deposit-card";
 import { FeedbackCard } from "./feedback-card";
-import { SpecialistProposalCard } from "./money/specialist-proposal-card";
 import { VenueEventCard } from "./venue-event-card";
 
 export function AgentCard({
@@ -25,13 +23,9 @@ export function AgentCard({
       return <ActionCard card={card} onAskAgent={onAskAgent} />;
     case "action_plan":
       return <ActionPlanCard card={card} onAskAgent={onAskAgent} />;
-    case "specialist_proposal":
-      return <SpecialistProposalCard card={card} onAskAgent={onAskAgent} />;
     case "automation":
       // One line under the answer stands for every watch it set up (see WatchingLine).
       return null;
-    case "specialist_update":
-      return <SpecialistUpdateCard card={card} />;
     case "ask":
       return <AskCard card={card} />;
     case "app":

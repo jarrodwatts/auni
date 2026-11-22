@@ -36,10 +36,9 @@ function app(fields: Partial<AppWire> = {}): AppWire {
   };
 }
 
-const account = (usd: string | null, specialists: string[] = []) => ({
+const account = (usd: string | null) => ({
   usd,
   holdings: [],
-  specialists,
   moneyIn: null,
   moneyOut: null,
 });
@@ -160,24 +159,14 @@ describe("turningOff", () => {
     expect(turningOff(app({ account: account(null) }), "Venue")).toEqual({ kind: "free" });
   });
 
-  it("first says what off means when money sits there, naming who of the team stops", () => {
-    expect(turningOff(app({ account: account("212", ["Chips"]) }), "Venue")).toEqual({
+  it("first says what off means when money sits there", () => {
+    expect(turningOff(app({ account: account("212") }), "Venue")).toEqual({
       kind: "question",
       title: "Turn Venue off?",
       says: [
-        "Auni will stop acting there, and Chips, your specialist with money there, will stop too.",
+        "Auni will stop acting there.",
         "Your $212 stays yours and stays in your portfolio, and anything you already allowed still finishes.",
       ],
-    });
-    const two = turningOff(app({ account: account("212", ["Chips", "Rates"]) }), "Venue");
-    expect(two).toMatchObject({
-      says: [
-        "Auni will stop acting there, and Chips and Rates, your specialists with money there, will stop too.",
-        expect.any(String),
-      ],
-    });
-    expect(turningOff(app({ account: account("212") }), "Venue")).toMatchObject({
-      says: ["Auni will stop acting there.", expect.any(String)],
     });
   });
 

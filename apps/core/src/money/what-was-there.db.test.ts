@@ -107,7 +107,7 @@ async function trade(
   const action = await insertAction({ tool: "stock_trade", input: { side } });
   await db.transaction((tx) =>
     insertFills(tx, action.id, [
-      { chain, instrument: "native", side, quantity, usdValue: usd, specialistId: null },
+      { chain, instrument: "native", side, quantity, usdValue: usd, threadId: null },
     ]),
   );
   COIN_HELD[NETWORKS[chain].viem.id] = coin * 10n ** 18n;

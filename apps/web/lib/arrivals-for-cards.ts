@@ -3,7 +3,7 @@ import type { ArrivalCardWire, CardWire } from "@auni/shared";
 import { messageCards, type AuniUiMessage } from "./conversation";
 
 /** Cards that put money in, which may wait on money arriving before they can. */
-const MONEY_IN = new Set<CardWire["kind"]>(["specialist_proposal", "action_plan"]);
+const MONEY_IN = new Set<CardWire["kind"]>(["action_plan"]);
 
 /**
  * Money that came in right after an answer whose card puts money in is that card's news: the card

@@ -97,10 +97,6 @@ export function appHref(appId: string): string {
   return `${APPS_HREF}?${APP_SHEET_PARAM}=${encodeURIComponent(appId)}`;
 }
 
-export function specialistHref(specialistId: string): string {
-  return `/app/s/${specialistId}`;
-}
-
 export function chatHref(threadId: string): string {
   return `/app/chat/${threadId}`;
 }

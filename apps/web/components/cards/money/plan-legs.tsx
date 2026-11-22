@@ -1,11 +1,6 @@
 "use client";
 
-import type {
-  ActionStatus,
-  SpecialistProposalLeg,
-  SpecialistProposalMove,
-  FailureKind,
-} from "@auni/shared";
+import type { ActionPlanLeg, ActionStatus, FailureKind, PlanMove } from "@auni/shared";
 
 import type { LiveLeg } from "@/lib/data/proposals";
 
@@ -24,8 +19,15 @@ interface Live {
   readonly held: boolean;
 }
 
-export type Leg = Omit<SpecialistProposalLeg, "status"> &
+export type Leg = Pick<
+  ActionPlanLeg,
+  "actionReference" | "venue" | "logoUrl" | "amount" | "flow" | "note" | "cost" | "perp" | "verbs"
+> &
   Live & {
+    readonly name: string;
+    readonly why: string;
+    /** Optional face logo when a move specifies its own app mark. */
+    readonly card?: ActionPlanLeg["card"];
     /** What its logo shows, by name, drawn as initials without one; a plan's row is named by its move. */
     readonly logoName: string | null;
     /** What it does ("Close", "Open"), said where a card both puts money in and brings some back. */
@@ -33,7 +35,7 @@ export type Leg = Omit<SpecialistProposalLeg, "status"> &
     /** What its row says as it runs, when its own card has words for that; a pick's are made from its name. */
     readonly words?: Words;
   };
-export type Move = Omit<SpecialistProposalMove, "status"> & Live;
+export type Move = Omit<PlanMove, "status"> & Live;
 
 /**
  * A move as its card carried it, with where it stands now: a move that filled
@@ -43,7 +45,7 @@ export function withLive<
   T extends {
     readonly actionReference: string;
     readonly status: ActionStatus;
-    readonly amount?: SpecialistProposalLeg["amount"];
+    readonly amount?: ActionPlanLeg["amount"];
   },
 >(leg: T, live: readonly LiveLeg[] | undefined): T & Omit<Live, "status"> {
   const current = live?.find(({ id }) => id === leg.actionReference);

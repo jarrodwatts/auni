@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { MascotArt } from "@/components/brand/mascot-art";
 import { SiteMark } from "@/components/conversation/site-marks";
-import { LogoImage, Monogram } from "@/components/specialist/marks";
+import { LogoImage, Monogram } from "@/components/brand/marks";
 import type { ReadPage } from "@/lib/pages-read";
 import { nextLandingIn, nextPage, pileOf } from "@/lib/reading-pile";
 

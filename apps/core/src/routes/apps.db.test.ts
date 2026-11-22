@@ -1,5 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
@@ -16,7 +16,6 @@ import {
   arrivalCursors,
   fills,
   jobs,
-  specialists,
   threads,
 } from "../db/schema.ts";
 import { actionKind } from "../jobs/kinds.ts";
@@ -24,7 +23,7 @@ import { decideActions, executeAction } from "../money/actions.ts";
 import { readPortfolio } from "../money/portfolio.ts";
 import { recipeForTool } from "../money/recipes/index.ts";
 import { forgetKept } from "../money/swaps/shared.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { insertThread, wipe } from "../test/db.ts";
 import { queued } from "../test/jobs.ts";
 import {
   PERPS,
@@ -68,12 +67,14 @@ vi.mock(import("../agent/brain.ts"), async (original) => ({
             name: "Claude Code",
             state: "ready" as const,
             login: "your Claude Max subscription",
+            models: [],
           },
           {
             id: "codex",
             name: "Codex",
             state: "not-installed" as const,
             fix: "npm install -g @openai/codex",
+            models: [],
           },
         ]
       : [
@@ -82,12 +83,14 @@ vi.mock(import("../agent/brain.ts"), async (original) => ({
             name: "Claude Code",
             state: "signed-out" as const,
             fix: "claude auth login",
+            models: [],
           },
           {
             id: "codex",
             name: "Codex",
             state: "expired" as const,
             fix: "codex login --device-auth",
+            models: [],
           },
         ],
   pickBrain: async () =>
@@ -132,7 +135,7 @@ beforeEach(async () => {
   delete process.env.APPS_OFF;
   // Each test reads the portfolio afresh, not the reading the one before it shared.
   forgetKept();
-  await wipe(actions, fills, specialists, threads, arrivalCursors, jobs, appTroubles);
+  await wipe(actions, fills, threads, arrivalCursors, jobs, appTroubles);
 });
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
@@ -163,7 +166,10 @@ describe("GET /apps", () => {
     expect(text).not.toContain(KEY);
     const { apps, settingsFile } = appsWireSchema.parse(JSON.parse(text));
     // Where a setting only the owner's file changes is set.
-    expect(settingsFile).toBe(join(home, ".env"));
+    const envPath = join(home, ".env");
+    expect(settingsFile).toBe(
+      envPath.startsWith(`${homedir()}/`) ? `~${envPath.slice(homedir().length)}` : envPath,
+    );
 
     // Only what the owner acts through has a switch; what core's own work runs on has none.
     expect(apps.filter(({ canSwitch }) => canSwitch).map(({ id }) => id)).toEqual(
@@ -233,19 +239,7 @@ describe("GET /apps", () => {
     );
   });
 
-  it("says what the owner holds at each app, from one reading, and who of their team holds it", async () => {
-    const chips = await insertSpecialist({ name: "Chips" });
-    // Chips bought the long.
-    const bought = await insertAction({ specialistId: chips.id, status: "done" });
-    await db.insert(fills).values({
-      actionId: bought.id,
-      specialistId: chips.id,
-      chain: PERPS,
-      instrument: "FAKE",
-      side: "buy",
-      quantity: "2",
-      usdValue: "5.00",
-    });
+  it("says what the owner holds at each app, from one reading", async () => {
     const perps = await app(PERPS);
     expect(perps.account).toEqual({
       usd: "17.34",
@@ -265,7 +259,6 @@ describe("GET /apps", () => {
           usdValue: "5.00",
         },
       ],
-      specialists: ["Chips"],
       // A move of its own puts money in; it says in words how money comes back.
       moneyIn: null,
       moneyOut: expect.stringMatching(/\w/u),

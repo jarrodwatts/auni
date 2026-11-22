@@ -16,7 +16,7 @@ import { useAppDialogs } from "@/components/app/app-dialogs";
 import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
 import type { EdgeScene } from "@/components/brand/edge-pose";
 import type { AskAgentHandler } from "@/components/cards/ask-agent";
-import { LogoImage } from "@/components/specialist/marks";
+import { LogoImage } from "@/components/brand/marks";
 import { TextSwap } from "@/components/motion/text-swap";
 import { WithdrawReviewDialog } from "@/components/withdraw/withdraw-review-dialog";
 import {
@@ -29,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { actionCardContent, figureWidth, withFilled } from "./action-card-content";
-import { FooterMorph, StepError } from "./specialist-funnel";
+import { FooterMorph, StepError } from "./plan-funnel";
 import { FullAddress, isAddress } from "./full-address";
 import { edgeScene } from "./edge-scene";
 import { MoneyButton, MoneyButtons, MoneyCardFrame, MoneyMark } from "./money-card-parts";
@@ -90,10 +90,7 @@ export function ActionCard({
   // Once it fills, it says what it really moved rather than what the card priced.
   const shown = withFilled(card, filledUsd(state.run));
   const content = actionCardContent(shown);
-  // A move on another specialist's holding says whose, so it's never a surprise.
-  const context = [card.fromSpecialist && `From ${card.fromSpecialist}`, content.context]
-    .filter(Boolean)
-    .join(": ");
+  const context = content.context ?? "";
   const landed = watched && state.status === "done";
   useEffect(() => {
     if (!landed) return undefined;

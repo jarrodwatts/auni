@@ -6,42 +6,29 @@ import Link from "next/link";
 import { Fragment, type MouseEvent, type ReactNode } from "react";
 
 import { useStartNew } from "@/components/app/use-start-conversation";
+import { AssetLogo, LogoImage } from "@/components/brand/marks";
 import { Mascot } from "@/components/brand/mascot";
-import { SpecialistOrb } from "@/components/specialist/specialist-orb";
-import { AssetLogo, LogoImage } from "@/components/specialist/marks";
 import { PlaceLink } from "@/components/places/open-place";
-import { specialistHref } from "@/lib/app-links";
-import type { Specialist } from "@/lib/data/views";
+import { chatHref } from "@/lib/app-links";
+import type { Thread } from "@/lib/data/views";
 import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { amountText, TONE_CLASS_NAME } from "./activity-groups";
 
-type Owner = Pick<Specialist, "id" | "theme" | "name"> | undefined;
+type ThreadRef = Pick<Thread, "id" | "title"> | undefined;
 
-/** Something done to them rather than by them: its coin, ringed in the loss color. */
 const OUTSIDE_RING = "flex rounded-full ring-2 ring-negative/70 ring-offset-1";
 
-/**
- * What an item is about, as its row wears it: a move its specialist's orb, a
- * venue acting by itself the coin it acted on, ringed when it leaves them a
- * decision, money arriving its asset.
- */
 export function ItemMark({
   item,
-  owner,
   size,
 }: {
   readonly item: ActivityItemWire;
-  readonly owner: Owner;
   readonly size: number;
 }) {
-  if (item.kind === "move" && owner) return <SpecialistOrb specialist={owner} size={size} />;
-  // A move made in Auni's own chat that is about no one asset (a routine saved, cash brought
-  // back) wears Auni itself, never the initials of the sentence that names it.
   if (!item.logo) return <AuniMark size={size} />;
   const logo = <AssetLogo holding={{ logoUrl: item.logo.src, name: item.logo.name }} size={size} />;
-  // Ringed around the logo, not on it: initials standing in for one draw their own shadow.
   return item.kind === "outside" && item.decision ? (
     <span className={OUTSIDE_RING}>{logo}</span>
   ) : (
@@ -49,7 +36,6 @@ export function ItemMark({
   );
 }
 
-/** Auni, as who made a move: its mascot on a soft round tile, the size of the logos beside it. */
 function AuniMark({ size }: { readonly size: number }) {
   return (
     <span
@@ -62,36 +48,17 @@ function AuniMark({ size }: { readonly size: number }) {
   );
 }
 
-/**
- * One item in full, like a receipt: its mark, what it was and whose, the
- * amount, then what it was made of. A move lists how Auni did it, step by
- * step, with its fee; something a venue did shows the position before and
- * after and why, and offers to ask Auni what now; money that arrived says
- * how much, on which network, and from whom.
- */
 export function ActivityReceipt({
   item,
-  owner,
+  thread,
 }: {
   readonly item: ActivityItemWire;
-  readonly owner: Owner;
+  readonly thread: ThreadRef;
 }) {
   return (
     <div className="flex flex-col px-6 pt-8 pb-7 sm:px-7">
       <div className="flex justify-center">
-        {item.kind === "outside" && item.logo ? (
-          <span className="relative flex">
-            <AssetLogo holding={{ logoUrl: item.logo.src, name: item.logo.name }} size={60} />
-            {owner ? (
-              // The orb draws its own shadow, so its white edge is a disc behind it.
-              <span className="absolute -right-1.5 -bottom-1.5 flex rounded-full bg-popover p-[2px]">
-                <SpecialistOrb specialist={owner} size={24} />
-              </span>
-            ) : null}
-          </span>
-        ) : (
-          <ItemMark item={item} owner={owner} size={60} />
-        )}
+        <ItemMark item={item} size={60} />
       </div>
       <h2 className="mt-3.5 text-center text-[18px] leading-6 font-semibold tracking-[-0.015em] text-ink">
         {item.title}
@@ -117,9 +84,9 @@ export function ActivityReceipt({
       ) : null}
       <div className="mt-6">
         {item.kind === "move" ? (
-          <HowAuniDidIt receipt={item.receipt} owner={owner} />
+          <HowAuniDidIt receipt={item.receipt} thread={thread} />
         ) : item.kind === "outside" ? (
-          <WhatHappened receipt={item.receipt} owner={owner} decision={item.decision} />
+          <WhatHappened receipt={item.receipt} thread={thread} decision={item.decision} />
         ) : (
           <WhatArrived receipt={item.receipt} out={item.amount?.direction === "out"} />
         )}
@@ -128,36 +95,25 @@ export function ActivityReceipt({
   );
 }
 
-/**
- * How Auni did it: a move of one step as its story (what left and what arrived, side by side,
- * then its price, the services it went through and where to see it), else each step down one
- * track, the way it ran, small logos at its stops.
- */
 function HowAuniDidIt({
   receipt,
-  owner,
+  thread,
 }: {
   readonly receipt: Extract<ActivityItemWire, { kind: "move" }>["receipt"];
-  readonly owner: Owner;
+  readonly thread: ThreadRef;
 }) {
   return (
     <>
       {receipt.story ? <Story story={receipt.story} /> : <Steps steps={receipt.steps} />}
-      {owner ? (
-        <PrimaryLink href={specialistHref(owner.id)} specialist={owner}>
-          Open {owner.name}
+      {thread ? (
+        <PrimaryLink href={chatHref(thread.id)} thread={thread}>
+          Open {thread.title}
         </PrimaryLink>
       ) : null}
     </>
   );
 }
 
-/**
- * One move as a small scene: what left and what arrived (or what a position did and what that
- * made or lost) as tiles with an arrow between, each saying where; under them the prices it moved
- * between on one line, highest first, then its price and the services it went through, and its
- * transactions on their chains' explorers.
- */
 function Story({ story }: { readonly story: ActivityStoryWire }) {
   const sides = [story.gave, story.got].filter((side) => side !== null);
   return (
@@ -182,11 +138,7 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
       {story.facts.length > 0 ? (
         <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3">
           {story.facts.map(({ label, value }) => (
-            <div
-              key={label}
-              // A long line of services takes the row to itself.
-              className={cn("min-w-0", value.length > 18 && "col-span-2")}
-            >
+            <div key={label} className={cn("min-w-0", value.length > 18 && "col-span-2")}>
               <dt className="text-caption text-muted-foreground">{label}</dt>
               <dd className="mt-0.5 text-[15px] leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
                 {value}
@@ -219,11 +171,6 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
   );
 }
 
-/**
- * A move's prices on one line, highest first, as a chart would stack them: where a position was
- * entered and closed, or the price then, as solid stops on the line, and each stop-loss or
- * take-profit waiting on it as an open one.
- */
 function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
   return (
     <ol className="mt-5 rounded-[16px] bg-surface px-4 py-1.5">
@@ -249,7 +196,6 @@ function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
   );
 }
 
-/** Each step down one track, the way it ran, small logos at its stops. */
 function Steps({
   steps,
 }: {
@@ -286,14 +232,13 @@ function Steps({
   );
 }
 
-/** The position before and after, why it happened, and, when it's theirs to decide, the way to. */
 function WhatHappened({
   receipt,
-  owner,
+  thread,
   decision,
 }: {
   readonly receipt: Extract<ActivityItemWire, { kind: "outside" }>["receipt"];
-  readonly owner: Owner;
+  readonly thread: ThreadRef;
   readonly decision: boolean;
 }) {
   const startNew = useStartNew();
@@ -307,8 +252,8 @@ function WhatHappened({
       <p className="mt-4 text-center text-[14px] leading-[1.55] text-muted-foreground">
         {receipt.why}
       </p>
-      {!decision ? null : owner ? (
-        <PrimaryLink href={specialistHref(owner.id)} specialist={owner}>
+      {!decision ? null : thread ? (
+        <PrimaryLink href={chatHref(thread.id)} thread={thread}>
           Ask Auni what now
         </PrimaryLink>
       ) : (
@@ -320,10 +265,6 @@ function WhatHappened({
   );
 }
 
-/**
- * One side of what happened, on a soft tile: what it was, and where, when that's said; what a
- * position made or lost in the gain or loss color.
- */
 function Side({
   label,
   value,
@@ -351,7 +292,6 @@ function Side({
   );
 }
 
-/** How much came in or went out, on which network, and who was on the other side. */
 function WhatArrived({
   receipt,
   out,
@@ -387,17 +327,17 @@ const PRIMARY =
 
 function PrimaryLink({
   href,
-  specialist,
+  thread,
   onClick,
   children,
 }: {
   readonly href: string;
-  readonly specialist?: NonNullable<Owner>;
+  readonly thread?: NonNullable<ThreadRef>;
   readonly onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   readonly children: ReactNode;
 }) {
-  return specialist ? (
-    <PlaceLink href={href} specialist={specialist.id} className={PRIMARY}>
+  return thread ? (
+    <PlaceLink href={href} thread={thread.id} className={PRIMARY}>
       {children}
     </PlaceLink>
   ) : (

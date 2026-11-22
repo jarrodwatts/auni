@@ -1,8 +1,5 @@
-import type { ActionRow } from "../db/schema.ts";
 import type { Money } from "./recipe.ts";
 import { centsToUsd, signedUsdToCents, sumUsd, usdToCents } from "./usd.ts";
-
-type ActionFacts = Pick<ActionRow, "status" | "phase" | "summary" | "amountUsd">;
 
 /** "$150" for whole dollars, "$150.50" otherwise. */
 export function dollars(usd: string): string {
@@ -50,26 +47,4 @@ export function askLine(
   if (legs.length === 1) return first.summary;
   const money = moneyLine(legs.map((leg) => leg.money));
   return `${legs.length} moves${money ? `, ${money}` : ""}`;
-}
-
-/** One line of a specialist's record of what Auni did. */
-export function activityLabel(action: ActionFacts): string {
-  switch (action.status) {
-    case "awaiting_permission":
-      return `Asked you: ${action.summary}`;
-    case "running":
-      return action.phase === "needs_owner"
-        ? `Not confirmed, waiting on you: ${action.summary}`
-        : `Working on: ${action.summary}`;
-    case "done":
-      return action.summary;
-    case "failed":
-      return `Didn't go through: ${action.summary}`;
-    case "cancelled":
-      return `You declined: ${action.summary}`;
-    case "replaced":
-      return `Replaced by a newer plan: ${action.summary}`;
-    case "retracted":
-      return `Taken back: ${action.summary}`;
-  }
 }

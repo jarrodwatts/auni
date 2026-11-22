@@ -124,9 +124,7 @@ describe("auni doctor", () => {
     );
     expect(rpc).toContainEqual(expect.stringMatching(/^ok {3}rpc: Arbitrum, through/u));
     expect(of(findings, "brain")).toEqual([
-      expect.stringMatching(
-        /^note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready\. To choose, set BRAIN in .*\.env\.$/u,
-      ),
+      "note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready. You can also pick a model right in any thread.",
       // Each made ready from the web app, on any device; the command stays for this machine.
       "fix  brain: Claude Code: sign it in from Settings → AI Brains, on any of your devices (or run `claude auth login` where Auni runs)",
       "fix  brain: Codex: install it from Settings → AI Brains, on any of your devices (or run `npm install -g @openai/codex` where Auni runs)",
@@ -165,13 +163,19 @@ describe("auni doctor", () => {
 
   it("names the brain that thinks, and the others as notes", async () => {
     vi.mocked(brainRows).mockResolvedValue([
-      { id: "claude-code", name: "Claude Code", state: "ready", login: "your Claude Max plan" },
+      {
+        id: "claude-code",
+        name: "Claude Code",
+        state: "ready",
+        login: "your Claude Max plan",
+        models: [],
+      },
       { id: "codex", name: "Codex", state: "expired", fix: "codex login --device-auth" },
     ]);
     // The rule that picks between them comes first, in one sentence.
     expect(of(await doctor(), "brain")).toEqual([
       expect.stringMatching(
-        /^note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready\. To choose, set BRAIN in .*\.env\.$/u,
+        /^note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready\. You can also pick a model right in any thread\.$/u,
       ),
       "ok   brain: Claude Code, on your Claude Max plan",
       "note brain: Codex's sign-in has expired: sign it in from Settings → AI Brains, on any of your devices (or run `codex login --device-auth` where Auni runs)",

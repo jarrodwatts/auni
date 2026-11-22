@@ -227,7 +227,7 @@ describe("a field that takes proof the owner is there", () => {
 
 describe("an app's secret setting", () => {
   const FIELD = encodeURIComponent("keys:elfa");
-  const thread = { id: "t", specialistId: null } as ThreadRow;
+  const thread = { id: "t" } as ThreadRow;
   const offered = () => toolsFor({ thread }).map((tool) => tool.name);
 
   // A settings file of this test's own, as an owner might have written it by hand.

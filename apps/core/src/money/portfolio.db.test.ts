@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
 import { actions, arrivals, otherTokens, valueSnapshots } from "../db/schema.ts";
-import { insertAction, insertSpecialist, wipe } from "../test/db.ts";
+import { insertAction, wipe } from "../test/db.ts";
 import { seeTokens } from "./buckets.ts";
 import { fillIdentity } from "./fill-key.ts";
 import {
@@ -81,27 +81,15 @@ const SHORT_BTC: Holding = {
   averageCostUsd: "104000",
 };
 
-/** A whole read begun just now: $130, of which $90 of NVIDIA is the specialist's. */
-function read(specialistId: string | null, overrides: Partial<Portfolio> = {}): Portfolio {
+/** A whole read begun just now: $130 across cash and two holdings. */
+function read(overrides: Partial<Portfolio> = {}): Portfolio {
   return {
     observedAt: new Date().toISOString(),
     totalUsd: "130.00",
     unavailable: [],
     looking: [],
     holdings: [USDC, NVIDIA, SHORT_BTC],
-    specialists: specialistId
-      ? [
-          {
-            id: specialistId,
-            purpose: "AI keeps eating software",
-            status: "active",
-            usdValue: "90.00",
-            holdings: [NVIDIA],
-            whole: true,
-          },
-        ]
-      : [],
-    other: { usdValue: "10.00", holdings: [SHORT_BTC] },
+    assets: { usdValue: "100.00", holdings: [NVIDIA, SHORT_BTC] },
     cash: { usdValue: "30.00", holdings: [USDC] },
     onTheWay: { usdValue: "0.00", moves: [] },
     ...overrides,
@@ -109,20 +97,20 @@ function read(specialistId: string | null, overrides: Partial<Portfolio> = {}): 
 }
 
 async function readingAt(takenAt: Date) {
-  await db.insert(valueSnapshots).values({ specialistId: null, usdValue: "1.00", takenAt });
+  await db.insert(valueSnapshots).values({ usdValue: "1.00", takenAt });
 }
 
 const readings = () => db.select().from(valueSnapshots).orderBy(asc(valueSnapshots.takenAt));
 
 describe("saveReading", () => {
-  it("keeps the total with what it held, only what prices it again, and each specialist", async () => {
-    const specialist = await insertSpecialist();
-    const portfolio = read(specialist.id);
+  it("keeps the total with what it held, only what prices it again", async () => {
+    const portfolio = read();
 
     expect(await saveReading(portfolio)).toBe(true);
 
     const rows = await readings();
-    const total = rows.find((row) => row.specialistId === null);
+    expect(rows).toHaveLength(1);
+    const [total] = rows;
     expect(total).toMatchObject({ usdValue: "130.00", cashUsd: "30.00" });
     expect(total?.takenAt.toISOString()).toBe(portfolio.observedAt);
     expect(total?.holdings).toEqual([
@@ -157,49 +145,44 @@ describe("saveReading", () => {
         price: 100_000,
       },
     ]);
-    expect(rows.find((row) => row.specialistId === specialist.id)).toMatchObject({
-      usdValue: "90.00",
-      cashUsd: null,
-      holdings: null,
-    });
   });
 
   it("keeps nothing of a read missing a source, which would show as a dip", async () => {
-    expect(await saveReading(read(null, { unavailable: ["hyperliquid"] }))).toBe(false);
+    expect(await saveReading(read({ unavailable: ["hyperliquid"] }))).toBe(false);
     expect(await readings()).toEqual([]);
   });
 
   it("keeps nothing while a move runs, or settled too lately for the read to show it", async () => {
     const running = await insertAction({ status: "running", startedAt: minutesAgo(1) });
-    expect(await saveReading(read(null))).toBe(false);
+    expect(await saveReading(read())).toBe(false);
 
     await db
       .update(actions)
       .set({ status: "done", phase: null, updatedAt: minutesAgo(1) })
       .where(eq(actions.id, running.id));
-    expect(await saveReading(read(null))).toBe(false);
+    expect(await saveReading(read())).toBe(false);
 
     await db
       .update(actions)
       .set({ updatedAt: minutesAgo(3) })
       .where(eq(actions.id, running.id));
-    expect(await saveReading(read(null))).toBe(true);
+    expect(await saveReading(read())).toBe(true);
   });
 
   it("keeps one past a move still running long after any recipe would have finished", async () => {
     // Left running for a person once its money moved unrecorded (see reconcileStuckActions).
     await insertAction({ status: "running", startedAt: minutesAgo(31) });
-    expect(await saveReading(read(null))).toBe(true);
+    expect(await saveReading(read())).toBe(true);
   });
 
   it("keeps one every 15 minutes, sooner only once an action has finished since the last", async () => {
     await readingAt(minutesAgo(10));
     await insertAction({ status: "done", updatedAt: minutesAgo(12) });
-    expect(await saveReading(read(null))).toBe(false);
+    expect(await saveReading(read())).toBe(false);
 
     // A buy that landed after the last reading changed what is held.
     await insertAction({ status: "done", updatedAt: minutesAgo(5) });
-    expect(await saveReading(read(null))).toBe(true);
+    expect(await saveReading(read())).toBe(true);
   });
 
   it("keeps one sooner once money has landed since the last, when the read can show it", async () => {
@@ -221,15 +204,15 @@ describe("saveReading", () => {
       });
     // Recorded a moment ago: the read may not show it yet.
     await deposit(minutesAgo(1));
-    expect(await saveReading(read(null))).toBe(false);
+    expect(await saveReading(read())).toBe(false);
 
     // A token with no price changes no value, and nor does dust under a cent.
     await db.delete(arrivals);
     await deposit(minutesAgo(5), null);
     await deposit(minutesAgo(5), "0.00");
-    expect(await saveReading(read(null))).toBe(false);
+    expect(await saveReading(read())).toBe(false);
     await deposit(minutesAgo(5));
-    expect(await saveReading(read(null))).toBe(true);
+    expect(await saveReading(read())).toBe(true);
   });
 
   it("waits on money recorded just now, however long ago it landed", async () => {
@@ -250,17 +233,17 @@ describe("saveReading", () => {
         block: 1,
       })
       .returning();
-    expect(await saveReading(read(null))).toBe(false);
+    expect(await saveReading(read())).toBe(false);
 
     await db
       .update(arrivals)
       .set({ createdAt: minutesAgo(5) })
       .where(eq(arrivals.id, arrived[0]!.id));
-    expect(await saveReading(read(null))).toBe(true);
+    expect(await saveReading(read())).toBe(true);
   });
 
   it("keeps one of two reads kept at once", async () => {
-    const portfolio = read(null);
+    const portfolio = read();
     const kept = await Promise.all([saveReading(portfolio), saveReading(portfolio)]);
     expect(kept.sort()).toEqual([false, true]);
     expect(await readings()).toHaveLength(1);
@@ -269,7 +252,7 @@ describe("saveReading", () => {
 
 describe("readStands", () => {
   const readAgo = (minutes: number, unavailable: string[] = []) =>
-    read(null, { observedAt: minutesAgo(minutes).toISOString(), unavailable });
+    read({ observedAt: minutesAgo(minutes).toISOString(), unavailable });
 
   it("lets a whole read stand for 15 minutes, and one missing a source for 2", async () => {
     expect(await readStands(readAgo(14))).toBe(true);

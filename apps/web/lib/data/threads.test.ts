@@ -8,9 +8,13 @@ const THREAD = "7d0c0000-0000-4000-8000-000000000001" as ThreadId;
 describe("a thread row from core", () => {
   const wire = {
     id: THREAD,
-    specialistId: null,
     title: "Buy SOL",
     status: "idle",
+    actMode: "ask_first",
+    budgetUsd: "0",
+    pinnedAt: null,
+    modelSelection: null,
+    notes: null,
     archivedAt: null,
     moneyLine: null,
     lastActivityAt: "2026-10-28T09:00:00.000Z",

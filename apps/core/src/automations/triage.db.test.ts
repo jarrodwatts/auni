@@ -25,7 +25,7 @@ vi.mock("../agent/brain.ts", () => ({
     return { output: brain.answer };
   },
 }));
-vi.mock("../specialists/context.ts", () => ({ promptPortfolio: async () => null }));
+vi.mock("../conversation/context.ts", () => ({ promptPortfolio: async () => null }));
 
 /** A recorded answer, its fire ids filled in from the fires' event ids. */
 function answer(name: string, ids: ReadonlyMap<string, string>): unknown {

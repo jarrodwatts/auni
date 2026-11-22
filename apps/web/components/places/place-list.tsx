@@ -1,28 +1,14 @@
 "use client";
 
-import type { ThreadId } from "@auni/shared";
-import { ChevronRight, LayoutGrid, ReceiptText } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { LayoutGrid, ReceiptText } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { useActivity } from "@/components/activity/use-activity";
-import { useChangeThread } from "@/components/app/use-threads";
-import { Mascot } from "@/components/brand/mascot";
 import { APPS_HREF, chatHref } from "@/lib/app-links";
 import { cn } from "@/lib/utils";
 
-import { attentionOf } from "./attention";
 import { ChatRow } from "./chat-row";
-import { SpecialistRow } from "./specialist-row";
-import {
-  ATTENTION_LABEL,
-  ChatStatusMark,
-  PortfolioMark,
-  UnreadCount,
-  WaitingCount,
-  WaitingDot,
-} from "./place-marks";
+import { PortfolioMark, UnreadCount, WaitingCount, WaitingDot } from "./place-marks";
 import {
   FOLD_FADE,
   ICON_CLASS_NAME,
@@ -33,71 +19,40 @@ import {
   ROW_LINE_CLASS_NAME,
   SectionLabel,
 } from "./sidebar-rows";
-import { useStoredFlag } from "./stored-state";
-import { inHistory, teamOf } from "./team";
 import { type ChatPlace, type PlaceRoute, usePlaceRoute, usePlaces } from "./use-places";
 
-/** Older chats shown in History before "Show more"; one that waits on you or is open always shows. */
-const RECENT_CHATS = 6;
+/** Recent threads shown before "Show more"; one that is open always shows. */
+const RECENT_THREADS = 12;
 
-function recentChats(chats: readonly ChatPlace[], route: PlaceRoute): readonly ChatPlace[] {
+function visibleRecent(chats: readonly ChatPlace[], route: PlaceRoute): readonly ChatPlace[] {
   return chats.filter(
     ({ thread, waiting }, index) =>
-      index < RECENT_CHATS || waiting || (route.kind === "chat" && route.id === thread.id),
+      index < RECENT_THREADS || waiting || (route.kind === "chat" && route.id === thread.id),
   );
 }
 
 /**
- * Every place as rows: Portfolio with what waits on you, Activity with what happened to your
- * money that you haven't seen, Apps (the services Auni acts through), then the team: Auni first, each specialist at work with how it is
- * going, and History folded under them, holding the retired ones and older chats. The sidebar's
- * and the phone sheets' own zone.
+ * Unified navigation list: Portfolio, Activity, Apps, then Threads grouped into
+ * Pinned, Active (waiting, running, watching, or Auto), and Recent.
  */
 export function PlaceList({ folded = false }: { readonly folded?: boolean }) {
   const route = usePlaceRoute();
   const places = usePlaces();
-  const team = teamOf(places.specialists, places.chats);
   const unread = useActivity().data?.unread ?? 0;
-  const changeThread = useChangeThread();
-  const router = useRouter();
-  const [historyOpen, setHistoryOpen] = useStoredFlag("auni:history-open", false);
-  const [allChats, setAllChats] = useState(false);
-  // History opens itself for the place open in it, so the sidebar always shows where you are.
-  const showHistory = historyOpen || inHistory(team, route);
-  const shownChats = allChats ? team.olderChats : recentChats(team.olderChats, route);
-  const hiddenChats = team.olderChats.length - shownChats.length;
-  const historyWaits = [...team.retired, ...team.olderChats].some(({ waiting }) => waiting);
+  const [allRecent, setAllRecent] = useState(false);
 
-  /** A retired specialist's conversation, put away; it leaves the sidebar. */
-  const archive = (thread: ThreadId, open: boolean) => {
-    // The open one is put away too, so the person lands somewhere new.
-    if (open) router.push("/app/new");
-    void changeThread(thread, { archived: true }).then(
-      () =>
-        toast.success("Specialist archived", {
-          action: {
-            label: "Undo",
-            onClick: () =>
-              void changeThread(thread, { archived: false }).catch(() =>
-                toast.error("That specialist couldn’t be brought back. Try again."),
-              ),
-          },
-        }),
-      () => toast.error("That specialist couldn’t be archived. Try again."),
-    );
-  };
-  const specialistRow = (place: (typeof places.specialists)[number]) => {
-    const open = route.kind === "specialist" && route.id === place.specialist.id;
-    return (
-      <SpecialistRow
-        key={place.specialist.id}
-        place={place}
-        active={open}
-        folded={folded}
-        onArchive={(thread) => archive(thread, open)}
-      />
-    );
-  };
+  const shownRecent = allRecent ? places.recent : visibleRecent(places.recent, route);
+  const hiddenRecent = places.recent.length - shownRecent.length;
+
+  const renderThread = ({ thread, status }: ChatPlace) => (
+    <ChatRow
+      key={thread.id}
+      active={route.kind === "chat" && route.id === thread.id}
+      href={chatHref(thread.id)}
+      thread={thread}
+      status={status}
+    />
+  );
 
   return (
     <>
@@ -147,123 +102,39 @@ export function PlaceList({ folded = false }: { readonly folded?: boolean }) {
         className="mt-px"
       />
 
-      <SectionLabel>Team</SectionLabel>
-      <ul className="flex flex-col gap-px">
-        <AuniRow chat={team.auni} route={route} folded={folded} />
-        {team.active.map(specialistRow)}
-      </ul>
-
-      {team.retired.length + team.olderChats.length > 0 ? (
+      {places.pinned.length > 0 ? (
         <div inert={folded} className={FOLD_FADE}>
-          <button
-            type="button"
-            aria-expanded={showHistory}
-            onClick={() => setHistoryOpen(!showHistory)}
-            className="group/history mt-5 mb-1 flex h-5 items-center gap-1 rounded-[6px] px-3 text-[12px] font-medium text-faint outline-none transition-colors duration-150 hover:text-ink focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            History
-            <ChevronRight
-              aria-hidden
+          <SectionLabel>Pinned</SectionLabel>
+          <ul className="flex flex-col gap-px">{places.pinned.map(renderThread)}</ul>
+        </div>
+      ) : null}
+
+      {places.active.length > 0 ? (
+        <div inert={folded} className={FOLD_FADE}>
+          <SectionLabel>Active</SectionLabel>
+          <ul className="flex flex-col gap-px">{places.active.map(renderThread)}</ul>
+        </div>
+      ) : null}
+
+      {places.recent.length > 0 ? (
+        <div inert={folded} className={FOLD_FADE}>
+          <SectionLabel>Threads</SectionLabel>
+          <ul className="flex flex-col gap-px">{shownRecent.map(renderThread)}</ul>
+          {(allRecent ? places.recent.length > RECENT_THREADS : hiddenRecent > 0) ? (
+            <button
+              type="button"
+              onClick={() => setAllRecent(!allRecent)}
               className={cn(
-                "size-3.5 transition-transform duration-200 ease-settle motion-reduce:transition-none",
-                showHistory && "rotate-90",
+                ROW_CLASS_NAME,
+                ROW_LINE_CLASS_NAME,
+                "mt-px w-full text-muted-foreground hover:text-ink",
               )}
-              strokeWidth={2}
-            />
-            {historyWaits && !showHistory ? (
-              <span className="relative ml-0.5 size-2">
-                <WaitingDot className="inset-0 size-2" />
-                <span className="sr-only">, {ATTENTION_LABEL.waiting}</span>
-              </span>
-            ) : null}
-          </button>
-          {showHistory ? (
-            <>
-              <ul className="flex flex-col gap-px">
-                {team.retired.map(specialistRow)}
-                {shownChats.map(({ thread, status }) => (
-                  <ChatRow
-                    key={thread.id}
-                    active={route.kind === "chat" && route.id === thread.id}
-                    href={chatHref(thread.id)}
-                    thread={thread}
-                    status={status}
-                  />
-                ))}
-              </ul>
-              {(allChats ? team.olderChats.length > RECENT_CHATS : hiddenChats > 0) ? (
-                <button
-                  type="button"
-                  onClick={() => setAllChats(!allChats)}
-                  className={cn(
-                    ROW_CLASS_NAME,
-                    ROW_LINE_CLASS_NAME,
-                    "mt-px w-full text-muted-foreground hover:text-ink",
-                  )}
-                >
-                  {allChats ? "Show less" : `Show ${hiddenChats} more`}
-                </button>
-              ) : null}
-            </>
+            >
+              {allRecent ? "Show less" : `Show ${hiddenRecent} more`}
+            </button>
           ) : null}
         </div>
       ) : null}
     </>
-  );
-}
-
-/**
- * Auni, first in the team: its latest open chat, the one it speaks up in, or a new one before
- * the first. Its line is that chat's title; a dot on it while something waits on the person or
- * an answer is unread, and the ring of its money while that moves.
- */
-function AuniRow({
-  chat,
-  route,
-  folded,
-}: {
-  readonly chat: ChatPlace | null;
-  readonly route: PlaceRoute;
-  readonly folded: boolean;
-}) {
-  const open = chat !== null && route.kind === "chat" && route.id === chat.thread.id;
-  // The chat on screen points at nothing: what waits or came in there is in front of the person.
-  const attention = chat && !open ? attentionOf(chat.thread) : null;
-  const money = chat?.status.mark?.kind === "money" ? chat.status.mark : null;
-  return (
-    <li>
-      <PlaceRow
-        active={open}
-        folded={folded}
-        href={chat ? chatHref(chat.thread.id) : "/app/new"}
-        thread={chat?.thread.id}
-        mark={
-          <>
-            {/* Its art has room around it, so it overhangs the mark box to sit as large as an orb. */}
-            <Mascot
-              alt=""
-              size={28}
-              state={chat?.status.working ? "thinking" : "color"}
-              className="max-w-none flex-none"
-            />
-            {attention ? (
-              <WaitingDot attention={attention} className="-top-1 -right-1 size-2.5" />
-            ) : null}
-          </>
-        }
-        title="Auni"
-        detail={
-          chat ? (
-            <span className={cn(chat.status.unread && "font-medium text-ink")}>
-              {chat.thread.title}
-            </span>
-          ) : (
-            "Ask me anything"
-          )
-        }
-        status={attention ? ATTENTION_LABEL[attention] : undefined}
-        trailing={money ? <ChatStatusMark mark={money} /> : null}
-      />
-    </li>
   );
 }

@@ -1,16 +1,16 @@
-import { specialistIdSchema } from "@auni/shared";
+import { threadIdSchema } from "@auni/shared";
 import type { Metadata } from "next";
 
 import { ActivityScreen } from "@/components/activity/activity-screen";
 
 export const metadata: Metadata = { title: "Activity" };
 
-/** `?specialist=<id>` opens it filtered to that specialist, as its page's record links. */
+/** `?thread=<id>` opens it filtered to that thread, as its inspector panel links. */
 export default async function ActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ specialist?: string | string[] }>;
+  searchParams: Promise<{ thread?: string | string[] }>;
 }) {
-  const only = specialistIdSchema.safeParse((await searchParams).specialist);
+  const only = threadIdSchema.safeParse((await searchParams).thread);
   return <ActivityScreen initialOnly={only.success ? only.data : null} />;
 }

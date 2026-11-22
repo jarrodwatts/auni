@@ -19,7 +19,7 @@ import { useChartWindow, useLiveEnd } from "./use-chart-window";
  */
 export function TotalHero() {
   const { portfolio } = useMoney();
-  const chart = useChartWindow(null, useLiveEnd(portfolio?.totalUsd, portfolio?.made));
+  const chart = useChartWindow(useLiveEnd(portfolio?.totalUsd, portfolio?.made));
   const latest = chart.points.at(-1)?.totalUsd;
   const total = portfolio
     ? BigInt(portfolio.totalUsd.baseUnits)

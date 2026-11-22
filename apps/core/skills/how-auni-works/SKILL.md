@@ -1,6 +1,6 @@
 ---
 name: how-auni-works
-description: Load when someone asks how Auni itself works, how to configure or run it locally or remotely, or why it did something - AI brains (Claude Code / Codex), Tailscale remote access, always-on background service, paired devices, Telegram, custom RPCs, personalization (X handle, watch-only wallets, profile), diagnostics (auni doctor / triage), updates, where their money is, which networks they can add money on, why a trade went to Solana, why a card checks it's them, what Auni charges, how specialists work, or whether their money is safe. Answer from this and inspect_auni rather than guessing.
+description: Load when someone asks how Auni itself works, how to configure or run it locally or remotely, or why it did something - AI brains (Claude Code / Codex), Tailscale remote access, always-on background service, paired devices, Telegram, custom RPCs, personalization (X handle, watch-only wallets, profile), diagnostics (auni doctor / triage), updates, where their money is, which networks they can add money on, why a trade went to Solana, why a card checks it's them, what Auni charges, how long a move takes, whether Auni can move money without asking, how threads and Auto budgets work, or whether their money is safe. Answer from this and inspect_auni rather than guessing.
 ---
 
 # How Auni works
@@ -126,23 +126,18 @@ through. On their computer, a browser paired in the last 15 minutes has passed i
 already; with an older pairing, the card says what to do and waits: run `auni pair` in
 the terminal where Auni runs, open its link, and tap Allow again.
 
-## Specialists
+## Threads and acting on its own
 
-Auni is their main agent, and beside it works a team of specialists, each with one job: a
-take runs one of their beliefs with a pot of money behind it, and a role does an ongoing job,
-like keeping idle cash earning. Auni proposes one on a card, and only their tap starts it, set
-up as the card said; it then works in its own conversation and keeps its own notes. By default it asks
-before every move. Only the owner can let it act on its own, with a tap, and then only in its own
-conversation, for buys and sells inside its pot that it can price: stocks, tokens for cash, savings, and
-prediction-market orders at the market price. Perps, limit orders, moving cash between
-networks and anything leaving the account still ask. It spends only its pot's free
-cash, never its gains. Once it has sold everything, it retires with a short report of
-how it went; its history stays, and a buy they allow later brings it back.
+Every view, task, or ongoing job lives in a thread, with its own working notes, watches, and
+inspector panel beside the chat showing positions opened in that thread, its budget headroom,
+its watches, and its record. By default every thread asks before every move.
 
-In the app, the team sits beside the chat: Auni first (its latest chat), then each specialist
-with a line on how it is going, and History under them with retired ones and older chats. A
-specialist's page holds its chat, and beside it its pot and positions, what it watches, its
-notes and its record, with its report once it retires.
+Only the owner can set a thread to act on its own (from the composer control or by tapping an
+ask card), with a dollar budget it can never spend past. Even then it acts unasked only in that
+thread, for buys and sells inside its budget that it can price: stocks, tokens for cash,
+savings, and prediction-market orders at the market price. Perps, limit orders, moving cash
+between networks and anything leaving the account still ask. It spends only its budget's free
+cash, never its gains.
 
 A way of working they want repeated can be saved as a routine, on a card showing its whole
 text; only their tap saves it. Routines are plain files in Auni's data folder
@@ -164,7 +159,7 @@ refunded after a minute.
 
 ## Is it safe
 
-The wallets are theirs, and they can show the keys in Settings at any time, once Auni has checked it's them. Auni signs only moves they approved on a card, or that a specialist they let
-act on its own may make within its pot, and it never spends more or sells more than
+The wallets are theirs, and they can show the keys in Settings at any time, once Auni has checked it's them. Auni signs only moves they approved on a card, or that a thread they set to
+act on its own may make within its budget, and it never spends more or sells more than
 the card said, nor gets less beyond the card's slippage. Nothing is insured: savings,
 stocks and tokens can lose value, and a venue can fail. Say that plainly when asked.

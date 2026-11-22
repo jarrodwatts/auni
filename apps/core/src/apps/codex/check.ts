@@ -1,3 +1,5 @@
+import type { BrainModelWire } from "@auni/shared";
+
 import { scratchDir } from "../../agent/box.ts";
 import type { BrainCheck } from "../contract.ts";
 import { startAppServer, type AppServer } from "./app-server.ts";
@@ -53,13 +55,36 @@ async function keepsExpiredLogin(server: AppServer): Promise<boolean> {
   return status.authMethod !== null;
 }
 
-/** The login's default model, which every role thinks on (at its own effort). */
-export async function defaultModel(server: AppServer): Promise<ModelChoice | null> {
-  const { data } = await server.request<{ data: (ModelChoice & { isDefault: boolean })[] }>(
-    "model/list",
-    {},
-  );
+/** All models this Codex login lists. */
+async function listModels(server: AppServer): Promise<ModelChoice[]> {
+  const { data } = await server.request<{ data: ModelChoice[] }>("model/list", {});
+  return data;
+}
+
+/** The chosen model (if listed), else the login's default model. */
+export async function pickModel(
+  server: AppServer,
+  preferred?: string,
+): Promise<ModelChoice | null> {
+  const data = await listModels(server);
+  if (preferred) {
+    const match = data.find((model) => model.model === preferred);
+    if (match) return match;
+  }
   return data.find((model) => model.isDefault) ?? data[0] ?? null;
+}
+
+/** Models formatted for the composer model picker, leaving hidden entries out. */
+function modelsForWire(data: readonly ModelChoice[]): BrainModelWire[] {
+  const visible = data.filter((model) => !model.hidden);
+  const shown = visible.length > 0 ? visible : data;
+  return shown.map((model) => ({
+    id: model.model,
+    name: model.displayName ?? model.model,
+    efforts: (model.supportedReasoningEfforts ?? []).map((option) => option.reasoningEffort),
+    ...(model.defaultReasoningEffort ? { defaultEffort: model.defaultReasoningEffort } : {}),
+    ...(model.isDefault ? { isDefault: true } : {}),
+  }));
 }
 
 /** The owner's own Codex, with none of a turn's box: to ask it about its login, or sign in. */
@@ -83,11 +108,13 @@ export async function check(signal: AbortSignal): Promise<BrainCheck> {
         why: (await keepsExpiredLogin(server)) ? "expired" : "signed-out",
         fix: LOGIN_FIX,
       };
-    if (!(await defaultModel(server))) return { ready: false, why: "signed-out", fix: LOGIN_FIX };
+    const listed = await listModels(server);
+    if (listed.length === 0) return { ready: false, why: "signed-out", fix: LOGIN_FIX };
     return {
       ready: true,
       login: loginOf(found),
       ...(found.email ? { signedInAs: found.email } : {}),
+      models: modelsForWire(listed),
     };
   } finally {
     server.close();

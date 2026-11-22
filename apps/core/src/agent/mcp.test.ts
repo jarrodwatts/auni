@@ -15,7 +15,7 @@ const url = serve(express().use(mcpRouter));
 
 describe("core MCP server", () => {
   it("registers exactly the tools web knows by name", () => {
-    const thread = { id: "t", specialistId: null } as ThreadRow;
+    const thread = { id: "t" } as ThreadRow;
     process.env.ELFA_AUTO_API_KEY = "elfa-test";
     try {
       const names = toolsFor({ thread }).map((tool) => tool.name);
@@ -26,7 +26,7 @@ describe("core MCP server", () => {
   });
 
   it("leaves out the market tools without an Elfa key, so the agent never calls one that can't answer", () => {
-    const thread = { id: "t", specialistId: null } as ThreadRow;
+    const thread = { id: "t" } as ThreadRow;
     const names = toolsFor({ thread }).map((tool) => tool.name);
     expect(names).not.toContain("market_pulse");
     expect(names).not.toContain("market_news");
@@ -166,7 +166,7 @@ describe("core MCP server", () => {
   // A live Polymarket buy sent its dollars as text and was refused with zod's bare words. Text
   // that plainly means a number is now read as one (tool.test.ts); what's left is said plainly.
   it("says plainly what a money tool's call got wrong, so the agent can send it again", async () => {
-    const thread = { id: "t", specialistId: null } as ThreadRow;
+    const thread = { id: "t" } as ThreadRow;
     const server = buildMcpServer(toolsFor({ thread }));
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);
@@ -183,9 +183,12 @@ describe("core MCP server", () => {
         amountUsd: "1.5 dollars",
       }),
     ).toContain('amountUsd must be a number, and it was sent as text (\\"1.5 dollars\\")');
-    expect(await said("update_specialist", { retired: "yes" })).toContain(
-      'retired must be true, without quotes, and it was sent as text (\\"yes\\")',
-    );
+    expect(
+      await said("suggest_replies", {
+        options: [{ label: "Yes" }, { label: "No" }],
+        multiple: "yes",
+      }),
+    ).toContain('multiple must be a boolean, and it was sent as text (\\"yes\\")');
     const swap = await said("evm_swap", { chain: "mars", sellToken: 5, amountUsd: 20 });
     expect(swap).toContain(
       'chain must be one of \\"monad\\", \\"base\\", \\"arbitrum\\", \\"polygon\\", and it was sent as text (\\"mars\\")',

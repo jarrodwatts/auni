@@ -20,7 +20,7 @@ until they are taken out. aUSDC sent in from anywhere else is recognised as savi
   more) takes everything, interest earned up to that moment included, so no aUSDC dust is left.
   Read the balance from the portfolio, since it has grown since it went in.
 
-Both are one tap, and a specialist set to act on its own may move its pot in and out by itself.
+Both are one tap, and a thread set to act on its own may move its budget in and out by itself.
 
 ## How the rate works
 

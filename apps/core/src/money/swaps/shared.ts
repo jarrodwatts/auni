@@ -1,13 +1,10 @@
 import type { Cost } from "../effect.ts";
-import { fillIdentity, QUANTITY_DECIMALS, type FillKey } from "../fill-key.ts";
-import type { SpecialistHolds } from "../recipe.ts";
 
 /**
- * How much of a trade's dollars it may lose the moment it fills before a
- * specialist won't make it on its own, and code won't pay for a card with it.
+ * How much of a trade's dollars it may lose the moment it fills before an
+ * auto thread won't make it on its own, and code won't pay for a card with it.
  * Slippage only holds a swap to its own quote, and a thin or seeded pool
- * quotes its own loss. Specialists have no loss limit a person set, so this
- * stands in for one; every card shows the loss itself in dollars.
+ * quotes its own loss.
  */
 export const MAX_BUY_IMPACT_PCT = 5;
 
@@ -142,24 +139,6 @@ export function toBaseUnits(amount: number, decimals: number): bigint {
   const scale = decimals + Number(exponent) - fraction.length;
   const digits = BigInt(whole + fraction);
   return scale >= 0 ? digits * 10n ** BigInt(scale) : digits / 10n ** BigInt(-scale);
-}
-
-/**
- * What a sell naming no amount sells, in base units: the whole balance, or for
- * a specialist only what its own fills hold of it, never past the balance. A
- * specialist holding the token alone holds all of it, so nothing is left behind.
- */
-export function wholeSale(
-  balance: bigint,
-  key: FillKey,
-  decimals: number,
-  specialistHolds: SpecialistHolds | undefined,
-): bigint {
-  if (!specialistHolds) return balance;
-  const share =
-    (specialistHolds.get(fillIdentity(key)) ?? 0n) / 10n ** BigInt(QUANTITY_DECIMALS - decimals);
-  if (share <= 0n) return 0n;
-  return share < balance ? share : balance;
 }
 
 export function fromBaseUnits(amount: bigint, decimals: number): number {

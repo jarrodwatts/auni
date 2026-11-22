@@ -5,9 +5,6 @@ export const timestampSchema = z.iso.datetime({ offset: true });
 export const threadIdSchema = z.uuid().brand<"ThreadId">();
 export type ThreadId = z.infer<typeof threadIdSchema>;
 
-export const specialistIdSchema = z.uuid().brand<"SpecialistId">();
-export type SpecialistId = z.infer<typeof specialistIdSchema>;
-
 export const messageIdSchema = z.uuid().brand<"MessageId">();
 export type MessageId = z.infer<typeof messageIdSchema>;
 

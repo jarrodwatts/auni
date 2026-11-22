@@ -6,8 +6,8 @@ import express from "express";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, arrivals, specialists, fills } from "../db/schema.ts";
-import { insertAction, insertSpecialist, setOwner, wipe } from "../test/db.ts";
+import { actions, arrivals, fills, threads } from "../db/schema.ts";
+import { insertAction, insertThread, setOwner, wipe } from "../test/db.ts";
 import { FACE } from "../test/recipe.ts";
 import { serve } from "../test/serve.ts";
 import { activityRouter } from "./routes.ts";
@@ -38,7 +38,7 @@ const ADDRESS = "0x00000000000000000000000000000000000a0b1c";
 const started = new Date("2026-10-20T08:30:00Z");
 
 beforeEach(async () => {
-  await wipe(specialists, actions, fills, arrivals);
+  await wipe(threads, actions, fills, arrivals);
 });
 
 async function activity(query = "") {
@@ -47,12 +47,12 @@ async function activity(query = "") {
 }
 
 /** The Pearl card, as it ran: two holdings sold, cash bridged and moved in, Pearl opened. */
-async function pearlCard(specialistId: string) {
+async function pearlCard(threadId: string) {
   const proposalId = randomUUID();
   const leg = (fields: Partial<typeof actions.$inferInsert>) =>
     insertAction({
       proposalId,
-      specialistId,
+      threadId,
       status: "done",
       startedAt: started,
       // Each run ended seconds after it started, once what it traded was recorded.
@@ -61,7 +61,7 @@ async function pearlCard(specialistId: string) {
     });
   await leg({
     tool: "convert_to_cash",
-    specialistId: null,
+    threadId: null,
     input: { chain: "solana", token: "native", amount: "0.025" },
     details: { chain: "solana", mint: "native", token: "SOL" },
     run: { returnedUsd: "4.30" },
@@ -69,7 +69,7 @@ async function pearlCard(specialistId: string) {
   });
   await leg({
     tool: "convert_to_cash",
-    specialistId: null,
+    threadId: null,
     input: { chain: "base", token: "native", amount: "0.0017" },
     details: { chain: "base", mint: "native", token: "ETH" },
     run: { returnedUsd: "4.50" },
@@ -77,7 +77,7 @@ async function pearlCard(specialistId: string) {
   });
   await leg({
     tool: "bridge_usdc",
-    specialistId: null,
+    threadId: null,
     input: { from_chain: "base", to_chain: "arbitrum", amount: "17" },
     amountUsd: "17.00",
   });
@@ -92,7 +92,7 @@ async function pearlCard(specialistId: string) {
   await db.insert(fills).values([
     {
       actionId: open.id,
-      specialistId,
+      threadId,
       chain: "hyperliquid",
       instrument: "io:PRL",
       side: "buy",
@@ -104,7 +104,7 @@ async function pearlCard(specialistId: string) {
     // Its stop went off two days later.
     {
       actionId: open.id,
-      specialistId,
+      threadId,
       chain: "hyperliquid",
       instrument: "io:PRL",
       side: "sell",
@@ -119,7 +119,7 @@ async function pearlCard(specialistId: string) {
 }
 
 /** On Oct 14 Hyperliquid liquidated Starknet's STRK long, recorded once Auni read it. */
-async function strkLiquidation(specialistId: string) {
+async function strkLiquidation(threadId: string) {
   const liquidated = await insertAction({
     tool: "hyperliquid_venue_fill",
     venue: "hyperliquid",
@@ -141,7 +141,7 @@ async function strkLiquidation(specialistId: string) {
   });
   await db.insert(fills).values({
     actionId: liquidated.id,
-    specialistId,
+    threadId,
     chain: "hyperliquid",
     instrument: "STRK",
     side: "sell",
@@ -160,8 +160,8 @@ describe("GET /activity", () => {
       timeZone: "Australia/Sydney",
       activitySeenAt: new Date("2026-10-01T00:00:00Z"),
     });
-    const starknet = await insertSpecialist({ name: "Starknet" });
-    const pearl = await insertSpecialist({ name: "Pearl bet" });
+    const starknet = await insertThread({ title: "Starknet" });
+    const pearl = await insertThread({ title: "Pearl bet" });
     const proposalId = await pearlCard(pearl.id);
     const liquidated = await strkLiquidation(starknet.id);
     await db.insert(arrivals).values({
@@ -185,13 +185,13 @@ describe("GET /activity", () => {
     expect(read.items.map((item) => [item.kind, item.title, item.unread])).toEqual([
       ["arrival", "Money arrived", true],
       ["move", "Closed your PRL long", false],
-      ["move", "Started Pearl bet", false],
+      ["move", "Opened a PRL long", false],
       ["outside", "Hyperliquid closed your STRK long", true],
     ]);
     const [, stop, card, outside] = read.items;
     expect(card).toMatchObject({
       id: proposalId,
-      specialistId: pearl.id,
+      threadId: pearl.id,
       subtitle: "Pearl bet, Oct 20 at 7:30pm",
       amount: { usd: "16.50", direction: null, tone: "neutral" },
       receipt: {
@@ -218,7 +218,7 @@ describe("GET /activity", () => {
     });
     expect(outside).toMatchObject({
       id: liquidated.id,
-      specialistId: starknet.id,
+      threadId: starknet.id,
       subtitle: "Starknet, Oct 14 at 8:21pm",
       amount: { usd: "5.26", direction: "out", tone: "loss" },
       decision: true,
@@ -230,7 +230,7 @@ describe("GET /activity", () => {
       },
     });
 
-    const starknets = activityWireSchema.parse((await activity(`?specialist=${starknet.id}`)).body);
+    const starknets = activityWireSchema.parse((await activity(`?thread=${starknet.id}`)).body);
     expect(starknets.items.map((item) => item.id)).toEqual([liquidated.id]);
 
     expect((await fetch(url("/activity/seen"), { method: "POST" })).status).toBe(204);
@@ -238,9 +238,9 @@ describe("GET /activity", () => {
   });
 
   it("says a limit was placed until it fills, then what it put in", async () => {
-    const specialist = await insertSpecialist({ name: "Rally" });
+    const thread = await insertThread({ title: "Rally" });
     const limit = await insertAction({
-      specialistId: specialist.id,
+      threadId: thread.id,
       status: "done",
       startedAt: started,
       tool: "hyperliquid_order",
@@ -269,7 +269,7 @@ describe("GET /activity", () => {
     // Two days later it filled: $150 of ETH at 3x is $50 of theirs.
     await db.insert(fills).values({
       actionId: limit.id,
-      specialistId: specialist.id,
+      threadId: thread.id,
       chain: "hyperliquid",
       instrument: "ETH",
       side: "buy",
@@ -279,7 +279,7 @@ describe("GET /activity", () => {
       createdAt: new Date("2026-10-22T03:00:00Z"),
     });
     expect((await items()).map(({ title, amount }) => [title, amount])).toEqual([
-      ["Started Rally", { usd: "50.00", direction: null, tone: "neutral" }],
+      ["Opened an ETH long", { usd: "50.00", direction: null, tone: "neutral" }],
       ["Placed an order for ETH", null],
     ]);
   });
@@ -606,7 +606,7 @@ describe("GET /activity", () => {
     ).toEqual(["Move $4 of USDC from Base to Optimism", "Move $5 of USDC from Optimism to Base"]);
   });
 
-  it("finds no specialist by what isn't an id", async () => {
-    expect((await activity("?specialist=not-a-uuid")).status).toBe(404);
+  it("finds no thread by what isn't an id", async () => {
+    expect((await activity("?thread=not-a-uuid")).status).toBe(404);
   });
 });

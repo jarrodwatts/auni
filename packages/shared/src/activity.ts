@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { cardLogoUrlSchema } from "./specialist-proposal-card.ts";
+import { cardLogoUrlSchema } from "./action-card.ts";
 import { dollarsSchema } from "./money.ts";
-import { specialistIdSchema, timestampSchema } from "./shared.ts";
+import { threadIdSchema, timestampSchema } from "./shared.ts";
 
 /** Green for money in or a gain, red for a loss, plain otherwise. */
 const toneSchema = z.enum(["gain", "loss", "neutral"]);
@@ -32,12 +32,12 @@ const activityBaseSchema = z.object({
   id: z.string(),
   /** In plain words: "Bought Pearl", "Closed Meta, bought Micron", "Money arrived". */
   title: z.string(),
-  /** Whose and when: "Starknet, Oct 14 at 8:21pm"; "Auni" for a move made in Auni's own chat. */
+  /** Where and when: "Peptides, Oct 14 at 8:21pm"; "Auni" for a move outside a named thread. */
   subtitle: z.string(),
   amount: activityAmountSchema.nullable(),
-  /** The specialist it belongs to, the one holding most of it; null for Other and the wallet. */
-  specialistId: specialistIdSchema.nullable(),
-  /** What it is about, for a row with no specialist orb to wear; null for none (Auni's own mark). */
+  /** The thread it belongs to; null for wallet arrivals or moves outside a thread. */
+  threadId: threadIdSchema.nullable(),
+  /** What it is about; null for none (Auni's own mark). */
   logo: activityLogoSchema.nullable(),
   /** When it happened. */
   at: timestampSchema,
@@ -118,7 +118,7 @@ export const activityItemWireSchema = z.discriminatedUnion("kind", [
     receipt: z.object({
       /** Who did it, as people know them: "Hyperliquid". */
       by: z.string(),
-      /** The position before and after, in the venue's numbers: "193.1 STRK long · $15.17", "Closed". */
+      /** The position before and after, in the venue's numbers: "193.1 STRK long, $15.17", "Closed". */
       before: z.string(),
       after: z.string(),
       /** Why it happened, in one sentence code wrote. */

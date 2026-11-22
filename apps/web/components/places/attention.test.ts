@@ -8,18 +8,11 @@ const thread = (fields: Partial<Thread>) =>
   ({ state: "done", asking: false, unread: false, moving: null, ...fields }) as Thread;
 
 describe("attentionOf", () => {
-  it("marks a place waiting while a card or a question waits on the person", () => {
+  it("marks a thread waiting while a card or a question waits on the person", () => {
     expect(attentionOf(thread({ state: "needs_user" }))).toBe("waiting");
     expect(attentionOf(thread({ asking: true }))).toBe("waiting");
-    expect(attentionOf(thread({ asking: true }), { status: "active" })).toBe("waiting");
-  });
-
-  it("leaves a retired specialist's unanswered question unmarked, but not a card", () => {
-    expect(attentionOf(thread({ asking: true }), { status: "retired" })).toBeNull();
-    expect(attentionOf(thread({ asking: true, unread: true }), { status: "retired" })).toBe(
-      "unread",
-    );
-    expect(attentionOf(thread({ state: "needs_user" }), { status: "retired" })).toBe("waiting");
+    expect(attentionOf(thread({ unread: true }))).toBe("unread");
+    expect(attentionOf(thread({}))).toBeNull();
   });
 });
 

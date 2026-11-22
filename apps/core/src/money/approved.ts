@@ -9,9 +9,6 @@ import type { Moved, Simulated, TokenLeg } from "./wallet-effect.ts";
 export const APPROVED_SALE = "sellsUpTo";
 // …and which holding it sells, by fillIdentity, so a card can be found by what it sells.
 export const APPROVED_SALE_OF = "sellsHolding";
-// …and the most of a holding a move between specialists re-files, and what that much was worth.
-export const APPROVED_MOVE = "movesUpTo";
-export const APPROVED_MOVE_USD = "movesAtUsd";
 // …and the least a trade's card said it gets: cash for a sell, the token for a buy.
 export const APPROVED_PROCEEDS = "getsAtLeast";
 // …and the worst price an order's card was approved at: the most a buy pays, the least a sale gets.

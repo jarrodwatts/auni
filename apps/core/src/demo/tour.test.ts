@@ -106,26 +106,26 @@ describe("the tour", () => {
 
   it("skips past the stops that speak of what the skipped one would have left on the screen", async () => {
     const started = await play("Take the tour");
-    // With no belief said there is no research and no specialist, so no stop 2, 3 or 4.
+    // With no belief said there is no plan card and no thread positions, so no stop 2 or 3.
     const skipped = await play("Skip", thread(["Take the tour", started.said]));
-    expect(skipped.said).toMatch(/^\*\*Stop 5 of/u);
+    expect(skipped.said).toMatch(/^\*\*Stop 4 of/u);
     // Looked at, a stop is followed by the next one, whatever that speaks of.
-    const at = (stop: number) => thread(["Take the tour", `**Stop ${stop} of 13. A stop**`]);
-    // Anything else said at a stop docks its reply again, which is how this reads stop 8's.
-    const seen = (await play("How am I doing?", at(8))).replies![0]!;
-    expect((await play(seen, at(8))).said).toMatch(/^\*\*Stop 9 of/u);
-    expect((await play("Skip", at(7))).said).toMatch(/^\*\*Stop 9 of/u);
-    expect((await play("Skip", at(9))).said).toMatch(/^\*\*Stop 10 of/u);
+    const at = (stop: number) => thread(["Take the tour", `**Stop ${stop} of 12. A stop**`]);
+    // Anything else said at a stop docks its reply again, which is how this reads stop 7's.
+    const seen = (await play("How am I doing?", at(7))).replies![0]!;
+    expect((await play(seen, at(7))).said).toMatch(/^\*\*Stop 8 of/u);
+    expect((await play("Skip", at(6))).said).toMatch(/^\*\*Stop 8 of/u);
+    expect((await play("Skip", at(8))).said).toMatch(/^\*\*Stop 9 of/u);
   });
 
   it("goes on from an app's card whichever way it was answered", async () => {
-    const at = thread(["Take the tour", "**Stop 9 of 13. I offer an app**"]);
+    const at = thread(["Take the tour", "**Stop 8 of 12. I offer an app**"]);
     const woken = (event: string) => `Nothing new from the owner. Background event: ${event}`;
     for (const event of [
       "The owner declined action 1 (Jupiter API key).",
       "The owner saved their Jupiter API key, which your card asked for.",
     ])
-      expect((await play(woken(event), at)).said).toMatch(/^\(the scene\)\n\*\*Stop 10 of/u);
+      expect((await play(woken(event), at)).said).toMatch(/^\(the scene\)\n\*\*Stop 9 of/u);
   });
 
   it("answers anything else said in its chat, and docks the stop's reply again", async () => {
@@ -146,11 +146,11 @@ describe("the tour", () => {
     });
   });
 
-  it("docks nothing in a thread it only passes through", async () => {
-    const passing = [
-      "(Background: The owner just started you.)\nAuni: I'm on it.\n**Stop 3 of 13. The plan card**",
+  it("ignores tour markers in any thread that did not start as a tour", async () => {
+    const other = [
+      "User: Buy Nvidia\nAuni: Sure.\n**Stop 2 of 12. The plan card**",
     ];
-    expect(await play("Add something to it.", passing)).toEqual({
+    expect(await play("Add something to it.", other)).toEqual({
       said: "(the scene)",
       replies: undefined,
     });

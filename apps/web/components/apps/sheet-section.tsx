@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** A section of the sheet: a quiet name over what it holds, as a specialist's pane has them. */
+/** A section of the sheet: a quiet name over what it holds, as a thread inspector pane has them. */
 export function Section({
   title,
   children,

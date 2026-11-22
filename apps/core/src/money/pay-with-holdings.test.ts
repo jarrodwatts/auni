@@ -452,7 +452,7 @@ describe("prepareLegs", () => {
       input: { chain: "solana", token: "native", amount: "1" },
       label: "convert",
     };
-    expect(await prepareLegs([leg], { specialistId: null })).toEqual({
+    expect(await prepareLegs([leg])).toEqual({
       prepared: [],
       problems: ["Leg 1 (convert): convert_to_cash is not a money tool."],
     });
@@ -477,11 +477,11 @@ describe("prepareLegs", () => {
       },
     });
     vi.spyOn(recipe, "describe").mockResolvedValueOnce(preview([]));
-    expect((await prepareLegs([savings], { specialistId: null })).problems).toEqual([]);
+    expect((await prepareLegs([savings])).problems).toEqual([]);
     vi.spyOn(recipe, "describe").mockResolvedValueOnce(
       preview([{ lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" }]),
     );
-    expect(await prepareLegs([savings], { specialistId: null })).toEqual({
+    expect(await prepareLegs([savings])).toEqual({
       prepared: [],
       problems: [
         "Leg 1 (savings): This one's card can also check it's the owner, so it is its own card: call aave_supply on its own.",
@@ -507,21 +507,17 @@ describe("payingHoldings", () => {
       ["monad", 0n],
       ["base", 40_000n],
     ]);
-    await expect(
-      payingHoldings({ specialistId: null }, [buying("monad", "100")], short),
-    ).rejects.toThrow(
+    await expect(payingHoldings([buying("monad", "100")], short)).rejects.toThrow(
       "Monad holds $0 of cash, and it spends $100 there: $100 short. They have cash to spare on other chains, which comes before anything they hold. Add a bridge_usdc leg moving $103.10 from base to monad, and propose again.",
     );
     // Even when they'd rather add money than pay with what they hold.
-    await expect(
-      payingHoldings({ specialistId: null }, [buying("monad", "100")], short, []),
-    ).rejects.toThrow("bridge_usdc");
+    await expect(payingHoldings([buying("monad", "100")], short, [])).rejects.toThrow(
+      "bridge_usdc",
+    );
   });
 
   it("asks nothing of a card its cash covers", async () => {
     const legs = [buying("monad", "100")];
-    expect(await payingHoldings({ specialistId: null }, legs, cash([["monad", 10_000n]]))).toEqual(
-      [],
-    );
+    expect(await payingHoldings(legs, cash([["monad", 10_000n]]))).toEqual([]);
   });
 });

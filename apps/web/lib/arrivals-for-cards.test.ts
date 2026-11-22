@@ -31,7 +31,7 @@ function message(
 it("gives money that came in right after a card that puts money in to that card", () => {
   const turns = [
     message("take", "user"),
-    message("answer", "assistant", [card("specialist_proposal")], { words: "Here's your take" }),
+    message("answer", "assistant", [card("action_plan")], { words: "Here's your take" }),
     message("in", "assistant", [arrived()], { posted: true }),
     message("in2", "assistant", [arrived()], { posted: true }),
   ];

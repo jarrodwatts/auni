@@ -17,7 +17,7 @@ export function saveRoutineTool(turn: ToolTurn) {
     name: "save_routine",
     description:
       "Ask to save a way of working the owner wants repeated as their routine: a playbook you " +
-      "and every specialist can load with load_skill from the next turn on. It shows the whole " +
+      "can load with load_skill from the next turn on in any thread. It shows the whole " +
       "text on a card, and nothing is saved until they tap Allow; they can read, edit or delete " +
       "it as a file afterwards. Write it as steps you'd follow, in plain words. Saving under the " +
       "name of one they have replaces it, and the card says so. When they want it run at a time or " +

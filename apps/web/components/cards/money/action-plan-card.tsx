@@ -1,39 +1,46 @@
 "use client";
 
 import { AMOUNT, type ActionPlanCardWire, type ActionStatus } from "@auni/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { useAppDialogs } from "@/components/app/app-dialogs";
 import type { AskAgentHandler } from "@/components/cards/ask-agent";
 import { TextSwap } from "@/components/motion/text-swap";
+import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { formatExactUsd } from "@/lib/money";
 
-import {
-  CardNote,
-  Costs,
-  FooterMorph,
-  PaysWith,
-  ProposalReceipt,
-  ReadyStep,
-} from "./specialist-funnel";
-import { withLive, type Leg, type Move } from "./specialist-legs";
+import { ArrivedLine } from "./arrived-line";
 import { edgeScene } from "./edge-scene";
 import { needingYou } from "./failed-step";
 import { MoneyCardFrame, MoneyMark, NeedsYou } from "./money-card-parts";
 import styles from "./money-card.module.css";
-import { ArrivedLine } from "./arrived-line";
 import { MoveList } from "./move-list";
 import { amountNote, headerLine, moveRows, planLeg } from "./move-rows";
-import { headline, sum } from "./pick-money";
-import { useProposalFailed } from "./use-failed";
+import { headline, pickVerb, sum } from "./pick-money";
+import {
+  CardNote,
+  Costs,
+  FooterMorph,
+  FundStep,
+  PaysWith,
+  ProposalReceipt,
+  ReadyStep,
+  RollingNumber,
+  wholeDollars,
+} from "./plan-funnel";
+import { withLive, type Leg, type Move } from "./plan-legs";
 import { untapped } from "./untapped";
+import { useProposalFailed } from "./use-failed";
 import { useProposal } from "./use-proposal";
 
+/** How often a card waiting for money to land checks whether enough has arrived. */
+const FUNDING_POLL_MS = 3_000;
+
 /**
- * Several moves outside a specialist, allowed with one tap: "close these three
- * positions", or "buy $5 of NVIDIA" paid from cash that has to move first.
- * Each row is one move, read live, the moves that only get the cash there
- * first, as on a specialist's card. The list tells the run; the foot of the
- * card holds only the ask, and the finish.
+ * Several moves or picks allowed with one tap: a basket of takes, "close these
+ * three positions", or "buy $5 of NVIDIA" paid from cash that has to move first.
+ * Each row is one move, read live, with funding moves first. When cash is short,
+ * the card offers Add money inline and turns ready the moment enough arrives.
  */
 export function ActionPlanCard({
   card,
@@ -42,10 +49,18 @@ export function ActionPlanCard({
   readonly card: ActionPlanCardWire;
   readonly onAskAgent?: AskAgentHandler | undefined;
 }) {
-  // Read again only while something is on its way; a waiting or settled card stays still.
-  const { live, queryKey, decide, pending, error } = useProposal(card.proposalId);
+  const { openAddMoney } = useAppDialogs();
+  const refreshMoney = useRefreshMoney();
+  // Shortfall amount we opened Add money for; keeps polling until it clears.
+  const [watchingFor, setWatchingFor] = useState<string | null>(null);
+  const { live, queryKey, decide, pending, error } = useProposal(card.proposalId, (data) =>
+    watchingFor !== null && data?.funding ? FUNDING_POLL_MS : false,
+  );
 
-  const legs: readonly Leg[] = card.legs.map((leg) => withLive(planLeg(leg), live.data?.legs));
+  const mixed = sum(card.legs, "in") > 0n && sum(card.legs, "back") > 0n;
+  const legs: readonly Leg[] = card.legs.map((leg) =>
+    withLive({ ...planLeg(leg), ...(mixed ? { verb: pickVerb(leg) } : {}) }, live.data?.legs),
+  );
   const moves: readonly Move[] = card.moves.map((move) => withLive(move, live.data?.legs));
   // One venue's moves wear its mark; a mix wears Auni's.
   const venues = new Set(card.legs.map((leg) => leg.venue));
@@ -59,13 +74,32 @@ export function ActionPlanCard({
   const held = legs.filter((leg) => leg.held).length;
   const running = count("running") - held;
   const done = count("done");
-  // Only a finish watched happening makes Auni hop, never a card reopened later.
+  // Only a finish watched happening refreshes balances and makes Auni hop.
   const [watched, setWatched] = useState(false);
   if (running > 0 && !watched) setWatched(true);
   const rows = moveRows(moves, legs);
   const failed = useProposalFailed(card.proposalId, queryKey, live.data, rows, onAskAgent);
+  const funding = live.data?.funding ?? null;
 
   const ended = untapped([...legs, ...moves]);
+  const step =
+    !live.data && !live.isError
+      ? "loading"
+      : done === legs.length
+        ? "done"
+        : running > 0 || pending === "allow"
+          ? "running"
+          : waiting > 0
+            ? funding
+              ? "fund"
+              : "ready"
+            : "settled";
+  const finished = step === "done" || step === "settled";
+
+  useEffect(() => {
+    if (watched && finished) refreshMoney();
+  }, [finished, refreshMoney, watched]);
+
   if (ended) {
     return (
       <MoneyCardFrame label={card.title} phase="expired">
@@ -78,17 +112,6 @@ export function ActionPlanCard({
     );
   }
 
-  const step =
-    !live.data && !live.isError
-      ? "loading"
-      : done === legs.length
-        ? "done"
-        : running > 0 || pending === "allow"
-          ? "running"
-          : waiting > 0
-            ? "ready"
-            : "settled";
-  const finished = step === "done" || step === "settled";
   const phase = finished ? "after" : step === "running" ? "running" : "before";
   // Once it has run, the total is what went through; until then, and when none of it did, what it
   // would move.
@@ -132,7 +155,7 @@ export function ActionPlanCard({
         {units > 0n ? (
           <div className="flex-none pl-1 text-right">
             <p className="text-[26px] leading-[1.1] font-semibold tracking-[-0.035em] text-ink tabular-nums">
-              {total}
+              <RollingNumber value={total} />
             </p>
             <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">
               <TextSwap text={amountNote(phase, flow, done === 0)} />
@@ -143,20 +166,32 @@ export function ActionPlanCard({
       <div className="mt-5 border-t border-foreground/[0.06] pt-5 pb-1.5">
         <MoveList rows={rows} failed={step === "settled" ? failed : null} />
         {finished ? null : <PaysWith lines={card.paysWith ?? []} />}
-        {step === "ready" ? <Costs costs={card.costs} /> : null}
-        {step === "ready" ? <CardNote says={card.buysFirst} /> : null}
-        {step === "ready" ? <CardNote says={card.pricedLater} /> : null}
+        {step === "ready" || step === "fund" ? <Costs costs={card.costs} /> : null}
+        {step === "ready" || step === "fund" ? <CardNote says={card.buysFirst} /> : null}
+        {step === "ready" || step === "fund" ? <CardNote says={card.pricedLater} /> : null}
         <ArrivedLine />
       </div>
       {/* Once it runs, the list and the header say it all. */}
-      {step === "loading" || step === "ready" ? (
+      {step === "loading" || step === "fund" || step === "ready" ? (
         <FooterMorph stepKey={step}>
           {step === "loading" ? (
             <div className="h-12" />
+          ) : step === "fund" && funding ? (
+            <FundStep
+              error={error}
+              needUsd={funding.needUsd}
+              pending={pending}
+              watching={watchingFor === funding.needUsd}
+              onAdd={() => {
+                setWatchingFor(funding.needUsd);
+                openAddMoney(wholeDollars(funding.needUsd));
+              }}
+              onDecline={() => void decide("decline")}
+            />
           ) : (
             <ReadyStep
               error={error}
-              landed={false}
+              landed={watchingFor !== null}
               move={card.action.replaceAll(AMOUNT, total)}
               pending={pending}
               onAllow={() => void decide("allow")}

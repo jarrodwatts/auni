@@ -2,95 +2,24 @@
 
 import { useState, type ReactNode } from "react";
 
-import { SpecialistOrb } from "@/components/specialist/specialist-orb";
-import { AssetLogo, Change, MoveCaret } from "@/components/specialist/marks";
-import { holdsNothing } from "@/components/specialist/use-specialists";
-import { PlaceLink } from "@/components/places/open-place";
-import { WaitingDot } from "@/components/places/place-marks";
-import type { SpecialistPlace } from "@/components/places/use-places";
-import { specialistHref } from "@/lib/app-links";
-import type { Specialist, Holding, LooseHoldings } from "@/lib/data/views";
-import { changePercent, formatUsdcBalance, formatUsdcChange } from "@/lib/money";
+import { AssetLogo, MoveCaret } from "@/components/brand/marks";
+import type { Holding } from "@/lib/data/views";
+import { formatUsdcBalance, formatUsdcChange } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { OtherTokensDialog, OtherTokensMark } from "./other-tokens";
 import { otherTokensLabel } from "./other-tokens-text";
 
-/**
- * On a phone, Portfolio's money is one list of rows, like a bank's: each
- * specialist, then cash and anything held on its own, so
- * the rows add up to the total above them. Rows sit on the page's fill with
- * a hairline between them that starts where the words do.
- */
 const LIST = "overflow-hidden rounded-[20px] bg-surface";
 const ROW =
   "flex items-center pl-4 outline-none transition-colors duration-150 active:bg-foreground/[0.04] focus-visible:bg-foreground/[0.04]";
 const RULE = "group-[:not(:first-child)]/row:border-t border-foreground/[0.06]";
 
-export function SpecialistRows({ places }: { readonly places: readonly SpecialistPlace[] }) {
+/** Live non-cash holdings as a clean brokerage-style list. */
+export function HoldingRows({ holdings }: { readonly holdings: readonly Holding[] }) {
   return (
     <ul className={LIST}>
-      {places.map(({ specialist, waiting }) => (
-        <SpecialistRow key={specialist.id} specialist={specialist} waiting={waiting} />
-      ))}
-    </ul>
-  );
-}
-
-function SpecialistRow({
-  specialist,
-  waiting,
-}: {
-  readonly specialist: Specialist;
-  readonly waiting: boolean;
-}) {
-  const forming = holdsNothing(specialist);
-  const value = BigInt(specialist.value.baseUnits);
-  return (
-    <li className="group/row">
-      <PlaceLink href={specialistHref(specialist.id)} specialist={specialist.id} className={ROW}>
-        <Row
-          mark={
-            <>
-              <SpecialistOrb specialist={specialist} size={36} />
-              {waiting ? <WaitingDot className="-top-px -right-px" ring="ring-surface" /> : null}
-            </>
-          }
-          name={specialist.name}
-          value={forming ? null : formatUsdcBalance(value)}
-          // Taking shape: no value yet rather than a $0.
-          note={forming ? "Nothing in it yet" : (specialist.pulse ?? specialist.purpose)}
-          move={
-            forming ? null : (
-              <Change
-                pct={changePercent(BigInt(specialist.todayChangeBaseUnits), value)}
-                period="today"
-                className="font-medium"
-              />
-            )
-          }
-        />
-      </PlaceLink>
-    </li>
-  );
-}
-
-/** Money outside every specialist: cash first, then anything bought on its own, each row the same shape. */
-export function LooseRows({ loose }: { readonly loose: LooseHoldings }) {
-  return (
-    <ul className={LIST}>
-      <li className="group/row">
-        <div className={ROW}>
-          <Row
-            mark={<AssetLogo holding={loose.cash} size={36} />}
-            name="Cash"
-            value={formatUsdcBalance(BigInt(loose.cash.value.baseUnits))}
-            note="Ready for Auni to put to work"
-            move={null}
-          />
-        </div>
-      </li>
-      {loose.other.map((holding) => (
+      {holdings.map((holding) => (
         <li key={holding.id} className="group/row">
           <div className={ROW}>
             <Row
@@ -103,12 +32,36 @@ export function LooseRows({ loose }: { readonly loose: LooseHoldings }) {
           </div>
         </li>
       ))}
-      {loose.otherTokens > 0 ? <OtherTokensRow count={loose.otherTokens} /> : null}
     </ul>
   );
 }
 
-/** Tokens Auni doesn't count, as the last row, which opens them (see OtherTokensDialog). */
+/** Cash and uncounted wallet tokens on mobile. */
+export function CashRows({
+  cash,
+  otherTokens,
+}: {
+  readonly cash: Holding;
+  readonly otherTokens: number;
+}) {
+  return (
+    <ul className={LIST}>
+      <li className="group/row">
+        <div className={ROW}>
+          <Row
+            mark={<AssetLogo holding={cash} size={36} />}
+            name="Cash"
+            value={formatUsdcBalance(BigInt(cash.value.baseUnits))}
+            note="Ready for Auni to put to work"
+            move={null}
+          />
+        </div>
+      </li>
+      {otherTokens > 0 ? <OtherTokensRow count={otherTokens} /> : null}
+    </ul>
+  );
+}
+
 function OtherTokensRow({ count }: { readonly count: number }) {
   const [open, setOpen] = useState(false);
   return (
@@ -127,7 +80,6 @@ function OtherTokensRow({ count }: { readonly count: number }) {
   );
 }
 
-/** Mark on the left; name over a quiet note, value over today's move. */
 function Row({
   mark,
   name,

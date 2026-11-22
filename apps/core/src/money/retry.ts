@@ -3,7 +3,7 @@ import { and, eq, or, sql, TransactionRollbackError } from "drizzle-orm";
 
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
-import { actions, specialists, fills, type ActionRow } from "../db/schema.ts";
+import { actions, fills, threads, type ActionRow } from "../db/schema.ts";
 import {
   approvedDetails,
   cardRuns,
@@ -71,7 +71,7 @@ export async function retryProposal(proposalId: string, runs: number): Promise<R
  * card's is before it is shown. One conditional update, under the lock a card
  * is recorded under, moves all of them or none: each still failed at the
  * attempt the person saw, with nothing of the move itself sent and no fills,
- * and not in a specialist retired since. So a second tap, or one from a screen
+ * and not in a thread archived since. So a second tap, or one from a screen
  * behind, moves nothing.
  */
 async function runAgain(
@@ -94,10 +94,7 @@ async function runAgain(
           or(...rows.map((row) => and(eq(actions.id, row.id), eq(actions.attempts, row.attempts)))),
           sql`not ${sentSomething}`,
           sql`not exists (select 1 from ${fills} where ${fills.actionId} = ${actions.id})`,
-          sql`(${actions.specialistId} is null or exists (
-            select 1 from ${specialists}
-            where ${specialists.id} = ${actions.specialistId} and ${specialists.status} <> 'retired'
-          ))`,
+          sql`not exists (select 1 from ${threads} where ${threads.id} = ${actions.threadId} and ${threads.archivedAt} is not null)`,
         ),
         {
           attempts: sql`${actions.attempts} + 1`,
@@ -132,14 +129,11 @@ async function runAgain(
 export async function quoteAgain(row: ActionRow): Promise<ActionQuoteWire> {
   const recipe = recipeForTool(row.tool);
   if (!recipe) throw new Error(`No recipe handles ${row.tool}.`);
-  const context = { specialistId: row.specialistId };
-  const held = await prepareLeg(recipe, row.input, { ...context, heldTo: row }).catch(
-    (error: unknown) => {
-      if (error instanceof PriceMoved) return null;
-      throw error;
-    },
-  );
-  const { preview } = held ?? (await prepareLeg(recipe, row.input, context));
+  const held = await prepareLeg(recipe, row.input, { heldTo: row }).catch((error: unknown) => {
+    if (error instanceof PriceMoved) return null;
+    throw error;
+  });
+  const { preview } = held ?? (await prepareLeg(recipe, row.input, {}));
   return {
     amountUsd: preview.amountUsd,
     // One unit's price as the new card would say it; null for a move priced without one.

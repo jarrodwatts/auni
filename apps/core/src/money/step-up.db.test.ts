@@ -38,7 +38,7 @@ const sendsTo = (to: string): Effect => ({
 async function card(effect: Effect) {
   const recipe = raw(effect);
   const { rows } = await recordActions(
-    { threadId: null, specialistId: null },
+    { threadId: null },
     [{ recipe, input: {}, preview: await recipe.describe({} as never, {} as never) }],
     null,
   );

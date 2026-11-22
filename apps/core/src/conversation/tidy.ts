@@ -1,3 +1,4 @@
+import type { ModelSelectionWire, ThreadActMode } from "@auni/shared";
 import { and, eq, exists, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { db, type Tx } from "../db/client.ts";
@@ -8,28 +9,20 @@ import {
   channelDeliveries,
   jobs,
   messages,
-  specialists,
-  specialistUpdates,
+  owner,
   threads,
   type ThreadRow,
 } from "../db/schema.ts";
+import { normalizeUsd } from "../money/usd.ts";
 
-// How the owner tidies their chats: renaming one, archiving it out of History, and deleting it for
-// good. Tidying never touches money: a move's record stays whatever happens to the chat it was
-// made in, so Activity and the portfolio read the same before and after. What tidying must not
-// do is hide something that still needs the owner, or leave a watch with no chat to wake, so each
-// of those is refused in words. An archived chat comes back by itself with Auni's next answer
-// there (`answered`), so nothing Auni says later lands where nobody looks.
+// How the owner tidies and configures their threads: renaming, pinning, archiving, deleting,
+// switching model/effort, and setting autonomy budget. Tidying never touches money: a move's
+// record stays whatever happens to the thread it was made in, so Activity and Portfolio read the
+// same before and after.
 
 /** Why a chat can't be tidied as asked: a code for code, and a sentence for the owner. */
 export interface TidyRefusal {
-  readonly error:
-    | "specialist_at_work"
-    | "specialist_record"
-    | "card_waiting"
-    | "still_telling"
-    | "move_landing"
-    | "watching";
+  readonly error: "card_waiting" | "still_telling" | "move_landing" | "watching";
   readonly message: string;
 }
 
@@ -67,23 +60,47 @@ const CARD_WAITING = refused(
   "A card here still waits for your answer. Answer it first, even with Not now, so it isn't put away unseen.",
 );
 
-/** Renames a chat. A specialist's name is its own, changed on its page, never by its thread. */
-export async function renameChat(
-  thread: ThreadRow,
-  title: string,
-): Promise<TidyRefusal | undefined> {
-  if (thread.specialistId)
-    return refused(
-      "specialist_record",
-      "A specialist's chat goes by the specialist's name. Rename it from its page.",
-    );
+/** Renames a thread. */
+export async function renameChat(thread: ThreadRow, title: string): Promise<void> {
   await db.update(threads).set({ title }).where(eq(threads.id, thread.id));
 }
 
+/** Pins or unpins a thread to the top of the sidebar. */
+export async function pinChat(thread: ThreadRow, pinned: boolean): Promise<void> {
+  await db
+    .update(threads)
+    .set({ pinnedAt: pinned ? sql`now()` : null })
+    .where(eq(threads.id, thread.id));
+}
+
+/** Updates a thread's autonomy mode and/or spending ceiling (owner route only). */
+export async function updateThreadAutonomy(
+  thread: ThreadRow,
+  patch: { readonly actMode?: ThreadActMode; readonly budgetUsd?: string },
+): Promise<void> {
+  await db
+    .update(threads)
+    .set({
+      ...(patch.actMode !== undefined ? { actMode: patch.actMode } : {}),
+      ...(patch.budgetUsd !== undefined ? { budgetUsd: normalizeUsd(patch.budgetUsd) } : {}),
+    })
+    .where(eq(threads.id, thread.id));
+}
+
+/** Updates a thread's model selection and remembers it as the owner's default for new threads. */
+export async function updateThreadModel(
+  thread: ThreadRow,
+  modelSelection: ModelSelectionWire | null,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.update(threads).set({ modelSelection }).where(eq(threads.id, thread.id));
+    await tx.update(owner).set({ defaultModelSelection: modelSelection });
+  });
+}
+
 /**
- * Archives a chat out of History, or brings it back. A specialist's chat is the specialist, so
- * it is archived only once the specialist is retired: archiving is not retiring it. A chat with
- * a card waiting stays, since archiving it would put the card away unseen.
+ * Archives a thread out of the sidebar, or brings it back. A thread with a card waiting stays,
+ * since archiving it would put the card away unseen.
  */
 export async function archiveChat(
   thread: ThreadRow,
@@ -100,43 +117,25 @@ export async function archiveChat(
       .from(threads)
       .where(eq(threads.id, thread.id))
       .for("update");
-    if (thread.specialistId) {
-      const [specialist] = await tx
-        .select({ status: specialists.status })
-        .from(specialists)
-        .where(eq(specialists.id, thread.specialistId));
-      if (specialist?.status !== "retired")
-        return refused(
-          "specialist_at_work",
-          "This specialist is still at work. Retire it first; its chat moves to History, and can be archived from there.",
-        );
-    }
     if (await cardWaiting(tx, thread.id)) return CARD_WAITING;
     await tx
       .update(threads)
-      .set({ archivedAt: sql`now()` })
+      .set({ archivedAt: sql`now()`, pinnedAt: null })
       .where(eq(threads.id, thread.id));
   });
 }
 
 /**
- * Deletes a chat for good: its messages, and what only made sense inside it (the channel
- * messages that pointed at it, its undo receipts, its ended watches). Every move made in it
- * keeps its record, now outside any chat, as a withdrawal from Settings is.
+ * Deletes a thread for good: its messages, and what only made sense inside it (the channel
+ * messages that pointed at it, its ended watches). Every move made in it keeps its record,
+ * now outside any thread, as a withdrawal from Settings is.
  *
- * Refused while anything there still needs the chat: a specialist's (its chat is its record),
- * something Auni has still to tell there (a turn queued or running, a watch's fire not yet
- * judged or held for the brief), a card waiting, a move still landing (its news comes back to
- * the chat), or a watch that would wake it, which is named so the owner can ask Auni to stop it.
+ * Refused while anything there still needs the thread: something Auni has still to tell there,
+ * a card waiting, a move still landing, or an active/paused watch that would wake it.
  */
 export async function deleteChat(thread: ThreadRow): Promise<TidyRefusal | undefined> {
-  if (thread.specialistId)
-    return refused(
-      "specialist_record",
-      "A specialist's chat is its record, so it can be archived once the specialist is retired, but not deleted.",
-    );
   return db.transaction(async (tx) => {
-    // A card or a watch recorded in this chat meanwhile waits for this lock, then finds it gone.
+    // A card or a watch recorded in this thread meanwhile waits for this lock, then finds it gone.
     const [locked] = await tx
       .select({ id: threads.id })
       .from(threads)
@@ -157,7 +156,7 @@ export async function deleteChat(thread: ThreadRow): Promise<TidyRefusal | undef
     if (landing)
       return refused(
         "move_landing",
-        "A move made here is still landing, and Auni tells you how it went in this chat. Delete it once it has landed.",
+        "A move made here is still landing, and Auni tells you how it went in this thread. Delete it once it has landed.",
       );
     const live = await tx
       .select({ description: automations.description })
@@ -170,7 +169,7 @@ export async function deleteChat(thread: ThreadRow): Promise<TidyRefusal | undef
       const watches = live.length === 1 ? `a watch, ${named}` : `${live.length} watches, ${named}`;
       return refused(
         "watching",
-        `This chat has ${watches}. When ${live.length === 1 ? "it comes" : "one comes"} true, Auni wakes this chat to tell you. Ask Auni here to stop watching, or archive the chat instead.`,
+        `This thread has ${watches}. When ${live.length === 1 ? "it comes" : "one comes"} true, Auni wakes this thread to tell you. Ask Auni here to stop watching, or archive the thread instead.`,
       );
     }
     await forget(tx, thread.id);
@@ -220,11 +219,10 @@ async function stillTelling(tx: Tx, threadId: string): Promise<boolean> {
   return fire !== undefined;
 }
 
-/** Removes a chat and what only it used, keeping every money record. */
+/** Removes a thread and what only it used, keeping every money record. */
 async function forget(tx: Tx, threadId: string): Promise<void> {
   await tx.update(actions).set({ threadId: null }).where(eq(actions.threadId, threadId));
   await tx.delete(channelDeliveries).where(eq(channelDeliveries.threadId, threadId));
-  await tx.delete(specialistUpdates).where(eq(specialistUpdates.threadId, threadId));
   const ended = tx
     .select({ id: automations.id })
     .from(automations)

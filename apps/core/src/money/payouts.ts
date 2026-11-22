@@ -9,8 +9,7 @@ import type { AppSweep } from "./sweep.ts";
 import { accountOwning, accounts } from "../apps/registry.ts";
 import { fillIdentity, QUANTITY_DECIMALS, type FillChain, type FillKey } from "./fill-key.ts";
 import { usdLabel } from "./format.ts";
-import { allFills, holdersOf, specialistBooks } from "./books.ts";
-import { signedQuantity } from "./books.ts";
+import { allFills, holdersOf, signedQuantity, threadBooks } from "./books.ts";
 import type { Fill } from "./recipe.ts";
 import { begins } from "./life.ts";
 import { showPosted, tellPayout, type Posted } from "./news.ts";
@@ -160,15 +159,15 @@ async function boughtIn(tx: Tx, keys: readonly FillKey[]): Promise<string | null
 function closingSales(
   everyFill: EveryFill,
   share: Payout["markets"][number]["shares"][number],
-): (Fill & { readonly specialistId: string | null })[] {
+): (Fill & { readonly threadId: string | null })[] {
   const key = fillIdentity(share.key);
-  const books = specialistBooks(everyFill);
+  const books = threadBooks(everyFill);
   const loose = everyFill
-    .filter((fill) => fill.specialistId === null && fillIdentity(fill) === key)
+    .filter((fill) => fill.threadId === null && fillIdentity(fill) === key)
     .reduce((sum, fill) => sum + signedQuantity(fill), 0n);
   const { burned } = share;
   const holders = holdersOf(burned, books, key);
-  const credited = new Map(holders.specialists);
+  const credited = new Map(holders.threads);
   const owners: [string | null, bigint, bigint][] = [
     ...[...books].map(([id, book]): [string, bigint, bigint] => [
       id,
@@ -179,8 +178,8 @@ function closingSales(
   ];
   return owners
     .filter(([, units]) => units > 0n)
-    .map(([specialistId, units, paidUnits]) => ({
-      specialistId,
+    .map(([threadId, units, paidUnits]) => ({
+      threadId,
       ...share.key,
       side: "sell",
       quantity: formatUnits(units, QUANTITY_DECIMALS),

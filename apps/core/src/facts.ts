@@ -1,11 +1,12 @@
 import { knownAsset, type FactSource, type OwnerSignals } from "@auni/shared";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, exists, isNull, or, sql } from "drizzle-orm";
 
 import { theOwner } from "./auth/owner.ts";
 import { db } from "./db/client.ts";
-import { specialists, type OwnerRow, type SpecialistRow } from "./db/schema.ts";
+import { automations, threads, type OwnerRow, type ThreadRow } from "./db/schema.ts";
 import { startFrom, type FactStart, type AppFact, type OwnerSeen } from "./apps/contract.ts";
 import { factSources } from "./apps/registry.ts";
+import { promptPortfolio } from "./conversation/context.ts";
 import { dayMoves } from "./money/day-moves.ts";
 import { holdingFaces, LOGOS, paysFees } from "./money/holdings.ts";
 import type { Holding, Portfolio } from "./money/portfolio.ts";
@@ -13,9 +14,8 @@ import { dollars } from "./money/summaries.ts";
 import { within } from "./money/swaps/shared.ts";
 import { centsToUsd, signedUsdToCents, usdToCents } from "./money/usd.ts";
 import { startOfDay } from "./money/value-history.ts";
-import { promptPortfolio } from "./specialists/context.ts";
 
-// What Auni sees that matters to the owner now: their own money and team, and what each app
+// What Auni sees that matters to the owner now: their own money, active threads, and what each app
 // sees (App.facts). Read fresh every time and never kept: a new chat's starting points are
 // written from them (conversation/starting-points.ts). Each fact names where it came from, so
 // whatever is made of it can cite it.
@@ -39,7 +39,7 @@ export const FACT_WAIT_MS = 6_000;
 const HOLDINGS_SEEN = 10;
 /** Of those, the ones that are a fact of their own. */
 const HOLDINGS_TOLD = 3;
-const SPECIALISTS_TOLD = 3;
+const ACTIVE_THREADS_TOLD = 3;
 
 /**
  * How long the facts wait for the owner's money. Nobody's turn waits on them, and a reading
@@ -51,14 +51,29 @@ const FACTS_PORTFOLIO_WAIT_MS = 30_000;
 
 /** Everything Auni sees now: their money first, which is always there, then their signals & the rest. */
 export async function readFacts(): Promise<Fact[]> {
-  const [portfolio, team, me] = await Promise.all([
+  const [portfolio, activeThreads, me] = await Promise.all([
     promptPortfolio(FACTS_PORTFOLIO_WAIT_MS),
     db
       .select()
-      .from(specialists)
-      .where(eq(specialists.status, "active"))
-      .orderBy(desc(specialists.createdAt))
-      .limit(SPECIALISTS_TOLD),
+      .from(threads)
+      .where(
+        and(
+          isNull(threads.archivedAt),
+          or(
+            eq(threads.actMode, "within_limits"),
+            exists(
+              db
+                .select({ one: sql`1` })
+                .from(automations)
+                .where(
+                  and(eq(automations.threadId, threads.id), eq(automations.status, "active")),
+                ),
+            ),
+          ),
+        ),
+      )
+      .orderBy(desc(threads.updatedAt))
+      .limit(ACTIVE_THREADS_TOLD),
     theOwner(),
   ]);
   const held = await heldNow(portfolio);
@@ -72,7 +87,7 @@ export async function readFacts(): Promise<Fact[]> {
   };
   return [
     ...moneyFacts(portfolio),
-    ...team.map(specialistFact),
+    ...activeThreads.map(activeThreadFact),
     ...held.slice(0, HOLDINGS_TOLD).map(holdingFact),
     ...personalFacts(me),
     ...(await appFacts(seen)),
@@ -278,18 +293,21 @@ function moneyFacts(portfolio: Portfolio | null): Fact[] {
   ];
 }
 
-function specialistFact(specialist: SpecialistRow): Fact {
+function activeThreadFact(thread: ThreadRow): Fact {
+  const name = thread.title?.trim() || "Active thread";
+  const notes = thread.notes?.trim() ?? "";
+  const mode =
+    thread.actMode === "within_limits"
+      ? `running Auto up to ${dollars(thread.budgetUsd)}`
+      : "actively watching";
   return {
-    text: `The owner's specialist "${specialist.name}", a ${specialist.kind}: ${specialist.purpose}.${specialist.pulse ? ` Its latest read: ${specialist.pulse}` : ""}`,
-    source: { app: AUNI, label: specialist.name, link: `/app/s/${specialist.id}` },
+    text: `The owner's thread "${name}" is ${mode}.${notes ? ` Notes: ${notes.slice(0, 140)}` : ""}`,
+    source: { app: AUNI, label: name, link: `/app/chat/${thread.id}` },
     image: null,
-    starts: startFrom(
-      `How is my ${specialist.name} specialist doing, and is there anything it should change?`,
-      [
-        { statement: `Your ${specialist.name} specialist.`, action: "Check in" },
-        { statement: `${specialist.name}, your specialist.`, action: "Check in" },
-      ],
-    ),
+    starts: startFrom(`How is "${name}" looking right now, and is there anything to adjust?`, [
+      { statement: `${name} is running.`, action: "Check in" },
+      { statement: `Check ${name}.`, action: "Review" },
+    ]),
   };
 }
 

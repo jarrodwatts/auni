@@ -26,10 +26,9 @@ import {
 } from "./sidebar-rows";
 
 /**
- * Up top, the person's own: New chat, Portfolio with what waits on them,
- * Activity, then the team (Auni and each specialist) with History under it. Pinned at the foot, their account. Search is not a row
- * but a palette (⌘K, or the glass beside the fold); on a phone it's the
- * field atop the sheet. On a desktop the sidebar folds to a rail of marks.
+ * Up top, the person's own: New thread, Portfolio with what waits on them,
+ * Activity, Apps, then Pinned, Active, and Recent threads. Pinned at the foot,
+ * their account.
  */
 export function Sidebar({
   mobile = false,
@@ -38,7 +37,6 @@ export function Sidebar({
 }: {
   readonly mobile?: boolean;
   readonly folded?: boolean;
-  /** Folds the desktop sidebar to its rail, or opens it back out. */
   readonly onFold?: (folded: boolean) => void;
 }) {
   const startNew = useStartNew();
@@ -109,13 +107,13 @@ export function Sidebar({
               href="/app/new"
               onClick={startNew}
               mark={<NewMark />}
-              title="New chat"
+              title="New thread"
               keys={["⇧⌘O", "Shift+Meta+O Shift+Control+O"]}
             />
           </div>
 
           <nav
-            aria-label="Team"
+            aria-label="Threads"
             className="auni-list-fade auni-scrollbar-none min-h-0 flex-1 overflow-y-auto px-2 pb-12"
           >
             <PlaceList folded={folded} />
@@ -123,7 +121,6 @@ export function Sidebar({
 
           <div className="flex-none">
             <div className="flex flex-col gap-px px-2 pt-2">
-              {/* The rail has no header room for the glass, so it sits above the account. */}
               <RailSearchRow folded={folded} onClick={openSearch} />
             </div>
             <AccountMenu />
@@ -134,10 +131,6 @@ export function Sidebar({
   );
 }
 
-/**
- * A phone's places, in the menu sheet and the switcher alike: search on
- * top, New chat and the team under it.
- */
 export function PhonePlaces({ footer }: { readonly footer?: ReactNode }) {
   const startNew = useStartNew();
   const close = useCloseMobileThreadMenu();
@@ -146,7 +139,7 @@ export function PhonePlaces({ footer }: { readonly footer?: ReactNode }) {
       <div data-mobile className="group/sidebar flex min-h-0 flex-1 flex-col">
         <SearchPanel variant="sheet" onDone={close}>
           <nav
-            aria-label="Team"
+            aria-label="Threads"
             className="auni-list-fade auni-scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-12"
           >
             <PlaceRow
@@ -154,7 +147,7 @@ export function PhonePlaces({ footer }: { readonly footer?: ReactNode }) {
               href="/app/new"
               onClick={startNew}
               mark={<NewMark />}
-              title="New chat"
+              title="New thread"
             />
             <PlaceList />
           </nav>

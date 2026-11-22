@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, specialists, fills } from "../db/schema.ts";
-import { insertAction, insertSpecialist, wipe } from "../test/db.ts";
+import { actions, fills, threads } from "../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { queued } from "../test/jobs.ts";
 import { FACE, stubRecipe } from "../test/recipe.ts";
 import type { Recipe } from "./recipe.ts";
@@ -44,7 +44,7 @@ vi.mock("./funding.ts", async (importOriginal) => ({
 
 beforeEach(async () => {
   cash.short = null;
-  await wipe(specialists, actions, fills);
+  await wipe(threads, actions, fills);
 });
 
 /** The moves queued to run, by action id. */
@@ -142,13 +142,13 @@ describe("retryAction", () => {
     expect(await actionRow(row.id)).toMatchObject({ status: "failed" });
   });
 
-  it("refuses what running again can't fix, a leg on its own, and a retired specialist's move", async () => {
+  it("refuses what running again can't fix, a leg on its own, and an archived thread's move", async () => {
     const short = await insertAction({ ...blipped, failureKind: "funds" });
     expect(await retryAction(short, 1)).toEqual({ kind: "refused", reason: "not_retryable" });
     const leg = await insertAction({ ...blipped, proposalId: randomUUID() });
     expect(await retryAction(leg, 1)).toEqual({ kind: "refused", reason: "not_retryable" });
-    const retired = await insertSpecialist({ status: "retired" });
-    const late = await insertAction({ ...blipped, specialistId: retired.id });
+    const archived = await insertThread({ archivedAt: new Date() });
+    const late = await insertAction({ ...blipped, threadId: archived.id });
     expect(await retryAction(late, 1)).toEqual({ kind: "moved_on" });
     expect(await started()).toEqual([]);
   });

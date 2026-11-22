@@ -5,14 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { filling } from "../apps/registry.ts";
 import { db } from "../db/client.ts";
-import { actions, fills, specialists } from "../db/schema.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { actions, fills, threads } from "../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { executeAction, proposeAction } from "./actions.ts";
 import { SOLANA_USDC } from "./chains.ts";
 import { retryRefusal } from "./failure.ts";
 import { WRAPPED_SOL } from "./fill-key.ts";
 import type { PayInRequest, PayInStanding } from "./pay-in.ts";
-import { specialistPot } from "./pot.ts";
+import { threadPot } from "./pot.ts";
 import type { EvmTx, KeptTx } from "./recipe.ts";
 import { recipeForTool } from "./recipes/index.ts";
 import { retryAction } from "./retry.ts";
@@ -240,7 +240,7 @@ async function tryAgain(id: string) {
 }
 
 beforeEach(async () => {
-  await wipe(specialists, actions, fills);
+  await wipe(threads, actions, fills);
   world.ownWay = true;
   world.short = SHORT;
   world.relay = "success";
@@ -369,28 +369,22 @@ describe("SOL a card buys by swapping the wallet's Solana USDC, where a sponsor 
   });
 });
 
-describe("a specialist that acts on its own, and the SOL its move would buy", () => {
-  /** A specialist set to act on its own within `potUsd`, proposing the $2 buy in its own thread. */
-  async function proposes(potUsd: string) {
-    const specialist = await insertSpecialist({ potUsd, actMode: "within_limits" });
-    const own = await insertThread({ specialistId: specialist.id });
-    const outcome = await proposeAction(
-      { threadId: own.id, specialistId: specialist.id },
-      recipe,
-      INPUT,
-    );
-    const free = async () =>
-      (await db.transaction((tx) => specialistPot(tx, specialist))).freeCashCents;
+describe("a thread that acts on its own, and the SOL its move would buy", () => {
+  /** A thread set to act on its own within `budgetUsd`, proposing the $2 buy. */
+  async function proposes(budgetUsd: string) {
+    const own = await insertThread({ budgetUsd, actMode: "within_limits" });
+    const outcome = await proposeAction({ threadId: own.id }, recipe, INPUT);
+    const free = async () => (await db.transaction((tx) => threadPot(tx, own))).freeCashCents;
     return { outcome, free };
   }
 
-  it("asks the owner where the buy and the dollar that buys its SOL don't both fit the pot", async () => {
+  it("asks the owner where the buy and the dollar that buys its SOL don't both fit the budget", async () => {
     const { outcome } = await proposes("2");
     expect(outcome.status).toBe("awaiting_permission");
     expect(world.sent).toEqual([]);
   });
 
-  it("runs unasked where both fit, and counts the purchase in the pot from then on", async () => {
+  it("runs unasked where both fit, and counts the purchase in the budget from then on", async () => {
     const { outcome, free } = await proposes("5");
     expect(outcome.status).toBe("running");
     expect(await free()).toBe(200n);
@@ -404,7 +398,7 @@ describe("a specialist that acts on its own, and the SOL its move would buy", ()
     world.ownWay = false;
     // 40 cents of SOL at a tenth over: 44 cents beside the $2.
     expect((await proposes("2.43")).outcome.status).toBe("awaiting_permission");
-    await wipe(specialists, actions);
+    await wipe(threads, actions);
     const { outcome, free } = await proposes("2.44");
     expect(outcome.status).toBe("running");
     expect(await free()).toBe(0n);

@@ -163,7 +163,7 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const core = <T>(path: string) =>
       page.evaluate<T>(`fetch("/core/${path}").then((response) => response.json())`);
     const { threads } = await core<{
-      threads: { id: string; title: string | null; specialistId: string | null }[];
+      threads: { id: string; title: string | null }[];
     }>("threads");
 
     await take(page, out, "portfolio", `${origin}/app`, "top");
@@ -229,15 +229,7 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       await take(page, out, `settings-${section}`, `${origin}/app?settings=${section}`, "top");
     for (const thread of threads.toReversed()) {
       const name = slug(thread.title ?? thread.id);
-      if (thread.specialistId)
-        await take(
-          page,
-          out,
-          `specialist-${name}`,
-          `${origin}/app/s/${thread.specialistId}`,
-          "end",
-        );
-      else await take(page, out, `chat-${name}`, `${origin}/app/chat/${thread.id}`, "end");
+      await take(page, out, `chat-${name}`, `${origin}/app/chat/${thread.id}`, "end");
     }
   } finally {
     await browser.close();

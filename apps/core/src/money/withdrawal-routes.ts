@@ -88,11 +88,7 @@ async function withdrawalWire(row: ActionRow): Promise<z.input<typeof withdrawal
 
 withdrawalsRouter.post("/", async (req, res) => {
   try {
-    const outcome = await proposeAction(
-      { threadId: null, specialistId: null },
-      withdrawUsdc,
-      req.body,
-    );
+    const outcome = await proposeAction({ threadId: null }, withdrawUsdc, req.body);
     res.json(await withdrawalWire(outcome.action));
   } catch (error) {
     res.status(400).json({

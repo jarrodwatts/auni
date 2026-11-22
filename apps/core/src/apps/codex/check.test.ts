@@ -46,7 +46,11 @@ describe.runIf(process.platform !== "win32")("the Codex check", () => {
       account: { type: "chatgpt", email: null, planType: "pro" },
       authMethod: "chatgpt",
     });
-    expect(await run()).toEqual({ ready: true, login: "your ChatGPT Pro plan" });
+    expect(await run()).toMatchObject({
+      ready: true,
+      login: "your ChatGPT Pro plan",
+      models: [expect.objectContaining({ id: "gpt-6.1-sol", isDefault: true })],
+    });
   });
 
   it("names the account a ChatGPT login is signed in as", async () => {
@@ -54,10 +58,11 @@ describe.runIf(process.platform !== "win32")("the Codex check", () => {
       account: { type: "chatgpt", email: "sam@example.com", planType: "plus" },
       authMethod: "chatgpt",
     });
-    expect(await run()).toEqual({
+    expect(await run()).toMatchObject({
       ready: true,
       login: "your ChatGPT Plus plan",
       signedInAs: "sam@example.com",
+      models: [expect.objectContaining({ id: "gpt-6.1-sol", isDefault: true })],
     });
   });
 

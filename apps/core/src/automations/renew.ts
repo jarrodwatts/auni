@@ -4,11 +4,11 @@ import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../db/client.ts";
-import { automations, specialists } from "../db/schema.ts";
+import { automations } from "../db/schema.ts";
 import { defineJob, jobKind } from "../jobs/queue.ts";
 import { WatchRefused } from "../apps/contract.ts";
 import { offered, sourceById, sources } from "../apps/registry.ts";
-import { asRead, deleteAutomation, rewatch } from "./automations.ts";
+import { asRead, rewatch } from "./automations.ts";
 
 /** A lease ending within this long is renewed now, so a run that fails still leaves time. */
 const RENEW_AHEAD_MS = 24 * 60 * 60 * 1_000;
@@ -70,21 +70,11 @@ export async function remoteWatchIds(): Promise<string[]> {
  * One watch a service keeps: a fresh one in its place when it has none yet (credits ran out when
  * it was set up), when its lease ends within a day and the watch goes on past it, or when the
  * service says it stopped watching (it failed it, or it ran its course there). A condition the
- * service now refuses fails the watch, so the owner sees it stopped. A watch whose specialist
- * closed is deleted instead.
+ * service now refuses fails the watch, so the owner sees it stopped.
  */
 export async function renewWatch(id: string): Promise<string> {
-  const [row] = await db
-    .select({ automation: automations, specialistStatus: specialists.status })
-    .from(automations)
-    .leftJoin(specialists, eq(specialists.id, automations.specialistId))
-    .where(eq(automations.id, id));
-  if (!row || row.automation.status !== "active") return "skipped";
-  const { automation } = row;
-  if (row.specialistStatus === "retired") {
-    await deleteAutomation(automation);
-    return "specialist retired; deleted";
-  }
+  const [automation] = await db.select().from(automations).where(eq(automations.id, id));
+  if (!automation || automation.status !== "active") return "skipped";
   const remote = sourceById(automation.source)?.source.remote;
   if (!remote) return "skipped";
   const { sourceRef, leaseUntil, expiresAt } = automation;

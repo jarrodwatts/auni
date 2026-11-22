@@ -23,7 +23,7 @@ function leg(does: Leg["does"], fields: Partial<Leg> = {}): Leg {
   return {
     id: `00000000-0000-4000-8000-${String(ids).padStart(12, "0")}`,
     proposalId: PROPOSAL,
-    specialistId: PEARL_BET,
+    threadId: PEARL_BET,
     touches: [PEARL_BET],
     at: new Date("2026-10-20T08:30:00Z"),
     does,
@@ -75,7 +75,7 @@ function facts(fields: Partial<ActivityFacts> = {}): ActivityFacts {
     legs: [],
     outside: [],
     arrivals: [],
-    specialists: new Map([
+    threads: new Map([
       [STARKNET, "Starknet"],
       [PEARL_BET, "Pearl bet"],
     ]),
@@ -87,7 +87,6 @@ function facts(fields: Partial<ActivityFacts> = {}): ActivityFacts {
 
 describe("folding moves", () => {
   it("makes one item of a card's legs, its plumbing only the steps of how", () => {
-    // Pearl bet bought something before, so this card didn't start it.
     const before = pick("Bought", "HYPE", "Opened HYPE, 2x long", "10.00", {
       proposalId: null,
       at: new Date("2026-10-10T00:00:00Z"),
@@ -101,7 +100,7 @@ describe("folding moves", () => {
       title: "Bought Pearl",
       subtitle: "Pearl bet, Oct 20 at 7:30pm",
       amount: { usd: "16.50", direction: null, tone: "neutral" },
-      specialistId: PEARL_BET,
+      threadId: PEARL_BET,
       logo: { src: "https://app.hyperliquid.xyz/coins/Pearl.svg", name: "Pearl" },
       at: "2026-10-20T08:30:00.000Z",
       unread: false,
@@ -122,9 +121,9 @@ describe("folding moves", () => {
     });
   });
 
-  it("names a specialist's first card that bought anything as its start", () => {
+  it("names a thread's first card by what it bought", () => {
     const { items } = activityOf(facts({ legs: pearlCard() }), null);
-    expect(items.map((item) => item.title)).toEqual(["Started Pearl bet"]);
+    expect(items.map((item) => item.title)).toEqual(["Bought Pearl"]);
   });
 
   it("names a card that only moved cash, or sold what they held loose, by what it did", () => {
@@ -222,7 +221,7 @@ describe("folding moves", () => {
         money: { flow: "out", usd: "40.00" },
         logo: null,
       },
-      { proposalId: null, specialistId: null, touches: [] },
+      { proposalId: null, threadId: null, touches: [] },
     );
     const [item] = activityOf(facts({ legs: [withdrawal] }), null).items;
     expect(item).toMatchObject({
@@ -342,7 +341,7 @@ const liquidation = {
   at: new Date("2026-10-14T09:21:00Z"),
   // Recorded once Auni read the statement, after they last looked.
   recordedAt: new Date("2026-10-23T00:00:00Z"),
-  specialistId: STARKNET,
+  threadId: STARKNET,
   touches: [STARKNET],
   title: "Hyperliquid closed your STRK long",
   amount: { usd: "5.26", direction: "out" as const, tone: "loss" as const },
@@ -383,7 +382,7 @@ describe("unread", () => {
     expect(everything.unread).toBe(2);
     expect(everything.items.map((item) => [item.title, item.unread])).toEqual([
       ["Money arrived", true],
-      ["Started Pearl bet", false],
+      ["Bought Pearl", false],
       ["Hyperliquid closed your STRK long", true],
       ["Hyperliquid closed your STRK long", false],
       ["Money arrived", false],

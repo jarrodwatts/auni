@@ -11,7 +11,6 @@ import { threads, type ThreadRow } from "../db/schema.ts";
 import { automationTools } from "../automations/tools.ts";
 import { conversationTools } from "../conversation/tools.ts";
 import { beforeTool } from "../conversation/turn-record.ts";
-import { specialistTools } from "../specialists/tools.ts";
 import { moneyTools } from "../money/tools.ts";
 import type { Reach } from "../money/recipe.ts";
 import { walletReach } from "../money/wallets.ts";
@@ -86,10 +85,7 @@ function withMessage(result: CallToolResult): CallToolResult {
 
 /** Permission enforcement lives in these core-side handlers: the agent holds this turn's token, so nothing it runs is trusted. */
 export function toolsFor(context: ToolContext, reach: Reach = { solana: true }): AuniTool[] {
-  const turn: ToolTurn = {
-    threadId: context.thread.id,
-    specialistId: context.thread.specialistId,
-  };
+  const turn: ToolTurn = { threadId: context.thread.id };
   return [
     // What the owner's wallet can move on decides the money tools it is offered.
     ...moneyTools(turn, reach),
@@ -97,7 +93,6 @@ export function toolsFor(context: ToolContext, reach: Reach = { solana: true }):
     ...offered().flatMap(({ about, lookups }) =>
       (lookups?.() ?? []).map((tool) => watchedLookup(about, tool)),
     ),
-    ...specialistTools(turn),
     ...automationTools(turn),
     ...conversationTools(turn),
     suggestRepliesTool(turn),

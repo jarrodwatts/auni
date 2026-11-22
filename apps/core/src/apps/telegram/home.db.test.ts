@@ -112,7 +112,7 @@ describe("homeChannel", () => {
 
   it("is what the owner asks Auni for with set_notices", async () => {
     await paired();
-    const [, setNotices] = conversationTools({ threadId: crypto.randomUUID(), specialistId: null });
+    const [, setNotices] = conversationTools({ threadId: crypto.randomUUID() });
     const picked = await setNotices!.handler({ home: "telegram" });
     expect(picked.structuredContent).toMatchObject({
       home: "telegram",

@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { useRefreshSpecialists } from "@/components/specialist/use-specialists";
+import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { useMoney } from "@/components/money/money-provider";
 import { markActivitySeen } from "@/lib/data/activity";
 
@@ -28,7 +28,7 @@ export function DepositPortal({ need }: { readonly need: string | null }) {
 
   // The portfolio read already holds what landed; the reads around it, such as history, don't.
   // The owner watched it land, so Activity has nothing new to tell them about it.
-  const refreshMoney = useRefreshSpecialists();
+  const refreshMoney = useRefreshMoney();
   const queryClient = useQueryClient();
   const { landed } = watch;
   useEffect(() => {

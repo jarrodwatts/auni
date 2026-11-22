@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STARTING_POINTS } from "@auni/shared";
 
-import { insertSpecialist, setOwner, wipe } from "./test/db.ts";
+import { insertThread, setOwner, wipe } from "./test/db.ts";
 import { readFacts } from "./facts.ts";
 import type { Holding, Portfolio } from "./money/portfolio.ts";
 
-// Auni's own facts from a portfolio read as given here, and the specialists in the database.
+// Auni's own facts from a portfolio read as given here, and active threads in the database.
 
 const { CASH_LOGO, NVIDIA_LOGO } = vi.hoisted(() => ({
   CASH_LOGO: "/brand/tokens/usdc.svg",
@@ -16,7 +16,7 @@ const read = vi.hoisted(() => ({
   portfolio: null as Portfolio | null,
   seen: [] as unknown[],
 }));
-vi.mock("./specialists/context.ts", () => ({ promptPortfolio: async () => read.portfolio }));
+vi.mock("./conversation/context.ts", () => ({ promptPortfolio: async () => read.portfolio }));
 vi.mock("./money/holdings.ts", () => ({
   holdingFaces: async (holdings: readonly Holding[]) =>
     holdings.map((holding) =>
@@ -60,6 +60,7 @@ function holding(symbol: string, usdValue: string, cash = false): Holding {
 
 function portfolio(holdings: readonly Holding[]): Portfolio {
   const cash = holdings.filter((each) => each.cash);
+  const assets = holdings.filter((each) => !each.cash);
   const sum = (some: readonly Holding[]) =>
     some.reduce((total, each) => total + Number(each.usdValue), 0).toFixed(2);
   return {
@@ -68,8 +69,7 @@ function portfolio(holdings: readonly Holding[]): Portfolio {
     unavailable: [],
     looking: [],
     holdings,
-    specialists: [],
-    other: { usdValue: "0", holdings: [] },
+    assets: { usdValue: sum(assets), holdings: assets },
     cash: { usdValue: sum(cash), holdings: cash },
     onTheWay: { usdValue: "0", moves: [] },
   };
@@ -109,7 +109,7 @@ describe("readFacts", () => {
     expect(money!.starts).toHaveLength(STARTING_POINTS);
   });
 
-  it("tells their money, their cash, specialists and largest holdings with their marks, and apps what they hold", async () => {
+  it("tells their money, their cash, active threads and largest holdings with their marks, and apps what they hold", async () => {
     read.portfolio = portfolio([
       holding("USDC", "310.50", true),
       holding("NVDAx", "620.40"),
@@ -118,25 +118,32 @@ describe("readFacts", () => {
       // The coin every fee there is paid in: no holding to ask whether to keep or sell.
       { ...holding("MON", "0.01"), instrument: "native" },
     ]);
-    const specialist = await insertSpecialist({
-      name: "AI chips",
-      purpose: "AI keeps eating software",
-      pulse: "NVIDIA held up after earnings.",
+    const thread = await insertThread({
+      title: "AI chips",
+      actMode: "within_limits",
+      budgetUsd: "200.00",
+      notes: "NVIDIA held up after earnings.",
     });
-    await insertSpecialist({ name: "Retired", status: "retired" });
+    await insertThread({
+      title: "Archived",
+      actMode: "within_limits",
+      budgetUsd: "100.00",
+      archivedAt: new Date(),
+    });
+    await insertThread({ title: "Quiet chat" });
 
     const facts = await readFacts();
     expect(facts.map(({ text }) => text)).toEqual([
       "The owner has $1,010.91 in all, $310.50 of it cash.",
       "$310.50 of the owner's money is cash, waiting to be used.",
-      'The owner\'s specialist "AI chips", a take: AI keeps eating software. Its latest read: NVIDIA held up after earnings.',
+      'The owner\'s thread "AI chips" is running Auto up to $200. Notes: NVIDIA held up after earnings.',
       "The owner holds $620.40 of NVIDIA, down $4.10 today.",
       "The owner holds $80 of ETH.",
     ]);
     expect(facts[2]!.source).toEqual({
       app: "auni",
       label: "AI chips",
-      link: `/app/s/${specialist.id}`,
+      link: `/app/chat/${thread.id}`,
     });
     expect(facts[0]!.starts.map(({ statement, action }) => `${statement} ${action}`)).toEqual([
       "You have $1,010.91. Look it over",

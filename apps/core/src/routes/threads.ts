@@ -1,8 +1,14 @@
-import { sendMessageRequestSchema, type threadSearchResultWireSchema } from "@auni/shared";
+import {
+  sendMessageRequestSchema,
+  updateThreadRequestSchema,
+  type threadSearchResultWireSchema,
+  type threadStateWireSchema,
+} from "@auni/shared";
 import { desc, eq, ilike, or, sql } from "drizzle-orm";
 import express, { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
+import { theOwner } from "../auth/owner.ts";
 import { stopTurn } from "../conversation/stop.ts";
 import { publishThreadGone } from "../conversation/stream.ts";
 import {
@@ -18,12 +24,23 @@ import {
 } from "../conversation/threads.ts";
 import { messageText } from "../conversation/history.ts";
 import { sendMessage } from "../conversation/send.ts";
-import { archiveChat, deleteChat, renameChat } from "../conversation/tidy.ts";
+import {
+  archiveChat,
+  deleteChat,
+  pinChat,
+  renameChat,
+  updateThreadAutonomy,
+  updateThreadModel,
+} from "../conversation/tidy.ts";
 import { db } from "../db/client.ts";
 import { messages, threads, type ThreadRow } from "../db/schema.ts";
 import { cancelLane } from "../jobs/queue.ts";
-
-const MAX_TITLE_CHARS = 160;
+import { allFills, holdingsOfThread } from "../money/books.ts";
+import { holdingViews } from "../money/holdings.ts";
+import { portfolioNow } from "../money/portfolio.ts";
+import { threadPot } from "../money/pot.ts";
+import { centsToUsd } from "../money/usd.ts";
+import { startOfDay } from "../money/value-history.ts";
 
 export const threadsRouter = Router();
 threadsRouter.use(express.json({ limit: "64kb" }));
@@ -87,26 +104,54 @@ threadsRouter.get("/:threadId/messages", async (req, res) => {
   });
 });
 
-const updateSchema = z
-  .object({ title: z.string().trim().min(1).max(MAX_TITLE_CHARS), archived: z.boolean() })
-  .partial();
+/** Live budget headroom and holdings opened in this thread, for the right-hand thread inspector. */
+threadsRouter.get("/:threadId/state", async (req, res) => {
+  const thread = await threadParam(req, res);
+  if (!thread) return;
+  const [pot, portfolio, everyFill, { timeZone }] = await Promise.all([
+    threadPot(db, thread),
+    portfolioNow().catch((error: unknown) => {
+      console.warn(`thread ${thread.id} state couldn't read portfolio:`, error);
+      return null;
+    }),
+    allFills(db),
+    theOwner(),
+  ]);
+  const freeBudgetUsd = centsToUsd(pot.freeCashCents > 0n ? pot.freeCashCents : 0n);
+  const mine = portfolio ? holdingsOfThread(thread.id, portfolio.assets.holdings, everyFill) : [];
+  const holdings = mine.length > 0 ? await holdingViews(mine, startOfDay(timeZone)) : [];
+  res.json({
+    budgetUsd: thread.budgetUsd,
+    freeBudgetUsd,
+    holdings,
+  } satisfies z.input<typeof threadStateWireSchema>);
+});
 
-/** Renames a chat, or archives it or brings it back; a refusal says why in the owner's words. */
+/** Updates a thread's title, pin, archive, autonomy budget, or model selection. */
 threadsRouter.patch("/:threadId", async (req, res) => {
-  const body = updateSchema.safeParse(req.body);
+  const body = updateThreadRequestSchema.safeParse(req.body);
   if (!body.success) return invalid(res, body.error);
   const thread = await threadParam(req, res);
   if (!thread) return;
-  const { title, archived } = body.data;
-  const refusal =
-    (title !== undefined ? await renameChat(thread, title) : undefined) ??
-    (archived !== undefined ? await archiveChat(thread, archived) : undefined);
-  if (refusal) return void res.status(409).json(refusal);
+  const { title, archived, pinned, actMode, budgetUsd, modelSelection } = body.data;
+  if (title !== undefined) await renameChat(thread, title);
+  if (pinned !== undefined) await pinChat(thread, pinned);
+  if (actMode !== undefined || budgetUsd !== undefined) {
+    await updateThreadAutonomy(thread, {
+      ...(actMode !== undefined ? { actMode } : {}),
+      ...(budgetUsd !== undefined ? { budgetUsd } : {}),
+    });
+  }
+  if (modelSelection !== undefined) await updateThreadModel(thread, modelSelection);
+  if (archived !== undefined) {
+    const refusal = await archiveChat(thread, archived);
+    if (refusal) return void res.status(409).json(refusal);
+  }
   void publishThread(thread.id);
   res.json({ thread: await readThreadWire(thread.id) });
 });
 
-/** Deletes a chat for good; its moves keep their records (conversation/tidy.ts). */
+/** Deletes a thread for good; its moves keep their records (conversation/tidy.ts). */
 threadsRouter.delete("/:threadId", async (req, res) => {
   const thread = await threadParam(req, res);
   if (!thread) return;

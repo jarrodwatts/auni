@@ -153,7 +153,25 @@ function textOf(content: unknown): string {
 }
 
 export const demoBrain: Brain = {
-  check: async () => ({ ready: true, login: "the demo, which needs no login" }),
+  check: async () => ({
+    ready: true,
+    login: "the demo, which needs no login",
+    models: [
+      {
+        id: "opus",
+        name: "Claude Opus",
+        efforts: ["low", "medium", "high", "xhigh", "max"],
+        defaultEffort: "high",
+        isDefault: true,
+      },
+      {
+        id: "sonnet",
+        name: "Claude Sonnet",
+        efforts: ["low", "medium", "high"],
+        defaultEffort: "medium",
+      },
+    ],
+  }),
   run,
   // It has no login, so there is nothing of its own for a box to hide.
   secrets: () => [],

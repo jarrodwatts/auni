@@ -9,24 +9,20 @@ import {
   type proposalWireSchema,
   type valueHistoryWireSchema,
 } from "@auni/shared";
+import { eq } from "drizzle-orm";
 import express, { Router, type Request, type Response } from "express";
 import { z } from "zod";
 
 import { theOwner } from "../auth/owner.ts";
 import { ownerHere } from "../auth/proof.ts";
+import { db } from "../db/client.ts";
+import { threads } from "../db/schema.ts";
 import { markActivitySeen, readActivity } from "./activity.ts";
 import { depositWire, recentDeposits } from "./arrivals.ts";
 import { listOtherTokens } from "./buckets.ts";
-import {
-  actionById,
-  actionsForThread,
-  actionWire,
-  opensSpecialist,
-  proposalActions,
-} from "./actions.ts";
+import { actionById, actionsForThread, actionWire, proposalActions } from "./actions.ts";
 import { allowAction, allowProposal, declineAction, declineProposal } from "./decide.ts";
 import { checkHeld, closeHeld } from "./held.ts";
-import { specialistById } from "../specialists/specialists.ts";
 import { proposalFunding } from "./funding.ts";
 import { pickDetail } from "./pick-detail.ts";
 import { legsToRetry } from "./proposal-order.ts";
@@ -183,12 +179,11 @@ async function answerProposal(proposalId: string, req: Request, res: Response): 
   if (legs.length === 0) return void res.status(404).json({ error: "proposal_not_found" });
   // A moved price is weighed when the card quotes it again, so none is left out here.
   const retrying = new Set(legsToRetry(legs, new Set()) ?? []);
-  const [funding, opens] = await Promise.all([proposalFunding(legs), opensSpecialist(legs)]);
+  const funding = await proposalFunding(legs);
   res.json({
     // Each leg offers Try again only if a tap on the card would run it (see legsToRetry).
     actions: legs.map((leg) => ({ ...actionWire(leg), retryable: retrying.has(leg.id) })),
     funding,
-    opens,
   } satisfies z.input<typeof proposalWireSchema>);
 }
 
@@ -260,9 +255,9 @@ portfolioRouter.get("/", async (req, res) => {
     ),
     unavailable: [...portfolio.unavailable],
     looking: [...portfolio.looking],
-    other: [
+    holdings: [
       ...onTheWay(portfolio.onTheWay.usdValue),
-      ...(await holdingViews(portfolio.other.holdings, startOfDay(timeZone))),
+      ...(await holdingViews(portfolio.assets.holdings, startOfDay(timeZone))),
     ],
     cashUsd: portfolio.cash.usdValue,
     otherTokens: others.length,
@@ -300,25 +295,30 @@ function onTheWay(usdValue: string): HoldingWire[] {
   ];
 }
 
-/** The total over `?range=` (see valueRangeSchema); one specialist's is GET /specialists/:id/history. */
+/** The total over `?range=` (see valueRangeSchema). */
 portfolioRouter.get("/history", async (req, res) => {
   const range = valueRangeSchema.safeParse(req.query.range);
   if (!range.success) return void res.status(400).json({ error: "invalid_range" });
-  res.json((await valueHistory(null, range.data)) satisfies z.input<typeof valueHistoryWireSchema>);
+  res.json((await valueHistory(range.data)) satisfies z.input<typeof valueHistoryWireSchema>);
 });
 
 /**
  * What happened to their money, newest first, everything or with
- * `?specialist=<id>` one specialist's, and how many of all of it are unread.
+ * `?thread=<id>` one thread's, and how many of all of it are unread.
  */
 export const activityRouter = Router();
 
 activityRouter.get("/", async (req, res) => {
-  const specialist =
-    req.query.specialist === undefined ? null : uuid.safeParse(req.query.specialist);
-  if (specialist && (!specialist.success || !(await specialistById(specialist.data))))
-    return void res.status(404).json({ error: "specialist_not_found" });
-  res.json((await readActivity(specialist?.data ?? null)) satisfies ActivityWire);
+  const thread = req.query.thread === undefined ? null : uuid.safeParse(req.query.thread);
+  if (thread) {
+    if (!thread.success) return void res.status(404).json({ error: "thread_not_found" });
+    const [exists] = await db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(eq(threads.id, thread.data));
+    if (!exists) return void res.status(404).json({ error: "thread_not_found" });
+  }
+  res.json((await readActivity(thread?.data ?? null)) satisfies ActivityWire);
 });
 
 /** They looked: everything recorded so far is read. */

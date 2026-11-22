@@ -31,14 +31,11 @@ export type FireVerdict = z.infer<typeof fireVerdictSchema>;
 export const automationWireSchema = z.object({
   id: automationRuleIdSchema,
   threadId: threadIdSchema,
-  specialistId: z.uuid().nullable(),
   /** The app that watches (its meta names it). */
   source: z.string().min(1),
   description: z.string().min(1).max(500),
   /** The agent's note on why it matters. */
   note: z.string(),
-  /** The one watch that tests the specialist's belief itself. */
-  thesis: z.boolean(),
   /** In the source's own shape, which only the source reads. */
   condition: z.record(z.string(), z.unknown()),
   /** Null fires once; otherwise the least time between fires that wake the thread ("1h"). */

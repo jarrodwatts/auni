@@ -1,12 +1,38 @@
 import { z } from "zod";
 
 import { actionStatusSchema } from "./action.ts";
+import { APP_MARKS } from "./apps.generated.ts";
 import { cardBaseSchema } from "./card-base.ts";
 import { cardFaceSchema } from "./card-face.ts";
-import { cardLogoUrlSchema, cardVenueSchema, moneyFlowSchema } from "./specialist-proposal-card.ts";
 import { moneyWireSchema } from "./money.ts";
 import { actionRecordIdSchema } from "./shared.ts";
 import { ACTION_TOOL_NAMES } from "./tools.ts";
+
+/** Same-origin artwork or an https logo; a leg without one shows its venue mark. */
+export const cardLogoUrlSchema = z
+  .string()
+  .max(2_000)
+  .refine(
+    (value) => (value.startsWith("/") && !value.startsWith("//")) || value.startsWith("https://"),
+    {
+      message: "must be a same-origin path or an https URL",
+    },
+  );
+
+/**
+ * The mark a money card carries when it has no logo of its own: an app's
+ * (see AppAbout.mark), or one of Auni's own for a stock trade, a swap, and
+ * anything else.
+ */
+const cardVenueSchema = z.enum(["auni", "stocks", "swap", ...APP_MARKS]);
+
+/**
+ * Which way a money card's amount goes: into what it buys, back to cash from
+ * what it sells or closes, or across, cash carried between the person's own
+ * places (a bridge, savings back to the wallet).
+ */
+const moneyFlowSchema = z.enum(["in", "back", "move"]);
+export type MoneyFlow = z.infer<typeof moneyFlowSchema>;
 
 /**
  * One money action the agent took on its own, drawn where the agent took it. The
@@ -34,8 +60,6 @@ export const actionCardSchema = cardBaseSchema.extend({
   /** What goes in, or comes back with `flow`; zero for a move that moves no money. */
   amount: moneyWireSchema,
   flow: moneyFlowSchema,
-  /** The specialist whose holding this move sells or closes, when it isn't the thread's own. */
-  fromSpecialist: z.string().trim().min(1).max(160).optional(),
   /** Allowing it takes proof the owner is at the computer, as core's approval ladder says. */
   takesProof: z.boolean().optional(),
   /** Why it does, in one sentence the card says to the owner. */

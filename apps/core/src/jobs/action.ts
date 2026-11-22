@@ -10,7 +10,6 @@ import { advanceProposal, stalledProposals } from "../money/proposal-run.ts";
 import { markCrashed, requireAction, settleLanding } from "../money/record.ts";
 import { reconcileStuckActions } from "../money/reconcile.ts";
 import { retractStale } from "../money/waiting.ts";
-import { outdatePulse } from "../specialists/specialists.ts";
 import { actionKind, landingKind, proposalKind, wakeThread } from "./kinds.ts";
 import { defineJob, jobKind, type Executor } from "./queue.ts";
 
@@ -68,7 +67,6 @@ export const proposalJob = defineJob({
     const patient = Date.now() - job.createdAt.getTime() < PATIENT_MS;
     const advanced = await advanceProposal(proposalId, patient);
     if (advanced.wake) {
-      await outdatePulse(db, advanced.wake.threadId);
       await wakeThread(advanced.wake.threadId, advanced.wake.reason.slice(0, 2_000), {
         key: advanced.wake.id,
       });
@@ -156,7 +154,6 @@ async function tellSettled(executor: Executor, row: ActionRow): Promise<void> {
   if (!row.threadId) return;
   const settled = await settledOutcome(row);
   if (!settled) return;
-  await outdatePulse(executor, row.threadId);
   await wakeThread(row.threadId, settled.reason.slice(0, 2_000), {
     key: settled.id,
     tx: executor,

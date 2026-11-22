@@ -15,7 +15,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { theOwner } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
-import { actions, arrivals, specialists, fills, owner, type ActionRow } from "../db/schema.ts";
+import { actions, arrivals, fills, owner, threads, type ActionRow } from "../db/schema.ts";
 import { accounts, ledgerAt } from "../apps/registry.ts";
 import { PNL_DECIMALS } from "./books.ts";
 import { subjectLogo } from "./action-card.ts";
@@ -63,7 +63,7 @@ type ArrivalRow = typeof arrivals.$inferSelect;
 type FillRow = Pick<
   typeof fills.$inferSelect,
   | "actionId"
-  | "specialistId"
+  | "threadId"
   | "instrument"
   | "side"
   | "quantity"
@@ -84,8 +84,8 @@ export interface Leg {
   /** Its action's id; for an order of its filling later, that and when. */
   readonly id: string;
   readonly proposalId: string | null;
-  readonly specialistId: string | null;
-  /** Every specialist it moved money for: its own, and any its fills went to. */
+  readonly threadId: string | null;
+  /** Every thread it moved money for: its own, and any its fills went to. */
   readonly touches: readonly string[];
   readonly at: Date;
   readonly does: LegDoes;
@@ -154,7 +154,7 @@ interface Outside {
   readonly at: Date;
   /** When Auni recorded it, which says whether it's unread. */
   readonly recordedAt: Date;
-  readonly specialistId: string | null;
+  readonly threadId: string | null;
   readonly touches: readonly string[];
   readonly title: string;
   readonly amount: Amount | null;
@@ -170,15 +170,15 @@ export interface ActivityFacts {
   readonly outside: readonly Outside[];
   /** Arrivals told (see told.ts). */
   readonly arrivals: readonly ArrivalRow[];
-  /** Each specialist's short name. */
-  readonly specialists: ReadonlyMap<string, string>;
+  /** Each thread's title, by id. */
+  readonly threads: ReadonlyMap<string, string>;
   readonly seenAt: Date;
   readonly timeZone: string;
 }
 
 /**
  * The person's activity, newest first: everything, or with `only` what one
- * specialist took part in; and how many of all of it are unread.
+ * thread took part in; and how many of all of it are unread.
  */
 export function activityOf(facts: ActivityFacts, only: string | null): ActivityWire {
   const all = [
@@ -201,9 +201,8 @@ interface Listed {
 
 /**
  * Every move of Auni's, one per card: the legs of one proposal folded into
- * one item. A card that only moved their cash, or sold what they held loose,
- * is named by its first step, since they asked for that itself. A
- * specialist's first that bought anything is its start.
+ * one item. A card that only moved their cash, or sold what they held,
+ * is named by its first step, since they asked for that itself.
  */
 function moves(facts: ActivityFacts): Listed[] {
   const cards = [...Map.groupBy(facts.legs, (leg) => leg.proposalId ?? leg.id)]
@@ -211,18 +210,12 @@ function moves(facts: ActivityFacts): Listed[] {
       id,
       legs,
       at: new Date(Math.min(...legs.map((leg) => leg.at.getTime()))),
-      specialistId: legs.find((leg) => leg.specialistId)?.specialistId ?? null,
+      threadId: legs.find((leg) => leg.threadId)?.threadId ?? null,
       picks: legs.flatMap((leg) => (leg.does.kind === "pick" ? [leg.does] : [])),
     }))
     .toSorted((a, b) => a.at.getTime() - b.at.getTime());
-  const started = new Set<string>();
   return cards.map((card) => {
-    const name = card.specialistId ? facts.specialists.get(card.specialistId) : undefined;
-    const starts =
-      name !== undefined &&
-      !started.has(card.specialistId!) &&
-      card.picks.some((pick) => pick.money?.flow === "in");
-    if (starts) started.add(card.specialistId!);
+    const name = card.threadId ? facts.threads.get(card.threadId) : undefined;
     const steps = stepsOf(card.legs);
     const only = card.picks.length === 0 ? steps[0] : undefined;
     return {
@@ -230,15 +223,14 @@ function moves(facts: ActivityFacts): Listed[] {
       item: {
         kind: "move",
         id: card.id,
-        title: starts ? `Started ${name}` : (only?.text ?? titleOf(card.picks)),
-        // A move no specialist made was made in Auni's own chat.
-        subtitle: `${name ?? "Auni"}, ${when(card.at, facts.timeZone)}`,
+        title: only?.text ?? titleOf(card.picks),
+        subtitle: `${name?.trim() || "Auni"}, ${when(card.at, facts.timeZone)}`,
         amount: only
           ? only.amountUsd
             ? { usd: only.amountUsd, direction: null, tone: "neutral" }
             : null
           : moveAmount(card.picks),
-        specialistId: card.specialistId as Item["specialistId"],
+        threadId: card.threadId as Item["threadId"],
         logo: only ? saleLogo(card.legs) : (card.picks.find((pick) => pick.logo)?.logo ?? null),
         at: card.at.toISOString(),
         unread: false,
@@ -334,17 +326,16 @@ export function stepsOf(legs: readonly Leg[]): Step[] {
 }
 
 function outsideItem(one: Outside, facts: ActivityFacts): Listed {
-  const name = one.specialistId ? facts.specialists.get(one.specialistId) : undefined;
+  const name = one.threadId ? facts.threads.get(one.threadId) : undefined;
   return {
     touches: one.touches,
     item: {
       kind: "outside",
       id: one.id,
       title: one.title,
-      // Nobody of the owner's did it, so with no specialist it touched there is only when.
-      subtitle: [...(name ? [name] : []), when(one.at, facts.timeZone)].join(", "),
+      subtitle: [...(name?.trim() ? [name.trim()] : []), when(one.at, facts.timeZone)].join(", "),
       amount: one.amount,
-      specialistId: one.specialistId as Item["specialistId"],
+      threadId: one.threadId as Item["threadId"],
       logo: one.logo,
       at: one.at.toISOString(),
       unread: one.recordedAt > facts.seenAt,
@@ -384,7 +375,7 @@ function arrivalItems(facts: ActivityFacts): Listed[] {
           direction: out ? "out" : "in",
           tone: out ? "neutral" : "gain",
         },
-        specialistId: null,
+        threadId: null,
         logo: {
           src: coin === null ? null : (knownAsset(coin)?.logoUrl ?? null),
           name: goods[0]?.symbol.slice(0, 60) || "a token",
@@ -426,7 +417,7 @@ export async function readActivity(only: string | null): Promise<ActivityWire> {
     db
       .select({
         actionId: fills.actionId,
-        specialistId: fills.specialistId,
+        threadId: fills.threadId,
         instrument: fills.instrument,
         side: fills.side,
         quantity: fills.quantity,
@@ -442,7 +433,7 @@ export async function readActivity(only: string | null): Promise<ActivityWire> {
       .select()
       .from(arrivals)
       .where(and(inArray(arrivals.kind, [...TOLD]), TOLD_SQL)),
-    db.select({ id: specialists.id, name: specialists.name }).from(specialists),
+    db.select({ id: threads.id, title: threads.title }).from(threads),
     namer(),
   ]);
   const { activitySeenAt, timeZone } = await theOwner();
@@ -466,7 +457,9 @@ export async function readActivity(only: string | null): Promise<ActivityWire> {
       legs: legs.flat(),
       outside,
       arrivals: arrived,
-      specialists: new Map(named.map(({ id, name }) => [id, name])),
+      threads: new Map(
+        named.flatMap(({ id, title }) => (title?.trim() ? [[id, title.trim()] as const] : [])),
+      ),
       seenAt: activitySeenAt,
       timeZone,
     },
@@ -491,8 +484,8 @@ async function legsOf(row: ActionRow, own: readonly FillRow[], names: Namer): Pr
   const move: Leg = {
     id: row.id,
     proposalId: row.proposalId,
-    specialistId: row.specialistId,
-    touches: touchesOf(row.specialistId, prompt),
+    threadId: row.threadId,
+    touches: touchesOf(row.threadId, prompt),
     at,
     does: await readLeg(row, names, prompt.length > 0),
     story: storyOf(row, prompt),
@@ -831,8 +824,7 @@ async function doesOf(
           : ["Unwrapped", `W${wrap.symbol}`, wrap.symbol];
         return { ...pick(verb, `${verb} ${from} into ${into}`, "move"), name: from };
       }
-      const verb =
-        row.tool === "move_holding" ? "Moved" : money?.flow === "back" ? "Sold" : "Bought";
+      const verb = money?.flow === "back" ? "Sold" : "Bought";
       return pick(verb, `${verb} ${name}`);
     }
     default:
@@ -881,8 +873,8 @@ async function laterFill(
   return {
     id: `${row.id}:${time}`,
     proposalId: null,
-    specialistId: row.specialistId,
-    touches: touchesOf(row.specialistId, filled),
+    threadId: row.threadId,
+    touches: touchesOf(row.threadId, filled),
     at: new Date(time),
     does: {
       kind: "pick",
@@ -962,13 +954,13 @@ function payoutOf(row: ActionRow, own: readonly FillRow[]): Outside {
   };
 }
 
-/** Whose something a venue did is: the specialist that held most of it, or Other. */
+/** Whose something a venue did is: the thread that held most of it, or none. */
 function outsideOf(row: ActionRow, own: readonly FillRow[]) {
   const held = new Map<string | null, bigint>();
   for (const fill of own)
     held.set(
-      fill.specialistId,
-      (held.get(fill.specialistId) ?? 0n) + parseUnits(fill.quantity, QUANTITY_DECIMALS),
+      fill.threadId,
+      (held.get(fill.threadId) ?? 0n) + parseUnits(fill.quantity, QUANTITY_DECIMALS),
     );
   const [main] = [...held].toSorted((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0));
   return {
@@ -976,14 +968,14 @@ function outsideOf(row: ActionRow, own: readonly FillRow[]) {
     at: row.createdAt,
     // Recorded done, and never changed since.
     recordedAt: row.updatedAt,
-    specialistId: main?.[0] ?? null,
+    threadId: main?.[0] ?? null,
     touches: touchesOf(null, own),
   };
 }
 
-function touchesOf(specialistId: string | null, own: readonly FillRow[]): string[] {
+function touchesOf(threadId: string | null, own: readonly FillRow[]): string[] {
   return [
-    ...new Set([specialistId, ...own.map((fill) => fill.specialistId)].filter((id) => id !== null)),
+    ...new Set([threadId, ...own.map((fill) => fill.threadId)].filter((id) => id !== null)),
   ];
 }
 

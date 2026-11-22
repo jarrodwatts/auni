@@ -13,7 +13,6 @@ import {
   type ReactNode,
 } from "react";
 
-import { ApprovalModeChip } from "@/components/app/approval-mode-chip";
 import { useComposerCaret } from "@/components/app/composer-caret";
 import { useComposerDraft } from "@/components/app/composer-drafts";
 import {
@@ -26,15 +25,13 @@ import type { MascotReadingTarget } from "@/components/brand/interactive-mascot"
 import { cn } from "@/lib/utils";
 
 const COMPOSER_MAX_HEIGHT_PX = 160;
-/** The text box's height on one line: 24px of words in 8px of padding. */
-const ONE_LINE_PX = 40;
 
 function resizeComposerDraft(input: HTMLTextAreaElement): void {
   input.style.height = "0px";
   input.style.height = `${Math.min(input.scrollHeight, COMPOSER_MAX_HEIGHT_PX)}px`;
 }
 
-/** A tap anywhere on the pill that isn't a control puts the cursor at the end of the draft. */
+/** A tap anywhere on the box that isn't a control puts the cursor at the end of the draft. */
 function focusDraftFromTap(target: EventTarget, input: HTMLTextAreaElement | null): void {
   if (!input || !(target instanceof Element)) return;
   if (target.closest('a, button, input, select, textarea, [role="button"]')) return;
@@ -76,6 +73,10 @@ interface ComposerProps {
   readonly initialMessage?: string;
   /** Docked above the words, inside the same enclosure: a question waiting on the person. */
   readonly lead?: ReactNode;
+  /** Inline control inside the bottom-right of the composer box beside Send (model picker). */
+  readonly inlineControl?: ReactNode;
+  /** Quiet control strip directly beneath the composer box (environment left, autonomy right). */
+  readonly footerStrip?: ReactNode;
   readonly loadingPhase?: ComposerLoadingPhase;
   readonly placeholder: string;
   readonly onCaretActivity?: (target: MascotReadingTarget) => void;
@@ -88,7 +89,9 @@ export function Composer({
   busy = false,
   disabled = false,
   draftKey,
+  footerStrip,
   initialMessage = "",
+  inlineControl,
   lead,
   loadingPhase = "ready",
   onCaretActivity,
@@ -138,19 +141,9 @@ export function Composer({
     };
   }, [draftKey, interactionDisabled, setMessage]);
 
-  // One line at rest. Once the words need a second, they take the pill's
-  // whole width with the chip and send on a row beneath, until it empties.
-  // Read from layout and written straight to the row, so typing never re-renders for it.
-  const rowRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const input = inputRef.current;
-    const row = rowRef.current;
-    if (!input || !row) return;
-    resizeComposerDraft(input);
-    const wrapped =
-      message !== "" && ("wrapped" in row.dataset || input.scrollHeight > ONE_LINE_PX);
-    if (wrapped === "wrapped" in row.dataset) return;
-    row.toggleAttribute("data-wrapped", wrapped);
+    if (!input) return;
     resizeComposerDraft(input);
   }, [message]);
 
@@ -181,82 +174,93 @@ export function Composer({
   };
 
   return (
-    <form
-      aria-busy={!composerInteractive}
-      data-loading-phase={loadingPhase}
-      className={cn(
-        COMPOSER_SURFACE_CLASS_NAME,
-        // Glows for typing only: tapping a docked answer is not writing.
-        "transition-shadow duration-300 ease-settle has-[textarea:focus]:shadow-[0_10px_30px_--alpha(var(--color-primary)/12%),0_0_0_1px_--alpha(var(--color-primary)/24%)] motion-reduce:transition-none",
-      )}
-      onClick={(event) => {
-        if (!interactionDisabled) focusDraftFromTap(event.target, inputRef.current);
-      }}
-      onSubmit={(event) => void submit(event)}
-    >
-      {lead ? <ComposerLeadContext value={leadControls}>{lead}</ComposerLeadContext> : null}
-      <div
-        ref={rowRef}
-        className="auni-composer-live grid grid-cols-[auto_minmax(0,1fr)_auto] items-end gap-x-1 [grid-template-areas:'chip_text_send'] data-wrapped:[grid-template-areas:'text_text_text'_'chip_._send']"
-        data-phase={loadingPhase}
-        inert={!composerInteractive}
+    <div className="flex flex-col">
+      <form
+        aria-busy={!composerInteractive}
+        data-loading-phase={loadingPhase}
+        className={cn(
+          COMPOSER_SURFACE_CLASS_NAME,
+          // Glows for typing only: tapping a docked answer is not writing.
+          "transition-shadow duration-300 ease-settle has-[textarea:focus]:shadow-[0_10px_30px_--alpha(var(--color-primary)/12%),0_0_0_1px_--alpha(var(--color-primary)/24%)] motion-reduce:transition-none",
+        )}
+        onClick={(event) => {
+          if (!interactionDisabled) focusDraftFromTap(event.target, inputRef.current);
+        }}
+        onSubmit={(event) => void submit(event)}
       >
-        <div className="flex h-10 items-center [grid-area:chip]">
-          <ApprovalModeChip />
-        </div>
-        <label className="sr-only" htmlFor="auni-message">
-          Message Auni
-        </label>
-        <textarea
-          id="auni-message"
-          ref={inputRef}
-          rows={1}
-          value={message}
-          maxLength={MAXIMUM_MESSAGE_CHARACTERS}
-          onChange={(event) => {
-            setMessage(event.target.value);
-            resizeComposerDraft(event.currentTarget);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={interactionDisabled}
-          autoComplete="off"
-          className={cn(
-            COMPOSER_INPUT_CLASS_NAME,
-            "overflow-y-auto [grid-area:text] disabled:cursor-not-allowed disabled:opacity-60",
-          )}
-        />
-        {/* Send: a 36px disc in a 40px target, quiet grey until there is something to send, then black. */}
-        <button
-          className="group/submit flex size-10 flex-none items-center justify-center rounded-full text-background outline-none [grid-area:send] active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100"
-          type={showStop ? "button" : "submit"}
-          aria-label={
-            showStop ? "Stop response" : busy && !onStop ? "Auni is responding" : "Send message"
-          }
-          disabled={interactionDisabled || (!showStop && (!canSend || message.trim().length === 0))}
-          onClick={showStop ? onStop : undefined}
+        {lead ? <ComposerLeadContext value={leadControls}>{lead}</ComposerLeadContext> : null}
+        <div
+          className="auni-composer-live flex flex-col gap-1.5"
+          data-phase={loadingPhase}
+          inert={!composerInteractive}
         >
-          <span className="pointer-events-none flex size-9 items-center justify-center rounded-full bg-foreground transition-[background-color,color] duration-200 ease-settle group-hover/submit:bg-foreground/85 group-focus-visible/submit:ring-[3px] group-focus-visible/submit:ring-ring/50 group-disabled/submit:bg-foreground/[0.07] group-disabled/submit:text-foreground/35">
-            {showStop ? (
-              <Square className="size-3 fill-current" aria-hidden />
-            ) : busy && !onStop ? (
-              <LoaderCircle className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <ArrowUp className="size-4" aria-hidden />
+          <label className="sr-only" htmlFor="auni-message">
+            Message Auni
+          </label>
+          <textarea
+            id="auni-message"
+            ref={inputRef}
+            rows={1}
+            value={message}
+            maxLength={MAXIMUM_MESSAGE_CHARACTERS}
+            onChange={(event) => {
+              setMessage(event.target.value);
+              resizeComposerDraft(event.currentTarget);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={interactionDisabled}
+            autoComplete="off"
+            className={cn(
+              COMPOSER_INPUT_CLASS_NAME,
+              "overflow-y-auto disabled:cursor-not-allowed disabled:opacity-60",
             )}
-          </span>
-        </button>
-      </div>
-      {loadingPhase !== "ready" ? (
-        // The veil captures typing while the live row is still hidden; the
-        // draft hook adopts it the moment the composer is real.
-        <ComposerLoadingLayout
-          capture
-          className="absolute inset-1.5"
-          label="Draft your message"
-          placeholder=""
-        />
+          />
+          <div className="flex items-center justify-end gap-1.5">
+            {inlineControl}
+            {/* Send: a 34px disc in a 38px target, quiet grey until there is something to send, then ink. */}
+            <button
+              className="group/submit flex size-9 flex-none items-center justify-center rounded-full text-background outline-none active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100"
+              type={showStop ? "button" : "submit"}
+              aria-label={
+                showStop ? "Stop response" : busy && !onStop ? "Auni is responding" : "Send message"
+              }
+              disabled={
+                interactionDisabled || (!showStop && (!canSend || message.trim().length === 0))
+              }
+              onClick={showStop ? onStop : undefined}
+            >
+              <span className="pointer-events-none flex size-8 items-center justify-center rounded-full bg-foreground transition-[background-color,color] duration-200 ease-settle group-hover/submit:bg-foreground/85 group-focus-visible/submit:ring-[3px] group-focus-visible/submit:ring-ring/50 group-disabled/submit:bg-foreground/[0.07] group-disabled/submit:text-foreground/35">
+                {showStop ? (
+                  <Square className="size-3 fill-current" aria-hidden />
+                ) : busy && !onStop ? (
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <ArrowUp className="size-4" aria-hidden />
+                )}
+              </span>
+            </button>
+          </div>
+        </div>
+        {loadingPhase !== "ready" ? (
+          // The veil captures typing while the live row is still hidden; the
+          // draft hook adopts it the moment the composer is real.
+          <ComposerLoadingLayout
+            capture
+            className="absolute inset-x-3 inset-y-2.5"
+            label="Draft your message"
+            placeholder=""
+          />
+        ) : null}
+      </form>
+      {footerStrip ? (
+        <div
+          className="mt-1.5 flex items-center justify-between gap-2 px-1"
+          inert={!composerInteractive}
+        >
+          {footerStrip}
+        </div>
       ) : null}
-    </form>
+    </div>
   );
 }

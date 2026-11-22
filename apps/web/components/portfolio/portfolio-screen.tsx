@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eye, Zap } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
@@ -8,46 +8,36 @@ import { useAppDialogs } from "@/components/app/app-dialogs";
 import { ThreadFailureNotice } from "@/components/app/thread-failure-notice";
 import { useStartNew } from "@/components/app/use-start-conversation";
 import { Mascot } from "@/components/brand/mascot";
-import { useSpecialists, usePortfolio } from "@/components/specialist/use-specialists";
 import { useMoney } from "@/components/money/money-provider";
+import { PlaceLink } from "@/components/places/open-place";
 import { PlaceHeader } from "@/components/places/place-header";
 import { PortfolioMark } from "@/components/places/place-marks";
 import { usePlaces } from "@/components/places/use-places";
+import { usePortfolio } from "@/components/portfolio/use-portfolio";
 import { Skeleton } from "@/components/ui/skeleton";
+import { chatHref } from "@/lib/app-links";
 import { cn } from "@/lib/utils";
 
 import { AskAuni } from "./ask-auni";
-import { CashTiles } from "./cash-tiles";
-import { SpecialistTile } from "./specialist-tile";
-import { SpecialistRows, LooseRows } from "./money-rows";
+import { CashTiles, HoldingTiles } from "./cash-tiles";
+import { CashRows, HoldingRows } from "./money-rows";
 import { NeedsYou } from "./needs-you";
 import { PortfolioSection } from "./portfolio-section";
 import { TotalHero } from "./total-hero";
 
-/** Shown in place of the page: a failed read must never look like an empty account. */
 const READ_FAILURE = { message: "Your portfolio couldn't load.", action: "reload" } as const;
-
-/** Tiles and cash share one set of columns: up to four across, one on a phone. */
-const GRID = "grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3";
+const GRID = "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3";
 
 /**
- * Portfolio is the overview of all your money, not a conversation, and it
- * fits on one screen: the total and its line, any decision waiting on you,
- * each specialist as a tile, then cash. Starting something happens in
- * a new chat, which is where an account with nothing yet is pointed.
+ * Portfolio is the flat live view of all your money: total and chart, any
+ * decisions waiting on you, live Holdings, Cash, and any Auto/watching threads.
  */
 export function PortfolioScreen() {
   const money = useMoney();
-  const specialists = useSpecialists();
-  // The same cached read the money provider holds; here only for whether it failed.
   const portfolio = usePortfolio();
-  const failed =
-    (specialists.isError && !specialists.data) || (portfolio.isError && !portfolio.data);
-  // Retired ones, in the sidebar's History, hold nothing, so they don't count here.
-  const empty =
-    money.portfolio?.empty && specialists.data?.every(({ status }) => status === "retired");
-  const loading = money.loading || specialists.isPending;
-  // Content that was already here simply shows; only content that had to load rises in.
+  const failed = portfolio.isError && !portfolio.data;
+  const empty = money.portfolio?.empty === true;
+  const loading = money.loading;
   const [loadedOnArrival] = useState(!loading);
   const reveal = !loadedOnArrival;
   return (
@@ -58,7 +48,6 @@ export function PortfolioScreen() {
           <ThreadFailureNotice
             failure={READ_FAILURE}
             onRetry={() => {
-              if (specialists.isError) void specialists.refetch();
               if (portfolio.isError) void portfolio.refetch();
             }}
           />
@@ -75,10 +64,13 @@ export function PortfolioScreen() {
 }
 
 function Overview({ reveal }: { readonly reveal: boolean }) {
-  const { specialists, chats, waiting } = usePlaces();
-  // Retired ones stay in the sidebar's History until archived; here are only where the money is.
-  const open = specialists.filter(({ specialist }) => specialist.status !== "retired");
-  const loose = useMoney().portfolio?.loose;
+  const { chats, pinned, active } = usePlaces();
+  const portfolio = useMoney().portfolio;
+  const holdings = portfolio?.holdings ?? [];
+  const workingThreads = [...pinned, ...active].filter(
+    ({ thread }) => thread.actMode === "within_limits" || thread.watchCount > 0,
+  );
+
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -89,42 +81,85 @@ function Overview({ reveal }: { readonly reveal: boolean }) {
           )}
         >
           <TotalHero />
-          {/* On a phone what waits on the person leads the page, above the total. */}
-          <NeedsYou
-            specialists={specialists}
-            chats={chats}
-            waiting={waiting}
-            className="max-sm:order-first"
-          />
-          <PortfolioSection title="Specialists">
-            {open.length > 0 ? (
+          <NeedsYou chats={chats} className="max-sm:order-first" />
+
+          <PortfolioSection title="Holdings">
+            {holdings.length > 0 ? (
               <>
                 <div className="sm:hidden">
-                  <SpecialistRows places={open} />
+                  <HoldingRows holdings={holdings} />
                 </div>
-                <div className={`${GRID} auto-rows-fr max-sm:hidden`}>
-                  {open.map(({ specialist, waiting: waits }) => (
-                    <SpecialistTile key={specialist.id} specialist={specialist} waiting={waits} />
-                  ))}
-                </div>
+                <HoldingTiles holdings={holdings} className={`${GRID} max-sm:hidden`} />
               </>
             ) : (
               <p className="text-ui font-normal text-muted-foreground">
-                Tell Auni something you believe, or a job you’d like done, in a{" "}
-                <NewChatLink>new chat</NewChatLink>, and it can start a specialist for it.
+                Tell Auni what you believe in a <NewChatLink>new thread</NewChatLink>, and any
+                positions you open will show here.
               </p>
             )}
           </PortfolioSection>
-          {loose ? (
-            <PortfolioSection
-              title={
-                loose.other.length > 0 || loose.otherTokens > 0 ? "Cash and other holdings" : "Cash"
-              }
-            >
+
+          {portfolio ? (
+            <PortfolioSection title="Cash">
               <div className="sm:hidden">
-                <LooseRows loose={loose} />
+                <CashRows cash={portfolio.cash} otherTokens={portfolio.otherTokens} />
               </div>
-              <CashTiles loose={loose} className={`${GRID} max-sm:hidden`} />
+              <CashTiles
+                cash={portfolio.cash}
+                otherTokens={portfolio.otherTokens}
+                className={`${GRID} max-sm:hidden`}
+              />
+            </PortfolioSection>
+          ) : null}
+
+          {workingThreads.length > 0 ? (
+            <PortfolioSection title="Active threads">
+              <ul className={GRID}>
+                {workingThreads.map(({ thread }) => {
+                  const auto = thread.actMode === "within_limits";
+                  const budget = Number(thread.budgetUsd);
+                  const budgetLabel =
+                    Number.isFinite(budget) && budget > 0
+                      ? `$${budget.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+                      : "";
+                  return (
+                    <li key={thread.id}>
+                      <PlaceLink
+                        href={chatHref(thread.id)}
+                        thread={thread.id}
+                        className="flex min-w-0 items-center gap-3 rounded-[16px] bg-surface px-3.5 py-3 transition-colors duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                      >
+                        <span
+                          className={cn(
+                            "flex size-8 flex-none items-center justify-center rounded-full",
+                            auto
+                              ? "bg-primary/[0.1] text-primary"
+                              : "bg-foreground/[0.06] text-muted-foreground",
+                          )}
+                        >
+                          {auto ? (
+                            <Zap aria-hidden className="size-4" />
+                          ) : (
+                            <Eye aria-hidden className="size-4" />
+                          )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14.5px] font-medium text-ink">
+                            {thread.title}
+                          </p>
+                          <p className="mt-0.5 truncate text-caption text-muted-foreground">
+                            {auto
+                              ? `Auto ${budgetLabel} budget`
+                              : thread.watchCount === 1
+                                ? "1 watch active"
+                                : `${thread.watchCount} watches active`}
+                          </p>
+                        </div>
+                      </PlaceLink>
+                    </li>
+                  );
+                })}
+              </ul>
             </PortfolioSection>
           ) : null}
         </div>
@@ -143,7 +178,6 @@ function NewChatLink({ children }: { readonly children: ReactNode }) {
   );
 }
 
-/** An account with nothing yet: where its money will be, and the one way to begin. */
 function NothingYet({ reveal }: { readonly reveal: boolean }) {
   const startNew = useStartNew();
   const { addMoneyHref } = useAppDialogs();
@@ -159,14 +193,14 @@ function NothingYet({ reveal }: { readonly reveal: boolean }) {
         Your portfolio starts with a belief
       </h2>
       <p className="mt-2 max-w-[380px] text-ui leading-[1.5] font-normal text-muted-foreground">
-        Tell Auni something you believe about the world, and the portfolio it builds will live here.
+        Tell Auni something you believe about the world, and the positions you open will live here.
       </p>
       <Link
         href="/app/new"
         onClick={startNew}
         className="mt-7 flex h-10 items-center gap-1.5 rounded-full bg-foreground px-5 text-ui font-semibold text-background transition-[background-color,transform] duration-200 ease-settle hover:bg-foreground/85 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.97]"
       >
-        New chat
+        New thread
         <ArrowRight aria-hidden className="size-4" strokeWidth={2.4} />
       </Link>
       <Link href={addMoneyHref} scroll={false} className="auni-text-link mt-4 text-meta">
@@ -184,9 +218,9 @@ function PortfolioLoading() {
       <Skeleton className="mt-6 h-[140px] w-full rounded-card" />
       <Skeleton className="mt-10 h-[192px] rounded-[20px] sm:hidden" />
       <div className={`mt-10 ${GRID} max-sm:hidden`}>
-        <Skeleton className="h-[150px] rounded-[20px]" />
-        <Skeleton className="h-[150px] rounded-[20px]" />
-        <Skeleton className="h-[150px] rounded-[20px]" />
+        <Skeleton className="h-[74px] rounded-[16px]" />
+        <Skeleton className="h-[74px] rounded-[16px]" />
+        <Skeleton className="h-[74px] rounded-[16px]" />
       </div>
     </div>
   );

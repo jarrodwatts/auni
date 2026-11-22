@@ -11,8 +11,6 @@ const PLACES: readonly (readonly [string, string])[] = [
   ["/app/team", "/app"],
   ["/app/specialists", "/app"],
   ["/app/s", "/app"],
-  ["/app/specialists/:specialist", "/app/s/:specialist"],
-  ["/app/specialist/:specialist", "/app/s/:specialist"],
   ["/app/chat", "/app/new"],
   ["/app/chats", "/app/new"],
   ["/app/history", "/app/activity"],

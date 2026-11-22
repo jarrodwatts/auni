@@ -98,7 +98,7 @@ describe("a recorded Claude Code turn that loads a skill", () => {
 const storedCards = async (name: string) => cardsOf(await messageOf(eventsOf(frames(name))));
 
 describe("recorded turns in Auni's chat that ask to change Auni", () => {
-  it("proposes a role specialist on a sealed ask card, which starts nothing until the tap", async () => {
+  it("drops a retired ask card kind from an older recording cleanly", async () => {
     const events = eventsOf(frames("start"));
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -107,14 +107,7 @@ describe("recorded turns in Auni's chat that ask to change Auni", () => {
         input: expect.objectContaining({ kind: "role", act_mode: "ask_first" }),
       }),
     );
-    expect(await storedCards("start")).toEqual([
-      expect.objectContaining({
-        kind: "ask",
-        ask: "start_specialist",
-        status: "awaiting_permission",
-        lines: expect.arrayContaining([expect.objectContaining({ label: "A role" })]),
-      }),
-    ]);
+    expect(await storedCards("start")).toEqual([]);
   });
 
   it("asks to save a routine on a card showing every word of it", async () => {

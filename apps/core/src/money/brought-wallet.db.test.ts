@@ -185,7 +185,7 @@ describe("a wallet brought in with money already in it", () => {
       expect.soft(swept.totalUsd).toBe("35.30");
       expect.soft(swept.madeUsd).toBe("0.00");
       // Polygon's coin is POL, read as the chain's own coin and as the token at 0x...1010.
-      const names = swept.other.map(({ name }) => name);
+      const names = swept.holdings.map(({ name }) => name);
       expect.soft(names.filter((name) => /^(polygon|pol)$/iu.test(name))).toEqual(["Polygon"]);
       expect.soft(names).toContain("NVIDIA");
     },

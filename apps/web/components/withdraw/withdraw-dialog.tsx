@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
-import { useRefreshSpecialists } from "@/components/specialist/use-specialists";
+import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import {
   AuniDialogMascot,
   auniDialogCardClass,
@@ -76,7 +76,7 @@ export function WithdrawDialog({
   const live = useLiveAction(sent?.action.id ?? null);
   const sentNow = sent ? (live.data ?? sent.action) : null;
   const settled = sentNow?.status === "done" || sentNow?.status === "failed";
-  const refreshMoney = useRefreshSpecialists();
+  const refreshMoney = useRefreshMoney();
   useEffect(() => {
     if (settled) refreshMoney();
   }, [refreshMoney, settled]);

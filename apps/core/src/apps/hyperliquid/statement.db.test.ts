@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { db } from "../../db/client.ts";
-import { actions, arrivalCursors, specialists, fills, messages, threads } from "../../db/schema.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../../test/db.ts";
+import { actions, arrivalCursors, fills, messages, threads } from "../../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../../test/db.ts";
 import { queued } from "../../test/jobs.ts";
 import { executeAction } from "../../money/actions.ts";
 import type { Recipe } from "../../money/recipe.ts";
@@ -64,19 +64,6 @@ vi.mock("../../money/wallets.ts", async (original) => ({
 /** The turns it woke. */
 const wakes = () => queued("turn");
 
-/** The cards left in a specialist's chat, oldest first. */
-async function cardsIn(specialistId: string) {
-  const rows = await db
-    .select({ parts: messages.parts })
-    .from(messages)
-    .innerJoin(threads, eq(threads.id, messages.threadId))
-    .where(eq(threads.specialistId, specialistId))
-    .orderBy(asc(messages.createdAt));
-  return rows.flatMap(({ parts }) =>
-    (parts as { data: { cards: Record<string, unknown>[] } }[]).flatMap((part) => part.data.cards),
-  );
-}
-
 /** The cards left in one thread, oldest first. */
 async function cardsInThread(threadId: string) {
   const rows = await db
@@ -90,6 +77,7 @@ async function cardsInThread(threadId: string) {
     ),
   );
 }
+const cardsIn = cardsInThread;
 
 /** One of the owner's chats, begun, last spoken in at `at`. */
 async function chatAt(at: Date, fields: Partial<typeof threads.$inferInsert> = {}) {
@@ -128,7 +116,7 @@ function venueFill(fill: {
 
 /** A move of Auni's on Hyperliquid, done, with what it filled as it once recorded it. */
 async function filledBefore(
-  specialistId: string,
+  threadId: string,
   coin: string,
   quantity: string,
   usdValue: string,
@@ -138,12 +126,12 @@ async function filledBefore(
     tool: "hyperliquid_order",
     venue: "hyperliquid",
     status: "done",
-    specialistId,
+    threadId,
     createdAt: at,
   });
   await db.insert(fills).values({
     actionId: action.id,
-    specialistId,
+    threadId,
     ...coinKey(coin),
     side: "buy",
     quantity,
@@ -174,13 +162,13 @@ beforeEach(async () => {
   venue.fills = [];
   open.orders = [];
   open.positions = [];
-  await wipe(specialists, actions, fills, arrivalCursors, threads, messages);
+  await wipe(actions, fills, arrivalCursors, threads, messages);
 });
 
 describe("the Hyperliquid statement", () => {
   // On Oct 14 Hyperliquid liquidated Starknet's STRK long, and nothing said so for 9 days.
-  it("records a liquidation from before tags once, under the specialist that held it", async () => {
-    const starknet = await insertSpecialist({ name: "Starknet" });
+  it("records a liquidation from before tags once, under the thread that held it", async () => {
+    const starknet = await insertThread({ title: "Starknet" });
     const opened = new Date("2026-10-06T15:02:00Z");
     await filledBefore(starknet.id, "STRK", "193.1", "16.50", opened);
     const liquidated = new Date("2026-10-14T20:21:00Z");
@@ -233,7 +221,7 @@ describe("the Hyperliquid statement", () => {
     ]);
     expect(await fillsOf(outside[0]!.id)).toEqual([
       expect.objectContaining({
-        specialistId: starknet.id,
+        threadId: starknet.id,
         side: "sell",
         quantity: "193.100000000000000000",
         usdValue: "15.16",
@@ -242,7 +230,7 @@ describe("the Hyperliquid statement", () => {
       }),
     ]);
     expect(await db.select().from(fills)).toHaveLength(2);
-    // Told once, in Starknet's chat, which wakes once: there is something to decide.
+    // Told once, in Starknet's thread, which wakes once: there is something to decide.
     expect(await cardsIn(starknet.id)).toEqual([
       expect.objectContaining({
         kind: "venue_event",
@@ -262,21 +250,21 @@ describe("the Hyperliquid statement", () => {
   });
 
   it("owns a liquidation read late by who held it then, not by trades made after it", async () => {
-    const specialist = await insertSpecialist();
+    const thread = await insertThread();
     const opened = new Date("2026-10-06T15:02:00Z");
-    await filledBefore(specialist.id, "ALGO", "10", "1.30", opened);
+    await filledBefore(thread.id, "ALGO", "10", "1.30", opened);
     const liquidated = new Date("2026-10-14T20:21:00Z");
-    // Before tags, the same specialist later went short 10: its books now net to nothing.
+    // Before tags, the same thread later went short 10: its books now net to nothing.
     const shorted = await insertAction({
       tool: "hyperliquid_order",
       venue: "hyperliquid",
       status: "done",
-      specialistId: specialist.id,
+      threadId: thread.id,
       createdAt: new Date("2026-10-20T09:00:00Z"),
     });
     await db.insert(fills).values({
       actionId: shorted.id,
-      specialistId: specialist.id,
+      threadId: thread.id,
       ...coinKey("ALGO"),
       side: "sell",
       quantity: "10",
@@ -302,20 +290,20 @@ describe("the Hyperliquid statement", () => {
 
     const [outside] = await db.select().from(actions).where(eq(actions.tool, VENUE_FILL_TOOL));
     expect(await fillsOf(outside!.id)).toEqual([
-      expect.objectContaining({ specialistId: specialist.id, side: "sell", createdAt: liquidated }),
+      expect.objectContaining({ threadId: thread.id, side: "sell", createdAt: liquidated }),
     ]);
   });
 
-  it("records a stop Auni set firing later under its move, split between the specialists holding it", async () => {
-    const first = await insertSpecialist();
-    const second = await insertSpecialist();
+  it("records a stop Auni set firing later under its move, split between the threads holding it", async () => {
+    const first = await insertThread();
+    const second = await insertThread();
     await filledBefore(first.id, "ETH", "2", "5000", new Date("2026-10-01T00:00:00Z"));
     await filledBefore(second.id, "ETH", "1", "2500", new Date("2026-10-02T00:00:00Z"));
     const stops = await insertAction({
       tool: "hyperliquid_set_stops",
       venue: "hyperliquid",
       status: "done",
-      specialistId: second.id,
+      threadId: second.id,
       input: { market: "ETH", stopLoss: 2400 },
       startedAt: new Date("2026-10-02T12:00:00Z"),
     });
@@ -341,11 +329,11 @@ describe("the Hyperliquid statement", () => {
     await readWhenDue();
     await readAgain();
 
-    // The stop's own specialist sells its share first, then the other specialist's, each with
+    // The stop's own thread sells its share first, then the other thread's, each with
     // its share of what the line locked in.
     expect(await fillsOf(stops.id)).toEqual([
       expect.objectContaining({
-        specialistId: second.id,
+        threadId: second.id,
         side: "sell",
         quantity: "1.000000000000000000",
         usdValue: "2400.00",
@@ -353,7 +341,7 @@ describe("the Hyperliquid statement", () => {
         venueRef: `hyperliquid:${ADDRESS}:7`,
       }),
       expect.objectContaining({
-        specialistId: first.id,
+        threadId: first.id,
         side: "sell",
         quantity: "2.000000000000000000",
         usdValue: "4800.00",
@@ -362,8 +350,7 @@ describe("the Hyperliquid statement", () => {
       }),
     ]);
     expect(await db.select().from(actions).where(eq(actions.tool, VENUE_FILL_TOOL))).toEqual([]);
-    // Each specialist is told of its share in its chat, and not woken: Auni's
-    // own stop did what it was set to.
+    // Each thread is told of its share, and not woken: Auni's own stop did what it was set to.
     const told = (share: string) => [
       expect.objectContaining({
         kind: "venue_event",
@@ -426,11 +413,11 @@ describe("the Hyperliquid statement", () => {
   });
 
   it("records Auni's own market order once, from the statement rather than the venue's answer", async () => {
-    const specialist = await insertSpecialist();
+    const thread = await insertThread();
     const order = await insertAction({
       tool: "hyperliquid_order",
       venue: "hyperliquid",
-      specialistId: specialist.id,
+      threadId: thread.id,
       input: { market: "BTC" },
     });
     lookup.recipe = {
@@ -472,7 +459,7 @@ describe("the Hyperliquid statement", () => {
     expect(await db.select().from(fills)).toEqual([
       expect.objectContaining({
         actionId: order.id,
-        specialistId: specialist.id,
+        threadId: thread.id,
         side: "buy",
         quantity: "0.000300000000000000",
         usdValue: "24.00",
@@ -480,14 +467,14 @@ describe("the Hyperliquid statement", () => {
       }),
     ]);
     // The move's own card tells it.
-    expect(await cardsIn(specialist.id)).toEqual([]);
+    expect(await cardsIn(thread.id)).toEqual([]);
   });
 
   it("records a tagged limit that filled before the first read, though the books held nothing open", async () => {
-    const specialist = await insertSpecialist();
+    const thread = await insertThread();
     const placed = new Date(Date.now() - 20 * 60_000);
     const limit = await perpOrder({
-      specialistId: specialist.id,
+      threadId: thread.id,
       createdAt: placed,
       startedAt: placed,
     });
@@ -508,14 +495,14 @@ describe("the Hyperliquid statement", () => {
 
     expect(await fillsOf(limit.id)).toEqual([
       expect.objectContaining({
-        specialistId: specialist.id,
+        threadId: thread.id,
         side: "buy",
         quantity: "0.050000000000000000",
         usdValue: "150.00",
         venueRef: `hyperliquid:${ADDRESS}:21`,
       }),
     ]);
-    expect(await cardsIn(specialist.id)).toEqual([
+    expect(await cardsIn(thread.id)).toEqual([
       expect.objectContaining({ title: "Your limit order opened your ETH long", outside: false }),
     ]);
   });
@@ -673,10 +660,10 @@ describe("the Hyperliquid statement", () => {
   });
 
   it("tells of a stop firing after its move, read together with the move's own fill", async () => {
-    const specialist = await insertSpecialist();
+    const thread = await insertThread();
     const opened = new Date(Date.now() - 30 * 60_000);
     const order = await perpOrder({
-      specialistId: specialist.id,
+      threadId: thread.id,
       createdAt: opened,
       startedAt: opened,
       endedAt: new Date(opened.getTime() + 5_000),
@@ -712,7 +699,7 @@ describe("the Hyperliquid statement", () => {
 
     expect((await fillsOf(order.id)).map(({ side }) => side)).toEqual(["buy", "sell"]);
     // The move's own fill is told by its card; the stop is news.
-    expect(await cardsIn(specialist.id)).toEqual([
+    expect(await cardsIn(thread.id)).toEqual([
       expect.objectContaining({
         title: "Your stop-loss closed your ETH long",
         detail: "It reached a stop-loss or take-profit price Auni set. You lost $7.50.",
@@ -721,11 +708,11 @@ describe("the Hyperliquid statement", () => {
   });
 
   it("tells of a tight stop that fires minutes after its move ended", async () => {
-    const specialist = await insertSpecialist();
+    const thread = await insertThread();
     // Live, 2026-11-16: a 0.3% stop on an ETH long fired three minutes after it opened.
     const opened = new Date(Date.now() - 10 * 60_000);
     const order = await perpOrder({
-      specialistId: specialist.id,
+      threadId: thread.id,
       createdAt: opened,
       startedAt: opened,
       endedAt: new Date(opened.getTime() + 5_000),
@@ -758,7 +745,7 @@ describe("the Hyperliquid statement", () => {
     await readWhenDue();
 
     // Its own fill is its card's to tell; the stop, though inside five minutes, is news.
-    expect(await cardsIn(specialist.id)).toEqual([
+    expect(await cardsIn(thread.id)).toEqual([
       expect.objectContaining({ title: "Your stop-loss closed your ETH long" }),
     ]);
   });
@@ -800,10 +787,10 @@ describe("the Hyperliquid statement", () => {
   });
 
   it("leaves what a move's orders fill while it runs to its own card", async () => {
-    const specialist = await insertSpecialist();
+    const thread = await insertThread();
     const placed = new Date(Date.now() - 5 * 60_000);
     const order = await perpOrder({
-      specialistId: specialist.id,
+      threadId: thread.id,
       status: "running",
       phase: "sending",
       createdAt: placed,
@@ -825,16 +812,16 @@ describe("the Hyperliquid statement", () => {
     await readWhenDue();
 
     expect((await fillsOf(order.id)).map(({ side }) => side)).toEqual(["buy"]);
-    expect(await cardsIn(specialist.id)).toEqual([]);
+    expect(await cardsIn(thread.id)).toEqual([]);
   });
 
   it("keeps why a move stopped once the statement shows it traded after all", async () => {
-    const specialist = await insertSpecialist();
+    const thread = await insertThread();
     const placed = new Date(Date.now() - 20 * 60_000);
     const stopped =
       "Hyperliquid didn't confirm it, so it may have gone through (cancelling the resting order: Hyperliquid refused the attached stop, so any of it that fills has no stops).";
     const order = await perpOrder({
-      specialistId: specialist.id,
+      threadId: thread.id,
       status: "running",
       createdAt: placed,
       startedAt: placed,

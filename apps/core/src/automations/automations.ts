@@ -10,7 +10,7 @@ import { and, count, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm"
 import { z } from "zod";
 
 import { db, type Tx } from "../db/client.ts";
-import { automationFires, automations, specialists, type AutomationRow } from "../db/schema.ts";
+import { automationFires, automations, type AutomationRow } from "../db/schema.ts";
 import { triageKind } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { OutOfCredits, type SourceFire } from "../apps/contract.ts";
@@ -45,11 +45,9 @@ export function automationWire(row: AutomationRow): z.input<typeof automationWir
   return {
     id: row.id,
     threadId: row.threadId,
-    specialistId: row.specialistId,
     source: row.source,
     description: row.description,
     note: row.note,
-    thesis: row.thesis,
     condition: row.condition,
     repeat: row.repeat,
     status: currentStatus(row),
@@ -112,19 +110,10 @@ function changed<Row extends AutomationRow | undefined>(row: Row): Row {
 export async function createAutomation(
   input: WatchFields & {
     readonly threadId: string;
-    readonly specialistId: string | null;
     readonly source: string;
-    readonly thesis: boolean;
   },
 ): Promise<AutomationRow> {
   if (!sourceById(input.source)) throw new Error(`No source named ${input.source}.`);
-  if (input.specialistId) {
-    const [specialist] = await db
-      .select({ id: specialists.id })
-      .from(specialists)
-      .where(eq(specialists.id, input.specialistId));
-    if (!specialist) throw new Error("No such specialist.");
-  }
 
   // Counted and stored under one lock, so watches set up at once can't all fit under it.
   const row = await db.transaction(async (tx) => {
@@ -302,7 +291,6 @@ export async function resumeAutomation(row: AutomationRow): Promise<AutomationRo
 /** The watches, newest first. Deleted ones stay hidden. */
 export async function listAutomations(input: {
   readonly threadId?: string;
-  readonly specialistId?: string;
 }): Promise<AutomationRow[]> {
   return db
     .select()
@@ -311,7 +299,6 @@ export async function listAutomations(input: {
       and(
         ne(automations.status, "deleted"),
         input.threadId ? eq(automations.threadId, input.threadId) : undefined,
-        input.specialistId ? eq(automations.specialistId, input.specialistId) : undefined,
       ),
     )
     .orderBy(desc(automations.createdAt));
@@ -320,10 +307,9 @@ export async function listAutomations(input: {
 /** A fire past the hub, whatever triage made of it or is about to: one the hub didn't quiet. */
 const spokeUp = sql`${automationFires.verdict} is distinct from 'quiet'`;
 
-/** A thread's, a specialist's, or every watch's fires past the hub, newest first. */
+/** A thread's or every watch's fires past the hub, newest first. */
 export async function listFires(input: {
   readonly threadId?: string;
-  readonly specialistId?: string;
 }): Promise<z.input<typeof automationFireWireSchema>[]> {
   const rows = await db
     .select({
@@ -339,13 +325,7 @@ export async function listFires(input: {
     })
     .from(automationFires)
     .innerJoin(automations, eq(automations.id, automationFires.automationId))
-    .where(
-      and(
-        spokeUp,
-        input.threadId ? eq(automations.threadId, input.threadId) : undefined,
-        input.specialistId ? eq(automations.specialistId, input.specialistId) : undefined,
-      ),
-    )
+    .where(and(spokeUp, input.threadId ? eq(automations.threadId, input.threadId) : undefined))
     .orderBy(desc(automationFires.createdAt))
     .limit(100);
   return rows.map((row) => ({ ...row, firedAt: row.firedAt.toISOString() }));
@@ -482,13 +462,4 @@ export function openingLine(text: string): string | null {
   if (!line) return null;
   const sentence = /^.+?[.!?](?=\s|$)/u.exec(line)?.[0] ?? line;
   return sentence.length > 200 ? `${sentence.slice(0, 199)}…` : sentence;
-}
-
-/** For retiring a specialist: stops everything that was watching for it. */
-export async function deleteSpecialistAutomations(specialistId: string): Promise<void> {
-  const rows = await db
-    .select()
-    .from(automations)
-    .where(and(eq(automations.specialistId, specialistId), ne(automations.status, "deleted")));
-  for (const row of rows) await deleteAutomation(row);
 }

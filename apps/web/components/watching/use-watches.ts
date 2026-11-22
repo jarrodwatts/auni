@@ -13,10 +13,10 @@ import {
 } from "@/lib/data/automations";
 
 function scopeKey(scope: WatchScope): string {
-  return "threadId" in scope ? `thread:${scope.threadId}` : `specialist:${scope.specialistId}`;
+  return `thread:${scope.threadId}`;
 }
 
-/** What Auni watches for a thread or a specialist, paused ones included. */
+/** What Auni watches for a thread, paused ones included. */
 export function useWatches(scope: WatchScope) {
   return useQuery({
     queryKey: ["watches", scopeKey(scope)],

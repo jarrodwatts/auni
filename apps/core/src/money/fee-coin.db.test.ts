@@ -4,12 +4,12 @@ import { decodeFunctionData, encodeFunctionData, parseAbi, type Address, type He
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, fills, specialists } from "../db/schema.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { actions, fills, threads } from "../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { executeAction, proposeAction, settleStopped } from "./actions.ts";
 import { retryRefusal } from "./failure.ts";
 import type { PayInRequest, PayInStanding } from "./pay-in.ts";
-import { specialistPot } from "./pot.ts";
+import { threadPot } from "./pot.ts";
 import { markCrashed } from "./record.ts";
 import type { EvmTx, KeptTx } from "./recipe.ts";
 import { recipeForTool } from "./recipes/index.ts";
@@ -242,7 +242,7 @@ async function tryAgain(id: string) {
 
 beforeEach(async () => {
   standIn();
-  await wipe(specialists, actions, fills);
+  await wipe(threads, actions, fills);
   world.lacks = { [ARBITRUM]: LACKS };
   world.coin = { [MONAD]: 67n * MON };
   world.relay = "success";
@@ -422,20 +422,15 @@ describe("the coin a card buys for its fees, through a move's whole run", () => 
   });
 });
 
-describe("a specialist that acts on its own, and the coin its move would buy for fees", () => {
-  /** A specialist set to act on its own within `potUsd`, proposing the stand-in buy of $2 in its own thread. */
-  async function proposes(potUsd: string) {
+describe("a thread that acts on its own, and the coin its move would buy for fees", () => {
+  /** A thread set to act on its own within `budgetUsd`, proposing the stand-in buy of $2. */
+  async function proposes(budgetUsd: string) {
     world.direction = "buy";
     world.coin = { [MONAD]: 1_000n * MON };
-    const specialist = await insertSpecialist({ potUsd, actMode: "within_limits" });
-    const own = await insertThread({ specialistId: specialist.id });
-    const outcome = await proposeAction(
-      { threadId: own.id, specialistId: specialist.id },
-      recipe,
-      INPUT,
-    );
+    const own = await insertThread({ budgetUsd, actMode: "within_limits" });
+    const outcome = await proposeAction({ threadId: own.id }, recipe, INPUT);
     const free = async () =>
-      (await db.transaction((tx) => specialistPot(tx, specialist))).freeCashCents;
+      (await db.transaction((tx) => threadPot(tx, own))).freeCashCents;
     return { outcome, free };
   }
 

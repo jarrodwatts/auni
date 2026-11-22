@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+import { dollarsSchema } from "./money.ts";
+import { holdingWireSchema } from "./portfolio.ts";
+import { modelSelectionSchema } from "./setup.ts";
 import {
   automationFireIdSchema,
   automationRuleIdSchema,
-  specialistIdSchema,
   messageIdSchema,
   threadIdSchema,
   timestampSchema,
@@ -11,16 +13,39 @@ import {
 
 const messageRoleSchema = z.enum(["user", "assistant"]);
 
+/**
+ * How Auni gets the owner's go-ahead in a thread. `ask_first` waits for a tap on every move.
+ * `within_limits` lets buys within the thread's uninvested budget, and sells of holdings this
+ * thread bought, run straight away; leveraged perps, bridges and withdrawals still ask.
+ */
+export const threadActModeSchema = z.enum(["ask_first", "within_limits"]);
+export type ThreadActMode = z.infer<typeof threadActModeSchema>;
+
+/** Working notes kept by Auni for an ongoing thread. */
+export const threadNotesSchema = z.string().trim().min(1).max(4_000);
+
 /** A conversation as core serves it: the sidebar row, and the thread a route lands in. */
 export const threadWireSchema = z.object({
   id: threadIdSchema,
-  /** The specialist this conversation belongs to; null for a chat. */
-  specialistId: specialistIdSchema.nullable(),
   /** Null until one is written. */
   title: z.string().nullable(),
   /** Running while a turn is; needs_user while a card waits on the person. */
   status: z.enum(["running", "needs_user", "idle"]),
-  /** When the owner archived it out of History; null while it is listed. */
+  /** How Auni acts on moves in this thread. */
+  actMode: threadActModeSchema.default("ask_first"),
+  /** Dollar spending ceiling when `actMode` is `within_limits`. */
+  budgetUsd: dollarsSchema.default("0.00"),
+  /** Working notes Auni keeps for this thread; null when none. */
+  notes: z.string().nullable().default(null),
+  /** Explicit brain, model and effort chosen for this thread; null uses owner/auto default. */
+  modelSelection: modelSelectionSchema.nullable().default(null),
+  /** Number of active watches or schedules attached to this thread. */
+  watchCount: z.number().int().min(0).default(0),
+  /** Number of settled money moves in this thread, so the inspector knows when there is history. */
+  moveCount: z.number().int().min(0).default(0),
+  /** When the owner pinned this thread to the top of the sidebar; null otherwise. */
+  pinnedAt: timestampSchema.nullable().default(null),
+  /** When the owner archived it out of the sidebar; null while it is listed. */
   archivedAt: timestampSchema.nullable(),
   /** What the thread waits on the person for, in one line: "Sell $80 of Lilly". */
   moneyLine: z.string().nullable(),
@@ -45,6 +70,27 @@ export const threadWireSchema = z.object({
   createdAt: timestampSchema,
 });
 export type ThreadWire = z.infer<typeof threadWireSchema>;
+
+/** `PATCH /threads/:threadId`: every field is optional; absent means unchanged. */
+export const updateThreadRequestSchema = z
+  .object({
+    title: z.string().trim().min(1).max(160),
+    archived: z.boolean(),
+    pinned: z.boolean(),
+    actMode: threadActModeSchema,
+    budgetUsd: dollarsSchema,
+    modelSelection: modelSelectionSchema.nullable(),
+  })
+  .partial();
+export type UpdateThreadRequest = z.infer<typeof updateThreadRequestSchema>;
+
+/** `GET /threads/:threadId/state`: live budget headroom and holdings opened in this thread. */
+export const threadStateWireSchema = z.object({
+  budgetUsd: dollarsSchema,
+  freeBudgetUsd: dollarsSchema,
+  holdings: z.array(holdingWireSchema),
+});
+export type ThreadStateWire = z.infer<typeof threadStateWireSchema>;
 
 /** `GET /threads/search`: a title match carries no message; a message match says which. */
 export const threadSearchResultWireSchema = z.object({

@@ -69,27 +69,13 @@ const AUNI_TOOL_COPY: Record<
     "Couldn’t put those moves together",
   ),
   retract_cards: copy("Taking back a card", "Took back a card", "Couldn’t take that card back"),
-  // Specialists
-  start_specialist: copy(
-    "Proposing a specialist",
-    "Proposed a specialist",
-    "Couldn’t propose that specialist",
+  // Thread state
+  set_thread_autonomy: copy(
+    "Updating thread permissions",
+    "Updated thread permissions",
+    "Couldn’t update thread permissions",
   ),
-  propose_specialist_portfolio: copy(
-    "Putting your picks together",
-    "Put your picks together",
-    "Couldn’t put those picks together",
-  ),
-  update_specialist: copy(
-    "Updating your specialist",
-    "Updated your specialist",
-    "Couldn’t update your specialist",
-  ),
-  get_specialist: copy(
-    "Looking over your specialist",
-    "Looked over your specialist",
-    "Couldn’t read your specialist",
-  ),
+  update_thread_notes: SILENT,
   // Moves: each prepares a card that waits for the person's OK, so done means prepared.
   stock_trade: copy("Preparing your order", "Prepared your order", "Couldn’t prepare that order"),
   evm_swap: copy("Preparing your trade", "Prepared your trade", "Couldn’t prepare that trade"),
@@ -108,11 +94,6 @@ const AUNI_TOOL_COPY: Record<
     "Preparing a withdrawal",
     "Prepared a withdrawal",
     "Couldn’t prepare that withdrawal",
-  ),
-  move_holding: copy(
-    "Preparing to move a holding",
-    "Prepared to move a holding",
-    "Couldn’t prepare that move",
   ),
   // Watching
   watch: copy("Changing what I watch", "Changed what I watch", "Couldn’t change what I watch"),

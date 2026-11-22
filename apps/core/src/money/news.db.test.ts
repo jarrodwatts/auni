@@ -303,7 +303,7 @@ async function waitWithCard(
 ) {
   const thread = threadId ?? (await insertThread()).id;
   const began = new Date();
-  const tool = moneyTools({ threadId: thread, specialistId: null }).find(
+  const tool = moneyTools({ threadId: thread }).find(
     ({ name }) => name === "wait_for_deposit",
   );
   const outcome = await tool!.handler(input);

@@ -3,21 +3,13 @@ import { and, eq, gt, isNotNull, min, type AnyColumn } from "drizzle-orm";
 import { isAddress, type Address } from "viem";
 
 import { db } from "../db/client.ts";
-import { arrivals, specialists, fills, otherTokens } from "../db/schema.ts";
+import { arrivals, fills, otherTokens } from "../db/schema.ts";
 import { chainIdOf } from "./chains.ts";
-import {
-  allFills,
-  attribute,
-  holdersOf,
-  holdingGaps,
-  specialistBooks,
-  withFillCosts,
-  worthUsd,
-} from "./books.ts";
+import { allFills, buildPortfolio, withFillCosts, worthUsd } from "./books.ts";
 import { readEvmWallet, readSavings, readSolanaWallet, namesOf } from "./chain-holdings.ts";
 import { fillIdentity, instrumentIn, QUANTITY_DECIMALS, type FillKey } from "./fill-key.ts";
 import { livePrices, movedUsd, perpSize, priceKey, pricesNow } from "./history.ts";
-import { outdated, priceKeys, readStands, reportGaps, saveReading } from "./readings.ts";
+import { outdated, priceKeys, readStands, saveReading } from "./readings.ts";
 import { onForget } from "./swaps/shared.ts";
 import { onTheirWay } from "./record.ts";
 import { centsToUsd, formatUnits, sumUsd, unitsUsd } from "./usd.ts";
@@ -70,11 +62,8 @@ export async function keptOutsideWallet(
 }
 
 /**
- * Live holdings, attributed to specialists through fills. A holding is keyed
- * by the same fill-key helpers recipes record fills with, so a specialist
- * holds its net filled quantity of it, capped at what the wallet really
- * holds, valued at the live price. The rest is Cash when it is a dollar
- * stablecoin and Other when it is not.
+ * Live holdings across every wallet and venue, valued at live prices.
+ * Free dollar stablecoins sit in Cash; everything else sits in Assets.
  */
 
 export interface Holding extends FillKey {
@@ -123,20 +112,10 @@ export interface Portfolio {
    * stillLooking): holdings there it has yet to find are missing from every total.
    */
   readonly looking: readonly string[];
-  /** Every holding as read, before attribution splits any of them. */
+  /** Every holding as read, including Cash. */
   readonly holdings: readonly Holding[];
-  readonly specialists: readonly (PortfolioBucket & {
-    readonly id: string;
-    readonly purpose: string;
-    readonly status: string;
-    /**
-     * False when a source that may hold some of it couldn't be read (see
-     * `unavailable`), so its holdings and value may be short. A source that
-     * holds none of it leaves it whole.
-     */
-    readonly whole: boolean;
-  })[];
-  readonly other: PortfolioBucket;
+  /** Every non-cash holding, plus cash held for open orders. */
+  readonly assets: PortfolioBucket;
   readonly cash: PortfolioBucket;
   /**
    * Money sent across to another network or a venue's account that hasn't landed
@@ -184,10 +163,9 @@ onForget(() => {
 
 /**
  * One live read every few seconds, shared by whatever asks within it:
- * the screens, which show one portfolio several ways at once (the total, the
- * specialists and the loose money), and a proposal's check of the cash and
- * holdings that pay for it. A read begun before a move finished shows the
- * money as it was, so it is not shared on (see sharedRead).
+ * screens and proposal checks of the cash and holdings that pay for them.
+ * A read begun before a move finished shows the money as it was, so it is
+ * not shared on (see sharedRead).
  */
 export async function readPortfolioShared(): Promise<Portfolio> {
   return (await sharedRead()).read;
@@ -251,8 +229,7 @@ export async function portfolioNow(): Promise<Portfolio> {
 /**
  * A read with each holding moved from the price it had as it was read to
  * the price now (see movedUsd), and every total summed again; one without
- * both prices holds its value. Each specialist's share of a holding moves
- * with it, so the shares still add up to it.
+ * both prices holds its value.
  */
 function repriced(
   read: Portfolio,
@@ -270,26 +247,24 @@ function repriced(
     );
     return { ...holding, usdValue: centsToUsd(BigInt(Math.round(usd * 100))) };
   };
-  const bucket = <T extends PortfolioBucket>(entry: T): T => {
-    const holdings = entry.holdings.map(move);
-    return { ...entry, holdings, usdValue: worthUsd(holdings) };
-  };
   const holdings = read.holdings.map(move);
+  const assets = holdings.filter((holding) => !holding.cash || holding.heldForOrders);
+  const cash = holdings.filter((holding) => holding.cash && !holding.heldForOrders);
   return {
     ...read,
     totalUsd: sumUsd([worthUsd(holdings), read.onTheWay.usdValue]),
     holdings,
-    specialists: read.specialists.map(bucket),
-    other: bucket(read.other),
+    assets: { usdValue: worthUsd(assets), holdings: assets },
+    cash: { usdValue: worthUsd(cash), holdings: cash },
   };
 }
 
 /**
  * How much of one holding a wallet holds now, read fresh from its chain, in
- * QUANTITY_DECIMALS units, so a sale can be written to whoever held what it
- * sold; null when it can't be read. What an account keeps outside the wallet
- * (an outcome share) is read from the account; a perp's trades are split by
- * its statement instead (see statements.ts).
+ * QUANTITY_DECIMALS units, so a sale can be written to whichever thread held
+ * what it sold; null when it can't be read. What an account keeps outside the
+ * wallet (an outcome share) is read from the account; a perp's trades are
+ * split by its statement instead (see statements.ts).
  */
 export async function heldNow(key: FillKey): Promise<bigint | null> {
   try {
@@ -314,17 +289,6 @@ export async function heldNow(key: FillKey): Promise<bigint | null> {
     console.warn(`holding ${fillIdentity(key)} unreadable before a sale:`, error);
     return null;
   }
-}
-
-/**
- * How much of one holding no specialist holds now, in QUANTITY_DECIMALS
- * units: what the wallet holds, read fresh, less each specialist's share as
- * the portfolio splits it (see holdersOf). Null when it can't be read.
- */
-export async function looseNow(key: FillKey): Promise<bigint | null> {
-  const [held, fillsNow] = await Promise.all([heldNow(key), allFills(db)]);
-  if (held === null) return null;
-  return holdersOf(held, specialistBooks(fillsNow), fillIdentity(key)).other;
 }
 
 /**
@@ -399,7 +363,7 @@ export function readFromStart(chain: string, instrument: string): boolean {
  */
 export async function readPortfolio(): Promise<Portfolio> {
   const observedAt = new Date();
-  const [wallets, everyFill, arrived, everySpecialist] = await Promise.all([
+  const [wallets, everyFill, arrived] = await Promise.all([
     walletAddresses(),
     allFills(db),
     // Every token that came in and was recorded, so one bought elsewhere and sent here is
@@ -416,7 +380,6 @@ export async function readPortfolio(): Promise<Portfolio> {
           .from(otherTokens)
           .where(isNotNull(otherTokens.keptAt)),
       ),
-    db.select().from(specialists),
   ]);
 
   const evm = wallets.evm as Address | null;
@@ -525,26 +488,21 @@ export async function readPortfolio(): Promise<Portfolio> {
     },
   );
 
-  const unread = (chain: string) => !pricesRead || failed.some(([, on]) => on === chain);
   const portfolio = withFillCosts(
-    attribute({
+    buildPortfolio({
       observedAt,
       holdings,
-      fills: everyFill,
-      specialists: everySpecialist,
       onItsWay,
       // Without prices every priced holding drops out of the totals, so the read is partial too.
       unavailable: pricesRead ? unavailable : [...unavailable, "prices"],
       looking,
-      unread,
     }),
     everyFill,
   );
-  // A read kept as a reading is whole and settled, so a gap it shows is no move still landing.
   if (looked)
-    void saveReading(portfolio)
-      .then((kept) => kept && reportGaps(holdingGaps({ holdings, fills: everyFill, unread })))
-      .catch((error: unknown) => console.error("reading not kept", error));
+    void saveReading(portfolio).catch((error: unknown) =>
+      console.error("reading not kept", error),
+    );
   return portfolio;
 }
 

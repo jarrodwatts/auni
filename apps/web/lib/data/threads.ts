@@ -1,12 +1,14 @@
 import {
   messageWireSchema,
-  threadSearchResultWireSchema,
   threadIdSchema,
+  threadSearchResultWireSchema,
+  threadStateWireSchema,
   threadWireSchema,
   type SendMessageRequest,
   type ThreadId,
   type ThreadStreamEvent as StreamEvent,
   type ThreadWire,
+  type UpdateThreadRequest,
 } from "@auni/shared";
 import type { UIMessageChunk } from "ai";
 import { z } from "zod";
@@ -14,23 +16,31 @@ import { z } from "zod";
 import { requestCore } from "@/lib/core";
 import { toAuniMetadata, type AuniUiMessage } from "@/lib/conversation";
 import { listenLive } from "@/lib/data/live";
-import type { Thread, ThreadSearchResult } from "@/lib/data/views";
+import { toHolding } from "@/lib/data/portfolio";
+import type { Thread, ThreadSearchResult, ThreadState } from "@/lib/data/views";
 
 /**
  * Threads and messages come from core, and so does everything live, over the tab's one stream
- * (lib/data/live.ts). A specialist has one thread; each chat is one (lib/data/places.ts).
+ * (lib/data/live.ts). Every conversation is a thread.
  */
 
 export function toThread(wire: ThreadWire): Thread {
   return {
     id: wire.id,
-    specialistId: wire.specialistId,
     title: wire.title?.trim() || "New conversation",
     state: wire.status === "idle" ? "done" : wire.status,
     moneyLine: wire.moneyLine,
     asking: wire.asking,
     unread: wire.unread,
     moving: wire.moving,
+    actMode: wire.actMode,
+    budgetUsd: wire.budgetUsd,
+    notes: wire.notes,
+    modelSelection: wire.modelSelection,
+    pinned: wire.pinnedAt !== null,
+    pinnedAt: wire.pinnedAt,
+    watchCount: wire.watchCount,
+    moveCount: wire.moveCount,
     archived: wire.archivedAt !== null,
     createdAt: wire.createdAt,
     updatedAt: wire.lastActivityAt,
@@ -38,6 +48,7 @@ export function toThread(wire: ThreadWire): Thread {
 }
 
 const threadsResponseSchema = z.object({ threads: z.array(threadWireSchema) });
+const threadResponseSchema = z.object({ thread: threadWireSchema });
 
 export async function listThreads(): Promise<readonly Thread[]> {
   return threadsResponseSchema
@@ -45,15 +56,33 @@ export async function listThreads(): Promise<readonly Thread[]> {
     .threads.map(toThread);
 }
 
-/** Renames a chat, or archives it or brings it back; core may refuse, saying why (`detail`). */
-export async function updateThread(
+/** Live budget headroom and holdings opened in one thread (`GET /threads/:id/state`). */
+export async function getThreadState(
   threadId: ThreadId,
-  change: { readonly title?: string; readonly archived?: boolean },
-): Promise<void> {
-  await requestCore(`threads/${threadId}`, { method: "PATCH", body: JSON.stringify(change) });
+  signal?: AbortSignal,
+): Promise<ThreadState> {
+  const body = threadStateWireSchema.parse(
+    await requestCore(`threads/${threadId}/state`, { method: "GET", signal }),
+  );
+  return {
+    budgetUsd: body.budgetUsd,
+    freeBudgetUsd: body.freeBudgetUsd,
+    holdings: body.holdings.map(toHolding),
+  };
 }
 
-/** Deletes a chat for good; core may refuse, saying why (`detail`). */
+/** Updates a thread's title, pin, archive, autonomy budget, or model selection. */
+export async function updateThread(
+  threadId: ThreadId,
+  change: UpdateThreadRequest,
+): Promise<Thread> {
+  const body = threadResponseSchema.parse(
+    await requestCore(`threads/${threadId}`, { method: "PATCH", body: JSON.stringify(change) }),
+  );
+  return toThread(body.thread);
+}
+
+/** Deletes a thread for good; core may refuse, saying why (`detail`). */
 export async function deleteThread(threadId: ThreadId): Promise<void> {
   await requestCore(`threads/${threadId}`, { method: "DELETE" });
 }

@@ -27,7 +27,7 @@ vi.mock("../../agent/brain.ts", async (importOriginal) => ({
     };
   },
 }));
-vi.mock("../../specialists/context.ts", () => ({ promptPortfolio: async () => null }));
+vi.mock("../../conversation/context.ts", () => ({ promptPortfolio: async () => null }));
 
 // The clock through the hub, on a real database: its watches set up with the watch tool, its
 // run started and stopped as Auni starts and stops, and each time recorded as a fire for triage.
@@ -76,7 +76,7 @@ describe("the clock source", () => {
     // Set up on Monday, through the watch tool, as the agent sets one up.
     vi.setSystemTime(FRIDAY_5PM - 4 * 24 * HOUR);
     const thread = await insertThread();
-    const [watch] = automationTools({ threadId: thread.id, specialistId: null });
+    const [watch] = automationTools({ threadId: thread.id });
     const set = async (description: string, condition: Record<string, unknown>) => {
       const answer = (await watch!.handler({
         action: "create",
@@ -146,7 +146,7 @@ describe("the clock source", () => {
   it("refuses a moment already past, saying the owner's time now", async () => {
     vi.setSystemTime(FRIDAY_5PM);
     const thread = await insertThread();
-    const [watch] = automationTools({ threadId: thread.id, specialistId: null });
+    const [watch] = automationTools({ threadId: thread.id });
     const answer = (await watch!.handler({
       action: "create",
       source: "clock",
@@ -168,7 +168,7 @@ describe("the clock source", () => {
       const twoThirtySix = Date.parse("2026-11-13T15:36:15Z");
       vi.setSystemTime(twoThirtySix);
       const thread = await insertThread();
-      const [watch] = automationTools({ threadId: thread.id, specialistId: null });
+      const [watch] = automationTools({ threadId: thread.id });
       await watch!.handler({
         action: "create",
         source: "clock",

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { platform } from "node:os";
 
-import type { AppAbout } from "@auni/shared";
+import type { AppAbout, BrainModelWire } from "@auni/shared";
 import { readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 
 import { databaseFiles } from "../db/client.ts";
@@ -255,13 +255,17 @@ export interface NoBrain {
   readonly blocked?: true;
 }
 
-/** The brains in the order a turn asks them: the one BRAIN names, then the order order.ts gives. */
-function inTurn(): ReturnType<typeof brains> {
+/** The brains in the order a turn asks them: `preferred` first if given, then BRAIN, then order.ts. */
+function inTurn(preferred?: string): ReturnType<typeof brains> {
   const all = brains();
-  const preferred = preferredBrainId();
-  return all.toSorted(
-    (a, b) => Number(b.about.id === preferred) - Number(a.about.id === preferred),
-  );
+  const fallback = preferredBrainId();
+  return all.toSorted((a, b) => {
+    if (preferred) {
+      const pref = Number(b.about.id === preferred) - Number(a.about.id === preferred);
+      if (pref !== 0) return pref;
+    }
+    return Number(b.about.id === fallback) - Number(a.about.id === fallback);
+  });
 }
 
 /**
@@ -274,17 +278,17 @@ export function whichBrainSays(settingsFile: string): string | null {
   const order = `${names.slice(0, -1).join(", ")}, then ${names.at(-1)}`;
   return preferredBrainId()
     ? `Auni asks ${order}, as BRAIN in ${settingsFile} says, and thinks with the first that is ready.`
-    : `Auni asks ${order}, and thinks with the first that is ready. To choose, set BRAIN in ${settingsFile}.`;
+    : `Auni asks ${order}, and thinks with the first that is ready. You can also pick a model right in any thread.`;
 }
 
 /**
- * The brain this turn thinks with: the first that is ready on this machine, in the order
- * whichBrainSays tells the owner. One at its usage limit waits behind any other that is ready;
- * with none, it's tried anyway, since its CLI knows best whether the limit has lifted. With no
- * brain ready, what the owner can run to make each ready.
+ * The brain this turn thinks with: `preferred` first if ready, then the first that is ready on
+ * this machine in the order whichBrainSays tells the owner. One at its usage limit waits behind
+ * any other that is ready; with none, it's tried anyway, since its CLI knows best whether the
+ * limit has lifted. With no brain ready, what the owner can run to make each ready.
  */
-export function pickBrain(): Promise<PickedBrain | NoBrain> {
-  return pick(checked);
+export function pickBrain(preferred?: string): Promise<PickedBrain | NoBrain> {
+  return pick(checked, preferred);
 }
 
 /**
@@ -301,12 +305,13 @@ export function brainSeen(): Promise<PickedBrain | NoBrain> {
 
 async function pick(
   look: (id: string, brain: Brain) => Promise<BrainCheck>,
+  preferred?: string,
 ): Promise<PickedBrain | NoBrain> {
   const blocked = brainsBlocked();
   if (blocked) return { fixes: [blocked], blocked: true };
   const fixes: string[] = [];
   let tired: PickedBrain | undefined;
-  for (const { about, brain } of inTurn()) {
+  for (const { about, brain } of inTurn(preferred)) {
     const check = await look(about.id, brain);
     if (!check.ready) {
       fixes.push(fixLine(about, check.why, check.fix));
@@ -342,13 +347,19 @@ export async function brainStatus(): Promise<BrainStatus> {
   };
 }
 
-/** One brain app as setup shows it: ready (or resting at its limit), or why not and the fix. */
+/** One brain app as setup and the model picker show it: ready (or resting at its limit), or why not. */
 export type BrainRow = { readonly id: string; readonly name: string } & (
-  | { readonly state: "ready"; readonly login: string; readonly signedInAs?: string }
+  | {
+      readonly state: "ready";
+      readonly login: string;
+      readonly signedInAs?: string;
+      readonly models: readonly BrainModelWire[];
+    }
   | {
       readonly state: "resting";
       readonly login: string;
       readonly signedInAs?: string;
+      readonly models: readonly BrainModelWire[];
       readonly until: Date;
     }
   | { readonly state: BrainNotReady; readonly fix: string }
@@ -370,6 +381,7 @@ export async function brainRows(
         ...named,
         login: check.login,
         ...(check.signedInAs ? { signedInAs: check.signedInAs } : {}),
+        models: check.models ?? [],
       };
       const until = restingUntil(about.id);
       return until ? { ...ready, state: "resting", until } : { ...ready, state: "ready" };

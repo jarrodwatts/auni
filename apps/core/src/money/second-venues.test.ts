@@ -98,7 +98,7 @@ describe("a second venue of each kind", () => {
   });
 
   describe("reaches the agent", () => {
-    const thread = { id: "t", specialistId: null, turnStartedAt: null } as ThreadRow;
+    const thread = { id: "t", turnStartedAt: null } as ThreadRow;
 
     it("as money tools, and in what the system prompt says Auni can do", async () => {
       const names = toolsFor({ thread }).map((tool) => tool.name);

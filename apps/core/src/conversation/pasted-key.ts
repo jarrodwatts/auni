@@ -203,7 +203,7 @@ async function solanaCard(thread: ThreadRow) {
   if (!field) return null;
   try {
     const { card } = await recordAsk(
-      { threadId: thread.id, specialistId: thread.specialistId },
+      { threadId: thread.id },
       "request_secret",
       { field: field.id, app: field.app, why: SOLANA_WHY },
       { summary: field.label, lines: [{ label: ASK_LINE.why, value: SOLANA_WHY }] },

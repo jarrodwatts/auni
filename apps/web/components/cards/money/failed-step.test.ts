@@ -126,7 +126,7 @@ describe("a held step", () => {
   it("asks once what closing means before it closes, with a way back", () => {
     expect(failedStep(held, null, true, true)).toEqual({
       reason:
-        "Close it without a record? Auni stops checking, and adds nothing to any specialist's record. Your portfolio still shows what you hold.",
+        "Close it without a record? Auni stops checking, and adds nothing to any thread's record. Your portfolio still shows what you hold.",
       actions: ["keep", "close"],
     });
   });

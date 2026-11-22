@@ -159,7 +159,7 @@ describe("the daily brief", () => {
   // "Send my brief at 7am instead, and only on weekdays": the same brief, moved.
   it("moves to the schedule the owner asks for, still holding what triage keeps for it", async () => {
     const { chat } = await sydneyOwner();
-    const [, setNotices] = conversationTools({ threadId: randomUUID(), specialistId: null });
+    const [, setNotices] = conversationTools({ threadId: randomUUID() });
     const weekdays = { every: ["mon", "tue", "wed", "thu", "fri"], at: "07:00" };
     const moved = await setNotices!.handler({ brief: weekdays });
     expect(moved.content).toEqual([
@@ -187,7 +187,6 @@ describe("the daily brief", () => {
     try {
       const [, setNotices, showBrief] = conversationTools({
         threadId: randomUUID(),
-        specialistId: null,
       });
       const moved = await setNotices!.handler({ brief: { every: "day", at: "15:02" } });
       expect(moved.structuredContent).toMatchObject({ next_brief: "2026-11-07T04:02:00.000Z" });
@@ -223,7 +222,7 @@ describe("the daily brief", () => {
 
   it("comes when the owner asks for it, and not at all once they turn it off", async () => {
     const { chat } = await sydneyOwner();
-    const [, setNotices] = conversationTools({ threadId: randomUUID(), specialistId: null });
+    const [, setNotices] = conversationTools({ threadId: randomUUID() });
 
     const moved = await setNotices!.handler({ brief: { every: "day", at: "09:15" } });
     expect(moved.structuredContent).toMatchObject({

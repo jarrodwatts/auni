@@ -77,10 +77,11 @@ describe.runIf(process.platform === "linux")("the Claude Code check", () => {
       email: "sam@example.com",
       subscriptionType: "max",
     });
-    expect(await run()).toEqual({
+    expect(await run()).toMatchObject({
       ready: true,
       login: "your Claude Max subscription",
       signedInAs: "sam@example.com",
+      models: expect.arrayContaining([expect.objectContaining({ id: "opus", isDefault: true })]),
     });
   });
 
@@ -91,6 +92,10 @@ describe.runIf(process.platform === "linux")("the Claude Code check", () => {
       authMethod: "api_key",
       apiKeySource: "ANTHROPIC_API_KEY",
     });
-    expect(await run()).toEqual({ ready: true, login: "Auni's Anthropic API key" });
+    expect(await run()).toMatchObject({
+      ready: true,
+      login: "Auni's Anthropic API key",
+      models: expect.arrayContaining([expect.objectContaining({ id: "sonnet" })]),
+    });
   });
 });

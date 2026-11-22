@@ -6,8 +6,8 @@ import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, specialists, fills, jobs } from "../db/schema.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { actions, fills, jobs, threads } from "../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { actionKind, turnKind } from "../jobs/kinds.ts";
 import { queued } from "../test/jobs.ts";
 import { stubRecipe } from "../test/recipe.ts";
@@ -15,7 +15,6 @@ import {
   actionWire,
   decideActions,
   executeAction,
-  opensSpecialist,
   prepareLeg,
   proposeAction,
   recordActions,
@@ -23,7 +22,6 @@ import {
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
 import { MayHaveSent, NothingMoved, type Recipe } from "./recipe.ts";
-import { toolRecipe } from "./recipes/index.ts";
 import { parseUnits } from "./usd.ts";
 import type { SignerOptions } from "./wallets.ts";
 
@@ -75,7 +73,7 @@ lookup.recipe = buy;
 
 beforeEach(async () => {
   executions = 0;
-  await wipe(specialists, actions, fills);
+  await wipe(threads, actions, fills);
 });
 
 const actionRow = async (id: string) =>
@@ -118,7 +116,6 @@ describe("executeAction", () => {
         phase: "queued",
         // Its card said it already: it wakes no thread when it settles.
         threadId: null,
-        specialistId: null,
         summary: "Get back",
         amountUsd: "0.00",
         input: { account: "acct" },
@@ -280,19 +277,14 @@ describe("executeAction", () => {
 
 describe("proposeAction", () => {
   it("queues a move of a holding it runs on its own, so it waits on other moves of that holding", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100", actMode: "within_limits" });
+    const own = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
     const nvidia: Recipe = {
       ...buy,
       about: () => ({ kind: "token", chain: "solana", mint: "nvda", stock: true, buysUsd: 10 }),
     };
     lookup.recipe = nvidia;
     try {
-      const own = await insertThread({ specialistId: specialist.id });
-      const outcome = await proposeAction(
-        { threadId: own.id, specialistId: specialist.id },
-        nvidia,
-        { usd: "10" },
-      );
+      const outcome = await proposeAction({ threadId: own.id }, nvidia, { usd: "10" });
       expect(outcome.status).toBe("running");
       expect(executions).toBe(0);
       expect(await queued("action")).toEqual([
@@ -307,11 +299,8 @@ describe("proposeAction", () => {
   });
   // Aave's supply, say: no venue lane and no holding, yet its job is what tells the thread.
   it("queues a lone move in lanes of its own too, rather than running it in the tool call", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100", actMode: "within_limits" });
-    const own = await insertThread({ specialistId: specialist.id });
-    const outcome = await proposeAction({ threadId: own.id, specialistId: specialist.id }, buy, {
-      usd: "10",
-    });
+    const own = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const outcome = await proposeAction({ threadId: own.id }, buy, { usd: "10" });
     expect(outcome.status).toBe("running");
     expect(executions).toBe(0);
     const { id } = outcome.action;
@@ -323,98 +312,56 @@ describe("proposeAction", () => {
 
 describe("recordActions", () => {
   it("lets only one of two plans spend the same free cash on its own; the other asks", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100", actMode: "within_limits" });
-    const own = await insertThread({ specialistId: specialist.id });
-    const context = { threadId: own.id, specialistId: specialist.id };
-    const plan = async () =>
-      recordActions(context, [await prepareLeg(buy, { usd: "60" }, context)], null);
+    const own = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const context = { threadId: own.id };
+    const plan = async () => recordActions(context, [await prepareLeg(buy, { usd: "60" })], null);
     await Promise.all([plan(), plan()]);
     const recorded = await db
       .select({ status: actions.status })
       .from(actions)
-      .where(eq(actions.specialistId, specialist.id));
+      .where(eq(actions.threadId, own.id));
     expect(recorded.map((row) => row.status).sort()).toEqual(["awaiting_permission", "running"]);
   });
 
-  it("acts on its own only in its own thread; filed under it from anywhere else, a move asks", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100", actMode: "within_limits" });
-    const other = await insertSpecialist({ actMode: "within_limits" });
-    const places = [await insertThread(), await insertThread({ specialistId: other.id }), null];
+  it("acts on its own only in an active Auto thread with a positive budget", async () => {
+    const places = [
+      await insertThread({ actMode: "ask_first", budgetUsd: "100" }),
+      await insertThread({ actMode: "within_limits", budgetUsd: "0" }),
+      await insertThread({ actMode: "within_limits", budgetUsd: "100", archivedAt: new Date() }),
+      null,
+    ];
     for (const thread of places) {
-      const context = { threadId: thread?.id ?? null, specialistId: specialist.id };
-      const { rows } = await recordActions(
-        context,
-        [await prepareLeg(buy, { usd: "10" }, context)],
-        null,
-      );
+      const context = { threadId: thread?.id ?? null };
+      const { rows } = await recordActions(context, [await prepareLeg(buy, { usd: "10" })], null);
       expect(rows[0]?.status).toBe("awaiting_permission");
     }
-    const own = await insertThread({ specialistId: specialist.id });
-    const context = { threadId: own.id, specialistId: specialist.id };
+    const own = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
     const { rows } = await recordActions(
-      context,
-      [await prepareLeg(buy, { usd: "10" }, context)],
+      { threadId: own.id },
+      [await prepareLeg(buy, { usd: "10" })],
       null,
     );
     expect(rows[0]?.status).toBe("running");
   });
 
-  it("asks before any move in a retired specialist; allowing a buy brings it back, a sell doesn't", async () => {
-    // Set to act on its own, with the cash for it, in its own thread: every move would run there.
-    const specialist = await insertSpecialist({
-      potUsd: "100",
-      actMode: "within_limits",
-      status: "retired",
-      retiredAt: new Date(),
-      report: "Sold the lot.",
-    });
-    const own = await insertThread({ specialistId: specialist.id });
-    const context = { threadId: own.id, specialistId: specialist.id };
-    const read = async () =>
-      (await db.select().from(specialists).where(eq(specialists.id, specialist.id)))[0];
-    const status = async () => (await read())?.status;
-
-    const sell: Recipe = { ...buy, direction: () => "sell" };
-    lookup.recipe = sell;
-    try {
-      const { rows } = await recordActions(
-        context,
-        [await prepareLeg(sell, { usd: "10" }, context)],
-        null,
-      );
-      expect(rows[0]?.status).toBe("awaiting_permission");
-      await decideActions({ actionId: rows[0]!.id }, "allow");
-      expect(await status()).toBe("retired");
-    } finally {
-      lookup.recipe = buy;
-    }
-
-    const { rows } = await recordActions(
-      context,
-      [await prepareLeg(buy, { usd: "10" }, context)],
-      null,
-    );
-    expect(rows[0]?.status).toBe("awaiting_permission");
-    await decideActions({ actionId: rows[0]!.id }, "allow");
-    expect(await read()).toMatchObject({ status: "active", retiredAt: null, report: null });
-  });
-  it("reads what a sale sells just before it runs, and writes the sale to whoever held it", async () => {
-    const ai = await insertSpecialist();
+  it("reads what a sale sells just before it runs, writes the sale to whoever held it, and lowers an auto thread's budget", async () => {
+    const ai = await insertThread({ actMode: "within_limits", budgetUsd: "100" });
+    const other = await insertThread();
     const bought = await insertAction({
-      specialistId: ai.id,
+      threadId: ai.id,
       status: "done",
       updatedAt: new Date(Date.now() - 10 * 60_000),
     });
     await db.insert(fills).values({
       actionId: bought.id,
-      specialistId: ai.id,
+      threadId: ai.id,
       chain: "base",
       instrument: "nvda",
       side: "buy",
       quantity: "10",
       usdValue: "100",
     });
-    // The wallet holds 10, all AI's, and a chat sells 4 of them.
+    // The wallet holds 10, all AI's, and another thread sells 4 of them.
     held.units = parseUnits("10", QUANTITY_DECIMALS);
     lookup.recipe = {
       ...buy,
@@ -424,6 +371,7 @@ describe("recordActions", () => {
       }),
     };
     const { id } = await insertAction({
+      threadId: other.id,
       input: { usd: "0" },
       details: { [APPROVED_SALE_OF]: "base:nvda" },
     });
@@ -434,10 +382,12 @@ describe("recordActions", () => {
     }
     expect(
       await db
-        .select({ specialistId: fills.specialistId })
+        .select({ threadId: fills.threadId })
         .from(fills)
         .where(eq(fills.actionId, id)),
-    ).toEqual([{ specialistId: ai.id }]);
+    ).toEqual([{ threadId: ai.id }]);
+    const [after] = await db.select().from(threads).where(eq(threads.id, ai.id));
+    expect(after?.budgetUsd).toBe("60.00");
   });
 });
 
@@ -451,33 +401,6 @@ describe("actionWire", () => {
       phase: "landing",
       run: { lands: "$5.00 on Base" },
     });
-  });
-});
-
-describe("opensSpecialist", () => {
-  it("counts a card's buys as its first money in, never closes that bring money back", async () => {
-    const specialist = await insertSpecialist();
-    const leg = (fields: Parameters<typeof insertAction>[0]) =>
-      insertAction({
-        specialistId: specialist.id,
-        proposalId: randomUUID(),
-        status: "done",
-        ...fields,
-      });
-    const close = await leg({
-      tool: "hyperliquid_close",
-      input: { market: "xyz:META", percent: 100, slippagePercent: 1 },
-      details: { market: "xyz:META", returnsUsd: "41.20" },
-      amountUsd: "0",
-    });
-    lookup.recipe = toolRecipe("hyperliquid_close");
-    try {
-      expect(await opensSpecialist([close])).toBe(false);
-    } finally {
-      lookup.recipe = buy;
-    }
-    // The close before it put nothing in, so this buy is still the first.
-    expect(await opensSpecialist([await leg({ input: { usd: "10" } })])).toBe(true);
   });
 });
 
@@ -576,25 +499,5 @@ describe("decideActions", () => {
         "u",
       ),
     );
-  });
-
-  it("forgets the pulse of the specialist whose card it was, which spoke of it waiting", async () => {
-    // The live test of 2026-11-13: a failed plan's "waiting on your tap" stayed on the team list.
-    const [own, other] = await Promise.all(
-      ["$3 into NVIDIA proposed, waiting on your tap", "Watching uranium"].map((pulse) =>
-        insertSpecialist({ pulse }),
-      ),
-    );
-    const thread = await insertThread({ specialistId: own!.id });
-    const proposalId = randomUUID();
-    await insertAction({ status: "awaiting_permission", threadId: thread.id, proposalId });
-    await decideActions({ proposalId }, "decline");
-    const pulses = await db
-      .select({ id: specialists.id, pulse: specialists.pulse })
-      .from(specialists);
-    expect(Object.fromEntries(pulses.map(({ id, pulse }) => [id, pulse]))).toEqual({
-      [own!.id]: null,
-      [other!.id]: "Watching uranium",
-    });
   });
 });

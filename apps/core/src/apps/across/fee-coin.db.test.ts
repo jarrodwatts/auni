@@ -4,10 +4,10 @@ import { encodeFunctionData, parseAbi, type Address, type Hex } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../../db/client.ts";
-import { actions, fills, jobs, specialists } from "../../db/schema.ts";
+import { actions, fills, jobs, threads } from "../../db/schema.ts";
 import { proposeAction } from "../../money/actions.ts";
 import type { PayInRequest } from "../../money/pay-in.ts";
-import { insertSpecialist, insertThread, wipe } from "../../test/db.ts";
+import { insertThread, wipe } from "../../test/db.ts";
 import { acrossBridge } from "./across.ts";
 
 // The one money tool that both says what it would send (so its card may buy the chain's coin
@@ -116,7 +116,7 @@ const wethQuote = {
 const buy = { from_chain: "arbitrum", to_chain: "1", amount: "0.99", output_token: WETH } as const;
 
 beforeEach(async () => {
-  await wipe(specialists, actions, fills, jobs);
+  await wipe(threads, actions, fills, jobs);
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) =>
@@ -126,15 +126,10 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe("bridge_usdc to a token that is not cash, from a specialist that acts on its own", () => {
-  it("is a buy whose card buys the coin for its fees, and waits for the owner however large the pot", async () => {
-    const specialist = await insertSpecialist({ potUsd: "100", actMode: "within_limits" });
-    const own = await insertThread({ specialistId: specialist.id });
-    const outcome = await proposeAction(
-      { threadId: own.id, specialistId: specialist.id },
-      acrossBridge,
-      buy,
-    );
+describe("bridge_usdc to a token that is not cash, from a thread set to act on its own", () => {
+  it("is a buy whose card buys the coin for its fees, and waits for the owner however large the budget", async () => {
+    const own = await insertThread({ budgetUsd: "100", actMode: "within_limits" });
+    const outcome = await proposeAction({ threadId: own.id }, acrossBridge, buy);
     // The path the gate would let run unasked, were it weighed as any buy is: a buy, within
     // the pot, whose card also sends MON to Relay for the ETH its fee is paid in.
     expect(acrossBridge.direction?.(buy)).toBe("buy");

@@ -17,7 +17,7 @@ is signed by the wallet and sent by the venue. The move landing is the next even
         |  each open tab over GET /live; it calls Auni's tools over MCP, which run in core
         v
   lookups answer at once          money tools record an action and return a sealed card
-                                        |  the owner taps Allow, or a specialist acts on its own
+                                        |  the owner taps Allow, or an Auto thread acts in budget
                                         v
                                   the action job (jobs/action.ts) -> executeAction
                                         |  the wallet app signs, the venue's recipe sends
@@ -54,17 +54,16 @@ running, which `running.ts` names and `auni stop` stops. What Auni keeps here is
 
 ## Where things live
 
-- `conversation/`: threads (`send.ts`; renaming, archiving or deleting one, `tidy.ts`), the
-  history a turn reads, `mainChat` (`places.ts`), live updates (`stream.ts`, `routes/live.ts`),
-  the `settle_quietly` and `set_notices` tools (`tools.ts`), and a new chat's starting points
-  (`starting-points.ts`), from what Auni sees (`facts.ts`).
+- `conversation/`: threads (`send.ts`, `threads.ts`; renaming, pinning, autonomy, model selection,
+  archiving or deleting one, `tidy.ts`), the history a turn reads (`history.ts`), what a turn reads
+  of its context (`context.ts`), `mainChat` (`places.ts`), live updates (`stream.ts`,
+  `routes/live.ts`), thread tools (`tools.ts`: `settle_quietly`, `set_notices`,
+  `update_thread_notes`), and a new chat's starting points (`starting-points.ts`), from what Auni
+  sees (`facts.ts`).
 - `agent/`: the brain, its box and Auni's MCP tools; read its AGENTS.md.
 - `money/`: moves, cards, holdings, chains; read its AGENTS.md.
 - `jobs/`: background work; read its AGENTS.md.
 - `asks.ts`: cards that change Auni (`recordAsk`, `applyAsk`); `connect.ts` offers an app.
-- `specialists/`: specialists and their rules (`specialists.ts`, `rules.ts`, `routes.ts`), their
-  tools (`tools.ts`), and what a turn reads of its place (`context.ts`: `auniContext`,
-  `specialistContext`).
 - `automations/`: watches and their fires (`sources.ts`, `sourcesJob`), lease renewals
   (`renew.ts`), triage (`triage.ts`), the daily brief (`brief.ts`), the watch tools (`tools.ts`).
 - `channels/`: the channels' hub (`hub.ts`: `channelsJob`, `deliverJob`, pairing, grants), cards

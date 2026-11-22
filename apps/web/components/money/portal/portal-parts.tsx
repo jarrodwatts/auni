@@ -4,7 +4,7 @@ import { QrCode } from "lucide-react";
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 
 import { MascotArt } from "@/components/brand/mascot-art";
-import { LogoImage } from "@/components/specialist/marks";
+import { LogoImage } from "@/components/brand/marks";
 import { REDUCED_MOTION } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
 

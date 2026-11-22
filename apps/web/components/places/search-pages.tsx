@@ -31,10 +31,10 @@ const PLACES: readonly (Page & { readonly href: string })[] = [
   },
   {
     key: "new",
-    title: "New chat",
+    title: "New thread",
     href: "/app/new",
     mark: <NewMark />,
-    names: ["start", "specialist", "chat"],
+    names: ["start", "thread", "chat"],
   },
   {
     key: "activity",

@@ -2,23 +2,23 @@ import { CLOSED } from "@auni/shared";
 import { and, eq, sql } from "drizzle-orm";
 
 import { db, type Tx } from "../db/client.ts";
-import { actions, specialists, type ActionRow } from "../db/schema.ts";
+import { actions, threads, type ActionRow } from "../db/schema.ts";
 import { toldSettled } from "../jobs/action.ts";
 import { APPROVED_SALE } from "./approved.ts";
 import { walkPositions } from "./books.ts";
 import { fillIdentity, QUANTITY_DECIMALS } from "./fill-key.ts";
 import { noted, step } from "./life.ts";
-import { potLeaving, specialistFills } from "./pot.ts";
+import { potLeaving, threadFills } from "./pot.ts";
 import { askForReading } from "./readings.ts";
 import { recipeForTool } from "./recipes/index.ts";
 import { settleFromReceipts } from "./reconcile.ts";
 import { insertFills, requireAction, soldHolding } from "./record.ts";
-import { centsToUsd, formatUnits, parseUnits } from "./usd.ts";
+import { centsToUsd, formatUnits, parseUnits, usdToCents } from "./usd.ts";
 
 // The owner's two taps on a held move (see `needs_owner` in life.ts): Check again and Close.
 // Neither sends anything, and neither records what a move got or brought in that Auni didn't
 // read from the chain or the venue: Check again is the read reconcile makes, made now, and
-// Close ends the move, saying it was closed, with its specialist's books on the safe side.
+// Close ends the move, saying it was closed, with its thread's budget on the safe side.
 
 /**
  * Reads a held move again now, as reconcile does every ten minutes: settled if its receipts or
@@ -39,8 +39,8 @@ export async function checkHeld(actionId: string): Promise<ActionRow | null> {
 /**
  * Closes a held move at the owner's word, after one more read (a record beats a close): done
  * when its money had moved, failed as sent when nothing shows it went, never to run again
- * either way, with words that say the owner closed it (see CLOSED). Its specialist's books
- * then count it as gone either way (see leaveSpecialist), and its thread is told. Null for a
+ * either way, with words that say the owner closed it (see CLOSED). Its thread's books
+ * then count it as gone either way (see leaveThread), and its thread is told. Null for a
  * move that isn't held.
  */
 export async function closeHeld(actionId: string): Promise<ActionRow | null> {
@@ -54,7 +54,7 @@ export async function closeHeld(actionId: string): Promise<ActionRow | null> {
       ? await step(tx, "finish", mine, { ...closedBy, error: CLOSED.moved })
       : await step(tx, "fail", mine, { ...closedBy, error: CLOSED.unknown, failureKind: "sent" });
     // Only the Close that closed it, so three at once change the books once.
-    if (row) await leaveSpecialist(tx, row);
+    if (row) await leaveThread(tx, row);
     return row;
   });
   if (!closed) return requireAction(actionId);
@@ -67,33 +67,30 @@ export async function closeHeld(actionId: string): Promise<ActionRow | null> {
 }
 
 /**
- * Takes a closed move out of its specialist's books as though it went, whether or not it did:
- * Auni will learn no more of it, and a specialist acting on its own must never spend money that
- * may be spent or sell what may be sold. A buy keeps its dollars spent, lowering the pot by
- * them. A sale's holding leaves the specialist, up to what its card approved selling, as a
- * holding leaving a specialist does (see potLeaving), so what it brought in isn't the
- * specialist's to spend either. No fill records what a buy got or a sale brought in, which
- * Auni never read: what moved is the owner's, outside every specialist, where the portfolio
- * reads it, and the owner can raise the pot or move a holding back. A sale's holding is
- * written into the owner's books at the same cost, so the wallet's figures don't move.
+ * Takes a closed move out of its thread's books as though it went, whether or not it did:
+ * Auni will learn no more of it, and a thread acting on its own must never spend money that
+ * may be spent or sell what may be sold. A buy keeps its dollars spent, lowering the budget by
+ * them. A sale's holding leaves the thread, up to what its card approved selling (see potLeaving),
+ * so what it brought in isn't the thread's to spend either. A sale's holding is written outside
+ * the thread at the same cost, so the wallet's figures don't move.
  */
-async function leaveSpecialist(tx: Tx, row: ActionRow): Promise<void> {
-  if (!row.specialistId) return;
-  const mine = eq(specialists.id, row.specialistId);
-  const [specialist] = await tx.select().from(specialists).where(mine).for("update");
-  if (!specialist) return;
+async function leaveThread(tx: Tx, row: ActionRow): Promise<void> {
+  if (!row.threadId) return;
+  const mine = eq(threads.id, row.threadId);
+  const [thread] = await tx.select().from(threads).where(mine).for("update");
+  if (!thread || usdToCents(thread.budgetUsd) <= 0n) return;
   const direction = recipeForTool(row.tool)?.direction?.(row.input as never);
   if (direction === "buy") {
     await tx
-      .update(specialists)
-      .set({ potUsd: sql`greatest(${specialists.potUsd} - ${row.amountUsd}::numeric, 0)` })
+      .update(threads)
+      .set({ budgetUsd: sql`greatest(${threads.budgetUsd} - ${row.amountUsd}::numeric, 0)` })
       .where(mine);
     return;
   }
   const sold = direction === "sell" ? soldHolding(row) : null;
   const approved = row.details[APPROVED_SALE];
   if (!sold || !approved) return;
-  const recorded = await specialistFills(tx, specialist.id);
+  const recorded = await threadFills(tx, thread.id);
   const position = walkPositions(recorded).positions.get(fillIdentity(sold));
   if (!position || position.quantity <= 0n) return;
   const asked = parseUnits(approved, QUANTITY_DECIMALS);
@@ -105,14 +102,12 @@ async function leaveSpecialist(tx: Tx, row: ActionRow): Promise<void> {
     quantity: formatUnits(leaving, QUANTITY_DECIMALS),
     usdValue: centsToUsd((position.cost * leaving) / position.quantity),
   };
-  // Out of the specialist and into the owner's books, as move_holding writes it, so the wallet's
-  // money put in is as it was: a lone sale at cost would read that cost as made.
   await insertFills(tx, row.id, [
-    { ...leaves, specialistId: specialist.id },
-    { ...leaves, side: "buy", specialistId: null },
+    { ...leaves, threadId: thread.id },
+    { ...leaves, side: "buy", threadId: null },
   ]);
   await tx
-    .update(specialists)
-    .set({ potUsd: potLeaving(specialist.potUsd, recorded, leaves) })
+    .update(threads)
+    .set({ budgetUsd: potLeaving(thread.budgetUsd, recorded, leaves) })
     .where(mine);
 }

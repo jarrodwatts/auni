@@ -2,7 +2,7 @@ import { readlinkSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { desc, isNull } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
 import type { KeptKeys, WalletAddresses } from "../apps/contract.ts";
 import { theWallet } from "../apps/registry.ts";
@@ -88,7 +88,6 @@ export async function keysChoice(ask: Ask): Promise<KeysChoice> {
     db
       .select({ usd: valueSnapshots.usdValue, takenAt: valueSnapshots.takenAt })
       .from(valueSnapshots)
-      .where(isNull(valueSnapshots.specialistId))
       .orderBy(desc(valueSnapshots.takenAt))
       .limit(1),
   ]);

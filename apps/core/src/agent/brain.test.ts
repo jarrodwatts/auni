@@ -111,7 +111,7 @@ describe("pickBrain", () => {
       fakeBrain("b", { ready: true, login: "b" }),
     );
     expect(whichBrainSays("~/.auni/.env")).toBe(
-      "Auni asks A, then B, and thinks with the first that is ready. To choose, set BRAIN in ~/.auni/.env.",
+      "Auni asks A, then B, and thinks with the first that is ready. You can also pick a model right in any thread.",
     );
     expect(await pickBrain()).toMatchObject({ about: { id: "a" } });
     env.BRAIN = "b";
@@ -276,8 +276,8 @@ describe("brainRows", () => {
     });
     expect(await brainRows()).toEqual([
       { id: "a", name: "A", state: "not-installed", fix: "install a" },
-      { id: "b", name: "B", state: "resting", login: "b's plan", until: resetsAt },
-      { id: "c", name: "C", state: "ready", login: "c's plan" },
+      { id: "b", name: "B", state: "resting", login: "b's plan", models: [], until: resetsAt },
+      { id: "c", name: "C", state: "ready", login: "c's plan", models: [] },
       { id: "d", name: "D", state: "signed-out", fix: "d login" },
     ]);
   });
@@ -323,7 +323,9 @@ describe("a one-off command, such as auni doctor or auni setup", () => {
     const one = fakeBrain("a", { ready: true, login: "a's key" });
     const run = vi.spyOn(one.brain, "run");
     registered.push(one);
-    expect(await brainRows()).toEqual([{ id: "a", name: "A", state: "ready", login: "a's key" }]);
+    expect(await brainRows()).toEqual([
+      { id: "a", name: "A", state: "ready", login: "a's key", models: [] },
+    ]);
     expect(run).not.toHaveBeenCalled();
   });
 });

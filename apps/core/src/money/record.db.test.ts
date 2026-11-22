@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, specialists, fills } from "../db/schema.ts";
-import { insertAction, insertSpecialist, wipe } from "../test/db.ts";
+import { actions, fills, threads } from "../db/schema.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { settledOutcome } from "./actions.ts";
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
@@ -18,7 +18,7 @@ import {
 import { moneyOf } from "./recipe.ts";
 import { parseUnits } from "./usd.ts";
 
-beforeEach(() => wipe(specialists, actions, fills));
+beforeEach(() => wipe(threads, actions, fills));
 
 // Settled long enough ago that a read of the wallet shows it.
 const settledLongAgo = (id: string) =>
@@ -157,13 +157,13 @@ describe("keepTxsSafely", () => {
 });
 
 describe("recordResult", () => {
-  it("writes a chat's sale to the specialist whose holding it sold, past what Other held", async () => {
-    const ai = await insertSpecialist();
-    const bought = await insertAction({ specialistId: ai.id, status: "done" });
+  it("writes a sale to the thread whose holding it sold, past what was loose", async () => {
+    const ai = await insertThread();
+    const bought = await insertAction({ threadId: ai.id, status: "done" });
     await settledLongAgo(bought.id);
     await db.insert(fills).values({
       actionId: bought.id,
-      specialistId: ai.id,
+      threadId: ai.id,
       chain: "solana",
       instrument: "nvda",
       side: "buy",
@@ -188,20 +188,20 @@ describe("recordResult", () => {
         );
         await settledLongAgo(action.id);
         return db
-          .select({ specialistId: fills.specialistId, quantity: fills.quantity })
+          .select({ threadId: fills.threadId, quantity: fills.quantity })
           .from(fills)
           .where(eq(fills.actionId, action.id));
       });
 
-    // 11 there: 10 AI's by its books, 1 loose, so 1 of the 4 was Other's and 3 were AI's.
+    // 11 there: 10 AI's by its books, 1 loose, so 1 of the 4 was loose and 3 were AI's.
     expect(await sell(parseUnits("11", QUANTITY_DECIMALS))).toEqual(
       expect.arrayContaining([
-        { specialistId: null, quantity: "1.000000000000000000" },
-        { specialistId: ai.id, quantity: "3.000000000000000000" },
+        { threadId: null, quantity: "1.000000000000000000" },
+        { threadId: ai.id, quantity: "3.000000000000000000" },
       ]),
     );
     // Unread, it's written where it was made, as before.
-    expect(await sell(null)).toEqual([{ specialistId: null, quantity: "4.000000000000000000" }]);
+    expect(await sell(null)).toEqual([{ threadId: null, quantity: "4.000000000000000000" }]);
 
     // 7 there, all AI's by its books, so this sale would be AI's, but with a Solana
     // transaction running that could move anything there, the read can't be trusted:
@@ -211,7 +211,7 @@ describe("recordResult", () => {
       tool: "send_solana_transaction",
     });
     expect(await sell(parseUnits("7", QUANTITY_DECIMALS))).toEqual([
-      { specialistId: null, quantity: "4.000000000000000000" },
+      { threadId: null, quantity: "4.000000000000000000" },
     ]);
     await settledLongAgo(other.id);
 
@@ -236,7 +236,7 @@ describe("recordResult", () => {
     );
     const swapped = await db
       .select({
-        specialistId: fills.specialistId,
+        threadId: fills.threadId,
         instrument: fills.instrument,
         quantity: fills.quantity,
       })
@@ -244,20 +244,20 @@ describe("recordResult", () => {
       .where(eq(fills.actionId, swap.id));
     expect(swapped).toEqual(
       expect.arrayContaining([
-        { specialistId: null, instrument: "nvda", quantity: "1.000000000000000000" },
-        { specialistId: ai.id, instrument: "nvda", quantity: "3.000000000000000000" },
-        { specialistId: null, instrument: "tsla", quantity: "2.000000000000000000" },
-        { specialistId: ai.id, instrument: "tsla", quantity: "6.000000000000000000" },
+        { threadId: null, instrument: "nvda", quantity: "1.000000000000000000" },
+        { threadId: ai.id, instrument: "nvda", quantity: "3.000000000000000000" },
+        { threadId: null, instrument: "tsla", quantity: "2.000000000000000000" },
+        { threadId: ai.id, instrument: "tsla", quantity: "6.000000000000000000" },
       ]),
     );
   });
 
-  it("writes what a card converts to pay for its picks to no specialist, though it holds the same token", async () => {
-    const ai = await insertSpecialist();
-    const bought = await insertAction({ specialistId: ai.id, status: "done" });
+  it("writes what a card converts to pay for its picks to no thread, though it holds the same token", async () => {
+    const ai = await insertThread();
+    const bought = await insertAction({ threadId: ai.id, status: "done" });
     await db.insert(fills).values({
       actionId: bought.id,
-      specialistId: ai.id,
+      threadId: ai.id,
       chain: "base",
       instrument: "native",
       side: "buy",
@@ -266,7 +266,7 @@ describe("recordResult", () => {
     });
     // On AI's card, converting ETH that came in loose: AI's own ETH stays AI's.
     const convert = await insertAction({
-      specialistId: ai.id,
+      threadId: ai.id,
       tool: "convert_to_cash",
       input: { chain: "base", token: "native", amount: "0.1" },
       details: { [APPROVED_SALE_OF]: "base:native" },
@@ -279,10 +279,10 @@ describe("recordResult", () => {
     });
     expect(
       await db
-        .select({ specialistId: fills.specialistId, quantity: fills.quantity })
+        .select({ threadId: fills.threadId, quantity: fills.quantity })
         .from(fills)
         .where(eq(fills.actionId, convert.id)),
-    ).toEqual([{ specialistId: null, quantity: "0.100000000000000000" }]);
+    ).toEqual([{ threadId: null, quantity: "0.100000000000000000" }]);
   });
 
   it("writes a result's fills and transactions once, however often it is retried", async () => {

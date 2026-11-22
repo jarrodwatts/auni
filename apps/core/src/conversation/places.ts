@@ -1,41 +1,11 @@
+import type { ModelSelectionWire, ThreadActMode } from "@auni/shared";
 import { and, asc, desc, eq, exists, isNull, sql } from "drizzle-orm";
 
+import { theOwner } from "../auth/owner.ts";
 import { db, type Tx } from "../db/client.ts";
-import { specialists, messages, threads, type ThreadRow } from "../db/schema.ts";
+import { messages, owner, threads, type ThreadRow } from "../db/schema.ts";
+import { normalizeUsd } from "../money/usd.ts";
 import { messageText } from "./history.ts";
-
-/**
- * A specialist's one thread, created the first time anyone asks for it.
- * The partial unique index makes a concurrent second create a no-op, so
- * both callers end up with the same row. Undefined when there is no such
- * specialist.
- */
-export async function specialistThread(
-  specialistId: string,
-  tx: Tx | typeof db = db,
-): Promise<ThreadRow | undefined> {
-  const existing = await findSpecialistThread(specialistId, tx);
-  if (existing) return existing;
-  const [specialist] = await tx
-    .select({ name: specialists.name })
-    .from(specialists)
-    .where(eq(specialists.id, specialistId));
-  if (!specialist) return undefined;
-  const [created] = await tx
-    .insert(threads)
-    .values({ specialistId, title: specialist.name })
-    .onConflictDoNothing()
-    .returning();
-  return created ?? findSpecialistThread(specialistId, tx);
-}
-
-async function findSpecialistThread(
-  specialistId: string,
-  tx: Tx | typeof db,
-): Promise<ThreadRow | undefined> {
-  const [row] = await tx.select().from(threads).where(eq(threads.specialistId, specialistId));
-  return row;
-}
 
 const TITLE_CHARS = 48;
 
@@ -51,53 +21,73 @@ function chatTitle(text: string): string {
   return `${cut.slice(0, space > TITLE_CHARS / 2 ? space : TITLE_CHARS).trimEnd()}...`;
 }
 
-/** A new chat with Auni, outside every specialist, titled by its first message. */
-export async function startChat(firstMessage: string): Promise<ThreadRow> {
+export interface StartChatOptions {
+  readonly modelSelection?: ModelSelectionWire | null;
+  readonly actMode?: ThreadActMode;
+  readonly budgetUsd?: string;
+}
+
+/**
+ * A new thread with Auni, titled by its first message, optionally carrying the
+ * model selection and autonomy budget picked in the composer.
+ */
+export async function startChat(
+  firstMessage: string,
+  options: StartChatOptions = {},
+): Promise<ThreadRow> {
+  const me = await theOwner();
+  const selection =
+    options.modelSelection !== undefined ? options.modelSelection : me.defaultModelSelection;
+  const actMode: ThreadActMode = options.actMode ?? "ask_first";
+  const budgetUsd =
+    options.budgetUsd !== undefined ? normalizeUsd(options.budgetUsd) : "0.00";
   const [created] = await db
     .insert(threads)
-    .values({ title: chatTitle(firstMessage) })
+    .values({
+      title: chatTitle(firstMessage),
+      actMode,
+      budgetUsd,
+      modelSelection: selection,
+    })
     .returning();
   if (!created) throw new Error("Failed to start the chat.");
+  // Remember an explicit choice as the default for the next new thread.
+  if (options.modelSelection !== undefined) {
+    await db.update(owner).set({ defaultModelSelection: options.modelSelection });
+  }
   return created;
 }
 
 /**
- * Where to tell the owner of something that follows from a move of theirs: the chat the move was
- * made in, when it is one of the owner's own chats not archived, so the news sits beside what led
- * to it; else their main conversation (see mainChat).
+ * Where to tell the owner of something that follows from a move of theirs: the thread the move was
+ * made in, when it is still active (not archived), so the news sits beside what led to it; else
+ * their main conversation (see mainChat).
  */
 export async function chatOfMove(
   threadId: string | null,
   tx: Tx | typeof db,
-): Promise<{ readonly id: string; readonly specialistId: string | null }> {
+): Promise<{ readonly id: string }> {
   if (threadId) {
     const [chat] = await tx
-      .select({ id: threads.id, specialistId: threads.specialistId })
+      .select({ id: threads.id })
       .from(threads)
-      .where(
-        and(eq(threads.id, threadId), isNull(threads.specialistId), isNull(threads.archivedAt)),
-      );
+      .where(and(eq(threads.id, threadId), isNull(threads.archivedAt)));
     if (chat) return chat;
   }
   return mainChat(tx);
 }
 
 /**
- * Auni's chat, where Auni speaks up unasked (news, the brief) and where a message from a channel
- * replying to nothing lands: the chat they were in last, outside every specialist, not archived,
- * and begun, which the web's sidebar names Auni (the one a person comes back to); or with none
- * yet, a new one. It may be about something else, so what lands there says where anything it
- * points to waits (see WRITE_IT in automations/brief.ts). A specialist's news stays in its own.
+ * Auni's main conversation, where Auni speaks up unasked (news, the brief) and where a message
+ * from a channel replying to nothing lands: the thread they were in last, not archived, and begun;
+ * or with none yet, a new one.
  */
-export async function mainChat(
-  tx: Tx | typeof db,
-): Promise<{ readonly id: string; readonly specialistId: string | null }> {
+export async function mainChat(tx: Tx | typeof db): Promise<{ readonly id: string }> {
   const [chat] = await tx
-    .select({ id: threads.id, specialistId: threads.specialistId })
+    .select({ id: threads.id })
     .from(threads)
     .where(
       and(
-        isNull(threads.specialistId),
         isNull(threads.archivedAt),
         exists(
           tx
@@ -113,7 +103,7 @@ export async function mainChat(
   const [created] = await tx
     .insert(threads)
     .values({ title: MAIN_TITLE })
-    .returning({ id: threads.id, specialistId: threads.specialistId });
+    .returning({ id: threads.id });
   if (!created) throw new Error("Failed to start the main conversation.");
   return created;
 }

@@ -326,7 +326,7 @@ describe("send_feedback", () => {
   it("returns a card core built, and reads no move of another thread", async () => {
     const [here, elsewhere] = [await insertThread(), await insertThread()];
     const other = await insertAction({ threadId: elsewhere.id, status: "failed", error: "secret" });
-    const tool = sendFeedbackTool({ threadId: here.id, specialistId: null });
+    const tool = sendFeedbackTool({ threadId: here.id });
     const refused = await tool.handler({
       kind: "bug",
       says: "It broke when I tried to buy.",

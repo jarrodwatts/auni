@@ -7,24 +7,22 @@ import { ConversationLaunchStage } from "@/components/app/conversation-launch-st
 import { useFirstRun } from "@/components/first-run/use-first-run";
 import { WelcomeWizard } from "@/components/onboarding/welcome-wizard";
 import { CloseMobileThreadMenuContext } from "@/components/app/mobile-thread-menu";
-import { useLiveThreadRows } from "@/components/app/use-threads";
-import { useSpecialist } from "@/components/specialist/use-specialists";
+import { useLiveThreadRows, useThreads } from "@/components/app/use-threads";
 import { AuniSheet } from "@/components/ui/auni-sheet";
 import { useMediaQuery } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
 
 import { ArrivingContext } from "./arriving";
-import { SpecialistPane } from "./specialist-pane";
 import { PlaceLayoutContext, type PlacesSheet } from "./place-header";
 import { SearchProvider } from "./search-palette";
 import { PhonePlaces, Sidebar } from "./sidebar";
 import { useStoredFlag } from "./stored-state";
+import { ThreadInspectorPane } from "./thread-inspector-pane";
 import { usePlaceRoute } from "./use-places";
 
 /**
- * Three panes, like a code editor: the team on the left, the place you're in
- * down the middle, and, for a specialist, everything about it on the right.
- * Both side panes fold; the middle never does. Handoffs play over the middle alone.
+ * Three panes, like a code editor: threads on the left, the active place down
+ * the middle, and an on-demand thread inspector on the right.
  */
 export function PlaceWorkspace({ children }: { readonly children: ReactNode }) {
   useLiveThreadRows();
@@ -46,7 +44,6 @@ export function PlaceWorkspace({ children }: { readonly children: ReactNode }) {
 
 function PlaceShell({ children }: { readonly children: ReactNode }) {
   const route = usePlaceRoute();
-  // First run is the landing alone; the app assembles around the take as it's sent.
   const firstRun = useFirstRun();
   const [wasFirstRun, setWasFirstRun] = useState(firstRun);
   const [arriving, setArriving] = useState(false);
@@ -55,14 +52,13 @@ function PlaceShell({ children }: { readonly children: ReactNode }) {
     setArriving(!firstRun);
   }
   const [railed, setRailed] = useStoredFlag("auni:sidebar-rail", false);
-  const [paneOpen, setPaneOpen] = useStoredFlag("auni:money-pane", true);
-  // Below the pane's breakpoint the pane comes up as a sheet instead.
+  const [paneOpen, setPaneOpen] = useStoredFlag("auni:thread-pane", false);
   const wide = useMediaQuery("(min-width: 1280px)");
   const roomy = useMediaQuery("(min-width: 1024px)");
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [places, setPlaces] = useState<PlacesSheet | null>(null);
   const closePlaces = useCallback(() => setPlaces(null), []);
-  const place = route.kind === "specialist" ? route.id : route.kind;
+  const place = route.kind === "chat" ? route.id : route.kind;
   const sheetOpen = sheetFor === place && !wide;
   const showPane = useCallback(() => {
     if (wide) setPaneOpen(true);
@@ -72,11 +68,12 @@ function PlaceShell({ children }: { readonly children: ReactNode }) {
     () => ({ paneOpen, setPaneOpen, showPane, places, openPlaces: setPlaces }),
     [paneOpen, places, setPaneOpen, showPane],
   );
-  const pane = route.kind === "specialist" ? <SpecialistPane specialistId={route.id} /> : null;
-  // Not read yet (a specialist just started) means no pane: it grows in once the specialist is known.
-  const { specialist } = useSpecialist(route.kind === "specialist" ? route.id : undefined);
-  const paneShown = paneOpen && specialist !== undefined;
-  const paneTitle = specialist?.name ?? "Specialist";
+  const { threads } = useThreads();
+  const activeThread =
+    route.kind === "chat" ? threads.find(({ id }) => id === route.id) : undefined;
+  const pane = route.kind === "chat" ? <ThreadInspectorPane threadId={route.id} /> : null;
+  const paneShown = paneOpen && activeThread !== undefined;
+  const paneTitle = activeThread?.title ?? "Thread details";
 
   return (
     <PlaceLayoutContext value={layout}>
@@ -87,7 +84,6 @@ function PlaceShell({ children }: { readonly children: ReactNode }) {
               <Sidebar folded={railed} onFold={setRailed} />
             </div>
           )}
-          {/* In first run the landing over it is the main content, where the skip link goes. */}
           <main
             id={firstRun ? undefined : "main-content"}
             className="flex min-w-0 flex-1 flex-col bg-background"
@@ -95,18 +91,17 @@ function PlaceShell({ children }: { readonly children: ReactNode }) {
             {children}
           </main>
           {pane ? (
-            // The pane narrows closed rather than vanishing; what it holds rides out with the edge.
             <aside
               aria-label={paneTitle}
               inert={!paneShown}
               className={cn(
                 "hidden h-full flex-none overflow-hidden border-l bg-background transition-[width,border-color] duration-[340ms] ease-settle motion-reduce:transition-none xl:block",
-                paneShown ? "w-[392px] border-foreground/[0.07]" : "w-0 border-transparent",
+                paneShown ? "w-[372px] border-foreground/[0.07]" : "w-0 border-transparent",
               )}
             >
               <div
                 className={cn(
-                  "auni-scrollbar-none h-full w-[392px] overflow-y-auto transition-opacity duration-200 ease-settle motion-reduce:transition-none",
+                  "auni-scrollbar-none h-full w-[372px] overflow-y-auto transition-opacity duration-200 ease-settle motion-reduce:transition-none",
                   paneShown ? "opacity-100 delay-75" : "opacity-0",
                 )}
               >
@@ -142,7 +137,6 @@ function PlaceShell({ children }: { readonly children: ReactNode }) {
               side="bottom"
               title="Places"
             >
-              {/* A set height, so typing a search never resizes the sheet under the thumb. */}
               <div className="flex h-[min(680px,82dvh)] min-h-0 flex-col pt-6">
                 <PhonePlaces />
               </div>

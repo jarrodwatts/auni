@@ -3,11 +3,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { and, eq, ne, sql } from "drizzle-orm";
 
-import { specialistThread, startChat } from "../conversation/places.ts";
-import { archiveChat } from "../conversation/tidy.ts";
+import { startChat } from "../conversation/places.ts";
+import { archiveChat, pinChat } from "../conversation/tidy.ts";
 import { sendMessage } from "../conversation/send.ts";
 import { db } from "../db/client.ts";
-import { actions, arrivals, owner, specialists, type ThreadRow } from "../db/schema.ts";
+import { actions, arrivals, owner, type ThreadRow } from "../db/schema.ts";
 import { JOBS_CHANNEL } from "../jobs/queue.ts";
 import { accounts } from "../apps/registry.ts";
 import { allowAction, allowProposal } from "../money/decide.ts";
@@ -300,28 +300,21 @@ export async function seed(): Promise<void> {
     welcomedAt: new Date(TODAY - 21 * DAY_MS + 9 * 60 * 60_000),
     backupSavedAt: new Date(TODAY - 21 * DAY_MS + 9 * 60 * 60_000),
   });
-  // A specialist's orb is drawn from its id, so the demo's get the same ids on every run: the
-  // first one made is always this one, the second that.
-  await db.execute(sql`
-    create sequence demo_specialists;
-    create function demo_specialist_id() returns uuid language sql as $$
-      select (substr(h, 1, 8) || '-' || substr(h, 9, 4) || '-4' || substr(h, 14, 3) || '-8' ||
-              substr(h, 18, 3) || '-' || substr(h, 21, 12))::uuid
-      from md5('auni demo specialist ' || nextval('demo_specialists')) as h $$;
-    alter table specialists alter column id set default demo_specialist_id()`);
   fundWallet();
   // The first sweep of a wallet only marks where it starts: what comes in after is news.
   await sweepArrivals(true);
 
   // Three weeks ago: the first money, and the first view.
+  let aiBuildout!: ThreadRow;
   await step(21, "09:40", async () => {
     await arrives("monad", 12_000);
-    const chat = await startChat("I think the AI buildout has years to run");
+    aiBuildout = await startChat("AI buildout");
     await say(
-      chat,
+      aiBuildout,
       "I think the AI buildout has years to run. Can you run that for me with $3,000?",
     );
     await allowWaiting();
+    await pinChat(aiBuildout, true);
   });
 
   // A leveraged position, paid for with money sent in on another network.
@@ -335,15 +328,15 @@ export async function seed(): Promise<void> {
   });
 
   await step(14, "08:30", async () => {
-    const chat = await startChat("Can you keep my idle cash earning?");
+    const chat = await startChat("Keep my idle cash earning");
     await say(chat, "Can you keep my idle cash earning?");
     await allowWaiting();
   });
 
-  // Something they held before Auni, moved under a specialist of its own.
+  // Watching an existing Solana position in its own thread.
   await step(11, "13:20", async () => {
-    const chat = await startChat("Look after the Solana I already hold");
-    await say(chat, "I think Solana keeps taking share. Look after the Solana I already hold.");
+    const chat = await startChat("Solana");
+    await say(chat, "I think Solana keeps taking share. Keep an eye on the Solana I hold.");
     await allowWaiting();
   });
 
@@ -381,12 +374,7 @@ export async function seed(): Promise<void> {
   });
 
   await step(3, "12:00", async () => {
-    const [buildout] = await db
-      .select()
-      .from(specialists)
-      .where(eq(specialists.name, "AI buildout"));
-    const thread = await specialistThread(buildout!.id, db);
-    await say(thread!, "You can act on its own now, and I've added $1,000 to your pot.");
+    await say(aiBuildout, "You can act on your own now with a $4,000 budget.");
     await allowWaiting();
   });
 

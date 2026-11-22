@@ -4,8 +4,7 @@ import {
   type AskToolName,
   isAsk,
   listed,
-  specialistNameSchema,
-  specialistPurposeSchema,
+  threadActModeSchema,
 } from "@auni/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -23,17 +22,14 @@ import type { ToolTurn } from "./agent/tool.ts";
 import { appById } from "./apps/registry.ts";
 import { connecting, offerNamed } from "./connect.ts";
 import { db, type Tx } from "./db/client.ts";
-import { actions, specialists, type ActionRow } from "./db/schema.ts";
-import { specialistThread } from "./conversation/places.ts";
+import { actions, threads, type ActionRow } from "./db/schema.ts";
 import { wakeThread } from "./jobs/kinds.ts";
 import { begins, step } from "./money/life.ts";
 import { lockCards } from "./money/pot.ts";
 import { walletAddresses } from "./money/wallets.ts";
 import { dollars } from "./money/summaries.ts";
-import { usdToCents } from "./money/usd.ts";
 import { PrivateFieldRefused } from "./private-fields.ts";
 import { saveSwitch } from "./settings.ts";
-import { createSpecialist, SPECIALIST_THEMES } from "./specialists/specialists.ts";
 
 // Cards that change Auni itself rather than move money. Each is an action row like a money card,
 // so the one path that decides cards (money/decide.ts) decides these on every channel, and the
@@ -42,12 +38,8 @@ import { createSpecialist, SPECIALIST_THEMES } from "./specialists/specialists.t
 
 export { isAsk };
 
-const actModeSchema = z.enum(["ask_first", "within_limits"]);
-
 interface Ask<Input> {
   readonly input: z.ZodType<Input>;
-  /** The specialist the card is filed under, so it shows in its record. */
-  filesUnder(input: Input, turn: ToolTurn): string | null;
   /**
    * Why no card of it may be recorded now, in words for the agent; asked while cards are
    * recorded one at a time, so two asks at once can't both pass.
@@ -57,7 +49,7 @@ interface Ask<Input> {
   apply(tx: Tx, row: ActionRow, input: Input): Promise<string | null>;
   /**
    * The main button's words, named for what the tap does and how much, as a money card's are:
-   * "Start with $500". Every surface that draws the card says these, never a bare "Allow".
+   * "Auto up to $500". Every surface that draws the card says these, never a bare "Allow".
    */
   action(input: Input): string;
 }
@@ -71,65 +63,32 @@ function naming(verb: string, name: string, short: string): string {
   return name && named.length <= 18 ? named : short;
 }
 
-const updateSpecialist = defineAsk({
-  input: z.object({ specialist_id: z.uuid(), act_mode: actModeSchema, pot_usd: z.string() }),
-  filesUnder: (input) => input.specialist_id,
-  // It only ever widens how one acts: on its own, within the pot the card shows.
-  action: (input) => `Let it trade ${dollars(input.pot_usd)}`,
-  async apply(tx, row, input) {
-    const [current] = await tx
-      .select({ status: specialists.status })
-      .from(specialists)
-      .where(eq(specialists.id, input.specialist_id))
-      .for("update");
-    if (!current) return "That specialist is gone.";
-    if (current.status === "retired") return "It retired before you allowed this.";
-    // Exactly what the card showed, whatever it was set to since.
-    await tx
-      .update(specialists)
-      .set({ actMode: input.act_mode, potUsd: input.pot_usd })
-      .where(eq(specialists.id, input.specialist_id));
-    return null;
-  },
-});
-
 /**
- * Auni's proposal of a new specialist, offered only outside every specialist. One tap starts it as
- * the card shows it, acting on its own included, and wakes it in its own new thread with what was
- * agreed, since that conversation starts empty.
+ * Widens how a thread acts (turning on Auto within a budget, or raising its dollar cap).
+ * Only the owner's tap on the sealed card applies it.
  */
-const startSpecialist = defineAsk({
+const setThreadAutonomy = defineAsk({
   input: z.object({
-    kind: z.enum(["take", "role"]),
-    name: specialistNameSchema,
-    purpose: specialistPurposeSchema,
-    theme: z.enum(SPECIALIST_THEMES).nullable(),
-    pot_usd: z.string(),
-    act_mode: actModeSchema,
-    handoff: z.string().max(2_000),
+    thread_id: z.uuid(),
+    act_mode: threadActModeSchema,
+    budget_usd: z.string(),
   }),
-  filesUnder: () => null,
-  action: ({ name, pot_usd }) =>
-    usdToCents(pot_usd) > 0n ? `Start with ${dollars(pot_usd)}` : naming("Start", name, "Start it"),
-  async apply(tx, row, input) {
-    const started = await createSpecialist(tx, {
-      kind: input.kind,
-      name: input.name,
-      purpose: input.purpose,
-      theme: input.theme,
-      potUsd: input.pot_usd,
-      actMode: input.act_mode,
-    });
-    const thread = await specialistThread(started, tx);
-    if (!thread) throw new Error("Failed to start the specialist.");
-    // Its record begins with the card that started it.
-    await tx.update(actions).set({ specialistId: started }).where(eq(actions.id, row.id));
-    await wakeThread(
-      thread.id,
-      `The owner just started you from Auni's chat by allowing the card. What they agreed there: ${input.handoff}\n` +
-        "Greet them here in a sentence, then get to work on your purpose: ask what you still need, or build and propose what it holds.",
-      { tx },
-    );
+  action: (input) =>
+    input.act_mode === "within_limits"
+      ? `Auto up to ${dollars(input.budget_usd)}`
+      : "Switch to Ask first",
+  async apply(tx, _row, input) {
+    const [current] = await tx
+      .select({ id: threads.id, archivedAt: threads.archivedAt })
+      .from(threads)
+      .where(eq(threads.id, input.thread_id))
+      .for("update");
+    if (!current) return "That thread is gone.";
+    if (current.archivedAt) return "That thread was archived before you allowed this.";
+    await tx
+      .update(threads)
+      .set({ actMode: input.act_mode, budgetUsd: input.budget_usd })
+      .where(eq(threads.id, input.thread_id));
     return null;
   },
 });
@@ -148,7 +107,6 @@ const saveRoutine = defineAsk({
     body: routineBodySchema,
     replaces: z.string().nullable(),
   }),
-  filesUnder: (_input, turn) => turn.specialistId,
   action: ({ name, replaces }) =>
     replaces
       ? naming("Replace", routineTitle(name), "Replace routine")
@@ -169,7 +127,6 @@ const saveRoutine = defineAsk({
  */
 const connectApp = defineAsk({
   input: z.object({ app: z.string(), why: z.string().max(200) }),
-  filesUnder: (_input, turn) => turn.specialistId,
   action: (input) => {
     const app = appById(input.app);
     return app ? offerNamed(app).button : "Turn on";
@@ -219,7 +176,6 @@ const requestSecret = defineAsk({
     app: z.string().max(100),
     why: z.string().max(200),
   }),
-  filesUnder: (_input, turn) => turn.specialistId,
   action: () => "Save",
   blocked: (tx, input) => waitingFor(tx, "request_secret", "field", input.field),
   async apply(tx, row) {
@@ -262,8 +218,7 @@ function defineAsk<Input>(ask: Ask<Input>): Ask<Input> {
 }
 
 const ASKS = {
-  start_specialist: startSpecialist,
-  update_specialist: updateSpecialist,
+  set_thread_autonomy: setThreadAutonomy,
   save_routine: saveRoutine,
   connect_app: connectApp,
   request_secret: requestSecret,
@@ -318,7 +273,6 @@ export async function recordAsk<Tool extends AskToolName>(
   const ask = ASKS[tool] as Ask<AskInput<Tool>>;
   const parsed = ask.input.parse(input);
   const row = await db.transaction(async (tx) => {
-    // As every card is recorded: no card is recorded against a holding mid-move.
     await lockCards(tx);
     const blocked = await ask.blocked?.(tx, parsed);
     if (blocked) throw new AskRefused(blocked);
@@ -326,7 +280,6 @@ export async function recordAsk<Tool extends AskToolName>(
       .insert(actions)
       .values({
         threadId: turn.threadId,
-        specialistId: ask.filesUnder(parsed, turn),
         summary: shown.summary,
         amountUsd: "0",
         ...begins("awaiting_permission"),

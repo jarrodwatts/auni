@@ -1,7 +1,7 @@
 import { AMOUNT, type ActionPlanLeg, type ActionRecordId } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import type { Leg, Move } from "./specialist-legs";
+import type { Leg, Move } from "./plan-legs";
 import { failedStep } from "./failed-step";
 import {
   actionRows,

@@ -26,7 +26,7 @@ function hyperliquidLists() {
 
 async function tools() {
   const thread = await insertThread();
-  const [watch, list] = automationTools({ threadId: thread.id, specialistId: null });
+  const [watch, list] = automationTools({ threadId: thread.id });
   const call = (tool: AuniTool, input: Record<string, unknown>) =>
     tool.handler(input as never) as Promise<CallToolResult>;
   return { watch: watch!, list: list!, call, thread };

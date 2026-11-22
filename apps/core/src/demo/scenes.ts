@@ -7,7 +7,6 @@ import type { BrainEvent } from "../apps/contract.ts";
 import { theOwner } from "../auth/owner.ts";
 import type { Stage } from "./brain.ts";
 import { payIn } from "./owner.ts";
-import { ON_TOUR, touring } from "./tour.ts";
 import { WALLET } from "./wallet.ts";
 import { addressOf } from "./world/chain.ts";
 import { dip, fireStop } from "./world/hyperliquid.ts";
@@ -78,13 +77,8 @@ const firstTake: Play = async function* ({ think, say, call }) {
   yield* say(
     "Early but right, I think: these drugs already sell about $50 billion a year and demand still outruns supply.\n\nSo here's your take: the two companies that make nearly all of them, more on the leader.",
   );
-  yield* call("propose_specialist_portfolio", {
-    take: {
-      purpose: "Peptides go mainstream by 2028",
-      name: "Peptides",
-      theme: "pill",
-      pot_usd: 50,
-    },
+  yield* call("propose_actions", {
+    title: "Peptides go mainstream by 2028",
     legs: [
       {
         tool: "stock_trade",
@@ -113,92 +107,6 @@ function later(ms: number, happens: () => void): void {
 
 const SCENES: readonly Scene[] = [
   // What core wakes a thread with, before anything the owner might say.
-  {
-    name: "first-picks",
-    shows: null,
-    hears: /The owner just started you.*AI buildout/su,
-    async *play({ think, say, call }) {
-      yield* think(
-        "The pot is $3,000. Nvidia is the core of the view, so it gets the larger share. Tesla is the more speculative leg, so it gets less.",
-      );
-      yield* say("I'm on it. Here is where I'd start.");
-      yield* call("propose_specialist_portfolio", {
-        legs: [
-          {
-            tool: "stock_trade",
-            input: { stock: "NVDA", side: "buy", amountUsd: 1_800 },
-            name: "Nvidia",
-            why: "Sells the chips everyone is buying",
-            note: "The clearest way to own the buildout. If data centre spending guidance is cut, I'd trim it.",
-          },
-          {
-            tool: "stock_trade",
-            input: { stock: "TSLA", side: "buy", amountUsd: 900 },
-            name: "Tesla",
-            why: "The biggest bet on robots",
-            note: "A smaller, riskier leg on robotics. If Optimus slips again, I'd drop it.",
-          },
-        ],
-      });
-    },
-  },
-  {
-    name: "first-savings",
-    shows: null,
-    hears: /The owner just started you.*idle cash/su,
-    async *play({ think, say, call }) {
-      yield* think(
-        "Most of the cash sits on Monad doing nothing. Aave pays about 4% a year there and it can come back out any time.",
-      );
-      yield* call("aave_supply", { chain: "monad", amount_usd: "4000" });
-      yield* say(
-        "I'll keep it simple: $4,000 into Aave on Monad, where it earns and stays one tap from cash.",
-      );
-    },
-  },
-  {
-    name: "first-holding",
-    shows: null,
-    hears: /The owner just started you.*Solana/su,
-    async *play({ say, call }) {
-      // The tool names the specialist a holding moves into, so the brain reads which one it is.
-      const output = yield* call("get_specialist", {});
-      const [, id] = /"id":\s*"([0-9a-f-]{36})"/u.exec(output) ?? [];
-      yield* call("move_holding", { chain: "solana", instrument: "native", to_specialist_id: id });
-      yield* say(
-        "I'll take the Solana you already hold under my wing, so its record sits with this view.",
-      );
-    },
-  },
-  {
-    name: "first-peptides",
-    shows: null,
-    hears: /The owner just started you.*peptides/su,
-    async *play({ think, say, call }) {
-      yield* think(
-        "The pot is $1,500. Eli Lilly leads on the newest of these drugs, so it gets the larger share. Novo Nordisk is cheaper and has more to prove, so it gets less.",
-      );
-      yield* say("I'm on it. Here is where I'd start.");
-      yield* call("propose_specialist_portfolio", {
-        legs: [
-          {
-            tool: "stock_trade",
-            input: { stock: "LLY", side: "buy", amountUsd: 900 },
-            name: "Eli Lilly",
-            why: "Makes the drugs leading the field",
-            note: "The clearest way to own the view. If a rival's pill tests better, I'd trim it.",
-          },
-          {
-            tool: "stock_trade",
-            input: { stock: "NVO", side: "buy", amountUsd: 450 },
-            name: "Novo Nordisk",
-            why: "The cheaper of the two big makers",
-            note: "A smaller leg on the one playing catch-up. If it keeps losing share, it goes.",
-          },
-        ],
-      });
-    },
-  },
   {
     name: "no-app",
     shows: null,
@@ -296,7 +204,7 @@ const SCENES: readonly Scene[] = [
     async *play({ heard, say }) {
       yield* say(
         /friday-check/u.test(heard)
-          ? "It's Friday at 5pm, time for the week's check. Your specialists are where they were on Monday, give or take a few dollars, and nothing is waiting on you."
+          ? "It's Friday at 5pm, time for the week's check. Your positions are where they were on Monday, give or take a few dollars, and nothing is waiting on you."
           : /as Clock watches it/u.test(heard)
             ? "It's the time you asked me to remind you: your portfolio is where you left it, and nothing is waiting on you."
             : /Solana/u.test(heard)
@@ -308,95 +216,118 @@ const SCENES: readonly Scene[] = [
 
   // What the owner asks for.
   {
-    name: "ask",
-    shows: "an ask: a card that starts a specialist",
+    name: "ai-buildout",
+    shows: "a belief turned straight into a two-stock plan on one card",
     hears: /AI buildout has years/iu,
     async *play({ think, say, call }) {
       yield* think(
-        "They hold a view with years to run, so it wants a specialist of its own rather than one trade. Nvidia sells the chips and Tesla is the robotics bet, and both trade as stocks on Monad.",
+        "Nvidia is the core of the AI buildout and Tesla is the robotics leg. Both trade as stocks on Monad where Sam's cash sits.",
       );
-      yield* call("start_specialist", {
-        kind: "take",
-        purpose: "The AI buildout has years to run",
-        name: "AI buildout",
-        theme: "chip",
-        pot_usd: 3_000,
-        act_mode: "ask_first",
-        handoff:
-          "Sam thinks the AI buildout has years to run and wants $3,000 behind it, asked first on every move. Start with Nvidia and Tesla.",
+      yield* call("update_thread_notes", {
+        notes:
+          "Thesis: The AI buildout has years to run. Core in chips (NVDA), smaller leg in robotics (TSLA).\nWatch for: Data centre capex guidance cuts from hyperscalers, or further Optimus timeline slips.",
+      });
+      yield* call("propose_actions", {
+        title: "AI buildout picks",
+        legs: [
+          {
+            tool: "stock_trade",
+            input: { stock: "NVDA", side: "buy", amountUsd: 1_800 },
+            name: "Nvidia",
+            why: "Sells the chips everyone is buying",
+            note: "The clearest way to own the buildout. If data centre spending guidance is cut, I'd trim it.",
+          },
+          {
+            tool: "stock_trade",
+            input: { stock: "TSLA", side: "buy", amountUsd: 900 },
+            name: "Tesla",
+            why: "The biggest bet on robots",
+            note: "A smaller, riskier leg on robotics. If Optimus slips again, I'd drop it.",
+          },
+        ],
       });
       yield* say(
-        "That is a view worth running on its own. I can start a specialist for it with $3,000 behind it, which asks you before every move.",
+        "Here is where I'd start: $1,800 in Nvidia as the core and $900 in Tesla for the robotics upside, both on one card.",
       );
     },
   },
   {
     name: "take",
-    shows: "a view looked into, then an ask to start a specialist for it",
+    shows: "a view looked into, then its picks on one card right in the same thread",
     hears: /peptides go mainstream/iu,
     async *play(stage) {
       const { think, say, call } = stage;
       // A new owner's first take (`auni demo --first-run`), as core tells the turn it is.
       if (/# Their first take/u.test(stage.context)) return yield* firstTake(stage);
       yield* think(
-        "A view with years to run wants a specialist of its own, not one trade. Eli Lilly and Novo Nordisk make most of these drugs. I'll check that both trade where Sam's cash is, and how much of that cash is free.",
+        "Eli Lilly leads on the newest weight-loss drugs, and Novo Nordisk is the cheaper second leg. I'll check that both trade where Sam's cash is, and how much of that cash is free.",
       );
       yield* call("find_instruments", {
         query: "weight loss drugs",
         related: ["Eli Lilly", "Novo Nordisk"],
       });
       yield* call("get_portfolio", {});
-      yield* call("start_specialist", {
-        kind: "take",
-        purpose: "Peptides go mainstream by 2028",
-        name: "Peptides",
-        theme: "pill",
-        pot_usd: 1_500,
-        act_mode: "ask_first",
-        handoff: `Sam thinks peptides go mainstream by 2028 and wants $1,500 behind it, asked first on every move. Start with Eli Lilly and Novo Nordisk.${touring(stage) ? ` ${ON_TOUR}` : ""}`,
+      yield* call("update_thread_notes", {
+        notes:
+          "Thesis: Peptides go mainstream by 2028. Lead with Eli Lilly, smaller leg in Novo Nordisk.\nWatch for: Oral GLP-1 trial readouts from rivals and quarterly script share.",
+      });
+      yield* call("propose_actions", {
+        title: "Peptides go mainstream by 2028",
+        legs: [
+          {
+            tool: "stock_trade",
+            input: { stock: "LLY", side: "buy", amountUsd: 900 },
+            name: "Eli Lilly",
+            why: "Makes the drugs leading the field",
+            note: "The clearest way to own the view. If a rival's pill tests better, I'd trim it.",
+          },
+          {
+            tool: "stock_trade",
+            input: { stock: "NVO", side: "buy", amountUsd: 450 },
+            name: "Novo Nordisk",
+            why: "The cheaper of the two big makers",
+            note: "A smaller leg on the one playing catch-up. If it keeps losing share, it goes.",
+          },
+        ],
       });
       yield* say(
-        "That is a view worth running on its own. Eli Lilly and Novo Nordisk make most of these drugs, and both trade as stocks on Monad, where your cash is. I can start a specialist for it with $1,500 behind it, which asks you before every move.",
+        "Eli Lilly and Novo Nordisk make nearly all of these drugs, and both trade as stocks on Monad where your cash sits. Here are both picks on one card.",
       );
     },
   },
   {
     name: "idle-cash",
-    shows: "an ask for a specialist that does a job, then a single move",
+    shows: "idle cash put to work in Aave savings",
     hears: /keep my idle cash/iu,
-    async *play({ say, call }) {
-      yield* call("start_specialist", {
-        kind: "role",
-        purpose: "Keep my idle cash earning",
-        name: "Idle cash",
-        theme: "coin",
-        pot_usd: 4_000,
-        act_mode: "ask_first",
-        handoff:
-          "Sam wants the idle cash earning somewhere safe, and to be asked before each move.",
-      });
+    async *play({ think, say, call }) {
+      yield* think(
+        "Most of the cash sits on Monad doing nothing. Aave pays about 4% a year there and it can come back out any time.",
+      );
+      yield* call("aave_supply", { chain: "monad", amount_usd: "4000" });
       yield* say(
-        "I can have a specialist look after that, so your spare cash is never just sitting there.",
+        "I'll keep it simple: $4,000 into Aave on Monad, where it earns and stays one tap from cash.",
       );
     },
   },
   {
     name: "holding",
-    shows: "a holding moved under a new specialist",
+    shows: "working notes and a price watch for an existing holding",
     hears: /Solana keeps taking share/iu,
     async *play({ say, call }) {
-      yield* call("start_specialist", {
-        kind: "take",
-        purpose: "Solana keeps taking share",
-        name: "Solana",
-        theme: "bolt",
-        pot_usd: 1_500,
-        act_mode: "ask_first",
-        handoff:
-          "Sam thinks Solana keeps taking share and already holds some SOL, which should move in here.",
+      yield* call("update_thread_notes", {
+        notes:
+          "Thesis: Solana keeps taking share in consumer apps and DEX volume.\nWatch for: Sharp drawdowns to add, or network congestion eating into usage.",
+      });
+      yield* call("watch", {
+        action: "create",
+        source: "prices",
+        condition: { market: "SOL", crosses: "below", price: 140 },
+        description: "Solana falls below $140",
+        note: "Sam holds Solana and wants to know if it dips into an add zone.",
+        repeat: "once",
       });
       yield* say(
-        "I can start a specialist for that view and move the Solana you already hold into it.",
+        "I've noted your Solana thesis here and set a watch if it dips below $140. Everything stays in this thread.",
       );
     },
   },
@@ -873,7 +804,7 @@ const SCENES: readonly Scene[] = [
         source: "prices",
         condition: { market: "SOL", moves: "down", percent: 5, within: "5m" },
         description: "Solana drops 5% within five minutes",
-        note: "Sam holds Solana under a specialist, so a sharp drop is worth a look.",
+        note: "Sam holds Solana, so a sharp drop is worth a look.",
         repeat: "once",
       });
       // The demo's Solana dips for a moment, once the watch has seen it not dipped: the
@@ -890,7 +821,7 @@ const SCENES: readonly Scene[] = [
       yield* call("save_routine", {
         name: "friday-check",
         description: "Load on Fridays, or when Sam asks how the week went.",
-        body: "1. Read each specialist's holdings and what changed this week.\n2. Say which moved most, up or down, and why if it is known.\n3. Name anything waiting on Sam, and anything worth trimming.\n4. Keep it to five lines.",
+        body: "1. Read the portfolio and what changed this week.\n2. Say which holdings moved most, up or down, and why if it is known.\n3. Name anything waiting on Sam, and anything worth trimming.\n4. Keep it to five lines.",
       });
       yield* call("watch", {
         action: "create",
@@ -921,12 +852,12 @@ const SCENES: readonly Scene[] = [
   },
   {
     name: "pot",
-    shows: "an ask that changes how a specialist acts (say it to a specialist)",
-    hears: /act on its own/iu,
+    shows: "an ask that lets this thread act on its own within a dollar budget",
+    hears: /act on (its|your) own/iu,
     async *play({ say, call }) {
-      yield* call("update_specialist", { pot_usd: 4_000, act_mode: "within_limits" });
+      yield* call("set_thread_autonomy", { act_mode: "within_limits", budget_usd: 4_000 });
       yield* say(
-        "That lets it buy and sell inside its pot without asking each time. It still asks for anything else.",
+        "That lets this thread buy and sell inside its $4,000 budget without asking each time. It still asks for perps, bridges, and withdrawals.",
       );
     },
   },
@@ -960,7 +891,7 @@ const SCENES: readonly Scene[] = [
     hears: /no longer want the nvidia buy/iu,
     async *play({ context, say, call }) {
       // The turn's context names each card waiting elsewhere by its id.
-      const card = /Nvidia[^\n]*\(card ([0-9a-f-]{36})\)/u.exec(context)?.[1];
+      const card = /- card ([0-9a-f-]{36})[^\n]*Nvidia/iu.exec(context)?.[1];
       if (!card) {
         yield* say("No Nvidia buy is waiting for you, so there's nothing to take back.");
         return;
@@ -991,24 +922,32 @@ const SCENES: readonly Scene[] = [
   },
   {
     name: "proposal",
-    shows: "a specialist's proposal: picks on one card",
+    shows: "a basket of picks on one card",
     hears: /add (to|something)/iu,
     async *play({ think, say, call }) {
       yield* think(
-        "Coinbase earns on every AI token trade and custody deal, so it widens the view without doubling up on chips.",
+        "Coinbase earns on crypto volume and Nvidia remains the core infrastructure leg, so adding a bit to both widens the position cleanly.",
       );
-      yield* call("propose_specialist_portfolio", {
+      yield* call("propose_actions", {
+        title: "Add Coinbase and Nvidia",
         legs: [
           {
             tool: "stock_trade",
             input: { stock: "COIN", side: "buy", amountUsd: 300 },
             name: "Coinbase",
-            why: "Where the AI money trades",
+            why: "Where the AI token flow trades",
             note: "A side door into the same story. If volumes fall for a quarter, it goes.",
+          },
+          {
+            tool: "stock_trade",
+            input: { stock: "NVDA", side: "buy", amountUsd: 200 },
+            name: "Nvidia",
+            why: "Adds to the core chip leader",
+            note: "Tops up the main position while cash is sitting idle.",
           },
         ],
       });
-      yield* say("One more name I'd add, if you agree.");
+      yield* say("Two names I'd add, if you agree.");
     },
   },
   {
@@ -1139,7 +1078,7 @@ const SCENES: readonly Scene[] = [
     async *play({ say, call }) {
       yield* call("send_feedback", {
         kind: "idea",
-        says: "A weekly email that says how each specialist did.",
+        says: "A weekly email that summarizes how my portfolio and active threads did.",
       });
       yield* say("That one is worth passing on. Here it is, ready for you to post.");
     },
@@ -1151,7 +1090,7 @@ const SCENES: readonly Scene[] = [
     async *play({ say, call }) {
       yield* call("show_brief", {});
       yield* say(
-        "In a real Auni your brief would be written here from that: how your money and each specialist moved since the last one, and anything your watches held for it. A look like this uses nothing up, so your next brief still comes at its usual time.",
+        "In a real Auni your brief would be written here from that: how your holdings moved since the last one, and anything your watches held for it. A look like this uses nothing up, so your next brief still comes at its usual time.",
       );
     },
   },
@@ -1166,7 +1105,7 @@ const SCENES: readonly Scene[] = [
       yield* call("get_portfolio", {});
       await sleep(200);
       yield* say(
-        "You're in good shape. Most of your money is working: the AI buildout specialist holds Nvidia and Tesla, your idle cash is earning in Aave, and you have a bitcoin long open on Hyperliquid.",
+        "You're in good shape. Most of your money is working: Nvidia and Tesla from your AI buildout thread, your idle cash earning in Aave, and a bitcoin long open on Hyperliquid.",
       );
       yield* say(
         "Nothing needs you right now. The one thing I'd keep an eye on is the long: it's 3x, so a bad week matters more there than anywhere else.",

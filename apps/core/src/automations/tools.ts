@@ -2,6 +2,7 @@ import { textAsMeant } from "@auni/shared";
 import { z } from "zod";
 
 import { defineTool, failure, result, type AuniTool, type ToolTurn } from "../agent/tool.ts";
+import { publishThread } from "../conversation/threads.ts";
 import type { AutomationRow } from "../db/schema.ts";
 import { OutOfCredits, WatchRefused } from "../apps/contract.ts";
 import { offered, sources, type InstalledSource } from "../apps/registry.ts";
@@ -46,9 +47,9 @@ function firstSentence(guide: string): string {
 function watchDescription(ready: readonly InstalledSource[]): string {
   return `Set up, change or delete a watch. When its condition comes true (a time asked for always wakes you), a quick triage weighs the fire against its note, their holdings and its earlier fires, and either wakes you in this thread now, holds it for their daily brief, or just notes it; the note is what it judges by, so say in it what would make a fire matter. Woken, you take a turn as for any message: tell the owner, propose a move under their permission mode, or settle_quietly when it turns out nothing is worth saying.
 
-action create takes source, condition, description (the plain-language line the owner sees in their watch list, "ETH falls below $2,000", never the condition's syntax) and note (for you when it fires: why it matters to them and what you meant to do, "they want to add to ETH under $2,000"). By default a watch fires once, or each time on a schedule; repeat (a cooldown such as "1h", or "0" for none) keeps it firing each time the condition comes true again, at most once per cooldown and once per story. expires_in ends it after that long ("24h", "7d"); without it, it watches until deleted. thesis_check marks the one watch that tests the specialist's belief itself. action edit takes watch_id and any of those to change (repeat "once" or expires_in "never" to clear one); action delete takes watch_id.
+action create takes source, condition, description (the plain-language line the owner sees in their watch list, "ETH falls below $2,000", never the condition's syntax) and note (for you when it fires: why it matters to them and what you meant to do, "they want to add to ETH under $2,000"). By default a watch fires once, or each time on a schedule; repeat (a cooldown such as "1h", or "0" for none) keeps it firing each time the condition comes true again, at most once per cooldown and once per story. expires_in ends it after that long ("24h", "7d"); without it, it watches until deleted. action edit takes watch_id and any of those to change (repeat "once" or expires_in "never" to clear one); action delete takes watch_id.
 
-A specialist's check-ins: once its first picks settle, set them up with its specialist_id: big news on its key holdings, a big daily move, and one plain-language condition that tests the thesis (thesis_check). Whenever its picks settle after that, list its watches and make them match what it now holds: watch a new holding, and edit or delete a watch on one it no longer holds or whose price levels no longer fit (a level set for 3x is too late at 5x). The app shows only a single "Watching" line, so tell the owner in your own words what you'll speak up about, the thesis check first; they can pause any watch from that line.
+Ongoing check-ins: when a thread builds a position or tracks a belief, you can set watches in this thread for key news, major price moves, or scheduled reviews. Whenever holdings in a thread change, keep its watches aligned: watch new holdings and edit or delete watches that no longer fit. Tell the owner plainly what you'll speak up about; they can pause or delete any watch from the thread panel.
 
 Each source below watches one kind of thing and reads its own shape of condition. Before your first watch on a source in this conversation, call action guide with that source: it answers with how to write its condition, with examples. A condition a source can't read is refused with its guide; reshape it and retry.
 ${ready.map(({ about, source }) => `- source "${about.id}" (${about.name}): ${firstSentence(source.guide)}`).join("\n")}`;
@@ -106,8 +107,6 @@ export function automationTools(context: ToolTurn): AuniTool[] {
       note: z.string().trim().min(1).max(500).optional(),
       repeat: repeatSchema.optional(),
       expires_in: expirySchema.optional(),
-      specialist_id: z.uuid().optional(),
-      thesis_check: z.boolean().optional(),
     },
     async handler(input) {
       try {
@@ -123,15 +122,14 @@ export function automationTools(context: ToolTurn): AuniTool[] {
           const condition = await parseCondition(installed, input.condition);
           const row = await createAutomation({
             threadId: context.threadId,
-            specialistId: input.specialist_id ?? context.specialistId,
             source: installed.about.id,
-            thesis: input.thesis_check ?? false,
             condition,
             description: input.description,
             note: input.note,
             repeat: input.repeat ? repeatOf(input.repeat) : repeatFor(installed, condition),
             expiresAt: input.expires_in ? expiryOf(input.expires_in) : null,
           });
+          void publishThread(context.threadId);
           return watching(row, "Watching", installed);
         }
 
@@ -139,6 +137,7 @@ export function automationTools(context: ToolTurn): AuniTool[] {
         if (!row || row.status === "deleted") return failure(new Error("No such watch."));
         if (input.action === "delete") {
           const deleted = await deleteAutomation(row);
+          void publishThread(deleted.threadId);
           return result(`Deleted: ${deleted.description}.`, {
             automation: automationWire(deleted),
           });
@@ -172,12 +171,12 @@ export function automationTools(context: ToolTurn): AuniTool[] {
   const list = defineTool({
     name: "list_watches",
     description:
-      "The owner's watches (all threads), newest first, with status: active, paused (the owner switched it off; only they turn it back on), triggered (done: it fired once), expired, or failed (its source stopped taking it). Pass specialist_id to narrow to one specialist.",
-    inputSchema: { specialist_id: z.uuid().optional() },
+      "The owner's watches (all threads), newest first, with status: active, paused (the owner switched it off; only they turn it back on), triggered (done: it fired once), expired, or failed (its source stopped taking it). Pass thread_id to narrow to one thread.",
+    inputSchema: { thread_id: z.uuid().optional() },
     async handler(input) {
       try {
         const rows = await listAutomations({
-          ...(input.specialist_id ? { specialistId: input.specialist_id } : {}),
+          ...(input.thread_id ? { threadId: input.thread_id } : {}),
         });
         const automations = rows.map(automationWire);
         return result(JSON.stringify(automations), { automations });

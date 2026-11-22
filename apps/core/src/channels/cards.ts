@@ -7,7 +7,6 @@ import { db } from "../db/client.ts";
 import {
   actions,
   channelDeliveries,
-  threads,
   type ActionRow,
   type ChannelDeliveryRow,
 } from "../db/schema.ts";
@@ -70,8 +69,7 @@ function canonicalJson(value: unknown): string {
 /** The action rows a sealed card part is about: a money move, a plan, or an ask. */
 function cardTarget(card: CardWire): CardTarget | null {
   if (card.kind === "action" || card.kind === "ask") return { actionId: card.actionReference };
-  if (card.kind === "action_plan" || card.kind === "specialist_proposal")
-    return { proposalId: card.proposalId };
+  if (card.kind === "action_plan") return { proposalId: card.proposalId };
   return null;
 }
 
@@ -94,14 +92,8 @@ function targetOf(delivery: ChannelDeliveryRow): CardTarget | null {
 }
 
 /** The web page a thread is on, where every card can also be decided. */
-export async function threadLink(threadId: string): Promise<string> {
-  const [thread] = await db
-    .select({ specialistId: threads.specialistId })
-    .from(threads)
-    .where(eq(threads.id, threadId));
-  return thread?.specialistId
-    ? `${env.WEB_ORIGIN}/app/s/${thread.specialistId}`
-    : `${env.WEB_ORIGIN}/app/chat/${threadId}`;
+export function threadLink(threadId: string): Promise<string> {
+  return Promise.resolve(`${env.WEB_ORIGIN}/app/chat/${threadId}`);
 }
 
 /** A card asking for a secret, which is typed into its field in the app and never into a chat. */

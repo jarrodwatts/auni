@@ -19,7 +19,7 @@ import { COMPACT_WIDTH, noteAir } from "./dawn-notes";
 /**
  * Auni's line: thin, in the place's own color, over a soft field of dots in
  * a morning sky, warming from the place's hue toward peach where today is. No axes, no grid. Today is a small lit orb, lit the way the
- * mascot and the specialist orbs are lit. Dragging across it reports the
+ * mascot is lit. Dragging across it reports the
  * reading under the finger. Levels, when given, mark prices across it (see
  * dawn-levels). Moments, when given, sit on the line as beads
  * (see dawn-moments).

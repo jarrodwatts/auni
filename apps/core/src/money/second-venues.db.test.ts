@@ -9,7 +9,6 @@ import {
   arrivals,
   fills,
   otherTokens,
-  specialists,
   threads,
 } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
@@ -117,7 +116,7 @@ afterAll(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-beforeEach(() => wipe(actions, fills, specialists, threads, arrivalCursors, arrivals, otherTokens));
+beforeEach(() => wipe(actions, fills, threads, arrivalCursors, arrivals, otherTokens));
 
 describe("a second venue of each kind", () => {
   it("proposes its money tool's card, filed under it, paid with cash a market holds", async () => {

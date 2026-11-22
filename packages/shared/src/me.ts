@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { modelSelectionSchema } from "./setup.ts";
+
 const BRIEF_DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const BRIEF_TIME = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/u);
 
@@ -87,6 +89,8 @@ export const meSchema = z.object({
     }),
     z.object({ ready: z.literal(false), fixes: z.array(z.string()) }),
   ]),
+  /** The owner's preferred brain, model and effort for new threads; null for automatic. */
+  defaultModelSelection: modelSelectionSchema.nullable().default(null),
   /** The chat apps Auni can talk in: whether each is set up on this machine, and paired. */
   channels: z.array(
     z.object({
@@ -111,6 +115,8 @@ export const meSchema = z.object({
     address: z.string(),
     /** The Tailscale login it answers, always on. */
     owner: z.string().nullable(),
+    /** Machine hostname as shown in the environment switcher. */
+    machine: z.string(),
     staysOn: z.object({ stays: z.boolean(), laptop: z.boolean(), says: z.string() }),
   }),
   /**
@@ -199,6 +205,8 @@ export const updateMeRequestSchema = z
     x_handle: z.string().trim().max(120).nullable(),
     /** Owner-editable summary of what Auni knows about them, or null to clear. */
     profile_summary: z.string().trim().max(2_000).nullable(),
+    /** Owner's default brain, model and effort for new threads. */
+    default_model_selection: modelSelectionSchema.nullable(),
   })
   .partial();
 export type UpdateMeRequest = z.infer<typeof updateMeRequestSchema>;

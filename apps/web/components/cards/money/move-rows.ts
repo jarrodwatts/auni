@@ -13,7 +13,7 @@ import {
 import type { Status } from "@/components/motion/status-mark";
 
 import { actionCardContent, cardMark, type MoneyCardMark } from "./action-card-content";
-import type { Leg, Move } from "./specialist-legs";
+import type { Leg, Move } from "./plan-legs";
 import type { Failure } from "./failed-step";
 import { amountLabel, closeResult, perpLine, perpTag } from "./pick-money";
 
@@ -83,7 +83,7 @@ function rowStatus({
 }
 
 /**
- * A plan's or specialist's rows: the moves that get the money ready first,
+ * A plan's rows: the moves that get the money ready first,
  * in the order they run, then the picks.
  */
 export function moveRows(moves: readonly Move[], legs: readonly Leg[]): MoveRow[] {
@@ -140,8 +140,7 @@ function pickRow(leg: Leg): MoveRow {
         ? [{ text: `Costs ${leg.cost}`, tone: "plain" } as const]
         : []),
     ],
-    // A pick on another specialist's holding says whose first, so it's never a surprise.
-    line: failed ? null : leg.fromSpecialist ? `From ${leg.fromSpecialist}: ${reason}` : reason,
+    line: failed ? null : reason,
     result: failed || !leg.perp ? null : closeResult(leg.perp),
     meta: failed
       ? null
@@ -224,49 +223,52 @@ function readableError(error: string | null): string | null {
 }
 
 /** Core names a prediction "Wegovy pill approved: Yes"; the side reads better as a tag. */
-export function splitSide(name: string): { readonly name: string; readonly side: string | null } {
+function splitSide(name: string): { readonly name: string; readonly side: string | null } {
   const match = /^(.+?):\s*(Yes|No)$/iu.exec(name);
   return match?.[1] && match[2] ? { name: match[1], side: match[2] } : { name, side: null };
 }
 
 /**
- * A plan's move as a row: a prediction reads as its market with the side
- * tagged, and says what it does under it; anything else names the move over
- * where it runs, in its own card's words as it runs and once done.
+ * A plan's move as a row: a named pick reads by its asset and why, a
+ * prediction reads as its market with the side tagged, and anything else
+ * names the move over where it runs, in its own card's words as it runs and
+ * once done.
  */
 export function planLeg(
   leg: ActionPlanLeg,
 ): Omit<Leg, "error" | "failureKind" | "retryable" | "started" | "held"> {
   const content = actionCardContent(leg);
-  // A card that says how it reads as a row (a prediction's) is named that way, as on a specialist.
   const { pick } = content;
+  const named = leg.name !== undefined;
+  const name = leg.name ?? (pick ? (pick.tag ? `${pick.name}: ${pick.tag}` : pick.name) : content.title);
+  const why = leg.why ?? (pick ? content.title : (leg.line ?? ""));
+  const note = leg.note ?? (leg.perp && leg.why ? leg.why : undefined);
+  const verbs = leg.verbs ?? (!named && pick ? pick.verbs : undefined);
   return {
     actionReference: leg.actionReference,
-    name: pick ? (pick.tag ? `${pick.name}: ${pick.tag}` : pick.name) : content.title,
-    // Any other move says the one line core wrote for it as a row, whatever its recipe.
-    why: pick ? content.title : (leg.line ?? ""),
-    // The row's line above is the card's own words; only this one is Auni's.
-    ...(leg.note ? { note: leg.note } : {}),
-    // Such a row says what it does to its name, in its card's verbs; anything else says what its card says.
-    ...(pick
-      ? pick.verbs
-        ? { verbs: pick.verbs }
-        : {}
-      : {
+    name,
+    why,
+    ...(note ? { note } : {}),
+    ...(leg.cost ? { cost: leg.cost } : {}),
+    ...(leg.perp ? { perp: leg.perp } : {}),
+    ...(verbs ? { verbs } : {}),
+    ...(!named && !pick
+      ? {
           words: {
             waiting: content.title,
             now: content.working,
             done: content.receipt.title,
             failed: didnt(content.title),
           },
-        }),
+        }
+      : {}),
+    card: leg.card,
     venue: leg.venue,
     logoUrl: leg.logoUrl,
-    // Its initials are what the move is about, never its sentence ("Move $9.50…" isn't "MO").
-    logoName: leg.logoName ?? null,
+    // Its initials are what the move is about, never its sentence ("Move $9.50..." isn't "MO").
+    logoName: leg.logoName ?? (leg.name ? splitSide(leg.name).name : null),
     amount: leg.amount,
     flow: leg.flow,
-    fromSpecialist: leg.fromSpecialist,
     status: leg.status,
   };
 }

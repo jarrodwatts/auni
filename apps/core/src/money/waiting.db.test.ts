@@ -5,10 +5,10 @@ import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, jobs, specialists } from "../db/schema.ts";
+import { actions, jobs, threads } from "../db/schema.ts";
 import { staleCardsJob } from "../jobs/action.ts";
-import { waitingCardsContext } from "../specialists/context.ts";
-import { insertAction, insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { waitingCardsContext } from "../conversation/context.ts";
+import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { stubRecipe } from "../test/recipe.ts";
 import { decideActions, prepareLeg, recordActions } from "./actions.ts";
 import { moneyTools } from "./tools.ts";
@@ -30,7 +30,7 @@ vi.mock("./recipes/index.ts", async (importOriginal) => ({
   toolRecipe: () => send,
 }));
 
-beforeEach(() => wipe(specialists, actions, jobs));
+beforeEach(() => wipe(threads, actions, jobs));
 
 const statusOf = async (id: string) =>
   (await db.select().from(actions).where(eq(actions.id, id)))[0];
@@ -39,8 +39,7 @@ const said = (answer: CallToolResult) =>
 
 /** A turn of the agent's in `threadId`, calling the money tool its card comes from. */
 function turnIn(threadId: string) {
-  const tool = (name: string) =>
-    moneyTools({ threadId, specialistId: null }).find((t) => t.name === name)!;
+  const tool = (name: string) => moneyTools({ threadId }).find((t) => t.name === name)!;
   return {
     card: async (what: string, replaces?: readonly string[]) => {
       // A tool that throws reaches the agent as its error's words (agent/mcp.ts).
@@ -102,25 +101,24 @@ describe("a card that takes the place of others", () => {
     expect(await statusOf(there.id)).toMatchObject({ status: "awaiting_permission" });
   });
 
-  it("needs no word while nothing waits, never counts an ask, and replaces a specialist's older plan", async () => {
-    const specialist = await insertSpecialist();
-    const thread = await insertThread({ specialistId: specialist.id });
+  it("needs no word while nothing waits, never counts an ask, and replaces named earlier plans", async () => {
+    const thread = await insertThread();
     const ask = await insertAction({
       threadId: thread.id,
-      tool: "update_specialist",
+      tool: "set_thread_autonomy",
       status: "awaiting_permission",
     });
-    const context = { threadId: thread.id, specialistId: specialist.id };
-    const plan = async () =>
+    const context = { threadId: thread.id };
+    const plan = async (replaces?: readonly string[]) =>
       recordActions(
         context,
-        [await prepareLeg(send, { what: "Buy Nvidia" }, context)],
+        [await prepareLeg(send, { what: "Buy Nvidia" })],
         crypto.randomUUID(),
+        replaces,
       );
     // The ask is no money card to replace, so the first plan needs no `replaces`.
     const first = await plan();
-    // A specialist has one plan on offer: its newer one replaces the older unasked.
-    const second = await plan();
+    const second = await plan([first.rows[0]!.proposalId!]);
     expect(second.replaced).toEqual([{ id: first.rows[0]!.proposalId, asks: "Buy Nvidia" }]);
     expect(await statusOf(ask.id)).toMatchObject({ status: "awaiting_permission" });
   });
@@ -142,8 +140,10 @@ describe("retract_cards", () => {
 
     // Its context names it by id, with the way to take it back.
     const context = await waitingCardsContext(thread.id);
-    expect(context).toContain(`Move 30 MON from Monad to Arbitrum as ETH (card ${stale.id})`);
-    expect(context).toContain("take back with retract_cards");
+    expect(context).toContain(
+      `card ${stale.id} in "another thread": Move 30 MON from Monad to Arbitrum as ETH`,
+    );
+    expect(context).toContain("taken back with retract_cards");
 
     const answer = await turnIn(thread.id).retract([stale.id, allowed.id]);
     expect(said(answer)).toBe(

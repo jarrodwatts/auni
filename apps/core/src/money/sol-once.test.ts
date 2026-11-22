@@ -76,13 +76,10 @@ describe("the cash a card that buys SOL once is checked for", () => {
       ...move("Buy about $1 of Palantir xStock on Solana", "1.00", BUYS, 1_000_000n),
       fundedFrom: () => "solana",
     });
-    const { prepared, problems } = await prepareLegs(
-      [
-        { tool: "bridge_usdc", input: {}, label: "bridge_usdc" },
-        { tool: "stock_trade", input: {}, label: "stock_trade" },
-      ],
-      { specialistId: null },
-    );
+    const { prepared, problems } = await prepareLegs([
+      { tool: "bridge_usdc", input: {}, label: "bridge_usdc" },
+      { tool: "stock_trade", input: {}, label: "stock_trade" },
+    ]);
     expect(problems).toEqual([]);
     const held = new Map([
       ["monad", 231n],

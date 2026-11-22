@@ -1,5 +1,4 @@
 import type { AppJob, AppWire, AppsWire } from "@auni/shared";
-import { inArray } from "drizzle-orm";
 import type { Address } from "viem";
 
 import { brainRows, pickBrain, whichBrainSays, type BrainRow } from "./agent/brain.ts";
@@ -10,8 +9,6 @@ import { theOwner } from "./auth/owner.ts";
 import { channelStates } from "./channels/home.ts";
 import { inUse, unsetSettings, walletLacks } from "./connect.ts";
 import { settingsFile } from "./data-dir.ts";
-import { db } from "./db/client.ts";
-import { specialists } from "./db/schema.ts";
 import { holdingFaces } from "./money/holdings.ts";
 import {
   keptOutsideWallet,
@@ -126,15 +123,13 @@ export async function staysOn({ about, account }: App): Promise<string | null> {
 async function accountOf(
   { about, account }: App,
   read: Portfolio | null,
-  named: ReadonlyMap<string, string>,
 ): Promise<Pick<AppWire, "account" | "stays">> {
   if (!account) return { account: null, stays: null };
   const words = (way: typeof account.moneyIn) => (typeof way === "string" ? way : null);
   const ways = { moneyIn: words(account.moneyIn), moneyOut: words(account.moneyOut) };
   // A source of its own that couldn't be read is named by its id (see readPortfolio).
   const unread = !read || read.unavailable.some((source) => source.split(" ")[0] === about.id);
-  if (unread)
-    return { account: { usd: null, holdings: [], specialists: [], ...ways }, stays: null };
+  if (unread) return { account: { usd: null, holdings: [], ...ways }, stays: null };
   const held = read.holdings
     .filter((holding) => keptAt(holding) === about.id)
     .toSorted((a, b) => Number(b.usdValue ?? 0) - Number(a.usdValue ?? 0));
@@ -147,24 +142,10 @@ async function accountOf(
         .map(({ id, name, detail, logoUrl, usdValue }) => ({ id, name, detail, logoUrl, usdValue }))
         // A crumb under a cent isn't something a person holds.
         .filter(({ usdValue }) => usdToCents(usdValue) > 0n),
-      specialists: read.specialists.flatMap(({ id, holdings }) =>
-        holdings.some((holding) => keptAt(holding) === about.id) ? (named.get(id) ?? []) : [],
-      ),
       ...ways,
     },
     stays: count > 0 ? openPositions(count) : null,
   };
-}
-
-/** Every specialist's name, by id, for the ones a reading says hold something. */
-async function specialistNames(read: Portfolio | null): Promise<Map<string, string>> {
-  const ids = read?.specialists.map(({ id }) => id) ?? [];
-  if (ids.length === 0) return new Map();
-  const rows = await db
-    .select({ id: specialists.id, name: specialists.name })
-    .from(specialists)
-    .where(inArray(specialists.id, ids));
-  return new Map(rows.map(({ id, name }) => [id, name]));
 }
 
 /** Every app as the owner sees it now. A setting's value is never among it: only whether it is set. */
@@ -189,7 +170,6 @@ export async function appsWire(): Promise<AppsWire> {
       ({ id, inputs }) => id === settingField(app) && inputs.some(({ name }) => name === key),
     );
   const thinking = "about" in picked ? picked.about.id : null;
-  const named = await specialistNames(read);
   const on = new Set(offered().map(({ about }) => about.id));
   return {
     settingsFile: settingsFile(),
@@ -247,7 +227,7 @@ export async function appsWire(): Promise<AppsWire> {
             field: typedIn(id, key) ? settingField(id) : null,
             env: declared.env,
           })),
-          ...(await accountOf(app, read, named)),
+          ...(await accountOf(app, read)),
         };
       }),
     ),

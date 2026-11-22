@@ -56,7 +56,7 @@ A demo's browser lands on a new chat, whose first starting point is the tour. Th
 chat (`tour.ts`): at each stop the brain says one thing to do, in Auni's own voice, and docks the
 reply that does it with Auni's own `suggest_replies`, so the next step is one tap; a place to go
 is a link in its words. A reply is what an owner would type, so the scene it plays is the real
-one, with the tour's words around it. Where a thread stands is the last "Stop 3 of 13" the brain
+one, with the tour's words around it. Where a thread stands is the last "Stop 3 of 12" the brain
 said in it: the tour keeps nothing, and a person can walk off and come back. Nothing of it is outside this folder but
 `landsOn`, the page a start brings the browser to (`tour.test.ts` holds that). `demo.test.ts`
 walks every stop through core. A new stop is an entry in `STOPS`, and a scene for its reply.
@@ -77,8 +77,7 @@ walks every stop through core. A new stop is an entry in `STOPS`, and a scene fo
 
 `auni demo --first-run` (`first-run.ts`) is a new owner's instead: no past and no money, first
 run's question, and its one take (peptides, `take` in `scenes.ts`) played through: its first
-picks on one card, the take started behind it, money sent in while the card's Add money is open,
-the buy, and the spare key.
+picks on one card, money sent in while the card's Add money is open, the buy, and the spare key.
 
 Not shown yet: a Polymarket buy or its cash coming home (both need its
 relayer, which has no stand-in; a sale needs only its book), a market pulse (it needs Elfa), a

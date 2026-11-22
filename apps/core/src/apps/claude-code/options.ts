@@ -79,6 +79,9 @@ export function mcpConfig(mcp: NonNullable<BrainTurn["mcp"]>): string {
  * the egress proxy, so pages are read with curl instead. Every other tool use is denied unasked
  * (dontAsk), and Edit and Write aren't offered.
  */
+/** Effort values Claude Code accepts. */
+const CLAUDE_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
+
 export function claudeOptions(
   turn: BrainTurn,
   hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>>,
@@ -89,11 +92,17 @@ export function claudeOptions(
 ): Options {
   // "//abs/**" is the rule syntax for an absolute path.
   const work = `/${turn.box.workDir}/**`;
+  const model = turn.model ?? MODELS[turn.role];
+  const effort =
+    turn.effort && CLAUDE_EFFORTS.has(turn.effort) && model !== "haiku"
+      ? (turn.effort as NonNullable<Options["effort"]>)
+      : undefined;
   return {
     env: childEnv(),
     cwd: turn.box.workDir,
     systemPrompt: turn.systemPrompt,
-    model: MODELS[turn.role],
+    model,
+    ...(effort ? { effort } : {}),
     // None of the owner's own settings, hooks, CLAUDE.md, MCP servers, skills or apiKeyHelper.
     settingSources: [],
     strictMcpConfig: true,

@@ -11,11 +11,11 @@ import { systemPrompt } from "./agent/prompt.ts";
 import { routinesDir } from "./agent/routines.ts";
 import { appsToOffer, declinedOffers } from "./connect.ts";
 import { db } from "./db/client.ts";
-import { actions, jobs, specialists, threads } from "./db/schema.ts";
+import { actions, jobs, threads } from "./db/schema.ts";
 import { executeAction } from "./money/actions.ts";
 import { allowAction, declineAction } from "./money/decide.ts";
 import { appsOff } from "./settings.ts";
-import { insertSpecialist, insertThread, wipe } from "./test/db.ts";
+import { insertThread, wipe } from "./test/db.ts";
 import { queued } from "./test/jobs.ts";
 
 // Every ask goes the way a money card does: a tool only records it waiting, and only the owner's
@@ -32,7 +32,7 @@ beforeEach(async () => {
   process.env.AUNI_HOME = home;
   for (const name of SETTINGS) delete process.env[name];
   rmSync(routinesDir(), { recursive: true, force: true });
-  await wipe(specialists, threads, actions, jobs);
+  await wipe(threads, actions, jobs);
 });
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
@@ -72,30 +72,20 @@ interface Case {
   applied(): Promise<boolean>;
 }
 
-const START: Case = {
-  ask: "start_specialist",
-  button: "Start with $200",
+const AUTONOMY: Case = {
+  ask: "set_thread_autonomy",
+  button: "Auto up to $500",
   async propose() {
-    const chat = await insertThread();
-    const actionId = await call(chat.id, "start_specialist", {
-      kind: "role",
-      name: "Idle cash",
-      purpose: "Keep my idle cash earning",
-      pot_usd: 200,
+    const thread = await insertThread({ budgetUsd: "100" });
+    const actionId = await call(thread.id, "set_thread_autonomy", {
       act_mode: "within_limits",
-      handoff: "They want their idle USDC in the best Aave market, moved when rates shift.",
+      budget_usd: 500,
     });
-    return { actionId, threadId: chat.id };
+    return { actionId, threadId: thread.id };
   },
   async applied() {
-    const rows = await db.select().from(specialists);
-    return rows.some(
-      (row) =>
-        row.kind === "role" &&
-        row.name === "Idle cash" &&
-        row.potUsd === "200.00" &&
-        row.actMode === "within_limits",
-    );
+    const [row] = await db.select().from(threads);
+    return row?.actMode === "within_limits" && row.budgetUsd === "500.00";
   },
 };
 
@@ -103,8 +93,7 @@ const ROUTINE: Case = {
   ask: "save_routine",
   button: "Save Check rates",
   async propose() {
-    const specialist = await insertSpecialist({ kind: "role", name: "Idle cash" });
-    const thread = await insertThread({ specialistId: specialist.id });
+    const thread = await insertThread({ title: "Idle cash" });
     const actionId = await call(thread.id, "save_routine", {
       name: "check-rates",
       description: "Load when moving idle cash between savings markets.",
@@ -132,28 +121,7 @@ const CONNECT: Case = {
   applied: async () => !appsOff().has("aave"),
 };
 
-const CASES: readonly Case[] = [
-  START,
-  ROUTINE,
-  {
-    ask: "update_specialist",
-    button: "Let it trade $500",
-    async propose() {
-      const specialist = await insertSpecialist({ potUsd: "100" });
-      const thread = await insertThread({ specialistId: specialist.id });
-      const actionId = await call(thread.id, "update_specialist", {
-        act_mode: "within_limits",
-        pot_usd: 500,
-      });
-      return { actionId, threadId: thread.id };
-    },
-    async applied() {
-      const [row] = await db.select().from(specialists);
-      return row?.actMode === "within_limits" && row.potUsd === "500.00";
-    },
-  },
-  CONNECT,
-];
+const CASES: readonly Case[] = [AUTONOMY, ROUTINE, CONNECT];
 
 const statusOf = async (id: string) =>
   (await db.select().from(actions).where(eq(actions.id, id)))[0]!;
@@ -202,50 +170,20 @@ describe.each(CASES)("$ask", (ask) => {
   });
 });
 
-describe("starting a specialist", () => {
-  it("opens its own thread, wakes it there once with what was agreed, and files the card under it", async () => {
-    const { actionId, threadId } = await START.propose();
-    const allowed = await allowAction(actionId);
-    const [started] = await db.select().from(specialists);
-    expect(allowed).toMatchObject({ action: { status: "done", specialistId: started!.id } });
-    const [own] = await db.select().from(threads).where(eq(threads.specialistId, started!.id));
-    const woken = await queued("turn");
-    expect(woken).toHaveLength(1);
-    expect(woken[0]!.data).toMatchObject({
-      threadId: own!.id,
-      reason: expect.stringContaining("idle USDC in the best Aave market"),
-    });
-    expect(own!.id).not.toBe(threadId);
-  });
-
-  it("is Auni's to propose: a specialist's own thread has no such tool", async () => {
-    const specialist = await insertSpecialist();
-    const [thread] = [await insertThread({ specialistId: specialist.id })];
-    const names = toolsFor({ thread }).map((tool) => tool.name);
-    expect(names).not.toContain("start_specialist");
-    const chat = await insertThread();
-    expect(toolsFor({ thread: chat }).map((tool) => tool.name)).toContain("start_specialist");
-  });
-});
-
 describe("saving a routine", () => {
-  it("shows the whole routine on the card, files it under the specialist that asked, and says when it replaces one", async () => {
-    const { actionId } = await ROUTINE.propose();
+  it("shows the whole routine on the card, files it under the thread that asked, and says when it replaces one", async () => {
+    const { actionId, threadId } = await ROUTINE.propose();
     const [row] = await db.select().from(actions).where(eq(actions.id, actionId));
     expect(row).toMatchObject({
       summary: "Save a routine: Check rates",
-      specialistId: expect.any(String),
+      threadId,
     });
     expect(row!.lines.at(-1)).toEqual({
       label: "What it says",
       value: "Read every Aave market's rate, and move only for half a point or more.",
     });
     await allowAction(actionId);
-    const [thread] = await db
-      .select()
-      .from(threads)
-      .where(eq(threads.specialistId, row!.specialistId!));
-    const again = await call(thread!.id, "save_routine", {
+    const again = await call(threadId, "save_routine", {
       name: "check-rates",
       description: "Load when moving idle cash.",
       body: "Just ask me.",
@@ -406,16 +344,33 @@ describe("connecting an app", () => {
   });
 });
 
-describe("widening a specialist", () => {
-  it("fails with why once it retired after the card was shown", async () => {
-    const { actionId } = await CASES[2]!.propose();
-    await db.update(specialists).set({ status: "retired" });
+describe("widening a thread's autonomy", () => {
+  it("fails with why once the thread was archived after the card was shown", async () => {
+    const { actionId, threadId } = await AUTONOMY.propose();
+    await db.update(threads).set({ archivedAt: new Date() }).where(eq(threads.id, threadId));
     const allowed = await allowAction(actionId);
     expect(allowed).toMatchObject({
       kind: "allowed",
-      action: { status: "failed", error: "It retired before you allowed this." },
+      action: { status: "failed", error: "That thread was archived before you allowed this." },
     });
-    const [row] = await db.select().from(specialists);
+    const [row] = await db.select().from(threads).where(eq(threads.id, threadId));
     expect(row?.actMode).toBe("ask_first");
+  });
+
+  it("tightens immediately without putting up a card", async () => {
+    const thread = await insertThread({ actMode: "within_limits", budgetUsd: "500" });
+    const lowered = await answer(thread.id, "set_thread_autonomy", {
+      act_mode: "within_limits",
+      budget_usd: 200,
+    });
+    expect(lowered.isError).toBeUndefined();
+    expect(await db.select().from(actions)).toEqual([]);
+    const [afterLower] = await db.select().from(threads).where(eq(threads.id, thread.id));
+    expect(afterLower).toMatchObject({ actMode: "within_limits", budgetUsd: "200.00" });
+
+    const asked = await answer(thread.id, "set_thread_autonomy", { act_mode: "ask_first" });
+    expect(asked.isError).toBeUndefined();
+    const [afterAsk] = await db.select().from(threads).where(eq(threads.id, thread.id));
+    expect(afterAsk?.actMode).toBe("ask_first");
   });
 });

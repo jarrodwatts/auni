@@ -11,7 +11,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { figureOf } from "../../test/recipe.ts";
-import { EVM_NATIVE, evmTokenKey, fillIdentity } from "../fill-key.ts";
+import { EVM_NATIVE, evmTokenKey } from "../fill-key.ts";
 import { moneyOf, NothingMoved, type Signer } from "../recipe.ts";
 import { executeEvmSwap, previewEvmSwap, readBackEvmSwap } from "./evm-swap.ts";
 import {
@@ -121,16 +121,6 @@ describe("previewEvmSwap", () => {
     const input = { chain: "base" as const, sellToken: "WETH", buyToken: "USDC" };
     const { sells } = await previewEvmSwap(input, owner);
     expect(sells?.quantity).toBe("0.010000000000000007");
-  });
-
-  it("sells only a specialist's own share when no amount is named, never another's", async () => {
-    vi.mocked(evmBalance).mockResolvedValue(10n ** 16n);
-    const specialistHolds = new Map([
-      [fillIdentity(evmTokenKey("base", weth.address)), 4n * 10n ** 15n],
-    ]);
-    const input = { chain: "base" as const, sellToken: "WETH", buyToken: "USDC" };
-    const { sells } = await previewEvmSwap(input, owner, { specialistHolds });
-    expect(sells?.quantity).toBe("0.004");
   });
 
   // Monad reverts any move taking a delegated wallet's MON below 10, and Auni's wallet is delegated.

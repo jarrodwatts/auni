@@ -9,7 +9,7 @@ import { useStartConversation } from "@/components/app/use-start-conversation";
 import { Mascot } from "@/components/brand/mascot";
 import { AutoHeight } from "@/components/motion/auto-height";
 import { BrainRow } from "@/components/brains/brain-row";
-import { AssetLogo } from "@/components/specialist/marks";
+import { AssetLogo } from "@/components/brand/marks";
 import { AuniSheet } from "@/components/ui/auni-sheet";
 import { useBrains } from "@/lib/data/brains";
 import { formatUsd } from "@/lib/money";

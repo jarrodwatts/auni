@@ -55,18 +55,12 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("a Polymarket bet from where Polymarket takes no new bets", () => {
   it("is never made into a card, and asks Polymarket nothing else", async () => {
-    await expect(prepareLeg(polymarketOrder, BET, { specialistId: null })).rejects.toThrow(REFUSED);
+    await expect(prepareLeg(polymarketOrder, BET)).rejects.toThrow(REFUSED);
     expect(asked).toEqual(["https://polymarket.com/api/geoblock"]);
   });
 
   it("leaves a sale to Polymarket, which takes it from there", async () => {
-    const sale = prepareLeg(
-      polymarketOrder,
-      { ...BET, side: "sell", shares: 1 },
-      {
-        specialistId: null,
-      },
-    );
+    const sale = prepareLeg(polymarketOrder, { ...BET, side: "sell", shares: 1 });
     // Its card is read from Polymarket's book, which this test doesn't answer.
     await expect(sale).rejects.toThrow("fetch failed");
     expect(asked.some((url) => url.includes("polymarket.com/api/geoblock"))).toBe(false);
@@ -96,9 +90,7 @@ describe("a Polymarket bet from where Polymarket takes no new bets", () => {
       throw new TypeError("fetch failed");
     });
     // Past the check, the card is read from Polymarket's markets, which this test doesn't answer.
-    await expect(prepareLeg(polymarketOrder, BET, { specialistId: null })).rejects.toThrow(
-      "fetch failed",
-    );
+    await expect(prepareLeg(polymarketOrder, BET)).rejects.toThrow("fetch failed");
     expect(asked.some((url) => !url.includes("geoblock"))).toBe(true);
   });
 

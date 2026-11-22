@@ -68,8 +68,9 @@ no login and no money, and a ten-minute tour of everything Auni does.
 
 ## What it does
 
-- **Takes become positions.** A take gets its own specialist: a pot of holdings Auni builds and
-  keeps an eye on. You can let a specialist buy and sell on its own, only within its own pot.
+- **Takes become positions.** Every take lives in its own thread, with working notes, watches,
+  a per-thread model and thinking effort selector, and an inspector pane beside the chat. You can
+  let any thread act on its own within a dollar budget you set.
 - **Monad first.** Anything Monad can do runs on Monad: tokenized stocks (xStocks), token swaps,
   savings. Other chains (Base, Arbitrum, Polygon, Solana) are there as fallbacks, alongside perps on
   Hyperliquid and prediction markets on Polymarket.
@@ -275,7 +276,7 @@ each finished at its size:
 | -------- | -------------------------------- | ------------------------------------------------------------------------------------- |
 | Know-how | a `SKILL.md`                     | Claude stops working the same thing out twice.                                        |
 | Reader   | plus the contracts it reads      | A transaction Claude built reads as a real card, under a name the repo vouches for.   |
-| Venue    | plus moves, an account, problems | What a transaction can't do, held to its card, and able to run in a specialist's pot. |
+| Venue    | plus moves, an account, problems | What a transaction can't do, held to its card, and able to run in an Auto thread's budget. |
 
 ```
   you                   Claude (the brain)                       the service, the chain

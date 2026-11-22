@@ -4,14 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../db/client.ts";
 import { appTroublesNow } from "../app-troubles.ts";
 import { OutOfCredits } from "../apps/contract.ts";
-import { appTroubles, automations, specialists, threads } from "../db/schema.ts";
-import { insertSpecialist, insertThread, wipe } from "../test/db.ts";
+import { appTroubles, automations, threads } from "../db/schema.ts";
+import { insertThread, wipe } from "../test/db.ts";
 import { createAutomation } from "./automations.ts";
 import { expireWatches, remoteWatchIds, renewWatch } from "./renew.ts";
 
 // Elfa is the source that keeps watches itself; its API is faked over fetch.
 
-beforeEach(() => wipe(threads, automations, specialists, appTroubles));
+beforeEach(() => wipe(threads, automations, appTroubles));
 afterEach(() => {
   process.env.ELFA_AUTO_API_KEY = "";
   vi.unstubAllGlobals();
@@ -61,13 +61,11 @@ function fakeElfa(state: Partial<Elfa> = {}): Elfa {
   return elfa;
 }
 
-async function newsWatch(fields: { expiresAt?: Date | null; specialistId?: string } = {}) {
+async function newsWatch(fields: { expiresAt?: Date | null } = {}) {
   const thread = await insertThread();
   return createAutomation({
     threadId: thread.id,
-    specialistId: fields.specialistId ?? null,
     source: "elfa",
-    thesis: false,
     condition: news,
     description: "News on Micron",
     note: "They hold MU.",
@@ -167,26 +165,6 @@ describe("a watch Elfa keeps", () => {
     expect(await renewWatch(watch.id)).toBe("refused; failed");
     expect(await stored(watch.id)).toMatchObject({ status: "failed" });
     expect(await remoteWatchIds()).toEqual([]);
-  });
-
-  it("is deleted once its specialist retired", async () => {
-    const elfa = fakeElfa();
-    const specialist = await insertSpecialist({ status: "retired" });
-    const thread = await insertThread();
-    const watch = await createAutomation({
-      threadId: thread.id,
-      specialistId: specialist.id,
-      source: "elfa",
-      thesis: true,
-      condition: news,
-      description: "Micron's thesis",
-      note: "The thesis check.",
-      repeat: null,
-      expiresAt: null,
-    });
-    expect(await renewWatch(watch.id)).toBe("specialist retired; deleted");
-    expect(await stored(watch.id)).toMatchObject({ status: "deleted" });
-    expect(elfa.asked).toContain("DELETE /v2/auto/queries/query-1");
   });
 });
 

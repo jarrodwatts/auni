@@ -210,7 +210,7 @@ describe("the ask for a star", () => {
   it("waits for a move that landed: not an ask, and not one still running", async () => {
     await insertAction({ status: "running" });
     await insertAction({ status: "failed" });
-    await insertAction({ status: "done", tool: "start_specialist" });
+    await insertAction({ status: "done", tool: "set_thread_autonomy" });
     expect(await starPrompt()).toBe("waiting");
     await insertAction({ status: "done" });
     expect(await starPrompt()).toBe("ask");

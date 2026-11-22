@@ -122,6 +122,8 @@ export type LiveMessage<Chunk, Row = ThreadWire> =
   | { readonly topic: "gone"; readonly threadId: string }
   | { readonly topic: "apps" }
   | { readonly topic: "brains" }
+  | { readonly topic: "me" }
+  | { readonly topic: "starting-points" }
   | {
       readonly topic: "thread";
       readonly threadId: string;

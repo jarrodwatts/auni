@@ -5,11 +5,13 @@ import type {
   MoveRun,
   AutomationStatus,
   CardFace,
+  OwnerSignals,
   SpecialistRulesWire,
   SpecialistWire,
   FailureKind,
   FireVerdict,
   StartingPoint,
+  WatchedWallet,
 } from "@auni/shared";
 import { sql } from "drizzle-orm";
 import {
@@ -70,6 +72,15 @@ export const owner = pgTable(
     // When they answered the web's ask for a star on GitHub (github-star.ts), from any device:
     // starred, not now, or closed. It is never asked again.
     starPromptAnsweredAt: timestamp("star_prompt_answered_at", TIMESTAMPTZ),
+    // Visual look synced across devices and editable by Auni ("light", "dark", or app theme id).
+    look: text("look"),
+    // Owner's public X/Twitter handle (without @) and watch-only public addresses for tailored prompts.
+    xHandle: text("x_handle"),
+    watchedWallets: jsonb("watched_wallets").$type<WatchedWallet[]>().default([]).notNull(),
+    // Auto-learned (and owner-editable) short profile of what Auni knows about the owner.
+    profileSummary: text("profile_summary"),
+    // Latest signal snapshot read from X and watched wallets (signals.ts).
+    profileSignals: jsonb("profile_signals").$type<OwnerSignals | null>(),
   },
   (table) => [check("owner_one_row_check", sql`${table.id} = 1`)],
 );
@@ -614,6 +625,11 @@ export const ownerSessions = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     tokenHash: text("token_hash").notNull().unique(),
     kind: text("kind").$type<"pairing" | "session">().notNull(),
+    label: text("label"),
+    userAgent: text("user_agent"),
+    lastSeenAt: timestamp("last_seen_at", TIMESTAMPTZ),
+    // Browser-issued pairing links pair a normal session but never grant or renew step-up proof.
+    browserIssued: boolean("browser_issued").default(false).notNull(),
     expiresAt: timestamp("expires_at", TIMESTAMPTZ).notNull(),
     createdAt: timestamp("created_at", TIMESTAMPTZ).defaultNow().notNull(),
   },

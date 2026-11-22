@@ -2,7 +2,13 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 
-import type { AppAbout, AppSetting } from "@auni/shared";
+import {
+  NETWORK_KEYS,
+  NETWORKS,
+  type AppAbout,
+  type AppSetting,
+  type NetworkKey,
+} from "@auni/shared";
 
 import { dataDir, envFile } from "./data-dir.ts";
 import {
@@ -106,15 +112,16 @@ export function settingsChanged(): AbortSignal {
   return changed.signal;
 }
 
-/** Calls `heard` each time a setting is saved, until the function it returns is called. */
-export function onSettingsChange(heard: () => void): () => void {
+/** Calls `heard` each time a setting is saved, with its variable name, until unsubscribed. */
+export function onSettingsChange(heard: (name: string) => void): () => void {
   let listening = true;
   const next = () =>
     settingsChanged().addEventListener(
       "abort",
-      () => {
+      (event) => {
         if (!listening) return;
-        heard();
+        const reason = (event.target as AbortSignal | null)?.reason;
+        heard(typeof reason === "string" ? reason : "");
         next();
       },
       { once: true },
@@ -188,14 +195,88 @@ export async function saveSwitch(id: string, on: boolean): Promise<void> {
   write(APPS_OFF, [...off].toSorted().join(","));
 }
 
+const TAILNET_ORIGIN = /^https:\/\/[^/]+\.ts\.net(?::\d+)?$/iu;
+
 /**
  * Records that Auni runs always on (always-on.ts): the owner's Tailscale login and this machine's
- * https address on the tailnet. Whom Auni trusts is decided at the terminal where it runs, so only
- * `auni up --always-on` calls this, and no route.
+ * https address on the tailnet. Preserves any custom file-configured local `WEB_ORIGIN` so
+ * disabling Tailscale later restores it cleanly. All keys are written atomically in one file write.
  */
 export function saveAlwaysOn(owner: string, origin: string): void {
-  write("WEB_ORIGIN", origin);
-  write("TAILSCALE_OWNER", owner);
+  const existingOrigin = setBy("WEB_ORIGIN") === "file" ? (process.env.WEB_ORIGIN ?? "") : "";
+  const preserveLocal =
+    existingOrigin && !TAILNET_ORIGIN.test(existingOrigin)
+      ? ([["LOCAL_WEB_ORIGIN", existingOrigin]] as const)
+      : ([] as const);
+  writeMany([...preserveLocal, ["WEB_ORIGIN", origin], ["TAILSCALE_OWNER", owner]]);
+}
+
+/**
+ * Clears Tailscale always-on settings atomically so Auni returns to local mode on next start.
+ * Restores any previously saved local `WEB_ORIGIN` (and never wipes an unrelated custom origin).
+ * If any modified variable is locked by the host environment, nothing is changed.
+ */
+export function clearAlwaysOn(): void {
+  const currentOrigin = process.env.WEB_ORIGIN ?? "";
+  const savedLocal =
+    setBy("LOCAL_WEB_ORIGIN") === "file" ? (process.env.LOCAL_WEB_ORIGIN ?? "") : "";
+  const entries: [string, string][] = [["TAILSCALE_OWNER", ""]];
+  if (savedLocal) {
+    entries.push(["WEB_ORIGIN", savedLocal], ["LOCAL_WEB_ORIGIN", ""]);
+  } else if (!currentOrigin || TAILNET_ORIGIN.test(currentOrigin)) {
+    entries.push(["WEB_ORIGIN", ""]);
+  }
+  writeMany(entries);
+}
+
+/**
+ * Sets or clears the owner's preferred brain app (`BRAIN`) in the settings file and immediately
+ * in this process. Validates that any non-null id names a real brain app.
+ */
+export async function savePreferredBrain(id: string | null): Promise<void> {
+  if (id !== null) {
+    const { brains } = await import("./apps/registry.ts");
+    if (!brains().some(({ about }) => about.id === id))
+      throw new PrivateFieldRefused(`${id} is not an AI brain in this Auni.`);
+  }
+  write("BRAIN", id ?? "");
+}
+
+/** Whether a custom RPC URL is safe to store and use: HTTPS, or local loopback HTTP for a fork/node. */
+function validRpcUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!SAVABLE.test(trimmed))
+    throw new PrivateFieldRefused("That URL contains characters that cannot be saved safely.");
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new PrivateFieldRefused("Enter a valid RPC URL.");
+  }
+  const loopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
+  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && loopback))
+    throw new PrivateFieldRefused("RPC URLs must use HTTPS (or localhost HTTP for a local node).");
+  // Preserve the owner's exact path/query without stripping trailing slashes required by some RPCs.
+  return trimmed;
+}
+
+/**
+ * Sets or clears a custom RPC URL (`RPC_URL_<CHAIN>`) in the owner's settings file and puts it
+ * in use immediately (money/chains.ts clears cached clients on settings change).
+ */
+export function saveRpcUrl(chain: NetworkKey, url: string | null): void {
+  if (!(NETWORK_KEYS as readonly string[]).includes(chain))
+    throw new PrivateFieldRefused(`${chain} is not a supported network.`);
+  const envName = `RPC_URL_${chain.toUpperCase()}`;
+  write(envName, url === null || url.trim() === "" ? "" : validRpcUrl(url));
+}
+
+/**
+ * Sets or clears `ALCHEMY_API_KEY` in the owner's settings file and puts it in use immediately.
+ * Never returns or logs the key value.
+ */
+export function saveAlchemyKey(key: string | null): void {
+  write("ALCHEMY_API_KEY", key === null || key.trim() === "" ? "" : savable(key));
 }
 
 /**
@@ -217,32 +298,43 @@ export function saveAlwaysOn(owner: string, origin: string): void {
  * Nothing in it waits, so two saves never read the same old file.
  */
 function write(name: string, value: string): void {
-  if (fromEnvironment?.has(name))
-    throw new PrivateFieldRefused(
-      `This computer's environment sets ${name} itself, so Auni can't change it here.`,
-    );
-  if (!SAVABLE.test(value)) throw new PrivateFieldRefused(UNSAFE);
+  writeMany([[name, value]]);
+}
+
+function writeMany(entries: readonly (readonly [name: string, value: string])[]): void {
+  if (entries.length === 0) return;
+  for (const [name, value] of entries) {
+    if (fromEnvironment?.has(name))
+      throw new PrivateFieldRefused(
+        `This computer's environment sets ${name} itself, so Auni can't change it here.`,
+      );
+    if (!SAVABLE.test(value)) throw new PrivateFieldRefused(UNSAFE);
+  }
 
   const old = fileText();
-  const line = `${name}='${value}'`;
-  const assigns = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`, "u");
-  let placed = false;
-  const kept = old.split("\n").flatMap((each) => {
-    if (!assigns.test(each)) return [each];
-    if (placed) return [];
-    placed = true;
-    return [line];
-  });
-  const next = placed
-    ? kept.join("\n")
-    : `${old}${old && !old.endsWith("\n") ? "\n" : ""}${line}\n`;
+  let next = old;
+  for (const [name, value] of entries) {
+    const line = `${name}='${value}'`;
+    const assigns = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`, "u");
+    let placed = false;
+    const kept = next.split("\n").flatMap((each) => {
+      if (!assigns.test(each)) return [each];
+      if (placed) return [];
+      placed = true;
+      return [line];
+    });
+    next = placed ? kept.join("\n") : `${next}${next && !next.endsWith("\n") ? "\n" : ""}${line}\n`;
+  }
 
+  const targets = new Map(entries);
   const [was, now] = [parseEnv(old), parseEnv(next)];
   const differs = [...new Set([...Object.keys(was), ...Object.keys(now)])].filter(
     (each) => was[each] !== now[each],
   );
-  if (now[name] !== value || differs.some((each) => each !== name))
-    throw new PrivateFieldRefused(UNSAFE);
+  for (const [name, value] of targets) {
+    if (now[name] !== value) throw new PrivateFieldRefused(UNSAFE);
+  }
+  if (differs.some((each) => !targets.has(each))) throw new PrivateFieldRefused(UNSAFE);
 
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
   const beside = `${envFile()}.${randomBytes(6).toString("hex")}.tmp`;
@@ -253,10 +345,14 @@ function write(name: string, value: string): void {
     rmSync(beside, { force: true });
     throw error;
   }
-  process.env[name] = value;
-  const ended = changed;
-  changed = new AbortController();
-  ended.abort("a setting changed");
+  for (const [name, value] of entries) {
+    process.env[name] = value;
+  }
+  for (const [name] of entries) {
+    const ended = changed;
+    changed = new AbortController();
+    ended.abort(name);
+  }
 }
 
 /** A typed value as it is saved, or a refusal: keys are pasted, so the space around one goes. */
@@ -355,6 +451,85 @@ export async function settingFields(): Promise<PrivateField[]> {
       } satisfies PrivateField,
     ];
   });
+}
+
+/** Private field ids for core's step-up-gated network credentials (Alchemy key & per-chain RPCs). */
+export const ALCHEMY_FIELD = "system:alchemy";
+export const rpcField = (chain: NetworkKey) => `system:rpc:${chain}`;
+
+/**
+ * Core's private fields for RPC credentials: Alchemy API key and per-chain custom RPC URLs.
+ * Every one requires owner step-up proof (`proof: true`) and never echoes or caches values.
+ */
+export function networkFields(): PrivateField[] {
+  const fields: PrivateField[] = [];
+  if (setBy("ALCHEMY_API_KEY") !== "environment") {
+    fields.push({
+      id: ALCHEMY_FIELD,
+      label: "Alchemy API key",
+      goes: GOES_TO_SETTINGS,
+      app: "auni",
+      ownerOnly: true,
+      inputs: [
+        {
+          name: "apiKey",
+          label: "Alchemy API key",
+          placeholder: "Paste Alchemy API key",
+          set: setBy("ALCHEMY_API_KEY") !== null,
+        },
+      ],
+      link: null,
+      confirms: false,
+      proof: true,
+      async check(values) {
+        savable(values.apiKey ?? "");
+        return { preview: "", notes: [] };
+      },
+      async accept(values) {
+        saveAlchemyKey(values.apiKey ?? "");
+        return null;
+      },
+      async clear(input) {
+        if (input !== "apiKey") throw new PrivateFieldRefused("Unknown input.");
+        saveAlchemyKey(null);
+      },
+    });
+  }
+  for (const chain of NETWORK_KEYS) {
+    const envVar = `RPC_URL_${chain.toUpperCase()}`;
+    if (setBy(envVar) === "environment") continue;
+    fields.push({
+      id: rpcField(chain),
+      label: `${NETWORKS[chain].name} RPC URL`,
+      goes: GOES_TO_SETTINGS,
+      app: "auni",
+      ownerOnly: true,
+      inputs: [
+        {
+          name: "url",
+          label: `${NETWORKS[chain].name} RPC URL`,
+          placeholder: "Paste custom RPC URL",
+          set: setBy(envVar) !== null,
+        },
+      ],
+      link: null,
+      confirms: false,
+      proof: true,
+      async check(values) {
+        const cleaned = validRpcUrl(values.url ?? "");
+        return { preview: new URL(cleaned).host, notes: [] };
+      },
+      async accept(values) {
+        saveRpcUrl(chain, values.url ?? "");
+        return null;
+      },
+      async clear(input) {
+        if (input !== "url") throw new PrivateFieldRefused("Unknown input.");
+        saveRpcUrl(chain, null);
+      },
+    });
+  }
+  return fields;
 }
 
 /** Each key typed, as it is saved: one left empty is left as it is, but one must be typed. */

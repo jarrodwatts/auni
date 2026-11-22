@@ -9,6 +9,11 @@ import type { PrivateCheckWire, PrivateFieldWire } from "@auni/shared";
 export type PrivateValues = Readonly<Record<string, string>>;
 
 export interface PrivateField extends PrivateFieldWire {
+  /**
+   * True for system settings the owner edits only from Settings (such as custom RPC URLs or the
+   * Alchemy key), which the agent's `request_secret` tool never offers a card for.
+   */
+  readonly ownerOnly?: boolean;
   /** What the values would do, said without them, such as the addresses keys sign for. */
   check(values: PrivateValues): Promise<PrivateCheckWire>;
   /**
@@ -32,12 +37,17 @@ export class PrivateFieldRefused extends Error {}
  * on. Each is loaded when asked for, since each of those files imports this one.
  */
 export async function privateFields(): Promise<PrivateField[]> {
-  const [{ walletFields }, { settingFields }, { signInFields }] = await Promise.all([
+  const [{ walletFields }, { networkFields, settingFields }, { signInFields }] = await Promise.all([
     import("./money/wallets.ts"),
     import("./settings.ts"),
     import("./agent/sign-in.ts"),
   ]);
-  return [...(await walletFields()), ...(await settingFields()), ...signInFields()];
+  return [
+    ...(await walletFields()),
+    ...(await settingFields()),
+    ...networkFields(),
+    ...signInFields(),
+  ];
 }
 
 /** The field core takes now by this id, or null. */

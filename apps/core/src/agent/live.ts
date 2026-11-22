@@ -91,7 +91,6 @@ export async function liveCore(): Promise<LiveCore> {
 async function threadTurn(live: LiveCore, brain: BrainVoice, message: string): Promise<BrainTurn> {
   const context = turnContext({
     owner: { name: "Sam", timeZone: "UTC" },
-    newUser: false,
     placeContext: null,
     wallets: null,
     now: new Date(),

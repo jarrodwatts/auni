@@ -209,7 +209,7 @@ const STOPS: readonly Stop[] = [
   },
   {
     title: "The look",
-    does: "Last one. Open [Settings](/app?settings=profile) and set **Look** to **Dark**, or to whichever you are not in now. It opens over Portfolio, so you see the change at once. Then come back here.",
+    does: "Last one. Open [Settings](/app?settings=appearance) and pick **Dark**, or whichever look you are not in now. It opens over Portfolio, so you see the change at once. Then come back here.",
     reply: "I've picked a look",
     looked: true,
   },

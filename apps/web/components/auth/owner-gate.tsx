@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 import { HandedOverNotice, OwnerNotice } from "@/components/auth/owner-notice";
 import { useOwner } from "@/components/auth/owner-provider";
-import { Waking } from "@/components/landing/landing";
+import { Waking } from "@/components/onboarding/waking";
 
 /** What only the owner's browser sees, once core has said it is theirs; else why not, plainly. */
 export function OwnerGate({ children }: { readonly children: (owner: Me) => ReactNode }) {

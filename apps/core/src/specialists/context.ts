@@ -275,9 +275,3 @@ export async function waitingCardsContext(threadId: string): Promise<string | nu
       : []),
   ].join("\n");
 }
-
-/** True once the owner has started a specialist: the first-take flow is behind them. */
-export async function hasBuiltSpecialist(): Promise<boolean> {
-  const [row] = await db.select({ id: specialists.id }).from(specialists).limit(1);
-  return row !== undefined;
-}

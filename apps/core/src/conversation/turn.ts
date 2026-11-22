@@ -33,12 +33,7 @@ import {
 } from "../db/schema.ts";
 import { env } from "../env.ts";
 import { deliverKind } from "../jobs/kinds.ts";
-import {
-  auniContext,
-  hasBuiltSpecialist,
-  specialistContext,
-  waitingCardsContext,
-} from "../specialists/context.ts";
+import { auniContext, specialistContext, waitingCardsContext } from "../specialists/context.ts";
 import { step } from "../money/life.ts";
 import { arrivalsPromptContext, landLate } from "../money/news.ts";
 import { walletAddresses } from "../money/wallets.ts";
@@ -344,17 +339,14 @@ async function runBegunTurn(
     context.thread,
     visible.filter((message) => message.role === "user").length,
   );
-  const [place, waiting, arrived, built, wallets, me] = await Promise.all([
+  const [place, waiting, arrived, wallets, me] = await Promise.all([
     context.specialist ? specialistContext(context.specialist) : auniContext(),
     waitingCardsContext(threadId),
     arrivalsPromptContext(),
-    hasBuiltSpecialist(),
     // A lookup that fails only costs the agent the addresses, never the turn.
     walletAddresses().catch(() => null),
     theOwner(),
   ]);
-  // No specialist started yet: their first take is still ahead.
-  const newUser = !built;
   const messageId = randomUUID();
   const origin = trigger.kind === "message" ? "human" : "automation";
   const replyToId =
@@ -391,7 +383,6 @@ async function runBegunTurn(
           prompt,
           turnContext({
             owner: me,
-            newUser,
             placeContext: [place, waiting, arrived, await declinedOffers(me.timeZone, wallets)]
               .filter(Boolean)
               .join("\n"),

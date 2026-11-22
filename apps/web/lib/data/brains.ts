@@ -1,7 +1,8 @@
 import { brainsWireSchema, type BrainsWire } from "@auni/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 
+import { ME_KEY } from "@/components/personalization/use-me";
 import { requestCore } from "@/lib/core";
 
 import { listenLive } from "./live";
@@ -89,4 +90,23 @@ export function useBrainAsk(): (ask: Ask) => Promise<void> {
  */
 export function typeIntoSignIn(field: string, line: string): Promise<unknown> {
   return acceptPrivate(field, { line });
+}
+
+/** Sets or clears the owner's preferred AI brain (`BRAIN`), taking effect immediately. */
+export function useSetPreferredBrain() {
+  const queryClient = useQueryClient();
+  return useMutation<BrainsWire, unknown, string | null>({
+    mutationFn: async (brain) =>
+      brainsWireSchema.parse(
+        await requestCore("brains/preferred", {
+          method: "PUT",
+          body: JSON.stringify({ brain }),
+        }),
+      ),
+    onSuccess: (brains) => {
+      queryClient.setQueryData(BRAINS_KEY, brains);
+      void queryClient.invalidateQueries({ queryKey: ME_KEY });
+      void queryClient.invalidateQueries({ queryKey: SETUP_KEY });
+    },
+  });
 }

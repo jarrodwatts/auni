@@ -3,7 +3,7 @@ import { Router } from "express";
 
 import { theOwner } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
-import { refreshStartingPoints } from "../jobs/kinds.ts";
+import { forceRefreshStartingPoints, refreshStartingPoints } from "../jobs/kinds.ts";
 
 /**
  * A new chat's starting points (conversation/starting-points.ts): those saved while they stand,
@@ -16,4 +16,10 @@ startingPointsRouter.get("/", async (_req, res) => {
   const { startingPoints, startingPointsAt } = await theOwner();
   const pending = await refreshStartingPoints(db, startingPointsAt);
   res.json({ points: pending ? [] : (startingPoints ?? []), pending } satisfies StartingPointsWire);
+});
+
+/** Queues a fresh starting-points generation right now, reusing an in-flight run if one is pending. */
+startingPointsRouter.post("/refresh", async (_req, res) => {
+  await forceRefreshStartingPoints(db, { reusePending: true });
+  res.json({ points: [], pending: true } satisfies StartingPointsWire);
 });

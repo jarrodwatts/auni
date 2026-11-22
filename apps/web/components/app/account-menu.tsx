@@ -5,8 +5,6 @@ import { ChevronsUpDown, Plus, Settings } from "lucide-react";
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
 import { VaultArt } from "@/components/brand/vault-art";
-import { useNoBrainYet } from "@/components/first-run/brain-needed";
-import { takeMadeWallet } from "@/components/first-run/wallet-made";
 import { useMoney } from "@/components/money/money-provider";
 import { useMe } from "@/components/personalization/use-me";
 import { useArriving } from "@/components/places/arriving";
@@ -34,19 +32,10 @@ export function AccountMenu() {
   const { loading: portfolioLoading, portfolio } = useMoney();
   const { openAddMoney, openSettings } = useAppDialogs();
   const balance = portfolio ? formatUsdcBalance(BigInt(portfolio.totalUsd.baseUnits)) : null;
-  // Just after the first take: the wallet made for them, its vault, drops into place and stays.
   const arriving = useArriving();
-  // Said of a wallet the take made, and only once Auni isn't asking for a brain in the chat.
-  const noBrain = useNoBrainYet();
-  const saysWallet = arriving && takeMadeWallet() && !noBrain;
 
   return (
     <div className="relative flex-none p-2" data-arriving={arriving || undefined}>
-      {saysWallet ? (
-        <p role="status" className="auni-account-note">
-          Your wallet, kept on this computer.
-        </p>
-      ) : null}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button

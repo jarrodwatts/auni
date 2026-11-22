@@ -547,6 +547,11 @@ describe("core", () => {
       "handover/hand-over.ts": [
         "https://raw.githubusercontent.com/jarrodwatts/auni/main/install.sh",
       ],
+      // Optional public X profile lookup for owner personalization signals (read-only, no API key).
+      "signals.ts": [
+        "https://api.fxtwitter.com/${encodeURIComponent(handle",
+        "https://syndication.twitter.com/srv/timeline-profile/screen-name/${encodeURIComponent(handle",
+      ],
     };
     const held = Object.fromEntries(
       core.flatMap((file) => {

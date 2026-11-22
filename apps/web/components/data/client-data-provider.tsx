@@ -2,9 +2,10 @@
 
 import type { Me } from "@auni/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ME_KEY } from "@/components/personalization/use-me";
+import { listenLive } from "@/lib/data/live";
 import { getMe } from "@/lib/data/me";
 
 /**
@@ -38,6 +39,14 @@ export function ClientDataProvider({
     client.setQueryData(ME_KEY, me);
     return client;
   });
+
+  useEffect(() => {
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: ME_KEY });
+    const live = listenLive((message) => {
+      if (message.topic === "me") refresh();
+    }, refresh);
+    return live.close;
+  }, [queryClient]);
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }

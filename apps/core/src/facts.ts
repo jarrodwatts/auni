@@ -1,9 +1,9 @@
-import type { FactSource } from "@auni/shared";
+import { knownAsset, type FactSource, type OwnerSignals } from "@auni/shared";
 import { desc, eq } from "drizzle-orm";
 
 import { theOwner } from "./auth/owner.ts";
 import { db } from "./db/client.ts";
-import { specialists, type SpecialistRow } from "./db/schema.ts";
+import { specialists, type OwnerRow, type SpecialistRow } from "./db/schema.ts";
 import { startFrom, type FactStart, type AppFact, type OwnerSeen } from "./apps/contract.ts";
 import { factSources } from "./apps/registry.ts";
 import { dayMoves } from "./money/day-moves.ts";
@@ -49,9 +49,9 @@ const SPECIALISTS_TOLD = 3;
  */
 const FACTS_PORTFOLIO_WAIT_MS = 30_000;
 
-/** Everything Auni sees now: their money first, which is always there, then the rest. */
+/** Everything Auni sees now: their money first, which is always there, then their signals & the rest. */
 export async function readFacts(): Promise<Fact[]> {
-  const [portfolio, team] = await Promise.all([
+  const [portfolio, team, me] = await Promise.all([
     promptPortfolio(FACTS_PORTFOLIO_WAIT_MS),
     db
       .select()
@@ -59,6 +59,7 @@ export async function readFacts(): Promise<Fact[]> {
       .where(eq(specialists.status, "active"))
       .orderBy(desc(specialists.createdAt))
       .limit(SPECIALISTS_TOLD),
+    theOwner(),
   ]);
   const held = await heldNow(portfolio);
   const seen: OwnerSeen = {
@@ -73,8 +74,58 @@ export async function readFacts(): Promise<Fact[]> {
     ...moneyFacts(portfolio),
     ...team.map(specialistFact),
     ...held.slice(0, HOLDINGS_TOLD).map(holdingFact),
+    ...personalFacts(me),
     ...(await appFacts(seen)),
   ];
+}
+
+/** Facts drawn from the owner's connected signals (X handle, watch-only wallets, learned profile). */
+function personalFacts(
+  me: Pick<OwnerRow, "xHandle" | "profileSummary" | "profileSignals">,
+): Fact[] {
+  const out: Fact[] = [];
+  const signals: OwnerSignals | null = me.profileSignals ?? null;
+  const holdings = signals?.watchedHoldings ?? [];
+  for (const h of holdings.slice(0, 2)) {
+    const value = dollars(h.usdValue);
+    const asset = knownAsset(h.symbol);
+    out.push({
+      text: `A watched external wallet holds ${value} of ${h.name} (${h.symbol}) on ${h.chain} (watch-only; not in Auni's wallet).`,
+      source: { app: AUNI, label: `Watched ${h.symbol}`, link: "/app?settings=personalization" },
+      image: asset?.logoUrl ?? null,
+      starts: startFrom(
+        `A wallet I'm watching holds about ${value} of ${h.name} on ${h.chain}. What's your take on ${h.name} right now, and are there smart angles around it?`,
+        [
+          { statement: `Watched ${h.symbol}: ${value}.`, action: "Any angles?" },
+          { statement: `You watch ${h.name}.`, action: "Any angles?" },
+        ],
+      ),
+    });
+  }
+  const topics = signals?.xTopics ?? [];
+  if (me.profileSummary || topics.length > 0) {
+    const parts = [
+      me.profileSummary ? `Owner profile: ${me.profileSummary}` : null,
+      topics.length > 0 ? `Owner's active themes: ${topics.join(", ")}.` : null,
+      me.xHandle ? `Connected X handle: @${me.xHandle}.` : null,
+    ].filter(Boolean);
+    const firstTopic = topics[0];
+    out.push({
+      text: parts.join(" "),
+      source: { app: AUNI, label: "Your profile", link: "/app?settings=personalization" },
+      image: null,
+      starts: firstTopic
+        ? startFrom(
+            `Based on my interest in ${firstTopic}, what's moving right now that could make a sharp take or position?`,
+            [
+              { statement: `${firstTopic} lately.`, action: "What's moving?" },
+              { statement: "Tailored to you.", action: "Explore ideas" },
+            ],
+          )
+        : [],
+    });
+  }
+  return out;
 }
 
 /**

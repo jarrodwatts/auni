@@ -46,3 +46,13 @@ export function publishThreadGone(threadId: string): void {
 export function publishBrains(): void {
   emit({ topic: "brains" });
 }
+
+/** The owner's settings or profile changed, so open tabs refresh `/me` and apply synced theme changes. */
+export function publishMe(): void {
+  emit({ topic: "me" });
+}
+
+/** Fresh tailored starting points were saved, so open new-chat screens update immediately. */
+export function publishStartingPoints(): void {
+  emit({ topic: "starting-points" });
+}

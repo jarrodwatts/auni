@@ -10,6 +10,7 @@ import { ClientDataProvider } from "@/components/data/client-data-provider";
 import { MoneyProvider } from "@/components/money/money-provider";
 import { TimeZoneSync } from "@/components/personalization/time-zone-sync";
 import { StarPrompt } from "@/components/star/star-prompt";
+import { LookSync } from "@/lib/look";
 
 /**
  * The app for the owner's browser, which keeps a new chat's starting points ready from any page. Nothing opens over it by itself: first run ends on Auni's chat
@@ -28,6 +29,7 @@ export function AuthenticatedProduct({
       <MoneyProvider>
         {children}
         <AppDialogs />
+        <LookSync />
         <TimeZoneSync />
         <BackFromTheTerminal />
         <StartingPointsReady />

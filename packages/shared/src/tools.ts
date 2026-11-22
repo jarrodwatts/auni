@@ -113,6 +113,8 @@ export const AUNI_TOOL_NAMES = [
   "connect_app",
   "request_secret",
   "send_feedback",
+  "inspect_auni",
+  "update_auni_preferences",
   "read_chain",
   "fetch_url",
 ] as const;

@@ -19,13 +19,13 @@ network on purpose, as a later `-H` wins.
 - Pages: `app/`. Whose browser this is: `components/auth/owner-provider.tsx`, which spends the
   pairing link's code (`/app#pair=<code>`) as the app loads, and `owner-gate.tsx` (the honest
   states: link used, still starting, no database).
-- First run is the owner's first take: until they send it, the app is the landing
-  (`components/landing/`), Auni among takes people hold and one question, over `/app/new`;
-  sending it makes the wallet and dives into the chat it starts (`landing-dive.ts`, handed the
-  chat's first frame by `lib/first-message.ts`). The rest is `components/first-run/`. What it still needs is core's `GET /setup`, never this tab's memory:
-  no AI asks in the chat (`brain-needed.tsx`, on an answer core marked `noBrain`), money is the
-  card's own Add money, the spare key comes once a first trade is through (`spare-key.tsx`), and an auni.io
-  wallet comes in at its quiet door (`bring-wallet.tsx`).
+- First run is a skippable 3-step local wizard (`components/onboarding/welcome-wizard.tsx`):
+  AI brain (`GET /brains`), local wallet creation or key import (`GET /setup`), and optional
+  read-only signals (X handle, watch-only wallet). Chat fallbacks stay in `components/first-run/`
+  (`brain-needed.tsx`, `spare-key.tsx`).
+- Settings (`components/settings/`): grouped searchable modal over `/me`, `/brains`, `/apps`, and
+  `/system/*` (`lib/data/system.ts`) for General, Appearance, Personalization, AI Brains, Wallet,
+  Channels, Remote access (Tailscale, service, sessions, handover), Network/RPCs, Diagnostics, About.
 - The owner's AI, made ready from any device: `components/brains/brain-row.tsx`, one row a brain
   on core's `GET /brains` (`lib/data/brains.ts`): installing its CLI, or its own sign-in (a page
   and code, or its prompt as a terminal, typed into by its private field). First run's ask for a

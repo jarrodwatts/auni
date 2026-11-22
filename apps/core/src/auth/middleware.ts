@@ -11,6 +11,8 @@ declare global {
     interface Request {
       /** This owner's request proves the owner is there (auth/proof.ts), as requireOwner judged it. */
       ownerHere?: boolean;
+      /** Current paired session row id in local mode (undefined under Tailscale). */
+      sessionId?: string;
     }
   }
 }
@@ -67,6 +69,7 @@ export async function requireOwner(req: Request, res: Response, next: NextFuncti
   if (!session) return void res.status(401).json({ error: "pairing_required" });
   fromTheApp(req, res, () => {
     req.ownerHere = session.freshlyPaired;
+    req.sessionId = session.id;
     next();
   });
 }

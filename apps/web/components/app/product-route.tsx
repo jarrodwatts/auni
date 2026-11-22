@@ -5,7 +5,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { AuthenticatedProduct } from "@/components/auth/authenticated-product";
 import { OwnerGate } from "@/components/auth/owner-gate";
-import { Waking } from "@/components/landing/landing";
+import { Waking } from "@/components/onboarding/waking";
 
 /** Where first run is: a new chat, which is the first take until it's sent. */
 const FIRST_RUN = "/app/new";

@@ -21,13 +21,18 @@ export function useSetup() {
 }
 
 /**
- * Saying the spare key is saved or will be later, or sending the first take (which makes the
- * wallet).
+ * Setup steps the owner takes during onboarding or first run: creating a local wallet, backing
+ * up keys, or completing onboarding (optionally with X handle and a watch-only wallet).
  */
-type SetupStep = {
-  readonly path: "setup/backup" | "setup/backup/later" | "setup/done";
-  readonly body: Record<string, never>;
-};
+type SetupStep =
+  | {
+      readonly path: "setup/backup" | "setup/backup/later" | "setup/wallet";
+      readonly body: Record<string, never>;
+    }
+  | {
+      readonly path: "setup/done";
+      readonly body: { readonly xHandle?: string; readonly watchedWallet?: string };
+    };
 
 /** Takes one step, keeping core's answer as where first run stands now. */
 export function useSetupStep() {

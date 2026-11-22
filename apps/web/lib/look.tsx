@@ -1,8 +1,9 @@
 "use client";
 
 import { APP_THEMES, appListing } from "@auni/shared";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
+import { useMe } from "@/components/personalization/use-me";
 import { useStoredChoice } from "@/components/places/stored-state";
 
 import { LOOK_KEY } from "./look-first";
@@ -48,5 +49,34 @@ export function Look() {
       bar.content = look ? page : bar.dataset.system;
     }
   }, [look]);
+  return null;
+}
+
+/**
+ * Keeps this browser's look aligned with the owner's saved look (`me.look`) when updated from
+ * another tab, another device, or Auni's `update_auni_preferences` tool in chat.
+ */
+export function LookSync() {
+  const { look: serverLook } = useMe();
+  const [localLook, setLook] = useLook();
+  const lastServer = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const normalized = serverLook && LOOKS.some(({ id }) => id === serverLook) ? serverLook : null;
+    if (lastServer.current === undefined) {
+      lastServer.current = normalized;
+      // On first mount, apply server preference if set and different from local.
+      if (normalized !== null) {
+        const target = normalized === "light" ? null : normalized;
+        if (target !== localLook) setLook(target);
+      }
+      return;
+    }
+    if (normalized === lastServer.current) return;
+    lastServer.current = normalized;
+    const target = normalized === null || normalized === "light" ? null : normalized;
+    if (target !== localLook) setLook(target);
+  }, [localLook, serverLook, setLook]);
+
   return null;
 }

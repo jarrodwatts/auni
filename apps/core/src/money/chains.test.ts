@@ -205,4 +205,8 @@ describe("where Auni reaches a chain", () => {
     expect(await evmClient(NETWORKS.ink.viem.id).getBlockNumber({ cacheTime: 0 })).toBe(16n);
     expect(asked).toEqual(NETWORKS.ink.rpcs.map((url) => new URL(url).href));
   });
+
+  it("disables off-chain CCIP-Read lookups so resolvers cannot make core dial arbitrary URLs", () => {
+    expect(evmClient(1).ccipRead).toBe(false);
+  });
 });

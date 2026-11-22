@@ -1,25 +1,31 @@
 import type { SetupWire } from "@auni/shared";
 import express, { Router } from "express";
 import { sql } from "drizzle-orm";
+import { z } from "zod";
 
-import { theOwner } from "../auth/owner.ts";
+import { lockOwner } from "../auth/owner.ts";
+import { publishMe } from "../conversation/stream.ts";
 import { db } from "../db/client.ts";
 import { owner } from "../db/schema.ts";
-import { refreshStartingPoints } from "../jobs/kinds.ts";
+import {
+  enqueueSignalsRefresh,
+  forceRefreshStartingPoints,
+  refreshStartingPoints,
+} from "../jobs/kinds.ts";
 import { WalletExists } from "../apps/contract.ts";
 import { createWallet } from "../money/wallets.ts";
 import { brainsFact, keyWorthSaving, ownerState, spareKey, walletFacts } from "../setup.ts";
+import { appendWatchedWallet, normalizeXHandle, resolveWatchedWallet } from "../signals.ts";
 import { brainRowWire, LOGIN_SEEN_MS } from "./brains.ts";
 
 /**
- * First run, as the web app plays it: where it stands (setup.ts's facts, read fresh), and the two
- * steps only the owner takes. First run is their first take: sending it finishes first run, and
- * makes the wallet, unless they brought one (its private field). Their spare key comes later, once
- * the wallet holds money (setup.ts's keyWorthSaving): showing it is /me/keys, with its proof
- * (auth/proof.ts), then saying it's saved, or that they'll save it later.
+ * Local onboarding wizard & spare-key state (`GET /setup` and steps). Creating or importing a
+ * wallet happens explicitly on Step 2 (or automatically if skipped on `/done`), and optional
+ * personalization signals (X handle, watch-only wallet) kick off background signal synthesis and
+ * tailored starting points immediately.
  */
 export const setupRouter = Router();
-setupRouter.use(express.json({ limit: "1kb" }));
+setupRouter.use(express.json({ limit: "4kb" }));
 
 async function setupWire(): Promise<SetupWire> {
   const [brains, state, wallet, worthSaving] = await Promise.all([
@@ -40,6 +46,17 @@ setupRouter.get("/", async (_req, res) => {
   res.json(await setupWire());
 });
 
+/** Explicitly generates a fresh local wallet during Step 2 of onboarding (idempotent). */
+setupRouter.post("/wallet", async (_req, res) => {
+  if (!(await walletFacts()).addresses) {
+    await createWallet().catch((error: unknown) => {
+      if (!(error instanceof WalletExists)) throw error;
+    });
+  }
+  publishMe();
+  res.json(await setupWire());
+});
+
 setupRouter.post("/backup", async (_req, res) => {
   if (!(await walletFacts()).addresses) return void res.status(409).json({ error: "no_wallet" });
   await db.update(owner).set({ backupSavedAt: sql`now()` });
@@ -52,18 +69,72 @@ setupRouter.post("/backup/later", async (_req, res) => {
   res.json(await setupWire());
 });
 
-/** Finishing makes the wallet the owner didn't bring, then opens the app on their first take. */
-setupRouter.post("/done", async (_req, res) => {
+const doneBodySchema = z
+  .object({
+    xHandle: z.string().trim().max(120).optional(),
+    watchedWallet: z.string().trim().max(160).optional(),
+  })
+  .optional();
+
+/** Finishing validates any supplied signals first, ensures a wallet exists, and opens Auni's chat. */
+setupRouter.post("/done", async (req, res) => {
+  const parsed = doneBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body", issues: parsed.error.issues });
+    return;
+  }
+
+  let xHandle: string | null = null;
+  if (parsed.data?.xHandle) {
+    xHandle = normalizeXHandle(parsed.data.xHandle);
+    if (!xHandle) {
+      res.status(400).json({
+        error: "invalid_x_handle",
+        detail: "Enter a valid X handle (letters, numbers, underscores), or leave it blank.",
+      });
+      return;
+    }
+  }
+
+  let watchedResolved: Awaited<ReturnType<typeof resolveWatchedWallet>> | null = null;
+  if (parsed.data?.watchedWallet) {
+    try {
+      watchedResolved = await resolveWatchedWallet(parsed.data.watchedWallet);
+    } catch (error) {
+      res.status(400).json({
+        error: "invalid_wallet",
+        detail:
+          error instanceof Error
+            ? error.message
+            : "Enter a valid EVM 0x address, .eth ENS name, or Solana address.",
+      });
+      return;
+    }
+  }
+
   if (!(await walletFacts()).addresses)
     await createWallet().catch((error: unknown) => {
       // Made meanwhile, say by a second tab finishing at once: that one is theirs.
       if (!(error instanceof WalletExists)) throw error;
     });
+
   await db.transaction(async (tx) => {
-    const { startingPointsAt } = await theOwner(tx);
-    await tx.update(owner).set({ welcomedAt: sql`coalesce(${owner.welcomedAt}, now())` });
-    // So Auni's chat, which opens next, has its starting points ready.
-    await refreshStartingPoints(tx, startingPointsAt);
+    const me = await lockOwner(tx);
+    const nextWatched = watchedResolved
+      ? appendWatchedWallet(me.watchedWallets, watchedResolved)
+      : undefined;
+    await tx.update(owner).set({
+      welcomedAt: sql`coalesce(${owner.welcomedAt}, now())`,
+      ...(xHandle ? { xHandle } : {}),
+      ...(nextWatched ? { watchedWallets: nextWatched } : {}),
+    });
+    if (xHandle || watchedResolved) {
+      await enqueueSignalsRefresh(tx);
+      await forceRefreshStartingPoints(tx);
+    } else {
+      await refreshStartingPoints(tx, me.startingPointsAt);
+    }
   });
+  publishMe();
   res.json(await setupWire());
 });

@@ -9,8 +9,6 @@ import {
   type SetStateAction,
 } from "react";
 
-import { consumeBootDraft } from "@/components/app/composer-boot-draft";
-
 const draftStorageKey = (draftKey: string) => `auni:composer-draft:${draftKey}`;
 
 /** Reads the tab-scoped copy of a draft. Storage being blocked reads as empty. */
@@ -47,27 +45,21 @@ interface ComposerDraft {
 export function useComposerDraft({
   draftKey,
   initialMessage,
-  interactive,
 }: {
   readonly draftKey: string | undefined;
   readonly initialMessage: string;
-  readonly interactive: boolean;
 }): ComposerDraft {
   const [message, setMessage] = useState(initialMessage);
   const adoptedRef = useRef(false);
 
   useEffect(() => {
-    if (!interactive || adoptedRef.current) return;
+    if (adoptedRef.current) return;
     adoptedRef.current = true;
-    const draft = consumeBootDraft() || (draftKey ? readStoredDraft(draftKey) : "");
-    // Adoption reads storage the composer cannot see during render, so the
-    // handoff is a store subscription's first read, not a render cascade. It
-    // happens once, at the moment the composer becomes real.
+    const draft = draftKey ? readStoredDraft(draftKey) : "";
+    // Adoption reads sessionStorage the composer cannot see during SSR, once on mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     if (draft) setMessage((current) => current || draft);
-    // Reacting to later changes would overwrite what the person typed since.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interactive]);
+  }, [draftKey]);
 
   useEffect(() => {
     if (!draftKey) return;

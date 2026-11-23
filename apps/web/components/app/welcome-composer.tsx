@@ -41,7 +41,7 @@ export function WelcomeComposer({
   };
 
   return (
-    <div className="w-full max-w-[680px]">
+    <div className="w-full max-w-[680px]" data-slot="welcome-composer">
       <Composer
         busy={busy}
         draftKey="new"

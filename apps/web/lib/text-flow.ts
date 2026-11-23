@@ -1,16 +1,16 @@
 /** Backlog (chars) at or below which the frontier snaps with no timer. */
 const PASS_THROUGH_CHARS = 24;
 /** Delay between drain ticks while the stream is still open. */
-const TICK_MS = 44;
+const TICK_MS = 32;
 /** Delay between drain ticks once the turn has finalized (catch-up). */
-const FINALIZED_TICK_MS = 26;
+const FINALIZED_TICK_MS = 20;
 /** Every this-many backlog chars adds one word to a drain tick. */
 const DRAIN_CHARS_PER_EXTRA_WORD = 160;
 /** Upper bound on words revealed per drain tick. */
 const MAX_WORDS_PER_TICK = 8;
 
 /** How long a fully revealed flow keeps animating so tail words finish fading. */
-const SETTLE_GRACE_MS = 250;
+const SETTLE_GRACE_MS = 320;
 
 /** Tolerance for timers firing marginally before their target. */
 const TIMER_EPSILON_MS = 5;

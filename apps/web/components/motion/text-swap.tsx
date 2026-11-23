@@ -9,39 +9,68 @@ import { swapOf, swapTo } from "./swap";
 import { useHandover, type Motion } from "./use-handover";
 
 const LEAVE: Motion = {
-  keyframes: [{ opacity: 0, transform: "translateY(-0.24em)", filter: `blur(${blurs.subtle}px)` }],
+  keyframes: [{ opacity: 0, filter: `blur(${blurs.soft}px)` }],
   options: { duration: durations.fast, easing: easings.settle },
 };
 
 const ARRIVE: Motion = {
   keyframes: [
-    { opacity: 0, transform: "translateY(0.3em)", filter: `blur(${blurs.soft}px)` },
-    { opacity: 1, transform: "none", filter: "blur(0px)" },
+    { opacity: 0, filter: `blur(${blurs.soft}px)` },
+    { opacity: 1, filter: "blur(0px)" },
   ],
   options: { duration: durations.standard, easing: easings.drift },
 };
 
+interface TextSwapCopy {
+  readonly className?: string | undefined;
+  readonly detail?: string | null | undefined;
+  readonly detailClassName?: string | undefined;
+  readonly text: string;
+}
+
 /**
- * One line of words that hands over when they change: the old words lift
- * away as the new ones rise in, and the line eases to its new width, so
- * nothing beside it jumps. Too long for its room, the words end in an
- * ellipsis, or with `wrap` run onto a second line first. Only the current
- * words are read out.
+ * One line of words that hands over in place when they change: the old words
+ * soften out of focus as the new ones sharpen in on the same baseline, and the
+ * line eases to its new width so nothing beside it jumps. Too long for its
+ * room, the words end in an ellipsis, or with `wrap` run onto a second line
+ * first. Only the current words are read out.
  */
 export function TextSwap({
+  align = "start",
   className,
+  detail,
+  detailClassName,
   text,
   wrap = false,
 }: {
-  /** Styles the current words, and stays with them as they leave: `shimmer` while working. */
-  readonly className?: string;
+  /** Which edge a leaving copy anchors to while the width glides. */
+  readonly align?: "start" | "end";
+  /** Styles the current words, and stays with them as they leave. */
+  readonly className?: string | undefined;
+  /** Optional quieter phrase kept inside the same blur-morph. */
+  readonly detail?: string | null | undefined;
+  readonly detailClassName?: string | undefined;
   readonly text: string;
   /** Words that must be read whole, such as what a card buys, take two lines before an ellipsis. */
   readonly wrap?: boolean;
 }) {
-  const [swap, setSwap] = useState(() => swapOf({ className, text }));
-  if (swap.current.text !== text || swap.current.className !== className) {
-    setSwap(swapTo(swap, { className, text }, swap.current.text !== text && !reducedMotion()));
+  const [swap, setSwap] = useState<ReturnType<typeof swapOf<TextSwapCopy>>>(() =>
+    swapOf({ className, detail, detailClassName, text }),
+  );
+  if (
+    swap.current.text !== text ||
+    swap.current.detail !== detail ||
+    swap.current.className !== className ||
+    swap.current.detailClassName !== detailClassName
+  ) {
+    const visibleChange = swap.current.text !== text || swap.current.detail !== detail;
+    setSwap(
+      swapTo(
+        swap,
+        { className, detail, detailClassName, text },
+        visibleChange && !reducedMotion(),
+      ),
+    );
   }
   const copy = useHandover(swap, setSwap, LEAVE, ARRIVE);
 
@@ -70,6 +99,13 @@ export function TextSwap({
 
   const copies = [...swap.leaving, { id: swap.id, value: swap.current }];
   const fit = wrap ? "line-clamp-2" : "truncate";
+  const anchor = align === "end" ? "right-0" : "left-0";
+  const renderCopy = (value: TextSwapCopy) => (
+    <>
+      {value.text}
+      {value.detail ? <span className={value.detailClassName}> {value.detail}</span> : null}
+    </>
+  );
   return (
     <span
       ref={box}
@@ -83,16 +119,16 @@ export function TextSwap({
             className={cn(!wrap && "block", fit, value.className)}
             data-slot="text-swap"
           >
-            {value.text}
+            {renderCopy(value)}
           </span>
         ) : (
           <span
             key={id}
             ref={copy(id)}
             aria-hidden
-            className={cn("pointer-events-none absolute top-0 left-0", fit, value.className)}
+            className={cn("pointer-events-none absolute top-0", anchor, fit, value.className)}
           >
-            {value.text}
+            {renderCopy(value)}
           </span>
         ),
       )}

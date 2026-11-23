@@ -7,26 +7,47 @@ import { COMPOSER_DOCK_CLASS_NAME } from "@/components/app/composer-shell";
 import { ConversationHistoryPreview } from "@/components/app/conversation-history-preview";
 import { ConversationMessage } from "@/components/app/conversation-message";
 import { useConversationLaunch } from "@/components/app/conversation-launch-context";
-import { Mascot } from "@/components/brand/mascot";
 import { BrainNeeded, useNoBrainYet } from "@/components/first-run/brain-needed";
 import { CHAT_PLACEHOLDER } from "@/components/places/chat-place";
 import { PlaceHeader } from "@/components/places/place-header";
 import { createOptimisticUserMessage, pendingAnswer } from "@/lib/conversation";
+import { easings, reducedMotion } from "@/lib/motion";
 
 /**
  * The first moment of a new chat, held over the place while it starts: the question sent, Auni
- * on it, the reply box below. Drawn exactly as the thread will draw it, so the handover
- * underneath changes nothing. The owner's first take is carried in by the landing's dive, which
- * flies its words, its box and Auni into this frame: it draws no entrance of its own then.
+ * on it, and the reply box smoothly gliding down from the centered welcome composer into the dock.
+ * Drawn identically to the thread underneath so the handover is invisible.
  */
 export function ConversationLaunchStage() {
   const { launch } = useConversationLaunch();
   const brainless = useNoBrainYet();
   const stage = useRef<HTMLElement>(null);
+  const composerDockRef = useRef<HTMLDivElement>(null);
   const carried = launch?.carried ?? null;
+  const launchId = launch?.id ?? null;
+  const composerFromTop = launch?.composerFromTop ?? null;
+
   useLayoutEffect(() => {
     if (carried && stage.current) carried.arrive(stage.current);
   }, [carried]);
+
+  // FLIP-glide the docked composer smoothly down from the hero welcome composer's exact Y.
+  useLayoutEffect(() => {
+    const dock = composerDockRef.current;
+    if (!dock || carried || composerFromTop === null || reducedMotion()) return undefined;
+    const target = dock.querySelector("form") ?? dock;
+    const toTop = target.getBoundingClientRect().top;
+    const dy = composerFromTop - toTop;
+    if (Math.abs(dy) < 2 || typeof dock.animate !== "function") return undefined;
+    const animation = dock.animate(
+      [
+        { transform: `translate3d(0, ${dy}px, 0)` },
+        { transform: "translate3d(0, 0, 0)" },
+      ],
+      { duration: 360, easing: easings.settle },
+    );
+    return () => animation.cancel();
+  }, [carried, composerFromTop, launchId]);
 
   if (!launch) return null;
   const message = createOptimisticUserMessage(launch.messageId, launch.prompt, {
@@ -50,7 +71,7 @@ export function ConversationLaunchStage() {
       {/* Once started, it wears the header of the chat it opens into, arriving softly. */}
       <PlaceHeader
         className="auni-conversation-launch-header"
-        icon={placed ? null : <Mascot alt="" size={22} state="thinking" />}
+        icon={null}
         preview
         title={
           placed ? (
@@ -68,7 +89,7 @@ export function ConversationLaunchStage() {
           <div className="auni-conversation-launch-message min-w-0" data-slot="conversation-turn">
             <ConversationMessage isStreaming={false} message={message} />
           </div>
-          {/* The answer to come, exactly as the thread will draw it before it hears a step. */}
+          {/* The answer to come, drawn identically to the live thread before any step arrives. */}
           <div className="auni-conversation-launch-thinking min-w-0" data-slot="conversation-turn">
             {brainless ? (
               <BrainNeeded latest={false} onReady={() => undefined} />
@@ -77,7 +98,6 @@ export function ConversationLaunchStage() {
                 isStreaming={false}
                 message={pendingAnswer(message)}
                 pending
-                firstAnswer
                 workStartedAt={message.metadata?.createdAt}
               />
             )}
@@ -85,6 +105,7 @@ export function ConversationLaunchStage() {
         </ConversationHistoryPreview>
 
         <div
+          ref={composerDockRef}
           aria-hidden
           inert
           className={`auni-conversation-launch-composer ${COMPOSER_DOCK_CLASS_NAME}`}
@@ -92,6 +113,7 @@ export function ConversationLaunchStage() {
           <Composer
             busy={!brainless}
             draftKey="launch"
+            footerStrip={<div aria-hidden className="h-7" />}
             onStop={() => undefined}
             onSubmit={() => undefined}
             placeholder={placeholder}

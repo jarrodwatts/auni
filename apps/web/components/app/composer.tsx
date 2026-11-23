@@ -18,8 +18,6 @@ import { useComposerDraft } from "@/components/app/composer-drafts";
 import {
   COMPOSER_INPUT_CLASS_NAME,
   COMPOSER_SURFACE_CLASS_NAME,
-  ComposerLoadingLayout,
-  type ComposerLoadingPhase,
 } from "@/components/app/composer-shell";
 import type { MascotReadingTarget } from "@/components/brand/interactive-mascot";
 import { cn } from "@/lib/utils";
@@ -67,6 +65,7 @@ export function useComposerLead(): ComposerLeadControls {
 interface ComposerProps {
   readonly autoFocus?: boolean;
   readonly busy?: boolean;
+  /** Disables both typing and sending (for example, when thread history failed to load). */
   readonly disabled?: boolean;
   /** Persists the draft in sessionStorage under this key so remounts keep it. */
   readonly draftKey?: string;
@@ -77,8 +76,9 @@ interface ComposerProps {
   readonly inlineControl?: ReactNode;
   /** Quiet control strip directly beneath the composer box (environment left, autonomy right). */
   readonly footerStrip?: ReactNode;
-  readonly loadingPhase?: ComposerLoadingPhase;
   readonly placeholder: string;
+  /** Keeps the box grounded and typeable while holding submit until messages finish loading. */
+  readonly sendDisabled?: boolean;
   readonly onCaretActivity?: (target: MascotReadingTarget) => void;
   readonly onStop?: () => void;
   readonly onSubmit: (message: string) => void | Promise<void>;
@@ -93,26 +93,23 @@ export function Composer({
   initialMessage = "",
   inlineControl,
   lead,
-  loadingPhase = "ready",
   onCaretActivity,
   onStop,
   onSubmit,
   placeholder,
+  sendDisabled = false,
 }: ComposerProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const composerInteractive = loadingPhase === "ready";
-  const interactionDisabled = disabled || !composerInteractive;
 
   const { clearForSend, message, setMessage } = useComposerDraft({
     draftKey,
     initialMessage,
-    interactive: composerInteractive,
   });
 
   useComposerCaret(inputRef, message, onCaretActivity);
 
   useEffect(() => {
-    if (!autoFocus || interactionDisabled) return;
+    if (!autoFocus || disabled) return;
     // On a phone the keyboard would cover the answer; it opens for words handed back to edit.
     if (!initialMessage && matchMedia("(pointer: coarse)").matches) return;
     const frame = requestAnimationFrame(() => {
@@ -122,10 +119,10 @@ export function Composer({
       input.setSelectionRange(initialMessage.length, initialMessage.length);
     });
     return () => cancelAnimationFrame(frame);
-  }, [autoFocus, initialMessage, interactionDisabled]);
+  }, [autoFocus, disabled, initialMessage]);
 
   useEffect(() => {
-    if (!draftKey || interactionDisabled) return;
+    if (!draftKey || disabled) return;
     const take = () => {
       const input = inputRef.current;
       if (!input || focusRequest?.draftKey !== draftKey) return;
@@ -139,7 +136,7 @@ export function Composer({
     return () => {
       focusListeners.delete(take);
     };
-  }, [draftKey, interactionDisabled, setMessage]);
+  }, [disabled, draftKey, setMessage]);
 
   useLayoutEffect(() => {
     const input = inputRef.current;
@@ -147,7 +144,7 @@ export function Composer({
     resizeComposerDraft(input);
   }, [message]);
 
-  const canSend = (!busy || Boolean(onStop)) && !interactionDisabled;
+  const canSend = (!busy || Boolean(onStop)) && !disabled && !sendDisabled;
   const showStop = busy && Boolean(onStop) && message.trim().length === 0;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -164,7 +161,7 @@ export function Composer({
     send: (text) => {
       if (canSend && text.trim()) void onSubmit(text.trim());
     },
-    disabled: interactionDisabled || !canSend,
+    disabled: disabled || !canSend,
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -176,24 +173,18 @@ export function Composer({
   return (
     <div className="flex flex-col">
       <form
-        aria-busy={!composerInteractive}
-        data-loading-phase={loadingPhase}
         className={cn(
           COMPOSER_SURFACE_CLASS_NAME,
           // Glows for typing only: tapping a docked answer is not writing.
           "transition-shadow duration-300 ease-settle has-[textarea:focus]:shadow-[0_10px_30px_--alpha(var(--color-primary)/12%),0_0_0_1px_--alpha(var(--color-primary)/24%)] motion-reduce:transition-none",
         )}
         onClick={(event) => {
-          if (!interactionDisabled) focusDraftFromTap(event.target, inputRef.current);
+          if (!disabled) focusDraftFromTap(event.target, inputRef.current);
         }}
         onSubmit={(event) => void submit(event)}
       >
         {lead ? <ComposerLeadContext value={leadControls}>{lead}</ComposerLeadContext> : null}
-        <div
-          className="auni-composer-live flex flex-col gap-1.5"
-          data-phase={loadingPhase}
-          inert={!composerInteractive}
-        >
+        <div className="flex flex-col gap-1.5">
           <label className="sr-only" htmlFor="auni-message">
             Message Auni
           </label>
@@ -209,7 +200,7 @@ export function Composer({
             }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            disabled={interactionDisabled}
+            disabled={disabled}
             autoComplete="off"
             className={cn(
               COMPOSER_INPUT_CLASS_NAME,
@@ -225,9 +216,7 @@ export function Composer({
               aria-label={
                 showStop ? "Stop response" : busy && !onStop ? "Auni is responding" : "Send message"
               }
-              disabled={
-                interactionDisabled || (!showStop && (!canSend || message.trim().length === 0))
-              }
+              disabled={disabled || (!showStop && (!canSend || message.trim().length === 0))}
               onClick={showStop ? onStop : undefined}
             >
               <span className="pointer-events-none flex size-8 items-center justify-center rounded-full bg-foreground transition-[background-color,color] duration-200 ease-settle group-hover/submit:bg-foreground/85 group-focus-visible/submit:ring-[3px] group-focus-visible/submit:ring-ring/50 group-disabled/submit:bg-foreground/[0.07] group-disabled/submit:text-foreground/35">
@@ -242,24 +231,9 @@ export function Composer({
             </button>
           </div>
         </div>
-        {loadingPhase !== "ready" ? (
-          // The veil captures typing while the live row is still hidden; the
-          // draft hook adopts it the moment the composer is real.
-          <ComposerLoadingLayout
-            capture
-            className="absolute inset-x-3 inset-y-2.5"
-            label="Draft your message"
-            placeholder=""
-          />
-        ) : null}
       </form>
       {footerStrip ? (
-        <div
-          className="mt-1.5 flex items-center justify-between gap-2 px-1"
-          inert={!composerInteractive}
-        >
-          {footerStrip}
-        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-2 px-1">{footerStrip}</div>
       ) : null}
     </div>
   );

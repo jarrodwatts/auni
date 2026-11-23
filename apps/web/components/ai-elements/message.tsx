@@ -13,6 +13,14 @@ import { Streamdown } from "streamdown";
 type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 const streamdownPlugins = { cjk, code, math, mermaid };
+/** Soft luminous leading-edge word fade for live streamed prose. */
+const STREAM_ANIMATE = {
+  animation: "fadeIn",
+  duration: 240,
+  easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+  sep: "word",
+  stagger: 22,
+} as const;
 
 /** Whether a link in Auni's words goes to a place in this app: a path under /app, on this origin. */
 function inApp(link: string): boolean {
@@ -48,7 +56,7 @@ export const MessageResponse = memo(
     const links = useLinks();
     return (
       <Streamdown
-        animated
+        animated={STREAM_ANIMATE}
         linkSafety={links}
         className={cn(
           "w-full text-pretty [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",

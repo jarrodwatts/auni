@@ -1,45 +1,41 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { TextFlowView } from "@/components/conversation/use-text-flow";
 import { MessageResponse } from "@/components/ai-elements/message";
-import {
-  formatWorkDuration,
-  useWorkClock,
-  workHistoryLabel,
-} from "@/components/conversation/work-clock";
-import { AutoHeight } from "@/components/motion/auto-height";
-import { TextSwap } from "@/components/motion/text-swap";
+import { ThinkingIndicator } from "@/components/conversation/thinking-indicator";
+import type { TextFlowView } from "@/components/conversation/use-text-flow";
+import { formatSettledDuration, parseStartMs } from "@/components/conversation/work-clock";
+import { WorkPanel, type WorkPanelStep } from "@/components/conversation/work-panel";
+import type { Status } from "@/components/motion/status-mark";
 import { Bubble, BubbleContent, BubbleGroup } from "@/components/ui/bubble";
+import { useSustained } from "@/lib/use-sustained";
 import { cn } from "@/lib/utils";
+
+/** Mid-turn silence after prose before showing a quiet trailing thinking line. */
+const MID_TURN_PAUSE_MS = 700;
 
 /** Tool or skill activity rendered in its place: after `offset` characters of the text. */
 interface SegmentedBubbleActivity {
   readonly key: string;
   readonly offset: number;
+  readonly iconKey: string;
+  readonly icon: ReactNode;
+  readonly isTool: boolean;
+  readonly status: Status | null;
   readonly node: ReactNode;
-  readonly foldsText?: boolean;
   /** Cards stay mounted and visible at their originating activity. */
   readonly cards?: ReactNode;
 }
 
 interface SegmentedBubblesProps {
   readonly text: string;
-  /** Core's measurement of the finished turn; the settled trigger reports it. */
+  /** Core's measurement of the finished turn; the settled header reports it. */
   readonly workDurationMs?: number | undefined;
-  /** When the request was sent; the live trigger counts up from it. */
+  /** When the request was sent; the live clock counts up from it. */
   readonly workStartedAt?: string | undefined;
-  /** What the live turn is doing, said in the line over its work. */
+  /** What the live turn is doing, shown while thinking or when a live panel is collapsed. */
   readonly liveLabel?: string | null;
-  /**
-   * The live label names a step under way or a thought being had, which its own row says too
-   * while the steps are open: the line over them then only says the turn is working.
-   */
-  readonly liveLabelIsStep?: boolean;
-  /** Keep action explanations alongside their cards when work is collapsed. */
-  readonly preserveText?: boolean;
   /** True once the assistant turn is complete; bubbles then render statically. */
   readonly finalized: boolean;
   readonly flow?: TextFlowView;
@@ -61,22 +57,35 @@ export function SegmentedBubbles({
   finalized,
   flow,
   liveLabel,
-  liveLabelIsStep = false,
-  preserveText = false,
   text,
   trailing,
   workDurationMs,
   workStartedAt,
 }: SegmentedBubblesProps) {
-  const [expansion, setExpansion] = useState<{ fold: number; open: boolean }>();
-  const historyId = useId();
   const settled =
     finalized && (flow === undefined || (flow.visibleLength >= text.length && !flow.animating));
-  const elapsedMs = useWorkClock({ active: !settled, startedAt: workStartedAt });
-  // A turn that drew its work line live keeps it once settled, so finishing never
-  // takes a row out from over the answer.
+  // Remember if this answer was observed live so its initial Thinking line folds
+  // smoothly away when text starts first instead of disappearing in one frame.
   const [drewLive, setDrewLive] = useState(!settled);
   if (!settled && !drewLive) setDrewLive(true);
+
+  // Measure live turn duration once on settle (zero per-second React re-renders).
+  const liveStartRef = useRef<number | null>(null);
+  const [measuredMs, setMeasuredMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!settled) {
+      if (liveStartRef.current === null) {
+        liveStartRef.current = parseStartMs(workStartedAt, Date.now());
+      }
+      return undefined;
+    }
+    if (liveStartRef.current === null) return undefined;
+    const elapsed = Math.max(0, Date.now() - liveStartRef.current);
+    liveStartRef.current = null;
+    const frame = window.requestAnimationFrame(() => setMeasuredMs(elapsed));
+    return () => window.cancelAnimationFrame(frame);
+  }, [settled, workStartedAt]);
+
   const shownText = flow === undefined ? text : text.slice(0, flow.visibleLength);
   const bubbles = layOutBubbles({
     activities:
@@ -86,189 +95,155 @@ export function SegmentedBubbles({
     text: shownText,
   });
 
-  const hasWork = bubbles.some((bubble) => bubble.leading.length > 0);
-  // Settled, a turn that did nothing to show and was done within a second worked on nothing
-  // worth a line over it.
-  const worked = !settled || Math.max(workDurationMs ?? 0, elapsedMs ?? 0) >= 1_000;
-  const showsWorkLine = hasWork || (drewLive && worked);
-
-  if (bubbles.length === 0) {
-    return (
-      <>
-        {showsWorkLine ? (
-          <WorkLine
-            elapsedMs={elapsedMs}
-            liveLabel={liveLabel}
-            settled={settled}
-            workDurationMs={workDurationMs}
-          />
-        ) : null}
-        <Bubble align="start" className="w-full max-w-full" variant="ghost">
-          {trailing}
-        </Bubble>
-      </>
-    );
-  }
-
-  const lastIndex = bubbles.length - 1;
-  const lastSegmentIndex = bubbles.findLastIndex((bubble) => bubble.segment !== undefined);
-  const passed = (bubble: BubbleModel): boolean => settled || bubble.runStart < shownText.length;
-  // Work folds under the words that follow it; with no words at all it stays in view.
-  const workFold =
-    lastSegmentIndex < 0
-      ? -1
-      : bubbles.findLastIndex((bubble) => bubble.leading.length > 0 && passed(bubble));
-  const foldBoundary = Math.min(
-    bubbles.findLastIndex(
-      (bubble) => passed(bubble) && bubble.leading.some((activity) => activity.foldsText !== false),
-    ),
-    lastSegmentIndex,
+  const displayBubbles: readonly BubbleModel[] =
+    bubbles.length > 0 ? bubbles : [{ leading: [], runStart: 0 }];
+  const lastIndex = displayBubbles.length - 1;
+  const lastSegmentIndex = displayBubbles.findLastIndex((bubble) => bubble.segment !== undefined);
+  const workPanelIndices = displayBubbles.flatMap((bubble, index) =>
+    bubble.leading.length > 0 ? [index] : [],
   );
-  const toggled = expansion !== undefined && expansion.fold === workFold;
-  const open = toggled ? expansion.open : workFold < 0;
-  const foldedThrough = open ? -1 : toggled ? lastIndex : workFold;
+  const lastWorkIndex = workPanelIndices.at(-1) ?? -1;
+  const singleWorkPanel = workPanelIndices.length === 1;
+  const primaryWorkIndex = workPanelIndices[0] ?? 0;
+  const settledDuration = formatSettledDuration(
+    Math.max(workDurationMs ?? 0, measuredMs ?? 0) || null,
+  );
+
+  // If the turn goes quiet after prose with all received text visible and no
+  // running step, surface a quiet thinking line after a brief grace window.
+  // Restart the timer on every new text chunk or activity so active typing
+  // never trips it (with or without smooth text flow).
+  const lastBubble = displayBubbles[lastIndex];
+  const trailingPaused = useSustained(
+    !settled &&
+      shownText.length > 0 &&
+      shownText.length >= text.length &&
+      lastBubble?.segment !== undefined &&
+      !activities.some((activity) => activity.status === "now"),
+    MID_TURN_PAUSE_MS,
+    `${shownText.length}:${activities.length}`,
+  );
+  const pauseLabel = liveLabel && liveLabel !== "Writing" ? liveLabel : "Thinking";
+  const [sawTrailingPause, setSawTrailingPause] = useState(false);
+  if (trailingPaused && !sawTrailingPause) setSawTrailingPause(true);
+
   return (
-    <>
-      {showsWorkLine ? (
-        <WorkLine
-          controls={historyId}
-          elapsedMs={elapsedMs}
-          liveLabel={open && hasWork && liveLabelIsStep ? WORKING : liveLabel}
-          onToggle={hasWork ? () => setExpansion({ fold: workFold, open: !open }) : undefined}
-          open={open}
-          settled={settled}
-          workDurationMs={workDurationMs}
-        />
-      ) : null}
-      <BubbleGroup id={historyId}>
-        {bubbles.map((bubble, index) => {
-          const showWork = index > foldedThrough;
-          const showText = showWork || !hasWork || preserveText || index >= foldBoundary;
-          const hasVisibleContent =
-            showWork ||
-            bubble.leading.some((activity) => Boolean(activity.cards)) ||
-            (showText && bubble.segment !== undefined) ||
-            (index === lastIndex && trailing);
-          return (
-            <Bubble
-              align="start"
-              className={cn(
-                "w-full max-w-full gap-2",
-                !hasVisibleContent && "hidden",
-                // Entrance animation only for bubbles appearing under a live
-                // cursor; a finalized history render mounts everything statically.
-                index > 0 && (!finalized || flow !== undefined) && "auni-segment-reveal",
-              )}
-              key={index}
-              variant="ghost"
-            >
-              {bubble.leading.length > 0 ? (
-                // One flat list of steps; only a card puts space between them. A step or
-                // card arriving live opens its room as it rises in, rather than in one frame.
-                <AutoHeight className="min-w-0">
-                  <div className="flex min-w-0 flex-col">
-                    {bubble.leading.map((activity) => (
-                      <div
-                        key={activity.key}
-                        className={cn("min-w-0", activity.cards && "not-last:mb-2")}
-                      >
-                        {activity.node !== null ? (
-                          // Folding closes the steps rather than dropping them, so the
-                          // words that follow slide up into their place.
-                          <div className="auni-fold" data-folded={!showWork} inert={!showWork}>
-                            <div className={cn(!settled && "auni-stagger-in")}>{activity.node}</div>
-                          </div>
-                        ) : null}
-                        {activity.cards ? (
-                          <div className={cn(!settled && "auni-stagger-in")}>{activity.cards}</div>
-                        ) : null}
-                      </div>
-                    ))}
+    <BubbleGroup>
+      {displayBubbles.map((bubble, index) => {
+        const hasSteps = bubble.leading.length > 0;
+        // Before any words or steps arrive on a live turn, bubble 0 shows a quiet,
+        // borderless Thinking line. Once prose starts first with no leading steps,
+        // it folds smoothly shut; if steps arrive, an enclosed WorkPanel takes over.
+        const hostsThinking = index === 0 && !hasSteps && drewLive;
+        const thinkingFolded = hostsThinking && (settled || shownText.length > 0);
+        const hasFollowingContent = bubble.segment !== undefined || index < lastIndex;
+        const panelActive =
+          hasSteps &&
+          !settled &&
+          (bubble.leading.some((step) => step.status === "now") ||
+            (!hasFollowingContent && index === lastWorkIndex));
+        const panelSettledDuration =
+          settled && singleWorkPanel ? settledDuration : null;
+        const cards = bubble.leading.flatMap((activity) =>
+          activity.cards ? [{ key: activity.key, node: activity.cards }] : [],
+        );
+        const steps: readonly WorkPanelStep[] = bubble.leading.map((activity) => ({
+          key: activity.key,
+          iconKey: activity.iconKey,
+          icon: activity.icon,
+          isTool: activity.isTool,
+          status: activity.status,
+          node: activity.node,
+        }));
+        const hasBodyBelowTop =
+          cards.length > 0 || bubble.segment !== undefined || (index === lastIndex && Boolean(trailing));
+
+        return (
+          <Bubble
+            align="start"
+            className={cn(
+              "w-full max-w-full gap-2.5",
+              index > 0 && (!finalized || flow !== undefined) && "auni-segment-reveal",
+            )}
+            key={index}
+            variant="ghost"
+          >
+            {hasSteps ? (
+              <WorkPanel
+                active={panelActive}
+                canCollapse={settled || hasFollowingContent}
+                key={`work-${index}`}
+                liveLabel={liveLabel}
+                liveOnMount={!settled}
+                primary={primaryWorkIndex === index}
+                settledDuration={panelSettledDuration}
+                steps={steps}
+                workStartedAt={workStartedAt}
+              />
+            ) : hostsThinking ? (
+              <div
+                className={cn(
+                  "auni-fold w-full min-w-0",
+                  thinkingFolded && hasBodyBelowTop && "-mb-2.5",
+                )}
+                data-folded={thinkingFolded}
+                inert={thinkingFolded}
+              >
+                <div className="min-w-0">
+                  <ThinkingIndicator
+                    active={!thinkingFolded}
+                    animateEnter
+                    label={liveLabel ?? "Thinking"}
+                    primary
+                    startedAt={workStartedAt}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {cards.length > 0 ? (
+              <div className="flex min-w-0 flex-col gap-2">
+                {cards.map((card) => (
+                  <div key={card.key} className={cn("min-w-0", !settled && "auni-card-enter")}>
+                    {card.node}
                   </div>
-                </AutoHeight>
-              ) : null}
-              {bubble.segment !== undefined ? (
-                // Its lines break so none ends on a word left alone.
-                <BubbleContent
-                  className={cn(
-                    "relative w-full border-0 text-[15px] leading-relaxed text-pretty",
-                    !showText && "hidden",
-                  )}
+                ))}
+              </div>
+            ) : null}
+
+            {bubble.segment !== undefined ? (
+              // Its lines break so none ends on a word left alone.
+              <BubbleContent className="relative w-full border-0 text-[15px] leading-relaxed text-pretty">
+                <MessageResponse
+                  isAnimating={index === lastSegmentIndex && (flow?.animating ?? false)}
                 >
-                  <MessageResponse
-                    isAnimating={index === lastSegmentIndex && (flow?.animating ?? false)}
-                  >
-                    {bubble.segment}
-                  </MessageResponse>
-                </BubbleContent>
-              ) : null}
-              {index === lastIndex ? trailing : null}
-            </Bubble>
-          );
-        })}
-      </BubbleGroup>
-    </>
-  );
-}
+                  {bubble.segment}
+                </MessageResponse>
+              </BubbleContent>
+            ) : null}
 
-const WORKING = "Working…";
+            {index === lastIndex && sawTrailingPause ? (
+              <div
+                className={cn("auni-fold w-full min-w-0", !trailingPaused && "-mb-2.5")}
+                data-folded={!trailingPaused}
+                inert={!trailingPaused}
+              >
+                <div className="min-w-0">
+                  <ThinkingIndicator
+                    active={trailingPaused}
+                    animateEnter
+                    label={pauseLabel}
+                    startedAt={workStartedAt}
+                  />
+                </div>
+              </div>
+            ) : null}
 
-/**
- * The one line over a turn's work, from the send to long after: what it is doing and
- * for how long while it runs, then how long it worked. Its size never changes, only what
- * it holds, so nothing under it moves as the turn goes from one moment to the next.
- */
-function WorkLine({
-  controls,
-  elapsedMs,
-  liveLabel,
-  onToggle,
-  open = false,
-  settled,
-  workDurationMs,
-}: {
-  readonly controls?: string;
-  readonly elapsedMs: number | null;
-  readonly liveLabel?: string | null | undefined;
-  readonly onToggle?: (() => void) | undefined;
-  readonly open?: boolean;
-  readonly settled: boolean;
-  readonly workDurationMs: number | undefined;
-}) {
-  const label = settled ? workHistoryLabel({ elapsedMs, workDurationMs }) : (liveLabel ?? WORKING);
-  return (
-    <button
-      aria-controls={onToggle ? controls : undefined}
-      aria-expanded={onToggle ? open : undefined}
-      className="mb-3 flex h-10 w-full min-w-0 items-center gap-2 border-b border-border/60 pb-2 text-left text-[14px] text-muted-foreground outline-none enabled:hover:text-foreground focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring"
-      data-slot="work-history-trigger"
-      disabled={!onToggle}
-      onClick={onToggle}
-      type="button"
-    >
-      {/* Only what it is doing is announced; the clock ticks for the eye alone. */}
-      <span aria-live={settled ? undefined : "polite"} className="min-w-0">
-        <TextSwap className={settled ? undefined : "shimmer shimmer-duration-1500"} text={label} />
-      </span>
-      {onToggle ? (
-        <ChevronRight
-          aria-hidden
-          className={cn(
-            "size-3.5 flex-none transition-transform motion-reduce:transition-none",
-            open && "rotate-90",
-          )}
-          strokeWidth={1.5}
-        />
-      ) : null}
-      {settled ? null : (
-        <span
-          aria-hidden
-          className="ml-auto flex-none text-[13px] text-muted-foreground/80 tabular-nums"
-        >
-          {elapsedMs === null || elapsedMs < 1_000 ? "0s" : formatWorkDuration(elapsedMs)}
-        </span>
-      )}
-    </button>
+            {index === lastIndex ? trailing : null}
+          </Bubble>
+        );
+      })}
+    </BubbleGroup>
   );
 }
 

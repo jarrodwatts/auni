@@ -37,7 +37,13 @@ export function useStartConversation() {
       if (!content || launch) return;
 
       setError(null);
-      const started = begin(content, carried);
+      const composerFromTop =
+        pathname === "/app/new" && !carried
+          ? (document
+              .querySelector('[data-slot="welcome-composer"] form')
+              ?.getBoundingClientRect().top ?? null)
+          : null;
+      const started = begin(content, carried, composerFromTop);
       if (!started) return;
 
       try {

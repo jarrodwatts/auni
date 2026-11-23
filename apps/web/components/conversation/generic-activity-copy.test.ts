@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { toolStepStatus } from "./generic-activity-copy";
+import { toolAppId, toolStepStatus } from "./generic-activity-copy";
 
 describe("toolStepStatus", () => {
   it("marks a step done once its output is in, and failed when it was turned down", () => {
@@ -14,5 +14,14 @@ describe("toolStepStatus", () => {
     expect(toolStepStatus("input-available", true)).toBe("now");
     // Stopped before it finished: no mark, rather than one that turns forever.
     expect(toolStepStatus("input-available", false)).toBeNull();
+  });
+});
+
+describe("toolAppId", () => {
+  it("resolves app-owned tools to their app id and returns null for core tools", () => {
+    expect(toolAppId("aave_supply")).toBe("aave");
+    expect(toolAppId("hyperliquid_markets")).toBe("hyperliquid");
+    expect(toolAppId("get_portfolio")).toBeNull();
+    expect(toolAppId("WebSearch")).toBeNull();
   });
 });

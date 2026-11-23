@@ -30,8 +30,8 @@ describe("answerWorkingLabel", () => {
       thought("Let me look at their cash."),
       step("get_portfolio", "input-available"),
     );
-    expect(answerWorkingLabel(message, shown)).toBe("Checking your money…");
-    expect(answerWorkingLabel(message, hidden)).toBe("Checking your money…");
+    expect(answerWorkingLabel(message, shown)).toBe("Checking your money");
+    expect(answerWorkingLabel(message, hidden)).toBe("Checking your money");
   });
 
   it("says the newest sentence of a thought, or only that it is thinking when thoughts are hidden", () => {
@@ -40,7 +40,7 @@ describe("answerWorkingLabel", () => {
       thought("They have cash on Monad. SOL looks strong this week."),
     );
     expect(answerWorkingLabel(message, shown)).toBe("SOL looks strong this week.");
-    expect(answerWorkingLabel(message, hidden)).toBe("Thinking…");
+    expect(answerWorkingLabel(message, hidden)).toBe("Thinking");
   });
 
   it("says it is writing once words follow", () => {
@@ -48,15 +48,15 @@ describe("answerWorkingLabel", () => {
       type: "text",
       text: "SOL had a strong week.",
     });
-    expect(answerWorkingLabel(message, hidden)).toBe("Writing…");
+    expect(answerWorkingLabel(message, hidden)).toBe("Writing");
   });
 
-  it("says it is reading what came back between steps", () => {
+  it("reflects thinking or reviewing between steps", () => {
     expect(answerWorkingLabel(turn(step("market_news", "output-available")), shown)).toBe(
-      "Reading what came back…",
+      "Thinking",
     );
     expect(answerWorkingLabel(turn(step("market_news", "output-denied")), shown)).toBe(
-      "Reviewing what happened…",
+      "Reviewing what happened",
     );
   });
 

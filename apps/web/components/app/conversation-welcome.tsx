@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ComposerLoadingSurface } from "@/components/app/composer-shell";
+import { ComposerStandin } from "@/components/app/composer-shell";
 import { WelcomeComposer } from "@/components/app/welcome-composer";
 import { StartingPoints } from "@/components/app/starting-points";
 import { Lockup } from "@/components/brand/lockup";
@@ -82,7 +82,11 @@ function NewChat({ preview }: { readonly preview: boolean }) {
           </p>
         </div>
         <div className="order-last mt-2 w-full max-w-[680px] sm:order-none sm:mt-8">
-          {preview ? <ComposerLoadingSurface /> : <WelcomeComposer onCaretActivity={trackCaret} />}
+          {preview ? (
+            <ComposerStandin placeholder="Peptides go mainstream by 2028" />
+          ) : (
+            <WelcomeComposer onCaretActivity={trackCaret} />
+          )}
         </div>
         <div className="w-full max-w-[680px] sm:mt-3">
           <StartingPoints />

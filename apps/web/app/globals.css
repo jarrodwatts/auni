@@ -207,64 +207,49 @@ button:not(:disabled),
 }
 
 /* One continuous handoff from the welcome composer into a live conversation. */
-@keyframes auni-conversation-launch-surface {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 @keyframes auni-conversation-launch-header {
   from {
     opacity: 0;
-    transform: translateY(-8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 @keyframes auni-conversation-launch-message {
   from {
     opacity: 0;
-    filter: blur(5px);
-    transform: translateY(clamp(84px, 18vh, 190px)) scale(0.965);
+    transform: translateY(14px) scale(0.98);
   }
   to {
     opacity: 1;
-    filter: blur(0);
-    transform: translateY(0) scale(1);
+    transform: none;
   }
 }
 
 @keyframes auni-conversation-launch-detail {
   from {
     opacity: 0;
-    transform: translateY(7px);
+    transform: translateY(5px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
+/* Solid canvas from frame 0 so the welcome screen never bleeds through underneath. */
 .auni-conversation-launch {
-  animation: auni-conversation-launch-surface 180ms ease-out both;
-  transition:
-    opacity 240ms ease,
-    filter 240ms ease;
+  transition: opacity 140ms ease-out;
 }
 
 .auni-conversation-launch-header {
-  animation: auni-conversation-launch-header 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: auni-conversation-launch-header 180ms ease-out both;
 }
 
 .auni-conversation-launch-message {
-  transform-origin: right center;
-  animation: auni-conversation-launch-message 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: right bottom;
+  animation: auni-conversation-launch-message 300ms var(--motion-settle) both;
 }
 
 /* The owner's first take is carried in by the landing's dive (components/landing), which moves
@@ -281,52 +266,65 @@ button:not(:disabled),
 }
 
 .auni-conversation-launch-thinking {
-  animation: auni-conversation-launch-detail 320ms 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: auni-conversation-launch-detail 220ms 90ms var(--motion-drift) both;
 }
 
 .auni-conversation-launch-composer {
-  animation: auni-conversation-launch-detail 360ms 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: none;
 }
 
-/* Settled reveals identical content beneath, so the exit must stay a pure
-   opacity crossfade, any filter would visibly pulse the whole screen. */
+/* Settled reveals identical content beneath, so the exit stays a pure opacity crossfade. */
 .auni-conversation-launch[data-phase="settled"],
 .auni-conversation-launch[data-phase="cancelled"] {
   pointer-events: none;
   opacity: 0;
 }
 
-.auni-conversation-launch[data-phase="cancelled"] {
-  filter: blur(2px);
-}
-
 @keyframes auni-loading-row-enter {
   from {
     opacity: 0;
-    transform: translateY(7px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
 @keyframes auni-loading-avatar-breathe {
   0%,
-  100% {
-    opacity: 0.72;
+  42% {
+    opacity: 0.94;
+    animation-timing-function: steps(4);
   }
-  50% {
+  50%,
+  92% {
+    opacity: 0.65;
+    animation-timing-function: steps(4);
+  }
+  100% {
     opacity: 0.94;
   }
 }
 
-@keyframes auni-loading-sheen {
-  from {
-    background-position: 120% 0;
+/*
+ * Duty-cycled breath for quiet structural placeholders: long restful holds with
+ * stepped ramps, so the compositor draws a handful of discrete frames per cycle
+ * rather than sweeping a noisy gradient every vsync.
+ */
+@keyframes auni-skeleton-breath {
+  0%,
+  42% {
+    opacity: 1;
+    animation-timing-function: steps(4);
   }
-  to {
-    background-position: -120% 0;
+  50%,
+  92% {
+    opacity: 0.55;
+    animation-timing-function: steps(4);
+  }
+  100% {
+    opacity: 1;
   }
 }
 
@@ -353,22 +351,20 @@ button:not(:disabled),
 }
 
 .auni-loading-row {
-  animation: auni-loading-row-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: auni-loading-row-enter 240ms var(--motion-drift) both;
+}
+
+.auni-skeleton-breath {
+  animation: auni-skeleton-breath 2.4s infinite;
 }
 
 .auni-loading-sheen {
-  background: linear-gradient(
-    100deg,
-    var(--muted) 18%,
-    color-mix(in oklab, var(--muted) 45%, var(--background)) 43%,
-    var(--muted) 68%
-  );
-  background-size: 230% 100%;
-  animation: auni-loading-sheen 1.65s ease-in-out infinite;
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+  animation: auni-skeleton-breath 2.4s infinite;
 }
 
 .auni-loading-mascot {
-  animation: auni-loading-avatar-breathe 2.2s ease-in-out infinite;
+  animation: auni-loading-avatar-breathe 2.4s infinite;
 }
 
 /* Toasts. Sonner injects unlayered CSS, which outranks Tailwind's layered
@@ -543,48 +539,15 @@ button:not(:disabled),
   animation: auni-content-resolve 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.auni-composer-live {
-  opacity: 1;
-  filter: blur(0);
-  transform: translateY(0);
-  transition:
-    opacity 320ms ease,
-    filter 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.auni-composer-live[data-phase="loading"] {
-  pointer-events: none;
-  opacity: 0;
-  filter: blur(3px);
-  transform: translateY(4px);
-}
-
 /* A placeholder for what usually arrives in a blink: it only shows once the wait is real. */
 .auni-appear-late {
   animation: auni-fade-in 200ms 150ms ease-out both;
 }
 
-.auni-history-veil {
-  overflow: hidden;
-  background: --alpha(var(--background) / 97%);
-  animation: auni-fade-in 200ms 150ms ease-out both;
-  transition: opacity 180ms ease-out;
-}
-
-.auni-history-veil[data-phase="resolving"] {
-  animation: none;
-  opacity: 0;
-}
-
-.auni-history-message-resolve {
-  animation: auni-fade-in 200ms ease-out both;
-}
-
 @keyframes auni-segment-reveal {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -593,7 +556,23 @@ button:not(:disabled),
 }
 
 .auni-segment-reveal {
-  animation: auni-segment-reveal 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: auni-segment-reveal 220ms var(--motion-drift) both;
+}
+
+@keyframes auni-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.auni-message-enter {
+  transform-origin: right bottom;
+  animation: auni-message-enter 240ms var(--motion-settle) both;
 }
 
 /* A step folding under the words after it closes to nothing instead of vanishing. */
@@ -601,8 +580,9 @@ button:not(:disabled),
   display: grid;
   grid-template-rows: 1fr;
   transition:
-    grid-template-rows 320ms cubic-bezier(0.45, 0, 0.25, 1),
-    opacity 180ms ease;
+    grid-template-rows 280ms var(--motion-settle),
+    margin-bottom 280ms var(--motion-settle),
+    opacity 150ms ease;
 }
 
 .auni-fold[data-folded="true"] {
@@ -615,51 +595,635 @@ button:not(:disabled),
   overflow: hidden;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .auni-fold {
-    transition: none;
+@keyframes auni-thinking-enter {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.auni-thinking-enter {
+  animation: auni-thinking-enter 180ms var(--motion-drift) both;
+}
+
+@keyframes auni-spotlight-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes auni-spotlight-counter {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
   }
 }
 
 /*
- * A step is one quiet line. Rows align to their first line, so a thought that
- * unfolds grows downward without its icon moving.
+ * Dual-layer spotlight sweep: clips a crisp foreground copy behind a soft
+ * moving mask while counter-translating it so icon and text stay pixel-locked.
+ * Pure compositor transforms, paused off-screen via observeVisibleAnimation.
+ */
+.auni-spotlight {
+  --auni-spotlight-width: 4.5rem;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 100%;
+  min-width: 0;
+  margin-block: -4px;
+  padding-block: 4px;
+  overflow-x: clip;
+  overflow-y: visible;
+  vertical-align: bottom;
+}
+
+.auni-spotlight-base {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+}
+
+.auni-spotlight-overlay {
+  pointer-events: none;
+  user-select: none;
+  position: absolute;
+  inset-block: 0;
+  right: auto;
+  left: calc(-1 * var(--auni-spotlight-width));
+  width: calc(100% + var(--auni-spotlight-width) + var(--auni-spotlight-width));
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0 / 0.2) 0.75rem,
+    rgb(0 0 0 / 0.5) 1.5rem,
+    #000 2.25rem,
+    rgb(0 0 0 / 0.5) 3rem,
+    rgb(0 0 0 / 0.2) 3.75rem,
+    transparent var(--auni-spotlight-width),
+    transparent 100%
+  );
+  -webkit-mask-repeat: no-repeat;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0 / 0.2) 0.75rem,
+    rgb(0 0 0 / 0.5) 1.5rem,
+    #000 2.25rem,
+    rgb(0 0 0 / 0.5) 3rem,
+    rgb(0 0 0 / 0.2) 3.75rem,
+    transparent var(--auni-spotlight-width),
+    transparent 100%
+  );
+  mask-repeat: no-repeat;
+  animation: auni-spotlight-sweep 2.1s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+
+.auni-spotlight-counter {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: auni-spotlight-counter 2.1s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+
+.auni-spotlight-aligned {
+  display: inline-flex;
+  width: calc(100% - var(--auni-spotlight-width) - var(--auni-spotlight-width));
+  height: 100%;
+  min-width: 0;
+  margin-left: var(--auni-spotlight-width);
+  padding-block: 4px;
+  align-items: center;
+}
+
+/* Precision kinetic glyph for Auni's borderless thinking state. */
+@keyframes auni-thinking-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes auni-thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+.auni-thinking-orbit {
+  transform-origin: 8px 8px;
+  animation: auni-thinking-spin 7.2s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+}
+
+.auni-thinking-node {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auni-thinking-pulse 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--n) * 0.28s);
+  animation-play-state: var(--visible-animation-state, paused);
+}
+
+/* Odometer-style vertical rolling digits with soft top/bottom mask fade. */
+@keyframes auni-digit-in {
+  from {
+    opacity: 0;
+    filter: blur(1.5px);
+    transform: translateY(105%);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes auni-digit-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(1.5px);
+    transform: translateY(-105%);
+  }
+}
+
+.auni-digit-window {
+  position: relative;
+  display: inline-flex;
+  height: 1.3em;
+  min-width: 1ch;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  line-height: 1.3em;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 16%,
+    #000 84%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+}
+
+.auni-digit-in {
+  animation: auni-digit-in 260ms var(--motion-settle) both;
+}
+
+.auni-digit-out {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: auni-digit-out 260ms var(--motion-settle) both;
+}
+
+/*
+ * Morphing work enclosure: full-width layered card while open, smoothly
+ * condensing in width and height into a tactile summary pill once collapsed.
+ */
+.auni-work-panel {
+  --work-surface: color-mix(in oklab, var(--color-surface) 58%, var(--card));
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border) 82%, transparent);
+  border-radius: 15px;
+  background: var(--work-surface);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent),
+    0 1px 2px --alpha(var(--color-shade) / 4%);
+  transition:
+    border-color 200ms var(--motion-settle),
+    background-color 200ms var(--motion-settle),
+    box-shadow 200ms var(--motion-settle);
+}
+
+.auni-work-panel[data-open="false"] {
+  width: fit-content;
+  border-radius: 20px;
+}
+
+.auni-work-panel[data-open="false"]:hover {
+  border-color: color-mix(in oklab, var(--foreground) 16%, transparent);
+  background: color-mix(in oklab, var(--foreground) 2.5%, var(--work-surface));
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent),
+    0 2px 8px --alpha(var(--color-shade) / 6%);
+}
+
+/* Whisper-subtle top-edge specular sheen while steps are actively running. */
+@keyframes auni-work-sheen-glide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(240%);
+  }
+}
+
+.auni-work-sheen {
+  pointer-events: none;
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  z-index: 2;
+  height: 1px;
+  overflow: hidden;
+}
+
+.auni-work-sheen::after {
+  content: "";
+  display: block;
+  width: 44%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in oklab, var(--foreground) 26%, transparent) 50%,
+    transparent 100%
+  );
+  animation: auni-work-sheen-glide 2.6s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+
+@keyframes auni-work-panel-enter {
+  from {
+    opacity: 0.45;
+    transform: translateY(2px) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.auni-work-panel-enter {
+  animation: auni-work-panel-enter 180ms var(--motion-drift) both;
+}
+
+.auni-work-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  color: var(--muted-foreground);
+  font-size: 13.5px;
+  font-weight: 450;
+  line-height: 20px;
+  text-align: left;
+  outline: none;
+  transition:
+    color 180ms var(--motion-settle),
+    padding 240ms var(--motion-settle),
+    min-height 240ms var(--motion-settle);
+}
+
+.auni-work-panel[data-open="false"] > .auni-work-header {
+  min-height: 36px;
+  gap: 8px;
+  padding: 6px 12px 6px 9px;
+  border-radius: 19px;
+}
+
+.auni-work-header:enabled:hover {
+  color: var(--foreground);
+}
+
+.auni-work-header:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--ring) 55%, transparent);
+}
+
+/* Overlapping stack of distinct step icons in the panel header. */
+.auni-work-icons {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.auni-work-icon {
+  position: relative;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--color-ink-soft);
+  box-shadow: 0 0 0 1.5px var(--work-surface);
+}
+
+.auni-work-icon + .auni-work-icon {
+  margin-left: -3px;
+}
+
+.auni-work-icon > svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.75;
+}
+
+.auni-work-icon > [data-slot="integration-mark"] {
+  border-radius: 999px !important;
+}
+
+@keyframes auni-work-icon-enter {
+  from {
+    width: 0;
+    opacity: 0;
+    filter: blur(2px);
+    transform: scale(0.45);
+  }
+}
+
+@keyframes auni-work-icon-enter-next {
+  from {
+    width: 0;
+    margin-left: 0;
+    opacity: 0;
+    filter: blur(2px);
+    transform: scale(0.45);
+  }
+}
+
+.auni-work-icon-enter {
+  animation: auni-work-icon-enter 280ms cubic-bezier(0.34, 1.35, 0.64, 1) both;
+}
+
+.auni-work-icon + .auni-work-icon.auni-work-icon-enter {
+  animation-name: auni-work-icon-enter-next;
+}
+
+.auni-work-failed-badge {
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-negative) 12%, transparent);
+  padding: 1px 7px;
+  color: var(--color-negative);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 16px;
+  animation: auni-fade-in 200ms var(--motion-settle) both;
+}
+
+/*
+ * Collapsible body inside a work panel: width: 0 + min-width: 100% prevents
+ * collapsed step rows from inflating the outer pill's fit-content width, while
+ * --work-body-width pins the inner list to the expanded width mid-morph so
+ * text never squishes or reflows.
+ */
+.auni-work-body {
+  display: grid;
+  width: 0;
+  min-width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms var(--motion-settle);
+}
+
+.auni-work-body[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+
+.auni-work-body-inner {
+  width: var(--work-body-width, 100%);
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 95ms ease-out,
+    transform 200ms var(--motion-settle);
+}
+
+.auni-work-body[data-open="true"] > .auni-work-body-inner {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 220ms var(--motion-drift) 45ms,
+    transform 260ms var(--motion-drift) 25ms;
+}
+
+.auni-work-divider {
+  height: 1px;
+  margin: 0 12px;
+  background: color-mix(in oklab, var(--border) 65%, transparent);
+}
+
+.auni-work-list {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+}
+
+/* Single floating highlight pill that glides smoothly from one active step to the next. */
+.auni-work-active-pill {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  right: 6px;
+  left: 6px;
+  z-index: 0;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 4.5%, transparent);
+  opacity: 0;
+  transition:
+    transform 260ms var(--motion-settle),
+    height 260ms var(--motion-settle),
+    opacity 180ms ease;
+}
+
+.auni-work-active-pill[data-shown="true"] {
+  opacity: 1;
+}
+
+.auni-work-active-pill[data-instant="true"] {
+  transition: opacity 180ms ease;
+}
+
+@keyframes auni-work-row-enter {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+.auni-work-row-enter {
+  animation: auni-work-row-enter 240ms var(--motion-drift) both;
+}
+
+/* Tactile arrival for live action/proposal cards landing inside a conversation. */
+@keyframes auni-card-enter {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+.auni-card-enter {
+  animation: auni-card-enter 420ms var(--motion-settle) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-fold,
+  .auni-work-panel,
+  .auni-work-header,
+  .auni-work-body,
+  .auni-work-body-inner,
+  .auni-work-active-pill {
+    transition: none;
+  }
+
+  .auni-work-body-inner {
+    transform: none;
+  }
+
+  .auni-thinking-enter,
+  .auni-thinking-orbit,
+  .auni-thinking-node,
+  .auni-digit-in,
+  .auni-digit-out,
+  .auni-work-sheen::after,
+  .auni-work-panel-enter,
+  .auni-work-icon-enter,
+  .auni-work-row-enter,
+  .auni-work-failed-badge,
+  .auni-card-enter,
+  .auni-message-enter {
+    animation: none;
+    filter: none;
+    transform: none;
+  }
+
+  .auni-work-sheen,
+  .auni-digit-out {
+    opacity: 0;
+  }
+
+  .auni-digit-out {
+    display: none;
+  }
+
+  .auni-spotlight-overlay,
+  .auni-spotlight-counter {
+    animation: none;
+    will-change: auto;
+  }
+
+  .auni-spotlight-overlay {
+    opacity: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .auni-spotlight-overlay,
+  .auni-spotlight-counter {
+    animation: none;
+    will-change: auto;
+  }
+
+  .auni-spotlight-overlay {
+    opacity: 0;
+  }
+}
+
+/*
+ * A step is one quiet line inside its work panel. Rows align to their first line,
+ * so a thought or long step that unfolds grows downward without its icon moving.
  */
 .auni-activity-row {
   display: flex;
   width: 100%;
   min-width: 0;
   align-items: flex-start;
-  gap: 10px;
-  padding: 6px 0;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 9px;
   /* A step quieter than a quiet word. */
-  color: color-mix(in oklab, var(--muted-foreground) 85%, var(--background));
-  font-size: 14px;
+  color: color-mix(in oklab, var(--muted-foreground) 88%, var(--background));
+  font-size: 13.5px;
   font-weight: 400;
   line-height: 20px;
   text-align: left;
+  transition:
+    background-color 180ms var(--motion-settle),
+    color 180ms var(--motion-settle);
 }
 
 .auni-activity-control {
   position: relative;
-  border-radius: 4px;
-  transition: color 180ms var(--motion-settle);
 }
 
 .auni-activity-control:hover {
+  background: color-mix(in oklab, var(--foreground) 3.5%, transparent);
   color: var(--foreground);
 }
 
 .auni-activity-control:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--ring) 55%, transparent);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .auni-activity-icon {
   display: flex;
-  width: 14px;
+  width: 16px;
   height: 20px;
-  flex: 0 0 14px;
+  flex: 0 0 16px;
   align-items: center;
   justify-content: center;
 }
@@ -690,37 +1254,42 @@ button:not(:disabled),
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .auni-activity-row,
   .auni-activity-control {
     transition: none;
   }
 }
 
-/* The sites a web step read, under it, each coming in after the one before. */
+/* The sites a web step read, under it as refined micro-chips arriving in sequence. */
 .auni-sites {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: -2px 0 0;
-  padding: 0 0 6px 24px;
+  gap: 5px 6px;
+  margin: -1px 0 0;
+  padding: 2px 8px 6px 32px;
   list-style: none;
 }
 
 .auni-site {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 3.5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 6%, transparent);
+  padding: 1px 8px 1px 5px;
   color: var(--muted-foreground);
-  font-size: 13px;
-  line-height: 20px;
-  animation: auni-site-in 420ms var(--motion-settle) both;
-  animation-delay: calc(var(--i) * 110ms);
+  font-size: 12px;
+  line-height: 18px;
+  animation: auni-site-in 300ms var(--motion-settle) both;
+  animation-delay: calc(var(--i) * 55ms);
 }
 
 @keyframes auni-site-in {
   from {
     opacity: 0;
     filter: blur(3px);
-    transform: translateY(5px) scale(0.94);
+    transform: translateY(4px) scale(0.95);
   }
 }
 
@@ -1404,12 +1973,10 @@ button:not(:disabled),
   .auni-conversation-launch-thinking,
   .auni-conversation-launch-composer,
   .auni-loading-row,
+  .auni-skeleton-breath,
   .auni-loading-sheen,
   .auni-loading-mascot,
   .auni-settings-value-resolve,
-  .auni-composer-live,
-  .auni-history-veil,
-  .auni-history-message-resolve,
   .auni-segment-reveal,
   .auni-account-balance-update,
   .auni-stagger-in,
@@ -1438,9 +2005,6 @@ button:not(:disabled),
   .auni-account-settings-link:hover .auni-account-mark,
   .auni-account-settings-link:focus-visible .auni-account-mark {
     transform: none;
-  }
-  .auni-composer-live[data-phase="loading"] {
-    opacity: 0;
   }
   .auni-float,
   .auni-mascot-body,

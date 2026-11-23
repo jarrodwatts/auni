@@ -40,7 +40,7 @@ type AuniUiTools = {
 
 export type AuniUiMessage = UIMessage<AuniMessageMetadata, MessageDataParts, AuniUiTools>;
 export type AuniToolPart = ToolUIPart<AuniUiTools>;
-export type AuniReasoningPart = {
+type AuniReasoningPart = {
   readonly type: "data-reasoning";
   readonly id?: string;
   readonly data: MessageDataParts["reasoning"];

@@ -1,7 +1,9 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+import { SpotlightShimmer } from "@/components/motion/spotlight-shimmer";
 import { StatusMark, type Status } from "@/components/motion/status-mark";
 import { TextSwap } from "@/components/motion/text-swap";
 import { cn } from "@/lib/utils";
@@ -13,6 +15,7 @@ import { cn } from "@/lib/utils";
  */
 export function ActivityRow({
   detail,
+  duration,
   icon,
   result,
   status,
@@ -21,16 +24,18 @@ export function ActivityRow({
   whole,
 }: {
   readonly detail?: string | null;
+  /** How long a live step took once finished ("420ms", "1.2s"), shown quietly on the right. */
+  readonly duration?: string | null;
   readonly icon: ReactNode;
   /**
    * What the step found, a few quiet words: "$412 in cash". Given on any step
-   * that may find something, null until it has, so the words rise in when it does.
+   * that may find something, null until it has, so the words blur in when it does.
    */
   readonly result?: string | null;
   /** Where the step is, as a mark at the end of the line; a thought has none. */
   readonly status?: Status | null;
   /**
-   * Hand the words over as they change, as a tool step's do when it finishes.
+   * Hand the words over in place as they change, as a tool step's do when it finishes.
    * A thought only grows at its end, past what the line shows, so it stays put.
    */
   readonly swap?: boolean;
@@ -56,12 +61,19 @@ export function ActivityRow({
     return () => observer.disconnect();
   }, [clipped, detail, open, text]);
 
-  // Under way, the words shimmer; done, they read in full ink.
-  const tone =
-    status === "now" ? "shimmer shimmer-duration-1500" : status === "done" ? "text-ink" : undefined;
+  // Under way, a soft spotlight glides across the line; done, it sharpens to full ink.
+  const active = status === "now";
+  const tone = status === "done" ? "text-ink" : undefined;
   const label = (
     <>
-      <span aria-hidden className="auni-activity-icon">
+      <span
+        aria-hidden
+        className={cn(
+          "auni-activity-icon transition-colors duration-200 ease-settle motion-reduce:transition-none",
+          status === "done" && "text-ink-soft",
+          status === "failed" && "text-negative",
+        )}
+      >
         {icon}
       </span>
       <span
@@ -71,25 +83,63 @@ export function ActivityRow({
             ? "break-words whitespace-pre-wrap"
             : whole !== undefined
               ? "text-pretty"
-              : "truncate",
+              : !swap && "truncate",
         )}
         ref={textRef}
       >
         {swap && !open ? (
-          <TextSwap className={tone} text={text} />
+          <SpotlightShimmer active={active} className="max-w-full">
+            <TextSwap
+              className={tone}
+              detail={detail}
+              detailClassName={active ? undefined : "auni-activity-detail"}
+              text={text}
+            />
+          </SpotlightShimmer>
         ) : (
-          <span className={tone}>{open && whole !== undefined ? whole : text}</span>
+          <SpotlightShimmer active={active} className="max-w-full">
+            <span className="min-w-0 break-words">
+              <span className={tone}>{open && whole !== undefined ? whole : text}</span>
+              {detail ? (
+                <span className={active ? undefined : "auni-activity-detail"}> {detail}</span>
+              ) : null}
+            </span>
+          </SpotlightShimmer>
         )}
-        {detail ? <span className="auni-activity-detail"> {detail}</span> : null}
       </span>
-      {result === undefined ? null : (
-        <span className="max-w-[45%] flex-none text-[13px] text-faint tabular-nums">
-          <TextSwap text={result ?? ""} />
+      {result === undefined && duration === undefined ? null : (
+        <span
+          className={cn(
+            "flex max-w-[52%] min-w-0 flex-none items-center text-[12.5px] tabular-nums",
+            result && duration && "gap-2",
+          )}
+        >
+          {result !== undefined ? (
+            <span className="flex min-w-0 text-muted-foreground/80">
+              <TextSwap align="end" text={result ?? ""} />
+            </span>
+          ) : null}
+          {duration !== undefined ? (
+            <span className="flex-none text-faint">
+              <TextSwap align="end" text={duration ?? ""} />
+            </span>
+          ) : null}
         </span>
       )}
       {status ? (
         <span className="flex h-5 flex-none items-center">
-          <StatusMark size={14} status={status} />
+          <StatusMark size={14} status={status} variant="bare" />
+        </span>
+      ) : null}
+      {clipped || open ? (
+        <span aria-hidden className="flex h-5 flex-none items-center text-faint">
+          <ChevronDown
+            className={cn(
+              "size-3.5 transition-transform duration-200 ease-settle motion-reduce:transition-none",
+              open && "rotate-180",
+            )}
+            strokeWidth={1.6}
+          />
         </span>
       ) : null}
     </>
@@ -97,7 +147,11 @@ export function ActivityRow({
 
   if (!clipped && !open)
     return (
-      <div className="auni-activity-row" data-slot="conversation-activity-row">
+      <div
+        className="auni-activity-row"
+        data-active={active || undefined}
+        data-slot="conversation-activity-row"
+      >
         {label}
       </div>
     );
@@ -106,8 +160,9 @@ export function ActivityRow({
     <button
       aria-expanded={open}
       className="auni-activity-row auni-activity-control"
+      data-active={active || undefined}
       data-slot="conversation-activity-row"
-      onClick={() => setOpen(!open)}
+      onClick={() => setOpen((was) => !was)}
       type="button"
     >
       {label}

@@ -29,14 +29,12 @@ export function SiteMarks({ sites }: { readonly sites: readonly string[] }) {
  * A site's own mark in a circle, or a plain globe for a site core found none for. Drawn as core
  * sends it, not through the image optimizer, which would ask core without the owner's session.
  */
-export function SiteMark({
+function SiteMark({
   site,
   size,
-  className,
 }: {
   readonly site: string;
   readonly size: number;
-  readonly className?: string;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
   const missing = failed === site;
@@ -45,7 +43,6 @@ export function SiteMark({
       className={cn(
         "inline-flex flex-none items-center justify-center overflow-hidden rounded-full",
         missing ? "text-muted-foreground" : "bg-plate",
-        className,
       )}
       style={{ width: size, height: size }}
     >

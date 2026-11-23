@@ -1,4 +1,4 @@
-import { type ConversationToolName, type ToolMeta } from "@auni/shared";
+import { APP_LISTINGS, type ConversationToolName, type ToolMeta } from "@auni/shared";
 import type { ToolUIPart } from "ai";
 import {
   BookOpen,
@@ -15,6 +15,17 @@ import type { ComponentType } from "react";
 
 import type { Status } from "@/components/motion/status-mark";
 import { APP_TOOLS } from "@/lib/tool-copy";
+
+const TOOL_APP_ID: Readonly<Record<string, string>> = Object.fromEntries(
+  APP_LISTINGS.flatMap(({ id, tools }) =>
+    Object.keys(tools ?? {}).map((name) => [name, id] as const),
+  ),
+);
+
+/** The app a tool belongs to, so a step and its header stack can wear that app's mark. */
+export function toolAppId(toolName: string): string | null {
+  return TOOL_APP_ID[toolName] ?? null;
+}
 
 /**
  * A step's mark: under way while the turn runs it, done once its output is

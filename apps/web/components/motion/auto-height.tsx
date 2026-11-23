@@ -14,12 +14,19 @@ import { durations, easings, reducedMotion } from "@/lib/motion";
 export function AutoHeight({
   children,
   className,
+  duration = durations.resize,
 }: {
   readonly children: ReactNode;
   readonly className?: string;
+  /** Override the height-ease duration (ms) for snappier inline surfaces such as work panels. */
+  readonly duration?: number;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
+  const durationRef = useRef(duration);
+  useLayoutEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
 
   useLayoutEffect(() => {
     const outer = box.current;
@@ -45,7 +52,7 @@ export function AutoHeight({
       }
       outer.style.overflow = "clip";
       const run = outer.animate([{ height: `${from}px` }, { height: `${to}px` }], {
-        duration: durations.resize,
+        duration: durationRef.current,
         easing: easings.settle,
       });
       glide = run;

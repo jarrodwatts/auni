@@ -17,7 +17,6 @@ import { EnvironmentPicker } from "@/components/app/environment-picker";
 import { ModelPicker } from "@/components/app/model-picker";
 import { useChangeThread, useThreads } from "@/components/app/use-threads";
 import { ThreadFailureNotice } from "@/components/app/thread-failure-notice";
-import { ThreadHistoryLoading } from "@/components/app/thread-history-loading";
 import { useThreadTranscript } from "@/components/app/use-thread-transcript";
 import { useThreadState } from "@/components/portfolio/use-portfolio";
 import { BrainNeeded, useNoBrainYet } from "@/components/first-run/brain-needed";
@@ -41,8 +40,8 @@ import {
   pendingAnswer,
   turnKeys,
   visibleThreadMessages,
-  type AuniUiMessage,
 } from "@/lib/conversation";
+import { useSustained } from "@/lib/use-sustained";
 import type { StickToBottomContext } from "use-stick-to-bottom";
 
 import { arrivalsForCards } from "@/lib/arrivals-for-cards";
@@ -66,7 +65,6 @@ export function ThreadPane({
   const money = moneyProgress(thread?.moving ?? null);
   const {
     failure,
-    hadCachedHistory,
     historyFailed,
     historyReady,
     messages,
@@ -84,18 +82,10 @@ export function ThreadPane({
     readThread,
   );
   const conversation = useRef<StickToBottomContext>(null);
-  const [historyPlaceholderVisible, setHistoryPlaceholderVisible] = useState(!hadCachedHistory);
-  const revealingHistory = historyReady && historyPlaceholderVisible;
   const [editing, setEditing] = useState<{
     readonly userMessageId: string;
     readonly text: string;
   } | null>(null);
-
-  useEffect(() => {
-    if (!historyReady || !historyPlaceholderVisible) return;
-    const timer = window.setTimeout(() => setHistoryPlaceholderVisible(false), 200);
-    return () => window.clearTimeout(timer);
-  }, [historyPlaceholderVisible, historyReady]);
 
   const initialLaunch = launch?.thread?.id === threadId ? launch : null;
   const persistedVisibleMessages = visibleThreadMessages(messages);
@@ -112,13 +102,21 @@ export function ThreadPane({
 
   const trailingMessage = visibleMessages.at(-1);
   const reveal = useTrailingTextFlow(trailingMessage, status === "streaming");
+  const [sentMessageIds, setSentMessageIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const submitMessage = useCallback(
     async (...args: Parameters<typeof sendTranscriptMessage>) => {
       reveal.flush();
+      const [content, providedId, supersedesMessageId] = args;
+      const messageId = providedId ?? crypto.randomUUID();
+      setSentMessageIds((current) => {
+        const next = new Set(current);
+        next.add(messageId);
+        return next;
+      });
       // Sending takes the reader to the end, wherever they had scrolled.
       void conversation.current?.scrollToBottom("instant");
-      await sendTranscriptMessage(...args);
+      await sendTranscriptMessage(content, messageId, supersedesMessageId);
     },
     [reveal, sendTranscriptMessage],
   );
@@ -133,7 +131,7 @@ export function ThreadPane({
   // With no AI to think with, a message's answer can only ask for one: it's drawn so from the send.
   const brainless = useNoBrainYet();
   // The answer a running turn will give, drawn from the send so its first words land in
-  // a place that already exists: Auni's line over the work, then the steps under it.
+  // a place that already exists: a quiet thinking line, then any steps, then words.
   // A turn core started before this visit heard it: only the thread's row says so. Held
   // a moment first, since that row also trails behind a turn this visit just watched end.
   const joinedLate = useSustained(
@@ -151,12 +149,6 @@ export function ThreadPane({
           (busy && trailingMessage?.metadata?.posted)
         ? pendingAnswer(null)
         : null;
-  // A chat's first answer has Auni reading in it until its words.
-  const firstPrompt = visibleMessages.find(({ role }) => role === "user")?.id;
-  const isFirstAnswer = (message: AuniUiMessage) =>
-    message.role === "assistant" &&
-    message.metadata?.origin === "human" &&
-    message.metadata.replyToMessageId === firstPrompt;
   const turns = answerToCome ? [...visibleMessages, answerToCome] : visibleMessages;
   // An answer and the stand-in drawn before it share a key, so the first words land in
   // the same component: its clock, folds and steps carry straight on.
@@ -222,32 +214,45 @@ export function ThreadPane({
     [busy, submitMessage],
   );
 
+  // Keep resizing instant through the first history layout so opening an
+  // uncached thread lands on its newest message instead of scrolling through older ones.
+  const [smoothFollow, setSmoothFollow] = useState(historyReady);
+  useEffect(() => {
+    if (!historyReady || smoothFollow) return undefined;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setSmoothFollow(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [historyReady, smoothFollow]);
+
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="relative flex min-h-0 flex-1 flex-col px-0 sm:px-5 sm:pt-6 sm:pb-4 lg:px-8 lg:pb-5">
         <Conversation
           contextRef={conversation}
           // Opening a thread lands on its end at once; only a live answer glides.
-          resize={historyReady && !revealingHistory ? "smooth" : "instant"}
+          resize={smoothFollow ? "smooth" : "instant"}
         >
-          <ConversationContent className={TRANSCRIPT_COLUMN_CLASS_NAME} onReadOn={readOn}>
-            {historyPlaceholderVisible ? (
-              <div
-                aria-hidden={historyReady}
-                className="auni-history-veil pointer-events-none absolute inset-0 z-10 px-4 pt-5 sm:px-0 sm:pt-0"
-                data-phase={historyReady ? "resolving" : "loading"}
-              >
-                <ThreadHistoryLoading />
-              </div>
+          <ConversationContent
+            className={TRANSCRIPT_COLUMN_CLASS_NAME}
+            data-timeline-loading={!historyReady || undefined}
+            onReadOn={readOn}
+          >
+            {!historyReady ? (
+              <span className="sr-only" role="status">
+                Loading conversation history.
+              </span>
             ) : null}
             {visibleMessages.length === 0 &&
             historyReady &&
             !busy &&
             !answerToCome &&
             thread?.state !== "running" ? (
-              <EmptyThread
-                className={revealingHistory ? "auni-history-message-resolve" : ""}
-              />
+              <EmptyThread />
             ) : null}
 
             {turns.map((message, index) => {
@@ -260,7 +265,7 @@ export function ThreadPane({
               return (
                 <div
                   key={keys[index]}
-                  className={`min-w-0 ${revealingHistory ? "auni-history-message-resolve" : ""}`}
+                  className="min-w-0"
                   data-slot="conversation-turn"
                   data-owner-turn={message.role === "user" || undefined}
                   data-read-from-start={keys[index] === readFromStart || undefined}
@@ -278,6 +283,7 @@ export function ThreadPane({
                   ) : (
                     <ArrivedForCard value={arrivals.told.get(index) ?? NONE_ARRIVED}>
                       <ConversationMessage
+                        animateEnter={message.role === "user" && sentMessageIds.has(message.id)}
                         answering={answeredQuestion(turns, index)}
                         threadId={threadId}
                         isStreaming={
@@ -287,7 +293,6 @@ export function ThreadPane({
                         }
                         message={message}
                         pending={live}
-                        firstAnswer={isFirstAnswer(message)}
                         workStartedAt={
                           standIn || message.id === trailingMessage?.id
                             ? answerStartedAt(turns, index)
@@ -334,11 +339,11 @@ export function ThreadPane({
           <Composer
             // Remounting with the returned or edited words puts them back under the cursor.
             key={editing?.userMessageId ?? returnedDraft?.key ?? threadId}
-            // Under an open question the answers come first, and number keys pick outside the field.
-            autoFocus={!openQuestion}
+            // Wait for history before autofocusing so an arriving QuestionPicker keeps its number-key shortcuts.
+            autoFocus={historyReady && !openQuestion}
             // With no AI to think with, a turn only asks for one: nothing is running to stop.
             busy={busy && !brainless}
-            disabled={!historyReady || historyFailed}
+            disabled={historyFailed}
             draftKey={threadId}
             initialMessage={editing?.text ?? returnedDraft?.text ?? ""}
             lead={
@@ -381,32 +386,18 @@ export function ThreadPane({
                 />
               </>
             }
-            loadingPhase={historyReady ? "ready" : "loading"}
             onStop={() => void stop()}
             onSubmit={async (content) => {
               setEditing(null);
               await submitMessage(content, crypto.randomUUID(), editingMessageId);
             }}
             placeholder={openQuestion ? "Or say something else" : placeholder}
+            sendDisabled={!historyReady}
           />
         </div>
       </div>
     </section>
   );
-}
-
-/** True once `value` has held for `ms`, and false the moment it stops. */
-function useSustained(value: boolean, ms: number): boolean {
-  const [held, setHeld] = useState(false);
-  useEffect(() => {
-    if (!value) return undefined;
-    const timer = window.setTimeout(() => setHeld(true), ms);
-    return () => {
-      window.clearTimeout(timer);
-      setHeld(false);
-    };
-  }, [ms, value]);
-  return value && held;
 }
 
 /** An answer shown in the open thread is read once the page is in front of the person. */

@@ -14,10 +14,11 @@ import {
 
 import type { Thread } from "@/lib/data/views";
 import type { CarriedTake } from "@/lib/first-message";
+import { reducedMotion } from "@/lib/motion";
 
-const MINIMUM_LAUNCH_DURATION_MS = 520;
-const HANDOFF_DURATION_MS = 260;
-const CANCEL_DURATION_MS = 180;
+const COMPOSER_FLIP_HOLD_MS = 340;
+const HANDOFF_DURATION_MS = 140;
+const CANCEL_DURATION_MS = 140;
 
 type ConversationLaunchPhase = "creating" | "navigating" | "settled" | "cancelled";
 
@@ -27,6 +28,8 @@ interface ConversationLaunch {
   readonly phase: ConversationLaunchPhase;
   readonly prompt: string;
   readonly startedAt: number;
+  /** Viewport Y of the centered hero composer on `/app/new`, for the FLIP glide into the dock. */
+  readonly composerFromTop: number | null;
   /** Where Auni placed it, once it has. */
   readonly thread: Thread | null;
   /** The owner's first take, flown in from the landing, which draws its entrance. */
@@ -35,7 +38,11 @@ interface ConversationLaunch {
 
 interface ConversationLaunchContextValue {
   readonly launch: ConversationLaunch | null;
-  readonly begin: (prompt: string, carried?: CarriedTake) => ConversationLaunch | null;
+  readonly begin: (
+    prompt: string,
+    carried?: CarriedTake,
+    composerFromTop?: number | null,
+  ) => ConversationLaunch | null;
   readonly cancel: (launchId: string) => void;
   /** The place is known: its thread, which the stage's header now names. */
   readonly continueToThread: (launchId: string, thread: Thread) => void;
@@ -56,7 +63,7 @@ export function useConversationLaunch(): ConversationLaunchContextValue {
 export function ConversationLaunchProvider({ children }: { readonly children: ReactNode }) {
   const [launch, setLaunch] = useState<ConversationLaunch | null>(null);
   const launchRef = useRef<ConversationLaunch | null>(null);
-  const handoffTimerRef = useRef<number | null>(null);
+  const settleTimerRef = useRef<number | null>(null);
 
   const replaceLaunch = useCallback((next: ConversationLaunch | null) => {
     launchRef.current = next;
@@ -64,7 +71,7 @@ export function ConversationLaunchProvider({ children }: { readonly children: Re
   }, []);
 
   const begin = useCallback(
-    (prompt: string, carried?: CarriedTake) => {
+    (prompt: string, carried?: CarriedTake, composerFromTop: number | null = null) => {
       const content = prompt.trim();
       if (!content || launchRef.current) return null;
 
@@ -74,6 +81,7 @@ export function ConversationLaunchProvider({ children }: { readonly children: Re
         phase: "creating",
         prompt: content,
         startedAt: Date.now(),
+        composerFromTop: carried ? null : composerFromTop,
         thread: null,
         carried: carried ?? null,
       };
@@ -96,6 +104,10 @@ export function ConversationLaunchProvider({ children }: { readonly children: Re
     (launchId: string) => {
       const current = launchRef.current;
       if (!current || current.id !== launchId) return;
+      if (settleTimerRef.current !== null) {
+        window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
       replaceLaunch({ ...current, phase: "cancelled" });
     },
     [replaceLaunch],
@@ -106,16 +118,26 @@ export function ConversationLaunchProvider({ children }: { readonly children: Re
       const current = launchRef.current;
       if (!current || current.thread?.id !== threadId || current.phase === "settled") return;
 
-      if (handoffTimerRef.current !== null) window.clearTimeout(handoffTimerRef.current);
-      const elapsed = Date.now() - current.startedAt;
-      const delay = Math.max(0, MINIMUM_LAUNCH_DURATION_MS - elapsed);
+      if (settleTimerRef.current !== null) {
+        window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
 
-      handoffTimerRef.current = window.setTimeout(() => {
-        handoffTimerRef.current = null;
+      const holdMs =
+        current.composerFromTop !== null && !current.carried && !reducedMotion()
+          ? Math.max(0, COMPOSER_FLIP_HOLD_MS - (Date.now() - current.startedAt))
+          : 0;
+
+      if (holdMs === 0) {
+        replaceLaunch({ ...current, phase: "settled" });
+        return;
+      }
+      settleTimerRef.current = window.setTimeout(() => {
+        settleTimerRef.current = null;
         const active = launchRef.current;
         if (!active || active.thread?.id !== threadId) return;
         replaceLaunch({ ...active, phase: "settled" });
-      }, delay);
+      }, holdMs);
     },
     [replaceLaunch],
   );
@@ -132,7 +154,7 @@ export function ConversationLaunchProvider({ children }: { readonly children: Re
 
   useEffect(
     () => () => {
-      if (handoffTimerRef.current !== null) window.clearTimeout(handoffTimerRef.current);
+      if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
     },
     [],
   );

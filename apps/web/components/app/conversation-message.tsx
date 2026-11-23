@@ -15,16 +15,10 @@ import {
 } from "@/components/app/message-action-row";
 import type { AskAgentHandler } from "@/components/cards/ask-agent";
 import { ActivityRow } from "@/components/conversation/activity-row";
-import { CardTakingShape } from "@/components/conversation/card-taking-shape";
-import { GenericActivityTool } from "@/components/conversation/generic-activity-tool";
-import { ReadingAuni } from "@/components/conversation/reading-auni";
+import { toolAppId, toolStepStatus } from "@/components/conversation/generic-activity-copy";
+import { GenericActivityTool, ToolStepIcon } from "@/components/conversation/generic-activity-tool";
 import { SegmentedBubbles } from "@/components/conversation/segmented-bubbles";
-import {
-  answerWorkingLabel,
-  currentThought,
-  firstSentence,
-  stepUnderWay,
-} from "@/components/conversation/tool-working-status";
+import { answerWorkingLabel, firstSentence } from "@/components/conversation/tool-working-status";
 import type { TextFlowView } from "@/components/conversation/use-text-flow";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Message, MessageContent } from "@/components/ui/message";
@@ -40,10 +34,11 @@ import { useShowThinking } from "@/components/places/stored-state";
 import { FiredRule } from "@/components/watching/fired-rule";
 import { WatchingLine } from "@/components/watching/watching-line";
 import { messageTranscript } from "@/lib/message-transcript";
-import { pagesRead, picksChosen, readingTheWeb, towardsACard } from "@/lib/pages-read";
 import { cn } from "@/lib/utils";
 
 interface ConversationMessageProps {
+  /** Animate a newly sent user bubble gliding in; history messages mount statically. */
+  readonly animateEnter?: boolean;
   /** On a user message: the question Auni asked just before it, which it answers. */
   readonly answering?: AuniQuestion | null;
   /** The thread it's in, so the watches the agent set up open their sheet. */
@@ -52,8 +47,6 @@ interface ConversationMessageProps {
   readonly isStreaming: boolean;
   /** The turn behind this answer is still running; live work stays open until it ends. */
   readonly pending?: boolean;
-  /** A chat's first answer, the longest wait: Auni reads beside the pages it opens until its words. */
-  readonly firstAnswer?: boolean;
   /** When the request was sent; the live work clock counts up from it. */
   readonly workStartedAt?: string | undefined;
   /** Present only on the user message whose exchange may still be edited. */
@@ -66,10 +59,8 @@ interface ConversationMessageProps {
   readonly flow?: TextFlowView;
 }
 
-/** Cards that move money, whose words stay beside them rather than fold into the work. */
-const MONEY_CARDS = new Set<string>(["action", "action_plan"]);
-
 export function ConversationMessage({
+  animateEnter = false,
   answering,
   flow,
   isStreaming,
@@ -77,7 +68,6 @@ export function ConversationMessage({
   onAskAgent,
   onEditMessage,
   onRegenerate,
-  firstAnswer = false,
   pending = false,
   threadId,
   workStartedAt,
@@ -90,7 +80,7 @@ export function ConversationMessage({
     return (
       // The owner's words and the answer under them read as one exchange: their actions show on
       // hover in the space under the bubble rather than holding a row of their own open.
-      <Message align="end" className="pb-4" {...reveal}>
+      <Message align="end" className={cn("pb-4", animateEnter && "auni-message-enter")} {...reveal}>
         <MessageContent>
           {answering?.question ? (
             // What the words answer, quiet over them; picked or typed, an answer is a message.
@@ -130,10 +120,6 @@ export function ConversationMessage({
   }
 
   const transcript = messageTranscript(message);
-  // A thought joins the steps as it's had, read whole on its own row while they're open, and the
-  // line over them says only that the turn is working; folded away, the line says the thought.
-  // With thinking hidden, no thought shows.
-  const thinking = isStreaming && showThinking ? currentThought(message) : undefined;
   const timeline = transcript.activities.filter(({ part }) =>
     part.type === "data-reasoning" ? showThinking : true,
   );
@@ -143,11 +129,11 @@ export function ConversationMessage({
   ];
   const lastCardId = placedCards.at(-1)?.id;
   const working = isStreaming || pending;
-  // Until its first step, a turn is thinking; after, the line says what it is doing.
+  // Until its first step, a turn is thinking; after, the status reflects what it is doing.
   const liveLabel = working
     ? message.parts.length === 0
-      ? "Thinking…"
-      : (answerWorkingLabel(message, { showThinking }) ?? "Working…")
+      ? "Thinking"
+      : (answerWorkingLabel(message, { showThinking }) ?? "Thinking")
     : null;
   // The ask under an answer lands once its words have, so nothing below them ever moves.
   const settled =
@@ -159,9 +145,6 @@ export function ConversationMessage({
   });
 
   const { fires } = message.metadata ?? {};
-  // A chat's first answer, the longest wait: what Auni reads, and the card it is building.
-  const pages = firstAnswer ? pagesRead(message) : [];
-  const shaping = firstAnswer && !settled ? towardsACard(message) : null;
 
   return (
     <>
@@ -175,16 +158,26 @@ export function ConversationMessage({
             workDurationMs={message.metadata?.workDurationMs}
             workStartedAt={workStartedAt}
             liveLabel={liveLabel}
-            liveLabelIsStep={
-              working && (stepUnderWay(message) !== undefined || thinking !== undefined)
-            }
-            activities={timeline.map(({ cards, key, offset, part }) => ({
-              key,
-              offset,
-              // A thought alone leaves the words around it read.
-              foldsText: part.type !== "data-reasoning",
-              node:
-                part.type === "data-reasoning" ? (
+            activities={timeline.map(({ cards, key, offset, part }) => {
+              const isReasoning = part.type === "data-reasoning";
+              const toolName = isReasoning ? null : getToolName(part);
+              const appId = toolName ? toolAppId(toolName) : null;
+              return {
+                key,
+                offset,
+                iconKey: isReasoning
+                  ? "thought"
+                  : appId
+                    ? `app:${appId}`
+                    : `tool:${toolName ?? "step"}`,
+                icon: isReasoning ? (
+                  <Brain className="size-3" aria-hidden />
+                ) : (
+                  <ToolStepIcon size={20} toolName={toolName ?? ""} />
+                ),
+                isTool: !isReasoning,
+                status: isReasoning ? null : toolStepStatus(part.state, working),
+                node: isReasoning ? (
                   <ActivityRow
                     icon={<Brain className="size-3.5" aria-hidden />}
                     text={firstSentence(part.data.text)}
@@ -196,22 +189,20 @@ export function ConversationMessage({
                     live={working}
                     output={part.state === "output-available" ? part.output : undefined}
                     state={part.state}
-                    toolName={getToolName(part)}
+                    toolName={toolName ?? ""}
                   />
                 ),
-              cards:
-                cards.length > 0 ? (
-                  <ConversationCards
-                    cards={cards}
-                    retried={transcript.retried}
-                    // A card something later followed up on offers no follow-up of its own.
-                    onAskAgent={cards.some(({ id }) => id === lastCardId) ? onAskAgent : undefined}
-                  />
-                ) : undefined,
-            }))}
-            preserveText={
-              transcript.watches.length > 0 || placedCards.some(({ kind }) => MONEY_CARDS.has(kind))
-            }
+                cards:
+                  cards.length > 0 ? (
+                    <ConversationCards
+                      cards={cards}
+                      retried={transcript.retried}
+                      // A card something later followed up on offers no follow-up of its own.
+                      onAskAgent={cards.some(({ id }) => id === lastCardId) ? onAskAgent : undefined}
+                    />
+                  ) : undefined,
+              };
+            })}
             finalized={!working}
             flow={flow}
             text={text}
@@ -231,24 +222,15 @@ export function ConversationMessage({
               </>
             }
           />
-          {/* A chat's first answer, the longest wait, has Auni in it until its words: under the
-              work, outside it, so it stays put as each step joins the work above it. */}
-          {working && firstAnswer && text.length === 0 ? (
-            <ReadingAuni pages={pages} searching={readingTheWeb(message)} />
-          ) : null}
-          {/* Under the work, then under the words, until the card itself lands in its place. */}
-          {shaping && transcript.activities.every(({ cards }) => cards.length === 0) ? (
-            <CardTakingShape
-              making={shaping === "making"}
-              chosen={picksChosen(message)}
-            />
-          ) : null}
           {text.length > 0 ? (
-            // Hidden rather than unmounted while streaming, so the finish reveals
-            // the actions instead of growing the answer under the reader.
+            // Kept mounted while streaming so finishing reveals actions smoothly without shifting layout.
             <div
-              aria-hidden={isStreaming || undefined}
-              className={cn("absolute start-0 top-[calc(100%+4px)]", isStreaming && "invisible")}
+              aria-hidden={!settled || undefined}
+              className={cn(
+                "absolute start-0 top-[calc(100%+4px)] transition-opacity duration-240 ease-settle motion-reduce:transition-none",
+                !settled && "pointer-events-none opacity-0",
+              )}
+              inert={!settled}
             >
               <MessageActionsRow align="start">
                 <CopyMessageAction text={text} />

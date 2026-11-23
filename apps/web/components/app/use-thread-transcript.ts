@@ -2,7 +2,7 @@
 
 import type { MessageId, ThreadId } from "@auni/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
 import {
   HISTORY_FAILURE,
@@ -20,7 +20,6 @@ export function useThreadTranscript(threadId: ThreadId) {
     send: sent,
     turn,
   } = useSyncExternalStore(session.subscribe, session.read, session.read);
-  const [hadCachedHistory] = useState(() => session.read().history !== "loading");
 
   // A turn core started on its own (an action settled, a deposit landed, a watch fired),
   // still before its first words.
@@ -54,7 +53,6 @@ export function useThreadTranscript(threadId: ThreadId) {
 
   return {
     failure,
-    hadCachedHistory,
     historyFailed: history === "failed",
     historyReady: history !== "loading",
     messages,

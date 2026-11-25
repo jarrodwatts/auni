@@ -287,8 +287,13 @@ export function whichBrainSays(settingsFile: string): string | null {
  * any other that is ready; with none, it's tried anyway, since its CLI knows best whether the
  * limit has lifted. With no brain ready, what the owner can run to make each ready.
  */
-export function pickBrain(preferred?: string): Promise<PickedBrain | NoBrain> {
-  return pick(checked, preferred);
+export async function pickBrain(preferred?: string): Promise<PickedBrain | NoBrain> {
+  const picked = await pick(checked, preferred);
+  if ("about" in picked) return picked;
+  if ("blocked" in picked) return { fixes: [picked.blocked], blocked: true };
+  return {
+    fixes: picked.unavailable.map(({ name, id, state, fix }) => fixLine({ name, id }, state, fix)),
+  };
 }
 
 /**
@@ -296,32 +301,45 @@ export function pickBrain(preferred?: string): Promise<PickedBrain | NoBrain> {
  * proof that its login answers (a model's one word, seconds more): what `auni` says it thinks
  * with as it starts, while the proof goes on for the first turn.
  */
-export function brainSeen(): Promise<PickedBrain | NoBrain> {
-  return pick((id, brain) => {
+export async function brainSeen(auni: string): Promise<{ name: string | null; line: string }> {
+  const picked = await pick((id, brain) => {
     void checked(id, brain);
     return checks.get(id)!.seen;
   });
+  const until = "about" in picked ? restingUntil(picked.about.id) : null;
+  const row: TerminalBrain | undefined =
+    "about" in picked
+      ? { ...picked.about, ...(until ? { state: "resting", until } : { state: "ready" }) }
+      : "unavailable" in picked
+        ? picked.unavailable[0]
+        : undefined;
+  return {
+    name: "about" in picked ? terminalName(picked.about) : null,
+    line: terminalBrainLine(row, "blocked" in picked ? picked.blocked : null, auni),
+  };
 }
+
+type UnavailableBrain = Extract<BrainRow, { fix: string }>;
 
 async function pick(
   look: (id: string, brain: Brain) => Promise<BrainCheck>,
   preferred?: string,
-): Promise<PickedBrain | NoBrain> {
+): Promise<PickedBrain | { blocked: string } | { unavailable: UnavailableBrain[] }> {
   const blocked = brainsBlocked();
-  if (blocked) return { fixes: [blocked], blocked: true };
-  const fixes: string[] = [];
+  if (blocked) return { blocked };
+  const unavailable: UnavailableBrain[] = [];
   let tired: PickedBrain | undefined;
   for (const { about, brain } of inTurn(preferred)) {
     const check = await look(about.id, brain);
     if (!check.ready) {
-      fixes.push(fixLine(about, check.why, check.fix));
+      unavailable.push({ id: about.id, name: about.name, state: check.why, fix: check.fix });
       continue;
     }
     const picked = { about, brain, login: check.login };
     if (!isResting(about.id)) return picked;
     tired ??= picked;
   }
-  return tired ?? { fixes };
+  return tired ?? { unavailable };
 }
 
 export type BrainStatus =
@@ -364,6 +382,38 @@ export type BrainRow = { readonly id: string; readonly name: string } & (
     }
   | { readonly state: BrainNotReady; readonly fix: string }
 );
+
+const terminalName = ({ id, name }: Named) =>
+  brains().find(({ about }) => about.id === id)?.brain.terminalName ?? name;
+type TerminalBrain = Named &
+  ({ state: "ready" } | { state: "resting"; until: Date } | UnavailableBrain);
+
+/** The terminal names only the brain Auni picked, or the first one it would try. */
+export function terminalBrainLine(
+  row: TerminalBrain | undefined,
+  blocked: string | null,
+  auni: string,
+): string {
+  if (blocked === ON_WINDOWS) return "Auni needs Linux on Windows. Run: wsl --install";
+  if (blocked)
+    return "Auni can't use the AI named in its settings file. Pick an installed AI there and try again.";
+  if (!row) return `Couldn't check your AI. Run: ${auni} doctor --verbose`;
+  const name = terminalName(row);
+  switch (row.state) {
+    case "ready":
+      return `${name} is ready.`;
+    case "resting":
+      return `${name} has reached its usage limit until ${row.until.toLocaleString()}.`;
+    case "signed-out":
+      return `${name} isn't signed in. Run: ${row.fix}`;
+    case "expired":
+      return `${name}'s sign-in expired. Run: ${row.fix}`;
+    case "not-installed":
+      return `${name} needs to be set up. Run: ${row.fix}`;
+    case "broken":
+      return `Couldn't check ${name}. Run: ${auni} doctor --verbose`;
+  }
+}
 
 /**
  * Every brain app, in the order a turn asks them, as it stands on this machine. `notReadyFreshMs` asks a

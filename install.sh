@@ -59,25 +59,25 @@ fail() {
   exit 1
 }
 
-# Runs a command with its output in the log, which is shown only when it fails. Never reads from
-# stdin, which under `curl | sh` is this script.
-logged() {
-  if ! "$@" >>"$LOG" 2>&1 </dev/null; then
-    printf '\n' >&2
-    tail -n 40 "$LOG" >&2
-    fail "the step above failed. See $LOG, then retry your install command."
-  fi
+# Never reads from stdin, which under `curl | sh` is this script.
+to_log() { "$@" >>"$LOG" 2>&1 </dev/null; }
+log_failure() {
+  printf '\n' >&2
+  tail -n 40 "$LOG" >&2
+  fail "the step above failed. See $LOG, then retry your install command."
 }
+logged() { to_log "$@" || log_failure; }
 
 # Keep the build output in the log while showing how long this step has been running.
 building() (
   label="$1"
   shift
-  done_ "$label"
   if [ ! -t 1 ] || [ "${TERM:-}" = dumb ]; then
+    done_ "$label"
     logged "$@"
     exit
   fi
+  printf '      %s' "$label"
   started=$(date +%s)
   (
     while sleep 1; do
@@ -85,10 +85,21 @@ building() (
     done
   ) &
   timer=$!
-  trap 'kill "$timer" 2>/dev/null || :; wait "$timer" 2>/dev/null || :; printf "\r      %s (%ss)\n" "$label" "$(($(date +%s) - started))"' EXIT
+  stop_timer() {
+    kill "$timer" 2>/dev/null || :
+    wait "$timer" 2>/dev/null || :
+  }
+  trap 'stop_timer; printf "\n"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
-  logged "$@"
+  result=0
+  to_log "$@" || result=$?
+  stop_timer
+  trap - EXIT
+  if [ "$result" -ne 0 ]; then
+    log_failure
+  fi
+  printf '\r      %s (%ss)\n' "$label" "$(($(date +%s) - started))"
 )
 
 # Stops, saying how to install it, when the command $1 (from the package $2) is missing.

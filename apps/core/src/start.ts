@@ -1,7 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import type { Server } from "node:http";
 
-import { brainSeen, onBrainReady, proveLogins } from "./agent/brain.ts";
+import { brainSeen, onBrainReady, proveLogins, terminalBrainLine } from "./agent/brain.ts";
 import { lastPaired, mintPairingCode, pairingLink, theOwner } from "./auth/owner.ts";
 import { closeDatabaseConnection } from "./db/client.ts";
 import { postgresLog, type Postgres } from "./db/embedded.ts";
@@ -19,11 +19,10 @@ import {
 import { lendToHandover, packHere } from "./handover/hand-over.ts";
 import { takingOver, handedOver } from "./handover/marks.ts";
 import { listen } from "./server.ts";
-import type { BrainFound } from "./hello/stage.ts";
 import { plainTelling, type Telling } from "./hello/telling.ts";
 import { canOpenBrowser, noteBrowserTry, openBrowser } from "./open-browser.ts";
 import { runningAuni, runsAs, where } from "./running.ts";
-import { auniCommand } from "./setup.ts";
+import { auniCommand, tunnelHint } from "./setup.ts";
 import { startWebApp } from "./web-app.ts";
 
 /**
@@ -309,15 +308,13 @@ export async function openOwner({
     }
   }
   noteBrowserTry(open && !screen ? "no-screen" : "not-opened");
-  if (paired) {
-    say(`\nOpen Auni at ${env.WEB_ORIGIN}`);
-    return false;
-  }
-  say(
-    printsLink
-      ? `\nOpen ${pairingLink(await mintPairingCode(), landsOn)}\nThis link works once and expires after 15 minutes.`
-      : `\nAuni is at ${env.WEB_ORIGIN}\nRun ${auniCommand()} pair to get a sign-in link.`,
-  );
+  const tunnel = screen ? "" : tunnelHint();
+  const link = paired
+    ? `Open Auni at ${env.WEB_ORIGIN}`
+    : printsLink
+      ? `Open ${pairingLink(await mintPairingCode(), landsOn)}\nThis link works once and expires after 15 minutes.`
+      : `Auni is at ${env.WEB_ORIGIN}\nRun ${auniCommand()} pair to get a sign-in link.`;
+  say(`\n${tunnel}${link}`);
   return false;
 }
 
@@ -326,20 +323,10 @@ export async function openOwner({
  * can. A running Auni goes on to prove the login with one tiny question (proveLogins), which its
  * first turn waits on; saying what the check saw needn't.
  */
-async function brainFound(): Promise<BrainFound> {
-  const picked = await brainSeen().catch((error: unknown) => {
-    console.error("Couldn't check your AI:", error);
-    return { fixes: [] as string[] };
-  });
-  return "about" in picked
-    ? {
-        name: picked.about.name,
-        line: `Your AI: ${picked.about.name} ready.`,
-      }
-    : {
-        name: null,
-        line: picked.fixes.length
-          ? picked.fixes.join("\n")
-          : "Couldn't check your AI. Open Settings to check your sign-in.",
-      };
+function brainFound() {
+  const auni = auniCommand();
+  return brainSeen(auni).catch(() => ({
+    name: null,
+    line: terminalBrainLine(undefined, null, auni),
+  }));
 }

@@ -123,8 +123,10 @@ switch (command) {
         console.log("Signed out every browser.");
       }
       const link = owner.pairingLink(await owner.mintPairingCode());
+      const { canOpenBrowser } = await import("./open-browser.ts");
+      const { tunnelHint } = await import("./setup.ts");
       console.log(
-        `Open this link to sign in to Auni:\n  ${link}\n\nIt works once and expires after 15 minutes.`,
+        `${canOpenBrowser() ? "" : tunnelHint()}Open this link to sign in to Auni:\n  ${link}\n\nIt works once and expires after 15 minutes.`,
       );
     });
     break;
@@ -155,7 +157,7 @@ switch (command) {
         dryRun: flags.has("--dry-run"),
         // Asked one at a time, starting at yes for a recommended one.
         ask:
-          process.stdin.isTTY && !json
+          process.stdin.isTTY && process.stdout.isTTY && !json
             ? async ({ does, recommended }) => {
                 const said = (await askInTerminal(`${does}? ${recommended ? "[Y/n]" : "[y/N]"} `))
                   .trim()
@@ -447,7 +449,6 @@ switch (command) {
       process.exitCode = 1;
       break;
     }
-    const { dataDir } = await import("./data-dir.ts");
     // Asked and stopped holding the database, which lets Postgres stop once both let go: it runs
     // from the app being removed. release/uninstall.ts reads the database, so it is imported only
     // once withDatabase has readied what env.ts reads (boot.ts).
@@ -462,7 +463,7 @@ switch (command) {
         return "stop";
       }
       console.log(
-        `This removes the app, the auni command, and its background service.\nYour data stays in ${dataDir()}.`,
+        "This removes the app, the auni command, and its background service. Your data stays where it is.",
       );
       if (running) console.log("Auni will finish any moves in progress before it stops.");
       try {

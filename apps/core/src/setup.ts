@@ -371,6 +371,14 @@ function tunnelCommand(): string | null {
   return `ssh -L ${port || 80}:127.0.0.1:${env.WEB_PORT} <this computer>`;
 }
 
+/** What to print before a local link when the browser is on a different computer. */
+export function tunnelHint(): string {
+  const tunnel = tunnelCommand();
+  return tunnel
+    ? `If your browser is on another computer, forward the port from there first:\n  ${tunnel}\n\n`
+    : "";
+}
+
 /** One answer as a person reads it, for `auni setup` without --json. */
 export function said(facts: SetupFacts, answer = nextStep(facts)): string {
   if (answer.run)
@@ -388,11 +396,8 @@ export function said(facts: SetupFacts, answer = nextStep(facts)): string {
     const command = `${auniCommand(facts.install)} pair`;
     if (facts.running.browser === "opened")
       return `Open the Auni tab in your browser. If you closed it, run ${command} for a new sign-in link.`;
-    const tunnel = facts.running.browser === "no-screen" ? tunnelCommand() : null;
-    const pair = `Run ${command} on the computer running Auni, then open the link. It works once and expires after 15 minutes.`;
-    return tunnel
-      ? `If your browser is on another computer, forward the port from there first:\n  ${tunnel}\n\n${pair}`
-      : pair;
+    const tunnel = facts.running.browser === "no-screen" ? tunnelHint() : "";
+    return `${tunnel}Run ${command} on the computer running Auni, then open the link. It works once and expires after 15 minutes.`;
   }
   if (answer.step === "done")
     return facts.tailscale

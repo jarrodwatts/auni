@@ -82,6 +82,8 @@ describe("openOwner", () => {
     expect(browserTried()?.how).toBe("not-opened");
     expect(said).not.toContain("#pair");
     expect(said.match(/auni pair/gu)).toHaveLength(2);
+    expect(said.match(/ssh -L/gu)).toHaveLength(1);
+    expect(said.indexOf("ssh -L")).toBeLessThan(said.indexOf(env.WEB_ORIGIN));
   });
 
   it("brings the browser to the page a start names, by the link it opens or prints", async () => {
@@ -91,8 +93,13 @@ describe("openOwner", () => {
     ]);
     // A demo, with nothing to open a browser in, prints the same link.
     vi.mocked(canOpenBrowser).mockReturnValue(false);
+    said = "";
     await openOwner({ web: true, open: true, printsLink: true, landsOn: "/app/new" });
     expect(said).toMatch(new RegExp(`Open ${env.WEB_ORIGIN}/app/new#pair=\\S+`, "u"));
+    expect(said).toContain(
+      `ssh -L ${new URL(env.WEB_ORIGIN).port}:127.0.0.1:${env.WEB_PORT} <this computer>`,
+    );
+    expect(said.indexOf("ssh -L")).toBeLessThan(said.indexOf(env.WEB_ORIGIN));
   });
 
   it("asks a paired owner for no pairing link", async () => {

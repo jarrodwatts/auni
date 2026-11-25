@@ -196,8 +196,10 @@ describe("auni doctor's repairs", () => {
     expect(said.out[0]).toMatch(/^Auni isn't running\.\nRun: pnpm auni\n/u);
     expect(ask).not.toHaveBeenCalled();
     await doctorCommand({ ...run, verbose: true });
-    expect(said.out.at(-1)).toContain("Repairs:");
-    expect(said.out.at(-1)).not.toContain("--verbose");
+    expect(said.out.at(-2)).toContain("Repairs:");
+    expect(said.out.at(-1)).toBe(
+      "To choose an optional repair, run pnpm auni doctor --verbose in a terminal.",
+    );
     await doctorCommand({ ...run, ask, verbose: true });
     expect(ask).toHaveBeenCalledWith(expect.objectContaining({ id: "install-service" }));
   });

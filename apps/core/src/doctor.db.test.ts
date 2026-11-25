@@ -150,12 +150,15 @@ describe("auni doctor", () => {
     const findings = await doctor();
     const summary = doctorSummary(findings, "pnpm auni");
     expect(summary).toMatch(/^Auni isn't running\.\nRun: pnpm auni\n/u);
-    expect(summary).toContain("Claude Code: sign it in");
-    expect(summary).toContain("claude auth login");
-    expect(summary).toContain("Set RPC_URL_MONAD");
-    expect(summary).toContain("Set RPC_URL_POLYGON");
+    expect(summary).toContain("Claude isn't signed in. Run: claude auth login");
+    expect(summary).not.toMatch(/Codex|Settings|RPC_URL_|DATABASE_URL|WEB_ORIGIN/u);
     expect(summary).toContain("Waiting for startup: Web app, Your wallet, Apps");
-    expect(summary).toContain("Networks: 7 chains ready, 1 with limits");
+    expect(summary).toContain(
+      "Networks: 7 chains ready, 1 with limits\n" +
+        "Monad didn't answer the deposit history check.\n" +
+        "Polygon didn't answer the past balance check.\n" +
+        "Set a working network URL in Auni's settings file.",
+    );
     expect(summary).toContain("Passed: Version");
     expect(summary).not.toMatch(/needs the database first|migrations to apply|Run: .*--verbose/u);
     // Machine readers still see the individual findings and no presentation fields.
@@ -168,6 +171,35 @@ describe("auni doctor", () => {
     expect(of(findings, "wallet")).toEqual(["fix  wallet: needs the database first"]);
   });
 
+  it("names the ready fallback AI and keeps a broken AI's raw output in the detailed check", async () => {
+    const broken = {
+      id: "codex",
+      name: "Codex",
+      state: "broken",
+      fix: "WARNING: raw error\nDetails",
+    } as const;
+    vi.mocked(brainRows).mockResolvedValue([broken]);
+    const findings = await doctor();
+    expect(doctorSummary(findings, "pnpm auni")).toContain(
+      "Couldn't check Codex. Run: pnpm auni doctor --verbose",
+    );
+    expect(doctorSummary(findings, "pnpm auni")).not.toContain("WARNING:");
+    expect(of(findings, "brain")).toContain("fix  brain: Codex: WARNING: raw error\nDetails");
+    vi.mocked(brainRows).mockResolvedValue([
+      broken,
+      {
+        id: "claude-code",
+        name: "Claude Code",
+        state: "ready",
+        login: "your Claude login",
+        models: [],
+      },
+    ]);
+    const summary = doctorSummary(await doctor(), "pnpm auni");
+    expect(summary).toContain("Claude is ready.");
+    expect(summary).not.toMatch(/Codex|Your AI/u);
+  });
+
   it("adds visual weight to the headline, problems and passed checks only when styled", () => {
     const findings: Finding[] = [
       { check: "version", status: "ok", says: "current" },
@@ -178,7 +210,7 @@ describe("auni doctor", () => {
     const styled = doctorSummary(findings, "auni", { styled: true });
     expect(plain).not.toContain("\u001B");
     expect(styled).toContain("\u001B[1mAuni is running, with checks to review.\u001B[0m");
-    expect(styled).toContain("\u001B[33m!\u001B[0m Your AI: Run claude auth login");
+    expect(styled).toContain("\u001B[33m!\u001B[0m Couldn't check your AI.");
     expect(styled).toContain("\u001B[2mPassed: Version, Web app\u001B[0m");
   });
 
@@ -191,7 +223,9 @@ describe("auni doctor", () => {
       ],
       "auni",
     );
-    expect(summary).toMatch(/^Auni can't reach its database\.\nDatabase: can't connect/u);
+    expect(summary).toMatch(
+      /^Auni can't reach its database\.\nDatabase: Check the database connection/u,
+    );
     expect(summary).not.toContain("Background work");
     expect(summary).not.toContain("Web app");
   });

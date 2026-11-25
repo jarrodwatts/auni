@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { fixLine, whichBrainSays } from "./agent/brain.ts";
+import { fixLine, terminalBrainLine, whichBrainSays } from "./agent/brain.ts";
 import { reachFindings } from "./always-on.ts";
 import { appTroublesNow, troubleWords } from "./app-troubles.ts";
 import { appById } from "./apps/registry.ts";
@@ -22,7 +22,14 @@ import { byRelease } from "./release/tags.ts";
 import type { RepairId } from "./repairs.ts";
 import { runningAuni, where, type RunningAuni } from "./running.ts";
 import { lingers, ownCommand, serviceCommand, serviceInstalled } from "./service.ts";
-import { answeringVersion, brainsFact, keptKeys, walletFacts, webUnreachable } from "./setup.ts";
+import {
+  answeringVersion,
+  auniCommand,
+  brainsFact,
+  keptKeys,
+  walletFacts,
+  webUnreachable,
+} from "./setup.ts";
 
 /**
  * `auni doctor`: whether each part Auni needs works on this machine, and what to do where one
@@ -49,7 +56,8 @@ export interface Finding {
   readonly status: "ok" | "note" | "fix";
   readonly says: string;
   readonly [terminalDetail]?:
-    | { readonly problem: string }
+    | { readonly problem: string; readonly setting?: string }
+    | { readonly ai: string; readonly needsAttention: boolean }
     | { readonly failedJobs: number }
     | "migrates-on-start"
     | "restart-to-update";
@@ -95,8 +103,9 @@ export async function doctor(): Promise<Finding[]> {
 }
 
 /** One line a finding, as `auni doctor` prints it. */
-export function line({ check, status, says }: Finding): string {
-  return `${status.padEnd(4)} ${check}: ${says}`;
+export function line({ check, status, says, [terminalDetail]: detail }: Finding): string {
+  const setting = typeof detail === "object" && "setting" in detail ? detail.setting : undefined;
+  return `${status.padEnd(4)} ${check}: ${says}${setting ? ` (check ${setting})` : ""}`;
 }
 
 /** How long one check may take: a busy RPC can ask to be waited on for minutes. */
@@ -156,7 +165,7 @@ const checkDatabase: Check = async () => {
         status: "fix",
         [terminalDetail]: {
           problem:
-            "Check your database connection in DATABASE_URL, or unset it to use Auni's own database.",
+            "Check the database address in Auni's settings file, or remove it to use Auni's own database.",
         },
         says: `can't connect (${said(error)}): check DATABASE_URL, or unset it for Auni's own Postgres`,
       },
@@ -327,7 +336,8 @@ async function checkNetwork(network: NetworkKey, run: Check): Promise<Finding[]>
     ...(finding.status === "fix" && !finding[terminalDetail]
       ? {
           [terminalDetail]: {
-            problem: `${NETWORKS[network].name} didn't answer. Check ${rpcUrlVar(network)} or set it to a working network URL.`,
+            problem: `${NETWORKS[network].name} isn't answering.`,
+            setting: rpcUrlVar(network),
           },
         }
       : {}),
@@ -348,19 +358,17 @@ function through(chain: NetworkKey): string {
 
 async function checkEvmRpc(chain: (typeof EVM_CHAIN_KEYS)[number]): Promise<Finding[]> {
   const client = publicClient(chain);
-  const fix = (what: string, error: unknown): Finding => ({
+  const fix = (what: string, problem: string, error: unknown): Finding => ({
     check: "rpc",
     status: "fix",
-    [terminalDetail]: {
-      problem: `${NETWORKS[chain].name} ${what}. Set ${rpcUrlVar(chain)} to a network URL that supports this check.`,
-    },
+    [terminalDetail]: { problem: `${NETWORKS[chain].name} ${problem}.` },
     says: `${NETWORKS[chain].name} ${what} (${said(error)}): set ${rpcUrlVar(chain)} to an RPC that does`,
   });
   let head: number;
   try {
     head = Number(await client.getBlockNumber());
   } catch (error) {
-    return [fix("doesn't answer", error)];
+    return [fix("doesn't answer", "isn't answering", error)];
   }
   const from = head - PROBE_BLOCKS + 1;
   // The logs as the sweep reads them, each RPC at the span it serves (see transferLogs).
@@ -372,6 +380,7 @@ async function checkEvmRpc(chain: (typeof EVM_CHAIN_KEYS)[number]): Promise<Find
     return [
       fix(
         `won't list ${PROBE_BLOCKS.toLocaleString("en-US")} blocks of logs, which finds deposits`,
+        "didn't answer the deposit history check",
         logs.reason,
       ),
     ];
@@ -384,7 +393,11 @@ async function checkEvmRpc(chain: (typeof EVM_CHAIN_KEYS)[number]): Promise<Find
             status: "note",
             says: `${through(chain)}: keeps no past balances, so coin sent straight to the wallet shows only in readings (${said(balance.reason)})`,
           }
-        : fix("won't read past balances, which the sweep for deposits needs", balance.reason),
+        : fix(
+            "won't read past balances, which the sweep for deposits needs",
+            "didn't answer the past balance check",
+            balance.reason,
+          ),
     ];
   return [{ check: "rpc", status: "ok", says: through(chain) }];
 }
@@ -398,6 +411,7 @@ const checkSolanaRpc: Check = async () => {
       {
         check: "rpc",
         status: "fix",
+        [terminalDetail]: { problem: "Solana isn't answering." },
         says: `Solana doesn't answer (${said(error)}): set ${rpcUrlVar("solana")} to an RPC that does`,
       },
     ];
@@ -406,12 +420,20 @@ const checkSolanaRpc: Check = async () => {
 
 const checkBrain: Check = async () => {
   const { rows, blocked } = await brainsFact();
-  if (blocked) return [{ check: "brain", status: "fix", says: blocked }];
+  const picked =
+    rows.find(({ state }) => state === "ready") ??
+    rows.find(({ state }) => state === "resting") ??
+    rows[0];
+  const detail = {
+    ai: terminalBrainLine(picked, blocked, auniCommand()),
+    needsAttention: Boolean(blocked || picked?.state !== "ready"),
+  };
+  if (blocked) return [{ check: "brain", status: "fix", says: blocked, [terminalDetail]: detail }];
   // With one brain ready, the rest are notes: something else to think with, should it rest.
   const thinking = rows.some(({ state }) => state === "ready" || state === "resting");
   const which = whichBrainSays(settingsFile());
   const order: Finding[] = which ? [{ check: "brain", status: "note", says: which }] : [];
-  return [
+  const findings = [
     ...order,
     ...rows.map((row): Finding => {
       if (row.state === "ready")
@@ -429,6 +451,8 @@ const checkBrain: Check = async () => {
       };
     }),
   ];
+  if (findings[0]) findings[0] = { ...findings[0], [terminalDetail]: detail };
+  return findings;
 };
 
 const checkWallet: Check = async () => {
@@ -482,7 +506,7 @@ const checkWeb: Check = async () => {
       status: "fix",
       [terminalDetail]: {
         problem:
-          "The web app isn't answering. Check auni.log and make sure WEB_ORIGIN matches the address you open.",
+          "The web app isn't answering. Check auni.log and the web address in Auni's settings file.",
       },
       says: `nothing answers at ${env.WEB_ORIGIN}/core/health (${why}): is Auni running, and is WEB_ORIGIN where the browser opens it?`,
     },
@@ -504,7 +528,7 @@ const LABELS: Record<Finding["check"], string> = {
   apps: "Apps",
   web: "Web app",
   "always-on": "Remote access",
-};
+} satisfies Record<Finding["check"], string>;
 
 /** Summarizes the same findings that --json and web diagnostics read. */
 export function doctorSummary(
@@ -550,15 +574,28 @@ export function doctorSummary(
 
   const issues = fixes.filter(
     ({ check }) =>
+      check !== "brain" &&
+      check !== "rpc" &&
       !(database && (check === "wallet" || check === "apps")) &&
       !(databaseDown && (check === "runner" || check === "web")) &&
       !(needsStart && (check === "runner" || check === "database" || check === "web")),
   );
   for (const issue of issues) {
     const detail = issue[terminalDetail];
-    const text = typeof detail === "object" && "problem" in detail ? detail.problem : issue.says;
+    const text =
+      typeof detail === "object" && "problem" in detail
+        ? detail.problem
+        : issue.check === "database"
+          ? "Check the database connection and run doctor with --verbose for details."
+          : issue.says;
     lines.push(problem(`${LABELS[issue.check]}: ${text}`));
   }
+  const ai = findings
+    .map((row) => row[terminalDetail])
+    .find((detail) => typeof detail === "object" && "ai" in detail);
+  if (ai) lines.push(ai.needsAttention ? problem(ai.ai) : ai.ai);
+  else if (fixes.some(({ check }) => check === "brain"))
+    lines.push(problem(terminalBrainLine(undefined, null, auni)));
   if (needsStart)
     lines.push(
       database ? "Waiting for startup: Web app, Your wallet, Apps" : "Waiting for startup: Web app",
@@ -590,12 +627,24 @@ export function doctorSummary(
     const parts = [`${ready} ${ready === 1 ? "chain" : "chains"} ready`];
     if (count("note")) parts.push(`${count("note")} with limits`);
     lines.push(paint(2, `Networks: ${parts.join(", ")}`));
+    for (const issue of networks.filter(({ status }) => status === "fix")) {
+      const detail = issue[terminalDetail];
+      lines.push(
+        problem(
+          typeof detail === "object" && "problem" in detail
+            ? detail.problem
+            : "Couldn't check the networks.",
+        ),
+      );
+    }
+    if (count("fix")) lines.push("Set a working network URL in Auni's settings file.");
   }
 
   const healthy = new Set(
     findings
       .filter(
         ({ check, status }) =>
+          check !== "brain" &&
           check !== "rpc" &&
           !(localOnly && check === "always-on") &&
           status === "ok" &&

@@ -272,7 +272,7 @@ export async function doctorCommand(run: DoctorRun): Promise<number> {
       const auni = auniCommand();
       if (recommended && (run.json || run.verbose))
         say(`Run ${auni} doctor --fix to run the recommended repairs.`);
-      else if (run.json && !run.verbose)
+      else if (run.json ? !run.verbose : run.verbose)
         say(`To choose an optional repair, run ${auni} doctor --verbose in a terminal.`);
     } else {
       const eligible = offers.filter(({ recommended }) => recommended || (!run.fix && run.verbose));

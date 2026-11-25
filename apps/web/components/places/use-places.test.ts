@@ -29,9 +29,9 @@ describe("placesOf", () => {
   it("puts each chat in one place: waiting on the owner, holding positions, or the rest", () => {
     const threads = [
       thread("Buy $250 of Nvidia", { moneyLine: "Buy $250" }),
-      thread("AI buildout", { moveCount: 2 }),
+      thread("AI buildout", { holds: true }),
       thread("How am I doing?"),
-      thread("Fed bet", { asking: true, moveCount: 1 }),
+      thread("Fed bet", { asking: true, holds: true }),
     ];
     const takes = new Map([
       ["AI buildout" as ThreadId, take(2_000_000n)],
@@ -46,9 +46,9 @@ describe("placesOf", () => {
 
   it("orders takes pinned first, then newest, never by what they're worth as prices tick", () => {
     const threads = [
-      thread("Older", { moveCount: 1 }),
-      thread("Newer", { moveCount: 1 }),
-      thread("Pinned", { moveCount: 1, pinned: true, pinnedAt: "2026-11-01T00:00:00Z" }),
+      thread("Older", { holds: true }),
+      thread("Newer", { holds: true }),
+      thread("Pinned", { holds: true, pinned: true, pinnedAt: "2026-11-01T00:00:00Z" }),
     ];
     const order = (older: bigint, newer: bigint) =>
       titles(
@@ -65,16 +65,26 @@ describe("placesOf", () => {
   });
 
   it("keeps a take in Your takes before its value is read", () => {
-    const threads = [thread("AI buildout", { moveCount: 2 }), thread("Chat")];
+    const threads = [thread("AI buildout", { holds: true }), thread("Chat")];
     const before = placesOf(threads, new Map());
     expect(titles(before.takes)).toEqual(["AI buildout"]);
     expect(before.takes[0]?.take).toBeUndefined();
     expect(titles(before.others)).toEqual(["Chat"]);
   });
 
+  // A closed take showed under Your takes on every load, until its own read moved it to Chats
+  // (2026-11-25 council). The thread list says it holds nothing, so it starts in Chats.
+  it("places a closed take in Chats on first paint, before any value is read", () => {
+    const threads = [thread("Close my bitcoin long", { moveCount: 2, holds: false })];
+    const places = placesOf(threads, new Map());
+    expect(titles(places.takes)).toEqual([]);
+    expect(titles(places.others)).toEqual(["Close my bitcoin long"]);
+    expect(places.others[0]?.take).toBeNull();
+  });
+
   // A take that sold everything sat in Your takes as a blank row for good, while Money dropped it.
   it("moves a take that holds nothing any more to Chats, as Money drops it", () => {
-    const threads = [thread("Close my bitcoin long", { moveCount: 2 }), thread("Chat")];
+    const threads = [thread("Close my bitcoin long", { holds: true }), thread("Chat")];
     const closed = placesOf(threads, new Map([["Close my bitcoin long" as ThreadId, null]]));
     expect(titles(closed.takes)).toEqual([]);
     expect(titles(closed.others)).toEqual(["Chat", "Close my bitcoin long"]);

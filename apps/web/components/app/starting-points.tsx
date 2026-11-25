@@ -8,7 +8,6 @@ import { useEffect } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { requestComposerFocus } from "@/components/app/composer";
-import { useStartConversation } from "@/components/app/use-start-conversation";
 import { useMoney } from "@/components/money/money-provider";
 import { LogoImage, preloadLogo } from "@/components/brand/marks";
 import { useMe } from "@/components/personalization/use-me";
@@ -32,17 +31,15 @@ const WAITING_WIDTHS = [212, 176, 238, 194].slice(0, STARTING_POINTS);
 // Each point is a bare row, no box: its picture, then one line of what's true (in ink) and what
 // to do (lighter). The picture's left edge sits on the composer's placeholder text, and the
 // words start a fixed GAP after it. Rows are 52 tall with nothing between them, so the evenness
-// comes from the rhythm. Under a pointer a row lightens and an arrow says it starts something.
+// comes from the rhythm. Under a pointer a row lightens and an arrow says it picks those words.
 const ROW = "group/point flex h-[52px] w-full items-center rounded-card pr-3 text-left";
 const ROW_SPACING = { paddingLeft: INSET, gap: GAP } as const;
 
 /**
  * Ways into a new chat, drawn from what Auni sees of the owner (core's starting points), each
- * wearing a picture of what it's about. A click starts the chat with its prompt; a tap on a phone
- * puts the prompt in the box for the owner to read and send.
+ * wearing a picture of what it's about. Picking one puts its words in the box (pickStartingPoint).
  */
 export function StartingPoints() {
-  const { busy, error, start } = useStartConversation();
   const { points, waiting } = useStartingPoints();
   const { portfolio } = useMoney();
   const me = useMe();
@@ -74,17 +71,10 @@ export function StartingPoints() {
             >
               <button
                 type="button"
-                disabled={busy}
-                onClick={() => {
-                  // A phone has no pointer to show a point's sources or its words before they
-                  // go: the words land in the box, to read, change, then send.
-                  if (matchMedia("(pointer: coarse)").matches)
-                    requestComposerFocus("new", point.prompt, true);
-                  else void start(point.prompt);
-                }}
+                onClick={() => pickStartingPoint(point)}
                 title={point.sources.map(cited).join("\n")}
                 style={ROW_SPACING}
-                className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-ring-inset disabled:pointer-events-none disabled:opacity-60`}
+                className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-ring-inset`}
               >
                 {/* 15px on a phone, PHONE_TEXT_PX, which core measures each line at (lineFits). */}
                 <PointImage image={point.image} />
@@ -131,13 +121,17 @@ export function StartingPoints() {
           </Link>
         ) : null}
       </p>
-      {error && (
-        <p role="alert" className="mt-2 text-center text-caption text-destructive">
-          {error}
-        </p>
-      )}
     </div>
   );
+}
+
+/**
+ * A point picked, by click, tap or key alike: its words take the new chat's box, focused with the
+ * caret at their end, for the owner to read, change, then send. A point's words carry more than
+ * its line says (what Auni is asked to do), so none is ever sent unseen.
+ */
+export function pickStartingPoint(point: { readonly prompt: string }): void {
+  requestComposerFocus("new", point.prompt, true);
 }
 
 /**

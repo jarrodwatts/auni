@@ -71,8 +71,8 @@ const pinnedFirst = (a: Thread, b: Thread) =>
 /**
  * Every thread, sorted into the places it shows: each once, in the first that fits.
  * - needsYou: a card or a question waits on the person, newest first
- * - takes: it moved money (known before its value is) and holds something still, pinned first,
- *   then newest, so a row never moves as prices tick
+ * - takes: it holds something still (the thread list says so before its value is read), pinned
+ *   first, then newest, so a row never moves as prices tick
  * - others: every other chat, a closed take among them as Money drops it, pinned first, then newest
  * - archived: put away, with nothing waiting (search finds them)
  * `chats` is every listed thread, newest first.

@@ -15,7 +15,7 @@ import { onTheirWay } from "./record.ts";
 import { centsToUsd, formatUnits, signedUsdToCents, sumUsd, unitsUsd, usdToCents } from "./usd.ts";
 import { walletAddresses } from "./wallets.ts";
 import type { Account, AccountHolding, RawHolding } from "../apps/contract.ts";
-import { accountOwning, accounts, savingsTokens } from "../apps/registry.ts";
+import { accountOwning, accounts, isSavingsToken, savingsTokens } from "../apps/registry.ts";
 import { countFirstLook, placeOf, stillLooking } from "./first-look.ts";
 
 /** An EVM chain a fill or arrival names: one of Auni's, or another recorded as eip155:N. */
@@ -30,10 +30,7 @@ function isEvmPlace(chain: string): boolean {
  * on their own and filed under the app that keeps them.
  */
 function isWalletToken(chain: string, instrument: string): boolean {
-  return (
-    /^0x[0-9a-fA-F]{40}$/u.test(instrument) &&
-    !savingsTokens(chain).some(({ token }) => token.toLowerCase() === instrument.toLowerCase())
-  );
+  return /^0x[0-9a-fA-F]{40}$/u.test(instrument) && !isSavingsToken({ chain, instrument });
 }
 
 /**

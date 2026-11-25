@@ -13,6 +13,8 @@ import {
   type ThreadRow,
 } from "../db/schema.ts";
 import { askWaits } from "../asks.ts";
+import { isSavingsToken } from "../apps/registry.ts";
+import { allFills, threadBooks } from "../money/books.ts";
 import { cardMoneys, filledFace } from "../money/recipes/index.ts";
 import { askLine } from "../money/summaries.ts";
 import { replyTargets } from "./history.ts";
@@ -43,6 +45,7 @@ interface RowFacts {
   readonly moving?: Moving | null;
   readonly watchCount?: number;
   readonly moveCount?: number;
+  readonly holds?: boolean;
 }
 
 /** A thread with a card still waiting on the person needs them. */
@@ -59,6 +62,7 @@ export function threadWire(thread: ThreadRow, facts: RowFacts = {}): ThreadWire 
     modelSelection: thread.modelSelection,
     watchCount: facts.watchCount ?? 0,
     moveCount: facts.moveCount ?? 0,
+    holds: facts.holds ?? false,
     pinnedAt: thread.pinnedAt?.toISOString() ?? null,
     archivedAt: thread.archivedAt?.toISOString() ?? null,
     moneyLine: money,
@@ -229,13 +233,27 @@ async function moneyMoveCounts(threadIds: readonly string[]): Promise<Map<string
   return new Map(rows.map((row) => [row.threadId, row.count]));
 }
 
+/**
+ * The threads whose books (what their own fills net to, as the inspector reads its holdings
+ * from) still hold something, long or short: takes that aren't closed. Savings are cash, as the
+ * portfolio counts them, so money only put into savings isn't a take.
+ */
+async function holdingThreads(threadIds: readonly string[]): Promise<Set<string>> {
+  if (threadIds.length === 0) return new Set();
+  const books = threadBooks((await allFills(db)).filter((fill) => !isSavingsToken(fill)));
+  return new Set(
+    threadIds.filter((id) => [...(books.get(id)?.values() ?? [])].some((units) => units !== 0n)),
+  );
+}
+
 async function rowFacts(threadIds: readonly string[]) {
-  const [money, questions, moving, watches, moves] = await Promise.all([
+  const [money, questions, moving, watches, moves, holding] = await Promise.all([
     waitingAsks(threadIds),
     openQuestions(threadIds),
     movingMoney(threadIds),
     activeWatchCounts(threadIds),
     moneyMoveCounts(threadIds),
+    holdingThreads(threadIds),
   ]);
   return (id: string): RowFacts => ({
     money: money.get(id) ?? null,
@@ -243,6 +261,7 @@ async function rowFacts(threadIds: readonly string[]) {
     moving: moving.get(id) ?? null,
     watchCount: watches.get(id) ?? 0,
     moveCount: moves.get(id) ?? 0,
+    holds: holding.has(id),
   });
 }
 

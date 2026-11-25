@@ -35,10 +35,11 @@ export function takeValue(holdings: readonly Holding[]): TakeValue | null {
 }
 
 /**
- * A chat that moved money, which the thread list says before any value is read: a take until its
- * read says it holds nothing.
+ * A chat whose own fills still hold something, which the thread list says before any value is
+ * read, so a closed take is never placed as a take on load: a take until its read says it holds
+ * nothing (sold outside Auni, say).
  */
-export const isTake = (thread: Thread) => thread.moveCount > 0;
+export const isTake = (thread: Thread) => thread.holds;
 
 /**
  * Every take's value, by thread, each from the same read as its inspector: absent until its read

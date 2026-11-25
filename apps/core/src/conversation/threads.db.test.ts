@@ -4,7 +4,8 @@ import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "../db/client.ts";
-import { messages, threads } from "../db/schema.ts";
+import { fills, messages, threads } from "../db/schema.ts";
+import { savingsTokens } from "../apps/registry.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { listThreads } from "./threads.ts";
 
@@ -36,6 +37,46 @@ async function say(threadId: string, role: "user" | "assistant", parts: unknown[
 }
 
 describe("listThreads", () => {
+  // A closed take showed under Your takes on every load, until a read of what it held moved it
+  // to Chats (2026-11-25 council): the list now says whether a chat's own fills still hold anything.
+  it("says which chats still hold something by their own fills: none, closed, open, short", async () => {
+    const [never, closed, open, short, saved] = await Promise.all([
+      insertThread(),
+      insertThread(),
+      insertThread(),
+      insertThread(),
+      insertThread(),
+    ]);
+    for (const thread of [never, closed, open, short, saved])
+      await say(thread.id, "user", [{ type: "text", text: "Bitcoin" }], 1);
+    const btc = { chain: "hyperliquid", instrument: "BTC" };
+    const fill = async (threadId: string, side: "buy" | "sell", quantity: string, key = btc) => {
+      const action = await insertAction({ threadId, status: "done", startedAt: at(2) });
+      await db
+        .insert(fills)
+        .values({ actionId: action.id, threadId, ...key, side, quantity, usdValue: "100" });
+    };
+    await fill(closed.id, "buy", "0.5");
+    await fill(closed.id, "sell", "0.5");
+    await fill(open.id, "buy", "0.5");
+    await fill(open.id, "sell", "0.2");
+    await fill(short.id, "sell", "0.1");
+    // Savings count as cash, as Money and the inspector count them: not a take.
+    await fill(saved.id, "buy", "100", {
+      chain: "base",
+      instrument: savingsTokens("base")[0]!.token,
+    });
+
+    const holds = Object.fromEntries((await listThreads()).map(({ id, holds }) => [id, holds]));
+    expect(holds).toEqual({
+      [never.id]: false,
+      [closed.id]: false,
+      [open.id]: true,
+      [short.id]: true,
+      [saved.id]: false,
+    });
+  });
+
   it("says which threads end on Auni's question, until the person answers it", async () => {
     const open = await insertThread();
     const answered = await insertThread();

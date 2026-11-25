@@ -62,6 +62,21 @@ export function draftAfter(current: string, { text, replace }: FocusRequest): st
   return replace ? text : current || text;
 }
 
+/**
+ * Lands a focus request on the box: its draft as draftAfter says, focused with the caret at the
+ * end. Returns the draft. React writing new words in puts the caret at their end; words already
+ * there (picked twice, or kept from before) would keep it wherever it last was, at the start.
+ */
+export function landFocusRequest(
+  input: Pick<HTMLTextAreaElement, "value" | "focus" | "setSelectionRange">,
+  request: FocusRequest,
+): string {
+  const draft = draftAfter(input.value, request);
+  input.focus();
+  input.setSelectionRange(draft.length, draft.length);
+  return draft;
+}
+
 /** What a docked lead (a question Auni is asking) can do with the reply box it sits in. */
 interface ComposerLeadControls {
   /** Sends these words as the person's message, leaving any typed draft alone. */
@@ -141,8 +156,7 @@ export function Composer({
       if (!input || focusRequest?.draftKey !== draftKey) return;
       const request = focusRequest;
       focusRequest = null;
-      setMessage((current) => draftAfter(current, request));
-      input.focus();
+      setMessage(landFocusRequest(input, request));
     };
     take();
     focusListeners.add(take);

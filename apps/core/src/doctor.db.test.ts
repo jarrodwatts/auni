@@ -4,10 +4,13 @@ import { InvalidParamsRpcError } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { brainRows } from "./agent/brain.ts";
+import * as database from "./db/client.ts";
 import { db } from "./db/client.ts";
 import { appTroubles, jobs } from "./db/schema.ts";
-import { doctor, line, type Finding } from "./doctor.ts";
+import { doctor, doctorSummary, line, type Finding } from "./doctor.ts";
 import { env } from "./env.ts";
+import * as migrations from "./db/migrations.ts";
+import { heldMoves } from "./money/reconcile.ts";
 import { checkRelease } from "./release/check.ts";
 import { runningVersion, versionLine } from "./release/layout.ts";
 import { holderName } from "./running.ts";
@@ -17,6 +20,10 @@ import { wipe } from "./test/db.ts";
 vi.mock("./agent/brain.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   brainRows: vi.fn(),
+}));
+vi.mock("./money/reconcile.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  heldMoves: vi.fn(),
 }));
 vi.mock("./money/chains.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -92,6 +99,7 @@ const of = (findings: readonly Finding[], check: Finding["check"]) =>
 beforeEach(async () => {
   await wipe(jobs, appTroubles);
   wallet.made = false;
+  vi.mocked(heldMoves).mockResolvedValue([]);
   layout.installed = false;
   service.command = null;
   service.lingers = null;
@@ -101,9 +109,29 @@ beforeEach(async () => {
   ]);
   vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 describe("auni doctor", () => {
+  it("names the custom settings file when the configured AI is blocked", async () => {
+    vi.stubEnv("AUNI_HOME", "/custom/auni");
+    const brain = env.BRAIN;
+    env.BRAIN = "unknown-ai";
+    try {
+      const findings = await doctor();
+      expect(of(findings, "brain")).toEqual([
+        "fix  brain: BRAIN=unknown-ai names no brain app: change it in /custom/auni/.env, or remove it.",
+      ]);
+      expect(doctorSummary(findings, "pnpm auni")).toContain(
+        "Auni can't use the AI named in /custom/auni/.env.",
+      );
+    } finally {
+      env.BRAIN = brain;
+    }
+  });
+
   it("says what works and what to fix, naming the setting that fixes a chain", async () => {
     const findings = await doctor();
     expect(of(findings, "version")).toEqual([`ok   version: v${version}, from a source checkout`]);
@@ -134,6 +162,174 @@ describe("auni doctor", () => {
     ]);
     expect(of(findings, "apps")).toEqual(["ok   apps: nothing has kept failing"]);
     expect(of(findings, "web")).toEqual([`ok   web: ${env.WEB_ORIGIN} answers and reaches core`]);
+  });
+
+  it("leads with startup when updates are pending, while keeping independent network checks", async () => {
+    vi.stubEnv("AUNI_HOME", "/custom/auni");
+    vi.spyOn(migrations, "pendingMigrations").mockResolvedValue(1);
+    vi.mocked(fetch).mockRejectedValue(new Error("fetch failed"));
+
+    const findings = await doctor();
+    const summary = doctorSummary(findings, "pnpm auni");
+    expect(summary).toMatch(/^Auni isn't running\.\nRun: pnpm auni\n/u);
+    expect(summary).toContain("Claude isn't signed in. Run: claude auth login");
+    expect(summary).not.toMatch(/Codex|Settings|RPC_URL_|DATABASE_URL|WEB_ORIGIN/u);
+    expect(summary).toContain("Waiting for startup: Web app, Your wallet, Apps");
+    expect(summary).toContain(
+      "Networks: 7 chains ready, 1 with limits\n" +
+        "Monad didn't answer the deposit history check.\n" +
+        "Polygon didn't answer the past balance check.\n" +
+        "Set a working network URL in /custom/auni/.env.",
+    );
+    expect(of(findings, "rpc").join("\n")).toContain(
+      "In /custom/auni/.env, set RPC_URL_MONAD=<url>",
+    );
+    expect(summary).toContain("Passed: Version");
+    expect(summary).not.toMatch(/needs the database first|migrations to apply|Run: .*--verbose/u);
+    // Machine readers still see the individual findings and no presentation fields.
+    expect(JSON.parse(JSON.stringify(findings))).toContainEqual({
+      check: "database",
+      status: "fix",
+      says: "1 migrations to apply: `auni` applies them as it starts",
+    });
+    expect(of(findings, "web")).toContainEqual(expect.stringMatching(/fetch failed/u));
+    expect(of(findings, "wallet")).toEqual(["fix  wallet: needs the database first"]);
+  });
+
+  it("names the ready fallback AI and keeps a broken AI's raw output in the detailed check", async () => {
+    const broken = {
+      id: "codex",
+      name: "Codex",
+      state: "broken",
+      fix: "WARNING: raw error\nDetails",
+    } as const;
+    vi.mocked(brainRows).mockResolvedValue([broken]);
+    const findings = await doctor();
+    expect(doctorSummary(findings, "pnpm auni")).toContain(
+      "Couldn't check Codex. Run: pnpm auni doctor --verbose",
+    );
+    expect(doctorSummary(findings, "pnpm auni")).not.toContain("WARNING:");
+    expect(of(findings, "brain")).toContain("fix  brain: Codex: WARNING: raw error\nDetails");
+    vi.mocked(brainRows).mockResolvedValue([
+      broken,
+      {
+        id: "claude-code",
+        name: "Claude Code",
+        state: "ready",
+        login: "your Claude login",
+        models: [],
+      },
+    ]);
+    const summary = doctorSummary(await doctor(), "pnpm auni");
+    expect(summary).toContain("Claude is ready.");
+    expect(summary).not.toMatch(/Codex|Your AI/u);
+  });
+
+  it("adds visual weight to the headline, problems and passed checks only when styled", () => {
+    const findings: Finding[] = [
+      { check: "version", status: "ok", says: "current" },
+      { check: "brain", status: "fix", says: "Run claude auth login" },
+      { check: "web", status: "ok", says: "answers" },
+    ];
+    const plain = doctorSummary(findings, "auni");
+    const styled = doctorSummary(findings, "auni", { styled: true });
+    expect(plain).not.toContain("\u001B");
+    expect(styled).toContain("\u001B[1mAuni is running, with checks to review.\u001B[0m");
+    expect(styled).toContain("\u001B[33m!\u001B[0m Couldn't check your AI.");
+    expect(styled).toContain("\u001B[2mPassed: Version, Web app\u001B[0m");
+  });
+
+  it("keeps database failures visible when starting won't resolve them", () => {
+    const summary = doctorSummary(
+      [
+        { check: "database", status: "fix", says: "can't connect" },
+        { check: "runner", status: "fix", says: "needs the database first" },
+        { check: "web", status: "fix", says: "nothing answers" },
+      ],
+      "auni",
+    );
+    expect(summary).toMatch(
+      /^Auni can't reach its database\.\nDatabase: Check the database connection/u,
+    );
+    expect(summary).not.toContain("Background work");
+    expect(summary).not.toContain("Web app");
+  });
+
+  it("explains a refused database connection and shows where to set its URL", async () => {
+    vi.stubEnv("AUNI_HOME", "/custom/auni");
+    const message = "connect ECONNREFUSED 127.0.0.1:9";
+    vi.spyOn(database, "pingDatabase").mockRejectedValue(
+      Object.assign(new Error(message), { code: "ECONNREFUSED" }),
+    );
+
+    const findings = await doctor();
+    const summary = doctorSummary(findings, "auni");
+    expect(summary).toMatch(
+      /^Auni can't reach its database\.\nDatabase: Connection refused\. Check the database address in \/custom\/auni\/\.env/u,
+    );
+    expect(summary).not.toContain("DATABASE_URL");
+    expect(summary).not.toContain(message);
+    expect(of(findings, "database").join("\n")).toContain(
+      "In /custom/auni/.env, set DATABASE_URL=<url>",
+    );
+    expect(JSON.parse(JSON.stringify(findings))).toContainEqual({
+      check: "database",
+      status: "fix",
+      says: `can't connect (${message}): check DATABASE_URL, or unset it for Auni's own Postgres`,
+    });
+  });
+
+  it("names a held move and points to its card in the default summary", async () => {
+    vi.mocked(heldMoves).mockResolvedValue(["held-id"]);
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      const findings = await doctor();
+      expect(doctorSummary(findings, "auni")).toContain(
+        "1 move needs checking. Open its card in Auni to check its status.",
+      );
+      expect(doctorSummary(findings, "auni")).not.toContain("held-id");
+      expect(JSON.stringify(findings)).toContain("held-id");
+    } finally {
+      await auni.end();
+    }
+  });
+
+  it("shows recent failed tasks without the error in the default summary", async () => {
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      await db.insert(jobs).values([
+        { kind: "found", data: {}, finishedAt: new Date(), outcome: "failed", error: "no price" },
+        { kind: "reading", data: {}, finishedAt: new Date(), outcome: "failed", error: "RPC busy" },
+      ]);
+      const findings = await doctor();
+      expect(of(findings, "runner")).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/no price/u),
+          expect.stringMatching(/RPC busy/u),
+        ]),
+      );
+      const summary = doctorSummary(findings, "auni");
+      expect(summary).toContain("Background work: 2 tasks failed in the last 24 hours");
+      expect(summary).not.toMatch(/no price|RPC busy/u);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  it("doesn't count local-only access as working remote access", () => {
+    const summary = doctorSummary(
+      [
+        { check: "runner", status: "ok", says: "running" },
+        { check: "always-on", status: "note", says: "on this computer only" },
+        { check: "always-on", status: "ok", says: "stays awake" },
+      ],
+      "auni",
+    );
+    expect(summary).toContain("Access: Only on this computer");
+    expect(summary).toContain("Passed: Background work\n");
+    expect(summary).not.toContain("Remote access");
   });
 
   it("says what keeps going wrong for an app, the oldest first: a read a service retired, a key out of credits", async () => {
@@ -317,7 +513,11 @@ describe("auni doctor", () => {
       ]);
       // A service from another folder: restarting it would run the same old code.
       service.command = ["/elsewhere/node", "/elsewhere/auni.mjs", "--no-open"];
-      expect(repairs(await doctor(), "runner")).toEqual([
+      const findings = await doctor();
+      expect(doctorSummary(findings, "pnpm auni")).toContain(
+        "Update pending: stop Auni and start it from this folder to run this version",
+      );
+      expect(repairs(findings, "runner")).toEqual([
         {
           status: "note",
           says: `Auni runs 0.0.9 (0ld0ld0ld) as a service, and this folder holds ${versionLine()}: restart it to run this one`,

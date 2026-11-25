@@ -29,6 +29,7 @@ export function noteBrowserTry(how: BrowserTry["how"]): void {
  * opens the Windows browser, which needs no screen of Linux's own.
  */
 export function canOpenBrowser(): boolean {
+  if (process.env.SSH_CONNECTION || process.env.SSH_TTY) return false;
   const os = platform();
   if (os === "darwin" || os === "win32" || process.env.WSL_DISTRO_NAME) return true;
   return Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);

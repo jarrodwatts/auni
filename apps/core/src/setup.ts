@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { platform } from "node:os";
+import { isIP } from "node:net";
+import { platform, userInfo } from "node:os";
 import { delimiter, join } from "node:path";
 
 import type { PrivateFieldWire, SpareKeyWire } from "@auni/shared";
@@ -266,7 +267,7 @@ export async function readSetup(): Promise<SetupFacts> {
 }
 
 /** The `auni` command as this machine reaches it. */
-function auniCommand({ checkout, onPath }: InstallFact): string {
+export function auniCommand({ checkout, onPath }: InstallFact = installFact()): string {
   return checkout ? "pnpm auni" : onPath ? "auni" : "~/.local/bin/auni";
 }
 
@@ -358,15 +359,62 @@ function pairSay(browser: NonNullable<RunningFact["browser"]>, auni: string): st
     return `The link Auni opened in your browser as it started has run out: ${pair}`;
   if (browser === "not-opened") return `Auni couldn't open your browser. To sign in, ${pair}`;
   // No screen here: the browser is on another computer, which reaches this one's web app through ssh.
+  const tunnel = tunnelHint();
+  return `Auni found no screen on this computer to open a browser on.${tunnel ? `\n\n${tunnel}` : " "}To sign in, ${pair}`;
+}
+
+function tunnelPorts(): string | null {
   const { hostname, port } = new URL(env.WEB_ORIGIN);
-  const local = hostname === "localhost" || hostname === "127.0.0.1";
-  const tunnel = local
-    ? ` If you reach this computer over ssh, connect with \`ssh -L ${port || 80}:127.0.0.1:${env.WEB_PORT} <this computer>\` first, then open the link in the browser on yours.`
-    : "";
-  return `Auni found no screen on this computer to open a browser on. To sign in, ${pair}${tunnel}`;
+  if (hostname !== "localhost" && hostname !== "127.0.0.1") return null;
+  return `${port || 80}:127.0.0.1:${env.WEB_PORT}`;
+}
+
+/** What to print before a local link when the browser is on a different computer. */
+export function tunnelHint(): string {
+  const ports = tunnelPorts();
+  if (!ports) return "";
+  // OpenSSH gives the server's address and port in the last two fields.
+  const [, , host = "", port = ""] = process.env.SSH_CONNECTION?.trim().split(/\s+/u) ?? [];
+  const knownHost = isIP(host) !== 0 && /^[\w.:%-]+$/u.test(host);
+  const user = knownHost ? userInfo().username : "";
+  const login = /^[\w.][\w.-]*$/u.test(user) ? `${user}@${host}` : host;
+  const sshPort =
+    knownHost && /^\d{1,5}$/u.test(port) && +port > 0 && +port <= 65535 && +port !== 22
+      ? ` -p ${port}`
+      : "";
+  return (
+    "If your browser is on another computer, run this there first:\n" +
+    `  ssh -L ${ports}${sshPort} ${knownHost ? login : "ssh-host"}\n` +
+    (knownHost
+      ? "If that address doesn't work from your computer, add -L as shown to your usual SSH command.\n"
+      : "Replace ssh-host with the address or user@host you use to reach this computer.\n") +
+    "Leave that SSH session open while you use Auni.\n\n"
+  );
 }
 
 /** One answer as a person reads it, for `auni setup` without --json. */
-export function said(answer: SetupAnswer): string {
-  return [answer.say, ...(answer.run ? [`Run: ${answer.run.command}`] : [])].join("\n");
+export function said(facts: SetupFacts, answer = nextStep(facts)): string {
+  if (answer.run)
+    return [
+      "Auni isn't running.",
+      `Run ${answer.run.command}`,
+      "Keep the terminal open while you use it.",
+      ...(facts.webBuilt ? [] : ["The web app builds on the first start (about a minute)."]),
+    ].join("\n");
+  if (answer.step === "start" && answer.next === "wait")
+    return facts.running.webAnswers
+      ? "Auni is up. Opening your browser."
+      : "Auni is starting the web app.";
+  if (answer.step === "start" && answer.next === "tell") {
+    const command = `${auniCommand(facts.install)} pair`;
+    if (facts.running.browser === "opened")
+      return `Open the Auni tab in your browser. If you closed it, run ${command} for a new sign-in link.`;
+    const tunnel = facts.running.browser === "no-screen" ? tunnelHint() : "";
+    return `${tunnel}Run ${command} on the computer running Auni, then open the link. It works once and expires after 15 minutes.`;
+  }
+  if (answer.step === "done")
+    return facts.tailscale
+      ? `Open ${env.WEB_ORIGIN} on a device signed in to your Tailscale account.`
+      : `Open ${env.WEB_ORIGIN} and tell Auni a take.`;
+  return answer.say;
 }

@@ -82,10 +82,23 @@ export function renderScene(state: SceneState, color: ColorMode, columns = SCENE
       for (let column = bubble.left; column < bubble.right; column++)
         sky[row]![column] = bubble.rows[row]![column]!;
   const rows = [...sky, ...drawStones(state, width), blank(width)];
-  const notes = state.notes.map((line, index) =>
-    text(`  ${line}`, index === 0 ? undefined : DIM, index === 0),
-  );
-  return [...rows, ...notes].map((cells) => serialize(cells, color));
+  for (const [index, note] of state.notes.entries()) {
+    const words = (line: string) => text(`  ${line}`, index === 0 ? undefined : DIM, index === 0);
+    const limit = width - 2;
+    let rest = note;
+    while (rest.length > limit) {
+      let space = rest.lastIndexOf(" ", limit);
+      // Keep a backtick-delimited command together when it fits on a line.
+      const before = rest.slice(0, space);
+      if (before.split("`").length % 2 === 0)
+        space = rest.lastIndexOf(" ", before.lastIndexOf("`"));
+      const end = space > 0 ? space : limit;
+      rows.push(words(rest.slice(0, end)));
+      rest = rest.slice(end).trimStart();
+    }
+    rows.push(words(rest));
+  }
+  return rows.map((cells) => serialize(cells, color));
 }
 
 function blank(width: number): Cell[] {

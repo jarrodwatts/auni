@@ -44,7 +44,13 @@ auni-release namespaces="auni-release" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAFcN
 '
 
 say() { printf '%s\n' "$*"; }
-step() { printf '\n[%s/6] %s\n' "$1" "$2"; }
+step() {
+  if [ -t 1 ] && [ "${TERM:-}" != dumb ] && [ -z "${NO_COLOR:-}" ]; then
+    printf '\n[%s/6] \033[1m%s\033[0m\n' "$1" "$2"
+  else
+    printf '\n[%s/6] %s\n' "$1" "$2"
+  fi
+}
 done_() { printf '      %s\n' "$*"; }
 # Stops with a sentence for the owner. Checking only, it is that sentence alone, for auni update.
 fail() {
@@ -53,23 +59,56 @@ fail() {
   exit 1
 }
 
-# Runs a command with its output in the log, which is shown only when it fails. Never reads from
-# stdin, which under `curl | sh` is this script.
-logged() {
-  if ! "$@" >>"$LOG" 2>&1 </dev/null; then
-    printf '\n' >&2
-    tail -n 40 "$LOG" >&2
-    fail "the step above failed (all of its output is in $LOG)"
-  fi
+# Never reads from stdin, which under `curl | sh` is this script.
+to_log() { "$@" >>"$LOG" 2>&1 </dev/null; }
+log_failure() {
+  printf '\n' >&2
+  tail -n 40 "$LOG" >&2
+  fail "the step above failed. See $LOG, then retry your install command."
 }
+logged() { to_log "$@" || log_failure; }
+
+# Keep the build output in the log while showing how long this step has been running.
+building() (
+  label="$1"
+  shift
+  if [ ! -t 1 ] || [ "${TERM:-}" = dumb ]; then
+    done_ "$label"
+    logged "$@"
+    exit
+  fi
+  printf '      %s' "$label"
+  started=$(date +%s)
+  (
+    while sleep 1; do
+      printf '\r      %s (%ss)' "$label" "$(($(date +%s) - started))"
+    done
+  ) &
+  timer=$!
+  stop_timer() {
+    kill "$timer" 2>/dev/null || :
+    wait "$timer" 2>/dev/null || :
+  }
+  trap 'stop_timer; printf "\n"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  result=0
+  to_log "$@" || result=$?
+  stop_timer
+  trap - EXIT
+  if [ "$result" -ne 0 ]; then
+    log_failure
+  fi
+  printf '\r      %s (%ss)\n' "$label" "$(($(date +%s) - started))"
+)
 
 # Stops, saying how to install it, when the command $1 (from the package $2) is missing.
 need() {
   command -v "$1" >/dev/null 2>&1 && return
   if [ "$os" = linux ]; then
-    fail "it needs $1. Install it with: sudo apt-get install $2 (or your system's package manager)"
+    fail "$1 is required. Install it with: sudo apt-get install $2 (or your system's package manager)."
   fi
-  fail "it needs $1. Install Xcode's command line tools with: xcode-select --install"
+  fail "$1 is required. Install Xcode command line tools with: xcode-select --install"
 }
 
 sha256() {
@@ -148,12 +187,11 @@ check_release() {
     ssh-keygen -Y verify -f "$TMP/keys" -I "$1" -n auni-release -s "$TMP/release.txt.sig" \
       <"$TMP/release.txt" 2>/dev/null
   }
-  if ! signed="$(verify auni-release)"; then
+  if ! verify auni-release >/dev/null; then
     verify retired >/dev/null &&
       fail "release $tag is signed with a release key that has been retired, so it isn't a release Auni makes any more."
     fail "release $tag isn't signed by Auni's release key: its release.txt was changed after it was signed, or someone else signed it."
   fi
-  key="$(printf '%s\n' "$signed" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p')"
 
   if [ -n "${AUNI_VERSION:-}" ] && [ "$tag" != "$AUNI_VERSION" ]; then
     fail "the release fetched as $AUNI_VERSION says it is $tag, so it wasn't used."
@@ -197,7 +235,7 @@ main() {
   LOG="$APP/install.log"
   : >"$LOG"
 
-  say "Installing Auni into $AUNI_HOME"
+  say "Installing Auni"
 
   step 1 "This machine"
   case "$(uname -s)" in
@@ -220,27 +258,27 @@ main() {
   step 2 "Release"
   if [ -n "${AUNI_SOURCE:-}" ]; then
     stage_source
-    done_ "$tag, from $AUNI_SOURCE, which you named: it is not a signed release, so it isn't checked"
+    done_ "$tag from the source you supplied (unsigned)"
   else
     check_release
-    done_ "$tag, made $made, signed by Auni's release key $key"
+    done_ "$tag ($made), signature verified"
   fi
   dir="$APP/versions/$tag"
 
   if [ -f "$dir/.auni-built" ]; then
     step 3 "Source"
-    done_ "$tag is built already"
+    done_ "$tag is already built"
     step 4 "Node"
     done_ "$(readlink "$dir/.node" | sed 's#.*/##')"
     step 5 "Build"
-    done_ "nothing to build"
+    done_ "Already built"
   else
     step 3 "Source"
     # A folder without .auni-built is a build that didn't finish: it starts over.
     rm -rf "$dir"
     if [ -n "${AUNI_SOURCE:-}" ]; then
       mv "$staged" "$dir"
-      done_ "$tag, from $AUNI_SOURCE"
+      done_ "Source ready"
     else
       logged curl -fsSL -o "$TMP/source.tar.gz" "$releases/download/$tag/source.tar.gz"
       [ "$(sha256 "$TMP/source.tar.gz")" = "$sum" ] ||
@@ -252,7 +290,7 @@ main() {
       # Kept with the version, so it can say which release it is: its commit and what changed.
       cp "$TMP/release.txt" "$TMP/source/$RELEASE_FILE"
       mv "$TMP/source" "$dir"
-      done_ "$tag, its SHA-256 checked"
+      done_ "Source verified"
     fi
 
     step 4 "Node"
@@ -269,25 +307,25 @@ main() {
       mkdir -p "$APP/node/$node.incoming"
       logged tar -C "$APP/node/$node.incoming" --strip-components=1 -xzf "$TMP/$file"
       mv "$APP/node/$node.incoming" "$APP/node/$node"
-      done_ "$node from nodejs.org, its checksum checked"
+      done_ "Node $node verified"
     else
-      done_ "$node, already here"
+      done_ "Node $node ready"
     fi
     ln -sfn "../../node/$node" "$dir/.node"
 
     step 5 "Build"
-    done_ "its dependencies from npm, then the web app (a few minutes, once a version)"
     # pnpm as package.json pins it, through corepack, with what both keep inside app/.
     (
       cd "$dir"
       PATH="$dir/.node/bin:$PATH"
       export PATH COREPACK_HOME="$APP/corepack" COREPACK_ENABLE_DOWNLOAD_PROMPT=0 AUNI_HOME
-      logged "$dir/.node/bin/corepack" pnpm install --frozen-lockfile --store-dir "$APP/pnpm-store"
+      done_ "Allow about 5 minutes for a fresh build. Slower machines may take longer."
+      building "Installing packages" "$dir/.node/bin/corepack" pnpm install --frozen-lockfile --store-dir "$APP/pnpm-store"
       # The version's own build, so how a version builds can change without a new install.sh.
-      logged "$dir/.node/bin/node" apps/core/bin/auni.mjs build
+      building "Building the web app" "$dir/.node/bin/node" apps/core/bin/auni.mjs build
     )
     touch "$dir/.auni-built"
-    done_ "built"
+    done_ "Build complete"
   fi
 
   step 6 "The auni command"
@@ -313,25 +351,25 @@ EOF
     ln -s "versions/$tag" "$APP/current"
     current="$tag"
   fi
-  done_ "$HOME/.local/bin/auni"
+  done_ "Command ready"
   case ":$PATH:" in
-    *":$HOME/.local/bin:"*) on_path=yes ;;
-    *) on_path=no ;;
+    *":$HOME/.local/bin:"*) ;;
+    *)
+      say ""
+      say "Add Auni to your PATH now and in your shell profile:"
+      say '  export PATH="$HOME/.local/bin:$PATH"'
+      ;;
   esac
 
   printf '\n'
   if [ "$current" != "$tag" ]; then
-    say "Auni $tag is built beside $current. Switch to it with: auni update --version $tag"
+    say "Auni $tag is built. $current is still the active version."
+    say "Switch to it with: auni update --version $tag"
     return
   fi
-  if [ "$on_path" = no ]; then
-    say "$HOME/.local/bin isn't on your PATH yet. Add this line to your shell's profile"
-    say "(~/.zshrc or ~/.bashrc), and run it now:"
-    say ""
-    say "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-    say ""
-  fi
-  say "Auni $tag is installed. Run: auni"
+  say "Done. Auni $tag is installed."
+  say "Run auni to start Auni and open it in your browser."
+  say "Run auni demo to try it with fake money."
 }
 
 main "$@"

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { AppAbout } from "@auni/shared";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { dataDir } from "../data-dir.ts";
+import { dataDir, settingsFile } from "../data-dir.ts";
 import { env } from "../env.ts";
 import type { Brain, BrainCheck, BrainEvent, BrainTurn } from "../apps/contract.ts";
 
@@ -100,7 +100,7 @@ describe("pickBrain", () => {
     expect(await pickBrain()).toMatchObject({ about: { id: "a" } });
     env.BRAIN = "z";
     expect(await pickBrain()).toEqual({
-      fixes: ["BRAIN=z names no brain app: change it in ~/.auni/.env, or remove it."],
+      fixes: [`BRAIN=z names no brain app: change it in ${settingsFile()}, or remove it.`],
       blocked: true,
     });
   });
@@ -398,7 +398,7 @@ describe("a login a check sees but a model refuses", () => {
       yield { type: "done" };
     });
     registered.push(one);
-    expect(await brainSeen()).toMatchObject({ about: { id: "a" }, login: "a's key" });
+    expect(await brainSeen("auni")).toEqual({ name: "A", line: "A is ready." });
     const picked = pickBrain();
     const later = Symbol("not yet");
     expect(await Promise.race([picked, Promise.resolve(later)])).toBe(later);
@@ -407,11 +407,19 @@ describe("a login a check sees but a model refuses", () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it("sees no brain where a check found it signed out or broken", async () => {
+  it("shows one AI sign-in command when no brain is ready", async () => {
     const broken = fakeBrain("b", { ready: true, login: "b" });
     vi.mocked(broken.brain.check).mockRejectedValue(new Error("it crashed"));
     registered.push(fakeBrain("a", { ready: false, why: "signed-out", fix: "a login" }), broken);
-    expect(await brainSeen()).toEqual({ fixes: ["A: a login", "B: it crashed"] });
+    expect(await brainSeen("auni")).toEqual({
+      name: null,
+      line: "A isn't signed in. Run: a login",
+    });
+    env.BRAIN = "b";
+    expect(await brainSeen("auni")).toEqual({
+      name: null,
+      line: "Couldn't check B. Run: auni doctor --verbose",
+    });
   });
 
   it("tells each listener of every ready answer, until it stops listening", async () => {

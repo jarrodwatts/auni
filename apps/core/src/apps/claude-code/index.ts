@@ -9,6 +9,7 @@ import { signIn } from "./sign-in.ts";
 export default defineApp({
   about,
   brain: {
+    terminalName: "Claude",
     check,
     run,
     secrets,

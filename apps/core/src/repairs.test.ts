@@ -67,7 +67,7 @@ const run = { json: false, fix: false, dryRun: false, ask: null } as const;
 
 describe("auni doctor's repairs", () => {
   it("--fix runs the recommended ones in their order, then says how things stand", async () => {
-    expect(await doctorCommand({ ...run, fix: true })).toBe(0);
+    expect(await doctorCommand({ ...run, fix: true, verbose: true })).toBe(0);
     // Linger before the start: the order repairs.ts lists them in, not the findings'.
     expect(vi.mocked(enableLinger).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(startService).mock.invocationCallOrder[0]!,
@@ -79,7 +79,7 @@ describe("auni doctor's repairs", () => {
         "  Start Auni's service (recommended)",
       ].join("\n"),
     );
-    expect(said.out.join("\n")).toContain("Now:\nok   runner: running as a service");
+    expect(said.out.join("\n")).toContain("After repairs:\nok   runner: running as a service");
   });
 
   // So the service starts Postgres as its own, in its own cgroup, rather than use doctor's.
@@ -95,7 +95,7 @@ describe("auni doctor's repairs", () => {
     vi.mocked(cameUp).mockResolvedValue(false);
     expect(await doctorCommand({ ...run, fix: true })).toBe(0);
     expect(said.out).toContain(
-      "  That didn't work: Auni didn't come up within 90 seconds: `journalctl --user -u auni -n 100 --no-pager` says why.",
+      "  Failed: Auni didn't start within 90 seconds. Check logs with: journalctl --user -u auni -n 100 --no-pager.",
     );
     expect(holdAgain).toHaveBeenCalledOnce();
   });
@@ -113,7 +113,7 @@ describe("auni doctor's repairs", () => {
     expect(await doctorCommand({ ...run, dryRun: true, fix: true })).toBe(1);
     expect(said.out.at(-1)).toBe("Dry run: nothing changed.");
     expect(await doctorCommand(run)).toBe(1);
-    expect(said.out.at(-1)).toMatch(/^Run auni doctor --fix to run the recommended ones/u);
+    expect(said.out.at(-1)).toMatch(/^Auni isn't running\.\nRun: pnpm auni doctor --fix/u);
     expect(startService).not.toHaveBeenCalled();
     expect(enableLinger).not.toHaveBeenCalled();
   });
@@ -123,7 +123,7 @@ describe("auni doctor's repairs", () => {
       throw new Error("this machine wants an administrator for that");
     });
     await doctorCommand({ ...run, fix: true });
-    expect(said.out).toContain("  That didn't work: this machine wants an administrator for that.");
+    expect(said.out).toContain("  Failed: this machine wants an administrator for that.");
     expect(startService).toHaveBeenCalledOnce();
   });
 
@@ -159,6 +159,51 @@ describe("auni doctor's repairs", () => {
     expect(stopAuni).not.toHaveBeenCalled();
   });
 
+  it("reports missing always-on service setup separately from running background work", async () => {
+    vi.mocked(doctor)
+      .mockReset()
+      .mockResolvedValue([
+        { check: "runner", status: "ok", says: "running in a terminal" },
+        { check: "web", status: "ok", says: "answers" },
+        {
+          check: "always-on",
+          status: "fix",
+          says: "Auni stops on logout",
+          repair: { id: "install-service", recommended: true },
+        },
+      ]);
+
+    expect(await doctorCommand(run)).toBe(1);
+    expect(said.out[0]).toMatch(/^Auni is running, with checks to review\./u);
+    expect(said.out[0]).toContain("Remote access:");
+    expect(said.out[0]).toContain("Passed: Background work, Web app");
+  });
+
+  it("leaves the choice to install a service behind verbose help on a stopped local Auni", async () => {
+    vi.mocked(doctor)
+      .mockReset()
+      .mockResolvedValue([
+        {
+          check: "runner",
+          status: "fix",
+          says: "Auni isn't running",
+          repair: { id: "install-service", recommended: false },
+        },
+      ]);
+    const ask = vi.fn(async () => false);
+
+    expect(await doctorCommand({ ...run, ask })).toBe(1);
+    expect(said.out[0]).toMatch(/^Auni isn't running\.\nRun: pnpm auni\n/u);
+    expect(ask).not.toHaveBeenCalled();
+    await doctorCommand({ ...run, verbose: true });
+    expect(said.out.at(-2)).toContain("Repairs:");
+    expect(said.out.at(-1)).toBe(
+      "To choose an optional repair, run pnpm auni doctor --verbose in a terminal.",
+    );
+    await doctorCommand({ ...run, ask, verbose: true });
+    expect(ask).toHaveBeenCalledWith(expect.objectContaining({ id: "install-service" }));
+  });
+
   it("never runs one that isn't recommended unasked", async () => {
     vi.mocked(doctor)
       .mockReset()
@@ -172,7 +217,7 @@ describe("auni doctor's repairs", () => {
       ]);
     await doctorCommand({ ...run, fix: true });
     expect(installService).not.toHaveBeenCalled();
-    expect(said.out.at(-1)).toBe("None is recommended: nothing changed.");
+    expect(said.out.at(-1)).toBe("No recommended repairs to run. Nothing changed.");
   });
 });
 
@@ -193,7 +238,7 @@ describe("a repair that needs Auni stopped", () => {
   it("changes nothing when the service won't stop, and never stops one run another way", async () => {
     vi.mocked(stopAuni).mockResolvedValue(false);
     const repair = vi.fn(async () => {});
-    await expect(whileStopped(repair, say)).rejects.toThrow(/still stopping/u);
+    await expect(whileStopped(repair, say)).rejects.toThrow(/didn't stop within 2\.5 minutes/u);
     expect(repair).not.toHaveBeenCalled();
     expect(startService).not.toHaveBeenCalled();
 
@@ -202,7 +247,7 @@ describe("a repair that needs Auni stopped", () => {
     expect(repair).toHaveBeenCalledOnce();
     expect(stopAuni).toHaveBeenCalledOnce();
     expect(say).toHaveBeenLastCalledWith(
-      "  Auni runs in a terminal: restart it there to use this.",
+      "  Auni is running in a terminal. Restart it there to apply this change.",
     );
   });
 });

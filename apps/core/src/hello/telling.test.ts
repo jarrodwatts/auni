@@ -41,9 +41,10 @@ describe("colour", () => {
 });
 
 describe("plain lines", () => {
-  it("are the lines `auni` has always printed, in the order they happen", () => {
+  it("report each stage as it happens", () => {
     const said: string[] = [];
     const told = plainTelling((line) => said.push(line));
+    told.memoryReady();
     told.memoryReady();
     told.firstRun(true);
     told.brain({ name: "Claude Code", line: "Auni thinks with Claude Code, on your login." });
@@ -54,9 +55,10 @@ describe("plain lines", () => {
     told.say("\nAuni is open in your browser, at http://localhost:3000");
     told.up(true);
     expect(said).toEqual([
+      "Memory ready.",
       "Auni thinks with Claude Code, on your login.",
       "Auni's API is listening on 127.0.0.1:4000.",
-      "Building the web app, once for each version of it…",
+      "Building the web app.",
       "\nAuni is open in your browser, at http://localhost:3000",
     ]);
   });
@@ -67,13 +69,13 @@ describe("plain lines", () => {
     expect(said).toEqual(["Auni's database is in use."]);
   });
 
-  it("set off what to run when no AI can think yet", () => {
+  it("say what to run when no AI can think yet", () => {
     const said: string[] = [];
     plainTelling((line) => said.push(line)).brain({
       name: null,
       line: "Auni has nothing to think with yet.",
     });
-    expect(said).toEqual(["\nAuni has nothing to think with yet.\n"]);
+    expect(said).toEqual(["Auni has nothing to think with yet."]);
   });
 });
 

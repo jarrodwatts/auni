@@ -1,5 +1,8 @@
 "use client";
 
+import type { ActivityItemWire } from "@auni/shared";
+import { useMemo } from "react";
+
 import { useMoney } from "@/components/money/money-provider";
 import { formatUsdcBalance } from "@/lib/money";
 
@@ -8,6 +11,8 @@ import { BigMoney } from "./big-money";
 import { ChartChange } from "./chart-change";
 import { AUNI_HUE } from "./dawn-chart";
 import { MoneyActions } from "./money-actions";
+import { chartMoves } from "./money-groups";
+import { moveMoments } from "./move-moments";
 import { RangePicker } from "./range-picker";
 import { useChartWindow, useLiveEnd } from "./use-chart-window";
 
@@ -15,11 +20,23 @@ import { useChartWindow, useLiveEnd } from "./use-chart-window";
  * Your money: the total with the ways in and out beside it, how far it moved
  * over the period with the period picker at its end, and its Dawn line. On a
  * phone the line runs edge to edge, the actions share a row under the move,
- * and the periods take their own row under the line.
+ * and the periods take their own row under the line. Each move over the period is a bead on
+ * the line (see moveMoments), so what lifted it can be told from what was made.
  */
-export function TotalHero() {
+export function TotalHero({
+  moves,
+  onOpenMove,
+}: {
+  readonly moves: readonly ActivityItemWire[];
+  readonly onOpenMove: (item: ActivityItemWire) => void;
+}) {
   const { portfolio } = useMoney();
   const chart = useChartWindow(useLiveEnd(portfolio?.totalUsd, portfolio?.made));
+  const from = chart.points[0]?.observedAt;
+  const moments = useMemo(
+    () => (from === undefined ? [] : moveMoments(chartMoves(moves, Date.parse(from)), onOpenMove)),
+    [moves, from, onOpenMove],
+  );
   const latest = chart.points.at(-1)?.totalUsd;
   const total = portfolio
     ? BigInt(portfolio.totalUsd.baseUnits)
@@ -78,6 +95,7 @@ export function TotalHero() {
         height={140}
         hue={AUNI_HUE}
         onScrub={chart.setScrub}
+        moments={moments}
         className="mt-4 max-sm:-mx-4"
       />
       {picker("mt-3 sm:hidden")}

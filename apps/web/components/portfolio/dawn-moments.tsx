@@ -21,7 +21,7 @@ import { noteRows, placeNotes, type PlacedNote } from "./dawn-notes";
  * quiet card over any bead that is pointed at, tapped or focused.
  */
 
-export type MomentTone = "positive" | "negative" | "neutral";
+export type MomentTone = "positive" | "negative" | "neutral" | "ink";
 
 /** Two lines written above a bead: what it was, and what came of it. */
 export interface MomentNote {
@@ -48,6 +48,7 @@ export const MOMENT_COLOR: Record<MomentTone, string> = {
   positive: "var(--color-positive)",
   negative: "var(--color-negative)",
   neutral: "var(--color-faint)",
+  ink: "var(--color-ink)",
 };
 
 /** A note's second line, colored by what came of it. */
@@ -280,7 +281,8 @@ function useNotePlaces(noted: readonly Spot[], width: number, compact: boolean) 
   useLayoutEffect(() => {
     const spots = noted.map(({ moment, x }) => ({
       x,
-      width: Math.ceil(ghosts.current.get(moment.key)?.offsetWidth ?? 0),
+      // Its exact width, rounded up: offsetWidth rounds to the nearest pixel, which can cut the last letter.
+      width: Math.ceil(ghosts.current.get(moment.key)?.getBoundingClientRect().width ?? 0),
     }));
     setPlaced(placeNotes(spots, width, compact));
   }, [noted, width, compact]);

@@ -24,11 +24,15 @@ const waiting = (holding: Holding) => holding.cash && !holding.heldForOrders;
  * so they give a take the same holdings, worth and gain.
  */
 export function heldByTakes(
-  portfolio: Pick<Portfolio, "assets" | "cash">,
+  portfolio: Pick<Portfolio, "assets" | "cash" | "observedAt">,
   everyFill: Fills,
 ): ReturnType<typeof holdingsByThread> {
   const savings = portfolio.cash.holdings.filter((holding) => isSavings(holding.venue));
-  return holdingsByThread([...portfolio.assets.holdings, ...savings], everyFill);
+  return holdingsByThread(
+    [...portfolio.assets.holdings, ...savings],
+    everyFill,
+    new Date(portfolio.observedAt),
+  );
 }
 
 /**

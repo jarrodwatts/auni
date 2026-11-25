@@ -376,3 +376,112 @@ describe("saleOwners and sharedFill", () => {
     expect(sum).toBe(1000n);
   });
 });
+
+describe("holdingsByThread, shared perps and growing savings", () => {
+  const perpFill = (threadId: string, side: "buy" | "sell", size: string, usd: string) => ({
+    threadId,
+    ...fill(side, size, usd, "ETH", "hyperliquid"),
+  });
+  const gainsOf = (split: ReturnType<typeof holdingsByThread>) =>
+    Object.fromEntries(
+      [...split.threads].map(([id, held]) => [id, held.map((holding) => gainOf(holding))]),
+    );
+
+  it("gains each take on a shared perp from its own entry, not a split of the venue's", () => {
+    // A shorted 1 ETH at $3,000 and B 1 at $2,000: the venue's entry is $2,500, the mark $2,400.
+    const short: Holding = {
+      venue: "hyperliquid",
+      chain: "hyperliquid",
+      instrument: "ETH",
+      symbol: "ETH",
+      quantity: "2",
+      decimals: 18,
+      usdValue: "5200.00",
+      cash: false,
+      priceId: null,
+      short: true,
+      leverage: 1,
+      averageCostUsd: "2500",
+      unrealizedPnlUsd: "200.00",
+    };
+    const split = holdingsByThread(
+      [short],
+      [perpFill("A", "sell", "1", "3000.00"), perpFill("B", "sell", "1", "2000.00")],
+    );
+    expect(gainsOf(split)).toEqual({
+      A: [{ costCents: 300_000n, changeCents: 60_000n }],
+      B: [{ costCents: 200_000n, changeCents: -40_000n }],
+    });
+    // The shares still add up to the venue's position.
+    const values = [...split.threads.values()].flat().map(({ usdValue }) => usdValue);
+    expect(values).toEqual(["3100.00", "2100.00"]);
+  });
+
+  it("keeps the venue's entry for what no take holds beside a take's own", () => {
+    // A went long 1 BTC at $55,000; 1 more came from outside Auni. Venue entry $60,000, mark $60,000.
+    const long: Holding = {
+      venue: "hyperliquid",
+      chain: "hyperliquid",
+      instrument: "BTC",
+      symbol: "BTC",
+      quantity: "2",
+      decimals: 18,
+      usdValue: "120000.00",
+      cash: false,
+      priceId: null,
+      leverage: 1,
+      averageCostUsd: "60000",
+      unrealizedPnlUsd: "0.00",
+    };
+    const split = holdingsByThread(
+      [long],
+      [{ threadId: "A", ...fill("buy", "1", "55000.00", "BTC", "hyperliquid") }],
+    );
+    // The blend of $55,000 and the venue's $60,000 is $57,500: A made $2,500 more than half of $0.
+    expect(gainsOf(split).A).toEqual([{ costCents: 5_500_000n, changeCents: 250_000n }]);
+    expect(split.loose.map((holding) => holding.unrealizedPnlUsd)).toEqual(["-2500.00"]);
+  });
+
+  const aUsdc = savingsTokens("monad")[0]!.token;
+  const savings = (quantity: string): Holding => ({
+    venue: "aave",
+    chain: "monad",
+    instrument: aUsdc,
+    symbol: "aUSDC",
+    quantity,
+    decimals: 6,
+    usdValue: quantity,
+    cash: true,
+    priceId: null,
+  });
+  const saved = (threadId: string | null, quantity: string, createdAt: Date) => ({
+    threadId,
+    createdAt,
+    ...fill("buy", quantity, quantity, aUsdc, "monad"),
+  });
+  const now = new Date("2026-11-01T00:00:00Z");
+  const monthsAgo = (months: number) => new Date(now.getTime() - months * 30 * 86_400_000);
+
+  it("gives the interest savings earned to the takes that put them in, at what they paid", () => {
+    // A saved $3,000 and B $1,000; it has grown to $4,012.50 since.
+    const split = holdingsByThread(
+      [savings("4012.5")],
+      [saved("A", "3000", monthsAgo(2)), saved("B", "1000", monthsAgo(2))],
+      now,
+    );
+    expect(gainsOf(split)).toEqual({
+      A: [{ costCents: 300_000n, changeCents: 937n }],
+      B: [{ costCents: 100_000n, changeCents: 313n }],
+    });
+    expect(split.loose).toEqual([]);
+  });
+
+  it("leaves savings sent in from elsewhere outside the takes", () => {
+    // A saved $4,000 a month ago; then $1,000 of aUSDC came in from an exchange.
+    const split = holdingsByThread([savings("5000")], [saved("A", "4000", monthsAgo(1))], now);
+    const [take] = split.threads.get("A")!;
+    // A month at the most savings are taken to earn (20% a year) is $65.75 on $4,000.
+    expect(take?.quantity).toBe("4065.753424");
+    expect(split.loose.map(({ quantity }) => quantity)).toEqual(["934.246576"]);
+  });
+});

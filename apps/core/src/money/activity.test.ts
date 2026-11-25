@@ -97,6 +97,7 @@ describe("folding moves", () => {
     expect(items[0]).toEqual({
       kind: "move",
       id: PROPOSAL,
+      category: "trade",
       title: "Bought Pearl",
       subtitle: "Pearl bet, Oct 20 at 7:30pm",
       amount: { usd: "16.50", direction: null, tone: "neutral" },
@@ -232,6 +233,7 @@ describe("folding moves", () => {
     expect(item).toMatchObject({
       title: "Withdrew $40",
       subtitle: "Auni, Oct 20 at 7:30pm",
+      category: "transfer",
       amount: { usd: "40.00", direction: "out", tone: "neutral" },
     });
   });

@@ -2,7 +2,7 @@ import { asc } from "drizzle-orm";
 
 import type { Tx } from "../db/client.ts";
 import { fills } from "../db/schema.ts";
-import { isMargined } from "../apps/registry.ts";
+import { isMargined, isSavings } from "../apps/registry.ts";
 import { fillIdentity, QUANTITY_DECIMALS } from "./fill-key.ts";
 import { unitUsd } from "./format.ts";
 import type { Holding, OnItsWay, Portfolio } from "./portfolio.ts";
@@ -221,7 +221,7 @@ export function allFills(q: Pick<Tx, "select">) {
     .orderBy(asc(fills.createdAt), asc(fills.id));
 }
 
-type BookFill = PotFill & { readonly threadId: string | null };
+type BookFill = PotFill & { readonly threadId: string | null; readonly createdAt?: Date };
 
 /**
  * Each thread's net filled quantity of each holding, keyed by `fillIdentity`
@@ -303,34 +303,135 @@ export function buyersOf(
  * threads' shares and the rest add up to the wallet, to the cent, and every screen gives a
  * thread the same. Each share costs what its own fills paid (see paidFor), never the wallet's
  * average: two takes that bought one stock at $100 and $200 each keep their own price, and
- * the owner's own buys of it change neither.
+ * the owner's own buys of it change neither. Savings that grew stay with the takes that put
+ * them in (see withGrowth), and a perp two takes share gains from each one's own entry (see
+ * ownEntries). `at` is when the holdings were read.
  */
 export function holdingsByThread(
   holdings: readonly Holding[],
   everyFill: readonly BookFill[],
+  at: Date = new Date(),
 ): { threads: Map<string, Holding[]>; loose: Holding[] } {
   const books = threadBooks(everyFill);
-  const paid = new Map(
-    [...Map.groupBy(everyFill, (fill) => fill.threadId)].map(([owner, own]) => [
-      owner,
-      purchases(own),
-    ]),
-  );
+  const byOwner = Map.groupBy(everyFill, (fill) => fill.threadId);
+  const paid = new Map([...byOwner].map(([owner, own]) => [owner, purchases(own)]));
   const threads = new Map<string, Holding[]>();
   const loose: Holding[] = [];
   for (const holding of holdings) {
     const total = parseUnits(holding.quantity, QUANTITY_DECIMALS);
     if (total === 0n) continue;
     const key = fillIdentity(holding);
-    const held = holdersOf(holding.short ? -total : total, books, key);
+    const inBooks = holdersOf(holding.short ? -total : total, books, key);
+    const held = isSavings(holding.venue)
+      ? withGrowth(inBooks, holding.decimals, (id) => firstBuy(byOwner.get(id), key), at)
+      : inBooks;
     const owners = [...held.threads, ...(held.other > 0n ? [[null, held.other] as const] : [])];
-    for (const [owner, share] of sharesOf(holding, owners, total)) {
-      const costed = paidFor(share, paid.get(owner)?.get(key));
+    const shares = isMargined(holding)
+      ? ownEntries(holding, sharesOf(holding, owners, total), (owner) =>
+          owner === null ? undefined : entryOf(byOwner.get(owner) ?? [], key),
+        )
+      : sharesOf(holding, owners, total).map(
+          ([owner, share]) => [owner, paidFor(share, paid.get(owner)?.get(key))] as const,
+        );
+    for (const [owner, costed] of shares) {
       if (owner === null) loose.push(costed);
       else threads.set(owner, [...(threads.get(owner) ?? []), costed]);
     }
   }
   return { threads, loose };
+}
+
+/** The most savings are taken to earn in a year: units past it came in from somewhere else. */
+const SAVINGS_MOST_A_YEAR_PERCENT = 20n;
+const YEAR_MS = 365n * 24n * 60n * 60n * 1000n;
+
+/**
+ * Savings grow by themselves (aUSDC's balance rises as interest accrues, a dollar each), so the
+ * wallet holds more than any fill bought. What no thread's books hold is the interest on what
+ * the threads put in, shared by what each put in, as far as it could have earned since its
+ * first buy there (see SAVINGS_MOST_A_YEAR_PERCENT); the rest stays unattributed, as savings
+ * sent in from elsewhere are.
+ */
+function withGrowth(
+  held: Holders,
+  decimals: number,
+  since: (threadId: string) => Date | undefined,
+  at: Date,
+): Holders {
+  const principal = held.threads.reduce((sum, [, units]) => sum + units, 0n);
+  if (held.other === 0n || principal === 0n) return held;
+  let other = held.other;
+  const threads = held.threads.map(([threadId, units]) => {
+    const start = since(threadId);
+    const elapsed = start ? BigInt(Math.max(0, at.getTime() - start.getTime())) : 0n;
+    const most = (units * SAVINGS_MOST_A_YEAR_PERCENT * elapsed) / (100n * YEAR_MS);
+    const share = (held.other * units) / principal;
+    // Whole base units of the token, so the shares still add up to the wallet.
+    const step = 10n ** BigInt(QUANTITY_DECIMALS - decimals);
+    const grown = ((share < most ? share : most) / step) * step;
+    other -= grown;
+    return [threadId, units + grown] as const;
+  });
+  return { threads, other };
+}
+
+/** When a thread first bought something, by its fills; undefined where nothing dates it. */
+function firstBuy(own: readonly BookFill[] | undefined, key: string): Date | undefined {
+  return own?.find((fill) => fill.side === "buy" && fillIdentity(fill) === key)?.createdAt;
+}
+
+/** A thread's own entry price into a perp, in dollars to 12 places, by its fills (see walkPositions). */
+function entryOf(own: readonly PotFill[], key: string): bigint | undefined {
+  const position = walkPositions(own).positions.get(key);
+  if (!position || position.quantity === 0n) return undefined;
+  return (position.cost * 10n ** 10n * 10n ** BigInt(QUANTITY_DECIMALS)) / abs(position.quantity);
+}
+
+/**
+ * A perp shared among owners. The venue keeps one position at one blended entry, so each share
+ * of what it has made (see sharesOf) moves by how far its owner's own entry sits from the blend
+ * of everyone's, and its value with it: the moves add to nothing, so the shares still add up to
+ * what the venue says. Two takes short at $3,000 and $2,000 with the mark at $2,400 make +$600
+ * and -$400, not +$100 each. A share with no entry of its own (what no take holds) keeps the
+ * venue's.
+ */
+function ownEntries<Owner>(
+  holding: Holding,
+  shares: readonly (readonly [Owner, Holding])[],
+  entry: (owner: Owner) => bigint | undefined,
+): readonly (readonly [Owner, Holding])[] {
+  if (shares.length < 2 || !holding.averageCostUsd || holding.unrealizedPnlUsd === undefined) {
+    return shares;
+  }
+  const venue = parseUnits(holding.averageCostUsd, 12);
+  const sized = shares.map(([owner, share]) => ({
+    owner,
+    share,
+    units: parseUnits(share.quantity, QUANTITY_DECIMALS),
+    entry: entry(owner) ?? venue,
+  }));
+  const units = sized.reduce((sum, { units }) => sum + units, 0n);
+  const blend = sized.reduce((sum, share) => sum + share.units * share.entry, 0n) / units;
+  // A long makes more the lower it got in; a short, the higher.
+  const sign = holding.short ? -1n : 1n;
+  // Units to 18 places times dollars to 12 is cents 28 places further.
+  const fine = 10n ** 28n;
+  let moved = 0n;
+  return sized.map(({ owner, share, units, entry }, index) => {
+    const shift =
+      index === sized.length - 1 ? -moved : (sign * units * (blend - entry)) / fine;
+    moved += shift;
+    const plus = (usd: string) => centsToUsd(signedUsdToCents(usd) + shift);
+    return [
+      owner,
+      {
+        ...share,
+        averageCostUsd: formatUnits(entry, 12),
+        usdValue: share.usdValue === null ? null : plus(share.usdValue),
+        unrealizedPnlUsd: plus(share.unrealizedPnlUsd ?? "0"),
+      },
+    ] as const;
+  });
 }
 
 /**
@@ -379,16 +480,18 @@ function sharesOf<Owner>(
 /**
  * A share of a holding with what its owner's own fills paid for it (`book`, see purchases):
  * their average, where they bought at least what the share is; else nothing records its cost.
- * A perp keeps its venue's entry price and what the venue says it has made, in proportion
- * (see sharesOf), since its fills are its size, not the margin it put up.
+ * Savings grow by themselves (see withGrowth), so a share of them that holds more than it bought
+ * spreads what it paid over all it holds, and what it has made is the interest.
  */
 function paidFor(share: Holding, book: { held: bigint; cost: bigint } | undefined): Holding {
-  if (isMargined(share)) return share;
   const rest = unpaid(share);
   const units = parseUnits(share.quantity, QUANTITY_DECIMALS);
-  if (!book || units === 0n || book.held < units) return rest;
+  if (!book || book.held <= 0n || units === 0n) return rest;
+  const grown = book.held < units;
+  if (grown && !isSavings(share.venue)) return rest;
   // Its cost is in cents carried 18 places further (FINE_CENTS); the average, in dollars to 12.
-  return { ...rest, averageCostUsd: formatUnits((book.cost * 10n ** 10n) / book.held, 12) };
+  const over = grown ? units : book.held;
+  return { ...rest, averageCostUsd: formatUnits((book.cost * 10n ** 10n) / over, 12) };
 }
 
 /** A holding with nothing recording what it cost. */

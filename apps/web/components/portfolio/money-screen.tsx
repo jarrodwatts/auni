@@ -2,7 +2,7 @@
 
 import type { ActivityItemWire, ThreadId } from "@auni/shared";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { ActivityReceipt } from "@/components/activity/activity-receipt";
 import { useActivity } from "@/components/activity/use-activity";
@@ -87,10 +87,10 @@ function Overview({
   const thread = receipt?.threadId
     ? { id: receipt.threadId, title: titles.get(receipt.threadId) ?? "Untitled take" }
     : undefined;
-  const open = (item: ActivityItemWire) => {
+  const open = useCallback((item: ActivityItemWire) => {
     setReceipt(item);
     setSheetOpen(true);
-  };
+  }, []);
 
   return (
     <div data-money-scroller className="min-h-0 flex-1 overflow-y-auto">
@@ -101,7 +101,7 @@ function Overview({
           reveal && "auni-stagger-in",
         )}
       >
-        <TotalHero />
+        <TotalHero moves={items} onOpenMove={open} />
         <YourTakes
           takes={takes.data?.takes ?? null}
           failed={takes.isError && !takes.data}

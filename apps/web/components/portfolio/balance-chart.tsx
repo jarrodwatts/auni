@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import type { BalanceHistoryPoint } from "@/lib/data/views";
 
 import { AUNI_HUE, DawnChart, type ChartHue } from "./dawn-chart";
+import type { ChartMoment } from "./dawn-moments";
 
 const compactUsd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -50,6 +51,7 @@ export function BalanceChart({
   height = 176,
   hue = AUNI_HUE,
   onScrub,
+  moments,
   className,
 }: {
   readonly points: readonly BalanceHistoryPoint[];
@@ -58,6 +60,8 @@ export function BalanceChart({
   readonly hue?: ChartHue;
   /** The reading under the pointer while scrubbing, or null. */
   readonly onScrub?: (point: ChartPoint | null) => void;
+  /** What happened along it, each a bead at its time (see DawnChart). */
+  readonly moments?: readonly ChartMoment[];
   readonly className?: string;
 }) {
   const drawn = useMemo(() => chartPoints(points), [points]);
@@ -75,6 +79,7 @@ export function BalanceChart({
       height={height}
       hue={hue}
       label={`${label}: from ${compact(first.baseUnits)} to ${compact(last.baseUnits)}.`}
+      moments={moments}
       className={className}
       onScrub={onScrub && ((index) => onScrub(index === null ? null : (drawn[index] ?? null)))}
     />

@@ -5,52 +5,87 @@ import { cashWords, samePlace, sentWords } from "./withdrawals";
 const maxUsd = { base: "8.70", solana: "8.70", arbitrum: "8.70", monad: "8.70", polygon: "8.70" };
 
 describe("cashWords", () => {
-  it("says what is in the wallet to send, and where the rest of their cash is", () => {
-    expect(
-      cashWords(
-        {
-          cashUsd: "9.29",
-          walletUsd: "8.70",
-          elsewhere: [
-            { name: "Aave", usdValue: "0.49" },
-            { name: "Polymarket", usdValue: "0.10" },
-          ],
-          maxUsd,
-          recent: [],
-        },
-        "base",
-      ),
-    ).toBe(
-      "$8.70 USDC in your wallet. $0.49 on Aave and $0.10 on Polymarket: ask Auni to move it " +
-        "back first.",
-    );
+  const cash = (fields: Partial<Parameters<typeof cashWords>[0]> = {}) => ({
+    cashUsd: "8.70",
+    walletUsd: "8.70",
+    elsewhere: [],
+    maxUsd,
+    recent: [],
+    ...fields,
   });
+  const atApps = [
+    { name: "Aave", usdValue: "0.49" },
+    { name: "Polymarket", usdValue: "0.10" },
+  ];
+  // $5 on Base and $5 on Arbitrum: one withdrawal sends $5 on any EVM network, and $5 on Solana.
+  const spread = { base: "5.00", solana: "5.00", arbitrum: "5.00", monad: "5.00", polygon: "5.00" };
 
-  it("says just the cash when all of it is in the wallet", () => {
-    expect(
-      cashWords({ cashUsd: "8.70", walletUsd: "8.70", elsewhere: [], maxUsd, recent: [] }, "base"),
-    ).toBe("$8.70 USDC in your wallet. To withdraw other holdings, ask Auni to sell them first.");
-  });
-
-  // $5 on Base and $5 on Arbitrum said "$10 USDC in your wallet" while Max filled $5.00
+  // At rest it read "$8,889 USDC in your wallet, but one withdrawal on Base can send up to
+  // $5,270. Ask Auni to gather it first for more. $4,000 on Aave...", before anything was typed
   // (review of 2026-11-25).
-  it("says the most one withdrawal sends there, what Max fills, when cash is spread", () => {
-    const spread = {
-      base: "5.00",
-      solana: "0.00",
-      arbitrum: "5.00",
-      monad: "5.00",
-      polygon: "5.00",
-    };
-    expect(
-      cashWords(
-        { cashUsd: "10", walletUsd: "10", elsewhere: [], maxUsd: spread, recent: [] },
-        "base",
-      ),
-    ).toBe(
-      "$10 USDC in your wallet, but one withdrawal on Base can send up to $5. Ask Auni to " +
-        "gather it first for more.",
+  it("is one short line until the amount is more than can leave", () => {
+    for (const typed of ["", "0", "8.70", "$8.70", "abc"])
+      expect(cashWords(cash({ elsewhere: atApps }), "base", typed)).toEqual({
+        words: "$8.70 USDC in your wallet.",
+        over: false,
+      });
+    expect(cashWords(cash({ walletUsd: "10", maxUsd: spread }), "base", "5")).toEqual({
+      words: "$10 USDC in your wallet.",
+      over: false,
+    });
+  });
+
+  it("says how far one withdrawal goes, and to gather the rest, once more is typed", () => {
+    expect(cashWords(cash({ walletUsd: "10", maxUsd: spread }), "base", "7")).toEqual({
+      words: "One withdrawal on Base can send up to $5. Ask Auni to gather the rest first.",
+      over: true,
+    });
+  });
+
+  it("says where the rest of their cash is once the amount is more than the wallet holds", () => {
+    expect(cashWords(cash({ elsewhere: atApps }), "base", "9")).toEqual({
+      words:
+        "One withdrawal on Base can send up to $8.70. $0.49 on Aave and $0.10 on Polymarket: " +
+        "ask Auni to move it back first.",
+      over: true,
+    });
+    expect(cashWords(cash(), "base", "9").words).toBe(
+      "One withdrawal on Base can send up to $8.70. To withdraw other holdings, ask Auni to sell " +
+        "them first.",
     );
+  });
+
+  // $10 on Solana only, withdrawn on Base, said "one withdrawal on Base can send up to $0. Ask
+  // Auni to gather it first for more", which can't help: Solana's cash leaves only on Solana
+  // (review of 2026-11-25).
+  it("names the network the cash leaves from, never a limit of $0", () => {
+    const onSolana = {
+      base: "0.00",
+      solana: "10.00",
+      arbitrum: "0.00",
+      monad: "0.00",
+      polygon: "0.00",
+    };
+    for (const typed of ["", "5"])
+      expect(cashWords(cash({ walletUsd: "10", maxUsd: onSolana }), "base", typed).words).toBe(
+        "Your cash is on Solana. Pick Solana to withdraw it.",
+      );
+    // $5 on Base and $8 on Solana: $7 fits on Solana in one withdrawal.
+    const mostOnSolana = { ...spread, solana: "8.00" };
+    expect(cashWords(cash({ walletUsd: "13", maxUsd: mostOnSolana }), "base", "7").words).toBe(
+      "One withdrawal on Base can send up to $5. Pick Solana to send up to $8.",
+    );
+  });
+
+  it("says when nothing can leave yet, and where their cash is", () => {
+    const none = { base: "0.00", solana: "0.00", arbitrum: "0.00", monad: "0.00", polygon: "0.00" };
+    expect(
+      cashWords(cash({ walletUsd: "0", maxUsd: none, elsewhere: atApps }), "base", ""),
+    ).toEqual({
+      words:
+        "No USDC in your wallet. $0.49 on Aave and $0.10 on Polymarket: ask Auni to move it back first.",
+      over: false,
+    });
   });
 });
 
@@ -112,6 +147,25 @@ describe("sentWords", () => {
     expect(done.title).toBe("About $118.75 arrived");
     expect(done.lede).toMatch(
       /^Reached your other wallet on Base at \d{1,2}:04[ap]m\. \$120 left your wallet, and moving it between networks cost \$1\.25\.$/u,
+    );
+  });
+
+  // One quoted before what lands was kept, with only its fee, said "$120 arrived" for $120 sent
+  // of which the bridge kept $1.25 (review of 2026-11-25).
+  it("never says the whole amount arrived when only the fee between networks is known", () => {
+    const quotedBefore = (status: "running" | "done") => ({
+      ...now(status),
+      amountUsd: "120.00",
+      details: { arrives: "In about a minute", fee: "$1.25" },
+    });
+    expect(sentWords(sent, quotedBefore("running"))).toEqual({
+      title: "$120 on its way",
+      lede: "Arrives in about a minute, less the $1.25 fee to move it between networks.",
+    });
+    const done = sentWords(sent, quotedBefore("done"));
+    expect(done.title).toBe("$120 sent");
+    expect(done.lede).toMatch(
+      /^Reached your other wallet on Base at \d{1,2}:04[ap]m, less the \$1\.25 fee to move it between networks\.$/u,
     );
   });
 

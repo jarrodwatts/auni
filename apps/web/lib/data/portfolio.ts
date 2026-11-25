@@ -1,4 +1,5 @@
 import {
+  depositsWireSchema,
   NETWORK_KEYS,
   NETWORKS,
   otherTokensWireSchema,
@@ -94,6 +95,21 @@ export async function getPortfolio(
     deposits: body.deposits,
     feesPayable: body.feesPayable,
   };
+}
+
+/**
+ * Every deposit core recorded in the `waitedMs` a screen has waited for one, newest first
+ * (`GET /portfolio/deposits`); each ask has core look for money that landed.
+ */
+export async function getDepositsSince(
+  waitedMs: number,
+  signal?: AbortSignal,
+): Promise<readonly DepositWire[]> {
+  const within = Math.max(0, Math.ceil(waitedMs));
+  const body = depositsWireSchema.parse(
+    await requestCore(`portfolio/deposits?within=${within}`, { method: "GET", signal }),
+  );
+  return body.deposits;
 }
 
 /** Total portfolio history over one range (`GET /portfolio/history`). */

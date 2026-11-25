@@ -223,6 +223,7 @@ export { clip, listed, withArticle } from "./words.ts";
 export { splitKeys } from "./wallet-keys.ts";
 export { type StartChatRequest, startChatRequestSchema, startedChatWireSchema } from "./places.ts";
 export {
+  depositsWireSchema,
   type DepositWire,
   type HoldingWire,
   holdingWireSchema,

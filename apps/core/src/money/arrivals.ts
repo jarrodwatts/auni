@@ -391,27 +391,25 @@ function valueOf(
   return unitsUsd(transfer.pricedUnits ?? transfer.baseUnits, transfer.decimals, price);
 }
 
-/** Long enough that a deposit recorded while a screen waits on one is still there to see. */
+/** How far back the portfolio lists deposits. */
 const RECENT_MS = 60 * 60_000;
 
 /**
- * The latest few deposits told (see toldDeposit), recorded in the last hour,
- * newest first: what a screen waiting on a deposit sees land. Recorded, not
- * made, as a first sweep may find money sent in days ago, which is news all the same.
+ * Every deposit told (see toldDeposit) recorded since `since`, newest first: what a screen
+ * waiting on one sees land, however many landed between two of its reads. Recorded, not made, as
+ * a first sweep may find money sent in days ago, which is news all the same.
  */
-export async function recentDeposits(): Promise<ArrivalRow[]> {
+export async function depositsSince(since: Date): Promise<ArrivalRow[]> {
   return db
     .select()
     .from(arrivals)
-    .where(
-      and(
-        eq(arrivals.kind, "deposit"),
-        gte(arrivals.createdAt, new Date(Date.now() - RECENT_MS)),
-        TOLD_SQL,
-      ),
-    )
-    .orderBy(desc(arrivals.createdAt), asc(arrivals.position))
-    .limit(5);
+    .where(and(eq(arrivals.kind, "deposit"), gte(arrivals.createdAt, since), TOLD_SQL))
+    .orderBy(desc(arrivals.createdAt), asc(arrivals.position));
+}
+
+/** The latest few deposits recorded in the last hour, as the portfolio lists them. */
+export async function recentDeposits(): Promise<ArrivalRow[]> {
+  return (await depositsSince(new Date(Date.now() - RECENT_MS))).slice(0, 5);
 }
 
 /** A deposit as a person reads it: "0.081 ETH on Base", its token named as news names it (see nameOf). */

@@ -1,6 +1,6 @@
 "use client";
 
-import { NETWORKS, type ActionStatus } from "@auni/shared";
+import type { ActionStatus } from "@auni/shared";
 import { ArrowRight, LoaderCircle, WalletMinimal } from "lucide-react";
 import { useState } from "react";
 
@@ -24,7 +24,8 @@ import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
 import { FullAddress } from "@/components/cards/money/full-address";
 import { ProofNote } from "@/components/cards/money/proof-note";
 import { shortAddress } from "@/components/money/portal/deposit-addresses";
-import { NetworkMark } from "@/components/money/portal/network-mark";
+
+import { PlaceMark } from "./place-mark";
 
 // An Allow that went through: the withdrawal is on its way or already settled.
 const SENT: ReadonlySet<ActionStatus> = new Set(["running", "done", "failed"]);
@@ -38,7 +39,7 @@ function refusal(error: unknown): string {
 
 /**
  * The confirm step every withdrawal passes, from Withdraw or from chat: the route as a scene
- * (their wallet, the amount, where it lands), the full address with the parts people check in
+ * (their wallet, the amount, whose place it lands in and on which network), the full address with the parts people check in
  * bold, a plain warning when it looks like an address they used before, what it costs and when
  * it lands, and the proof a new address takes, that the owner is at the computer, before the tap
  * can send. What the tap sends is the action core recorded; this only shows it.
@@ -97,7 +98,7 @@ export function WithdrawReview({
           <span className="grid size-10 place-items-center rounded-full bg-foreground/[0.06] text-ink">
             <WalletMinimal aria-hidden className="size-[18px]" />
           </span>
-          <span className="text-meta text-muted-foreground">Auni wallet</span>
+          <span className="text-meta text-muted-foreground">Your wallet</span>
         </span>
         <span className="relative flex min-w-0 flex-1 flex-col items-center pb-6">
           <span className="text-card-money text-ink tabular-nums">{amount}</span>
@@ -108,10 +109,7 @@ export function WithdrawReview({
           />
         </span>
         <span className="flex min-w-0 flex-col items-center gap-1.5">
-          <NetworkMark
-            network={{ key: review.network, logo: NETWORKS[review.network].logo }}
-            size={40}
-          />
+          <PlaceMark destination={review.destination} network={review.network} size={40} />
           <span className="text-meta whitespace-nowrap text-muted-foreground">
             {sentenceCase(placeName(review.destination) ?? "this address")}
           </span>

@@ -298,7 +298,7 @@ const SEND_UNCONFIRMED: Opener = {
 };
 
 /**
- * Money landing while Add money is open: every read of the money from here on carries one more
+ * Money landing while Add money is open: every read of what landed from here on carries one more
  * deposit, as if it had just been sent from an exchange, and the picture waits for the next read
  * (every 10 seconds while Add money watches) and the landing it plays.
  */
@@ -306,7 +306,7 @@ const LAND = `new Promise((landed) => {
   const real = window.fetch;
   window.fetch = async (input, init) => {
     const response = await real(input, init);
-    if (!/\\/core\\/portfolio(\\?|$)/u.test(String(input instanceof Request ? input.url : input))) return response;
+    if (!/\\/core\\/portfolio\\/deposits\\?/u.test(String(input instanceof Request ? input.url : input))) return response;
     const body = await response.json();
     body.deposits = [{ id: "shot-landed", symbol: "USDC", amount: "250", network: "Base", usdValue: "250", cash: "base" }, ...body.deposits];
     return new Response(JSON.stringify(body), { status: response.status, headers: response.headers });
@@ -529,6 +529,20 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
         { does: LAND, shows: `document.querySelector("[data-landed]")` },
       ],
       ["withdraw", `${origin}/app`, { does: PRESS("Withdraw"), shows: onTop("Withdraw") }],
+      [
+        "withdraw-over-limit",
+        `${origin}/app`,
+        {
+          does: `(async () => {
+            ${PRESS("Withdraw")};
+            await ${PAUSE(800)};
+            ${FILL("amount", "6000")};
+            await ${PAUSE(300)};
+            return true;
+          })()`,
+          shows: onTop("One withdrawal on"),
+        },
+      ],
       [
         "withdraw-review",
         `${origin}/app`,

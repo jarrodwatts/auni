@@ -1,10 +1,10 @@
 "use client";
 
-import type { ThreadId, ValueRange } from "@auni/shared";
+import type { DepositWire, ThreadId, ValueRange } from "@auni/shared";
 import { keepPreviousData, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
-import { getPortfolio, getValueHistory } from "@/lib/data/portfolio";
+import { getDepositsSince, getPortfolio, getValueHistory } from "@/lib/data/portfolio";
 import { getTakes } from "@/lib/data/takes";
 import { getThreadState } from "@/lib/data/threads";
 
@@ -58,6 +58,25 @@ export function useTakes() {
     refetchInterval: MONEY_POLL_MS,
     refetchOnWindowFocus: (query) => query.state.status === "error",
   });
+}
+
+const NO_DEPOSITS: readonly DepositWire[] = [];
+
+/**
+ * Every deposit core recorded since the screen calling this began waiting, newest first, read
+ * every 10 seconds with core looking for money that landed each time; none before the first read.
+ * Core counts back by how long it waited, so one landing before that first read counts, and a
+ * burst between two reads counts in full.
+ */
+export function useDepositsSince() {
+  // How long it waited, on a clock nothing sets back or forward.
+  const [since] = useState(() => performance.now());
+  const read = useQuery({
+    queryKey: ["deposits", since],
+    queryFn: ({ signal }) => getDepositsSince(performance.now() - since, signal),
+    refetchInterval: DEPOSIT_POLL_MS,
+  });
+  return read.data ?? NO_DEPOSITS;
 }
 
 /** Live holdings opened in one thread and its remaining auto-spend budget. */

@@ -39,6 +39,9 @@ const depositWireSchema = z.object({
 
 export type DepositWire = z.infer<typeof depositWireSchema>;
 
+/** Core's GET /portfolio/deposits: every deposit recorded while a screen waited, newest first. */
+export const depositsWireSchema = z.object({ deposits: z.array(depositWireSchema) });
+
 /** Core's GET /portfolio: the live total, all non-cash holdings, and cash. */
 export const portfolioWireSchema = z.object({
   /** Everything read; a source named in `unavailable` adds nothing to it. */

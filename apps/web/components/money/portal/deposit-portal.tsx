@@ -1,37 +1,28 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
-import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
+import { useDepositsSince, useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { useMoney } from "@/components/money/money-provider";
 import type { FundingNeed } from "@/lib/app-links";
 import { markActivitySeen } from "@/lib/data/activity";
 
-import { NOT_WATCHED, watchRead, type DepositWatch } from "../deposit-watch";
 import { Portal } from "./portal";
 
 /**
- * The Portal on the account's own addresses, reading the money more often for as long as it's
- * open, and showing every deposit core records after it opened. `need` is what a card is short
- * of, when one opened it.
+ * The Portal on the account's own addresses, showing every deposit core records after it opened,
+ * a test send and the real one after it alike. `need` is what a card is short of, when one opened
+ * it.
  */
 export function DepositPortal({ need }: { readonly need: FundingNeed | null }) {
-  const { depositNetworks: networks, portfolio, watchDeposits } = useMoney();
-  useEffect(() => watchDeposits(), [watchDeposits]);
+  const { depositNetworks: networks, portfolio } = useMoney();
+  const landed = useDepositsSince();
 
-  // Deposits recorded already are old news, taken as seen from the money as it was last read.
-  const [watch, setWatch] = useState<DepositWatch>(NOT_WATCHED);
-  if (portfolio) {
-    const read = watchRead(watch, portfolio.deposits);
-    if (read !== watch) setWatch(read);
-  }
-
-  // The portfolio read already holds what landed; the reads around it, such as history, don't.
-  // The owner watched it land, so Activity has nothing new to tell them about it.
+  // The money is read again to show what landed. The owner watched it land, so Activity has
+  // nothing new to tell them about it.
   const refreshMoney = useRefreshMoney();
   const queryClient = useQueryClient();
-  const { landed } = watch;
   const latest = landed[0]?.id ?? null;
   useEffect(() => {
     if (!latest) return;

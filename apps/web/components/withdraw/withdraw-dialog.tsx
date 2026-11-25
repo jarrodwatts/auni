@@ -7,7 +7,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { NetworkPicker } from "@/components/money/network-picker";
 import { MoneySheet } from "@/components/money/money-sheet";
-import { NetworkMark } from "@/components/money/portal/network-mark";
 import { shortAddress } from "@/components/money/portal/deposit-addresses";
 import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { AuniDialogMascot, auniDialogPrimaryButtonClass } from "@/components/ui/auni-dialog";
@@ -25,15 +24,16 @@ import {
   readWithdrawCash,
   samePlace,
   sentWords,
+  typedDollars,
   WITHDRAW_NETWORKS,
   type RecentPlace,
   type Withdrawal,
   type WithdrawDestination,
   type WithdrawNetwork,
 } from "@/lib/data/withdrawals";
-import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
+import { PlaceMark } from "./place-mark";
 import { WithdrawReview } from "./withdraw-review";
 
 type Step =
@@ -89,6 +89,7 @@ export function WithdrawDialog({
       ? chosen.place
       : { address, network, destination: destination as WithdrawDestination | null };
   const max = cash.data?.maxUsd[goesTo.network];
+  const cashLine = cash.data ? cashWords(cash.data, goesTo.network, amount) : null;
   // After Allow the withdrawal runs on its own; watch it until it settles.
   const sent = step.kind === "sent" ? step.withdrawal : null;
   const live = useLiveAction(sent?.action.id ?? null);
@@ -116,13 +117,11 @@ export function WithdrawDialog({
 
   const review = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const dollars = amount.replace(/[$,\s]/gu, "");
+    const dollars = typedDollars(amount);
     if (!/^\d+(\.\d{1,2})?$/u.test(dollars) || Number(dollars) <= 0)
       return setError("Enter an amount in dollars, like 50 or 12.50.");
-    if (max !== undefined && Number(dollars) > Number(max))
-      return setError(
-        `You can withdraw up to ${formatUsd(max)} on ${networkName(goesTo.network)}.`,
-      );
+    // The line under the amount already says how far it goes, and how to send more.
+    if (cashLine?.over) return setError(null);
     if (!addressFits(goesTo.network, goesTo.address))
       return setError(
         goesTo.network === "solana"
@@ -218,9 +217,15 @@ export function WithdrawDialog({
               </Button>
             </span>
           </label>
-          <p className="mt-2 text-meta text-muted-foreground">
-            {cash.data
-              ? cashWords(cash.data, goesTo.network)
+          <p
+            aria-live="polite"
+            className={cn(
+              "mt-2 text-meta",
+              cashLine?.over ? "text-negative" : "text-muted-foreground",
+            )}
+          >
+            {cashLine
+              ? cashLine.words
               : cash.isError
                 ? "Couldn't load your balance. You can still enter an amount."
                 : "Checking your cash"}
@@ -372,7 +377,7 @@ function Pick({
   );
 }
 
-/** A place money went before: its network's mark, whose it is, its ends, and when. */
+/** A place money went before: whose it is and on which network, its ends, and when. */
 function PlaceRow({
   on,
   onPick,
@@ -390,12 +395,7 @@ function PlaceRow({
     <Pick
       on={on}
       onPick={onPick}
-      mark={
-        <NetworkMark
-          network={{ key: place.network, logo: NETWORKS[place.network].logo }}
-          size={32}
-        />
-      }
+      mark={<PlaceMark destination={place.destination} network={place.network} size={32} />}
       title={`${whose} on ${networkName(place.network)}`}
       meta={
         <>

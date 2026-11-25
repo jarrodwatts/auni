@@ -4,6 +4,7 @@ import {
   valueRangeSchema,
   type ActionQuoteWire,
   type ActivityWire,
+  type depositsWireSchema,
   type HoldingWire,
   type OtherTokensWire,
   type portfolioWireSchema,
@@ -19,7 +20,7 @@ import { ownerHere } from "../auth/proof.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
 import { markActivitySeen, readActivity } from "./activity.ts";
-import { depositWire, recentDeposits } from "./arrivals.ts";
+import { depositsSince, depositWire, recentDeposits } from "./arrivals.ts";
 import { listOtherTokens } from "./buckets.ts";
 import { actionById, actionsForThread, actionWire, proposalActions } from "./actions.ts";
 import { allowAction, allowProposal, declineAction, declineProposal, outOfDate } from "./decide.ts";
@@ -289,6 +290,32 @@ portfolioRouter.get("/", async (req, res) => {
     deposits: deposits.map(depositWire),
     feesPayable: feesNow,
   } satisfies z.input<typeof portfolioWireSchema>);
+});
+
+/** `?within=`: how long a screen has waited for a deposit, by its own clock, in ms. */
+const waitedQuery = z.object({ within: z.coerce.number().int().min(0) });
+
+/**
+ * Longer than any trip here, so a deposit recorded as a screen began to wait is never missed by
+ * what it took its ask to arrive.
+ */
+const TRIP_MS = 5_000;
+
+/** Never further back than this, however long a screen waits. */
+const LONGEST_WAIT_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * Every deposit recorded since a screen began waiting on one (`?within=` ms ago, as it counts on
+ * its own clock, so the two clocks never need to agree), newest first and every one of them: what
+ * it sees land. Asking sweeps the wallets soon (see sweepSoon), as each ask while a screen waits.
+ */
+portfolioRouter.get("/deposits", async (req, res) => {
+  const query = waitedQuery.safeParse(req.query);
+  if (!query.success) return void res.status(400).json({ error: "invalid_within" });
+  sweepSoon(true);
+  const waited = Math.min(query.data.within, LONGEST_WAIT_MS) + TRIP_MS;
+  const deposits = await depositsSince(new Date(Date.now() - waited));
+  res.json({ deposits: deposits.map(depositWire) } satisfies z.input<typeof depositsWireSchema>);
 });
 
 /** Their Other tokens as they open the list (see readOtherTokens). */

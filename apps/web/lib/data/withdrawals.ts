@@ -73,28 +73,50 @@ export function samePlace(
   return a.network === b.network && a.address === b.address;
 }
 
+/** The dollars typed as the amount, without the "$", commas or spaces people type with them. */
+export function typedDollars(amount: string): string {
+  return amount.replace(/[$,\s]/gu, "");
+}
+
 /**
- * What Withdraw says of the owner's cash under the amount, for a withdrawal on `network`: what's in
- * their wallet to send, and the most one withdrawal can send there (what Max fills) when that's
- * less, as cash spread over networks makes it; then, where an app keeps some, how much and where,
- * which comes home by asking Auni first.
+ * What Withdraw says of the owner's cash under the amount, for `typed` dollars on `network`: just
+ * what's in their wallet, until that's more than one withdrawal can send there (what Max fills),
+ * or nothing can leave there at all. Then it says how far it goes, and the way to send more: the
+ * network their cash leaves from, gathering it first, or bringing home what an app keeps.
  */
 export function cashWords(
   { walletUsd, elsewhere, maxUsd }: WithdrawCash,
   network: WithdrawNetwork,
-): string {
-  const max = maxUsd[network];
-  const spread = max !== undefined && Number(max) < Number(walletUsd);
-  const inWallet = spread
-    ? `${formatUsd(walletUsd)} USDC in your wallet, but one withdrawal on ${NETWORKS[network].name} can send up to ${formatUsd(max)}. Ask Auni to gather it first for more.`
-    : `${formatUsd(walletUsd)} USDC in your wallet.`;
-  if (elsewhere.length === 0)
-    return spread
-      ? inWallet
-      : `${inWallet} To withdraw other holdings, ask Auni to sell them first.`;
+  typed: string,
+): { readonly words: string; readonly over: boolean } {
+  const dollars = Number(typedDollars(typed)) || 0;
+  const max = maxUsd[network] ?? walletUsd;
+  const over = dollars > Number(max);
+  if (!over && Number(max) > 0)
+    return { words: `${formatUsd(walletUsd)} USDC in your wallet.`, over };
+  // Where one withdrawal sends the most, as Solana's cash leaves only on Solana.
+  const best = WITHDRAW_NETWORKS.reduce((a, b) =>
+    Number(maxUsd[b.id] ?? 0) > Number(maxUsd[a.id] ?? 0) ? b : a,
+  );
+  const bestMax = maxUsd[best.id] ?? "0";
+  const limit = `One withdrawal on ${NETWORKS[network].name} can send up to ${formatUsd(max)}.`;
+  const words =
+    Number(bestMax) <= 0
+      ? `No USDC in your wallet. ${fromElsewhere(elsewhere)}`
+      : Number(max) <= 0
+        ? `Your cash is on ${best.name}. Pick ${best.name} to withdraw it.`
+        : best.id !== network && dollars <= Number(bestMax)
+          ? `${limit} Pick ${best.name} to send up to ${formatUsd(bestMax)}.`
+          : `${limit} ${dollars <= Number(walletUsd) ? "Ask Auni to gather the rest first." : fromElsewhere(elsewhere)}`;
+  return { words, over };
+}
+
+/** How cash beyond the wallet's comes to it: from the apps keeping some, or by selling first. */
+function fromElsewhere(elsewhere: WithdrawCash["elsewhere"]): string {
+  if (elsewhere.length === 0) return "To withdraw other holdings, ask Auni to sell them first.";
   const at = elsewhere.map(({ name, usdValue }) => `${formatUsd(usdValue)} on ${name}`);
   const rest = at.length === 1 ? at[0] : `${at.slice(0, -1).join(", ")} and ${at.at(-1)}`;
-  return `${inWallet} ${rest}: ask Auni to move it back first.`;
+  return `${rest}: ask Auni to move it back first.`;
 }
 
 const TIME = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
@@ -116,13 +138,15 @@ export function sentWords(
       title: "Withdrawal didn't go through",
       lede: now.error ?? "Your money stayed in your wallet. Try again in a moment.",
     };
+  // One quoted before what lands was kept says only that the fee comes out of it.
+  const less = fee && !lands ? `, less the ${fee} fee to move it between networks` : "";
   if (now.status !== "done") {
     const when = arrives ? `arrives ${arrives.toLowerCase()}` : "should arrive soon";
     return {
       title: `${amount} on its way`,
       lede: lands
         ? `About ${lands} ${when}, after the ${fee} fee to move it between networks.`
-        : `${when.charAt(0).toUpperCase()}${when.slice(1)}.`,
+        : `${when.charAt(0).toUpperCase()}${when.slice(1)}${less}.`,
     };
   }
   const network = WITHDRAW_NETWORKS.find((entry) => entry.id === review.network)?.name;
@@ -133,9 +157,9 @@ export function sentWords(
     (_, half: string) => `${half.toLowerCase()}m`,
   );
   return {
-    title: lands ? `About ${lands} arrived` : `${amount} arrived`,
+    title: lands ? `About ${lands} arrived` : fee ? `${amount} sent` : `${amount} arrived`,
     lede:
-      `Reached ${to}${network ? ` on ${network}` : ""} at ${at}.` +
+      `Reached ${to}${network ? ` on ${network}` : ""} at ${at}${less}.` +
       (lands ? ` ${amount} left your wallet, and moving it between networks cost ${fee}.` : ""),
   };
 }

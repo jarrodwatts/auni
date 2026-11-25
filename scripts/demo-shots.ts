@@ -315,6 +315,22 @@ const LAND = `new Promise((landed) => {
 })`;
 
 /**
+ * Add money opened while core can't mark where its watch starts (restarting, say): every ask for
+ * the mark fails, and the address shows all the same, the watch's line saying it's getting ready.
+ */
+const NO_MARK = `(async () => {
+  const real = window.fetch;
+  window.fetch = async (input, init) => {
+    if (/\\/core\\/portfolio\\/deposits$/u.test(String(input instanceof Request ? input.url : input)))
+      return new Response("{}", { status: 503 });
+    return real(input, init);
+  };
+  document.querySelector('a[href*="fund="]').click();
+  await new Promise((wait) => setTimeout(wait, 4_000));
+  return true;
+})()`;
+
+/**
  * Withdraw's read of the cash coming back late, with two places money went before, as an owner
  * starts typing a new address before it lands: what they typed stays picked once it does.
  */
@@ -523,6 +539,11 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
         },
       ],
       ["add-money-for-a-card", `${origin}/app?fund=50-base`, undefined],
+      [
+        "add-money-no-mark",
+        `${origin}/app`,
+        { does: NO_MARK, shows: onTop("Getting ready to watch for your transfer") },
+      ],
       [
         "add-money-landed",
         `${origin}/app?fund=open`,

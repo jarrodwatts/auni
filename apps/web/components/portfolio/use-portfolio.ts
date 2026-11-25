@@ -1,7 +1,13 @@
 "use client";
 
 import type { DepositWire, ThreadId, ValueRange } from "@auni/shared";
-import { keepPreviousData, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  queryOptions,
+  skipToken,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
 import {
@@ -68,20 +74,31 @@ export function useTakes() {
 const NO_DEPOSITS: readonly DepositWire[] = [];
 
 /**
+ * The read of a deposit wait's start mark, for the wait begun at `opened`: asked again until it
+ * comes, 1s, 2s, 4s and on to every 30s apart, since a core restarting or a database blip must
+ * never leave the screen unable to watch (review of 2026-11-25).
+ */
+export const depositMarkQuery = (opened: number) =>
+  queryOptions({
+    queryKey: ["deposit-mark", opened],
+    queryFn: ({ signal }) => markDepositWait(signal),
+    staleTime: Infinity,
+    retry: true,
+    retryDelay: (failures) => Math.min(1_000 * 2 ** failures, 30_000),
+  });
+
+/**
  * A screen waiting for a deposit: it first has core mark the instant it began, on the clock core
  * records deposits by, then reads every deposit recorded after that mark, newest first, every 10
  * seconds, with core looking for money that landed each time. So one landing just after it opened
  * counts, a burst between two reads counts in full, and one recorded before it opened never does.
- * `watching` is false until the mark is in, as nothing that lands can be counted before then.
+ * `watching` is false until the mark is in, as nothing that lands can be counted before then; the
+ * addresses show at once all the same, since only the counting waits for it.
  */
 export function useDepositWatch() {
   // This screen's own wait, so opening it again marks a new start.
   const [opened] = useState(() => performance.now());
-  const mark = useQuery({
-    queryKey: ["deposit-mark", opened],
-    queryFn: ({ signal }) => markDepositWait(signal),
-    staleTime: Infinity,
-  });
+  const mark = useQuery(depositMarkQuery(opened));
   const after = mark.data;
   const read = useQuery({
     queryKey: ["deposits", after],

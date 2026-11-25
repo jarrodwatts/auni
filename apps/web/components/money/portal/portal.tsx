@@ -64,6 +64,11 @@ interface PortalProps {
   readonly need?: FundingNeed | null;
   /** The networks where a move can pay its network fee now; null until the money is read. */
   readonly feesPayable?: readonly NetworkKey[] | null;
+  /**
+   * Whether what lands is being counted yet (see useDepositWatch). The addresses never wait for
+   * it: paying shouldn't, and money sent before it starts is in the wallet all the same.
+   */
+  readonly watching: boolean;
 }
 
 /**
@@ -75,7 +80,13 @@ interface PortalProps {
  * only once it's USDC on the network the card is short on, and while it falls short the sheet
  * says what's left and keeps watching.
  */
-export function Portal({ landed, need = null, networks, feesPayable = null }: PortalProps) {
+export function Portal({
+  landed,
+  need = null,
+  networks,
+  feesPayable = null,
+  watching,
+}: PortalProps) {
   // Stand-in addresses hold the places until the wallets are ready.
   const ready = networks.length > 0;
   const promised = ready ? networks : PLACEHOLDERS;
@@ -222,9 +233,11 @@ export function Portal({ landed, need = null, networks, feesPayable = null }: Po
             </p>
             <p className="mt-5 text-center text-meta text-muted-foreground">
               <SpotlightShimmer active={ready}>
-                {ready
-                  ? `Watching for your transfer on ${network.networkName}`
-                  : "Preparing your wallet address"}
+                {!ready
+                  ? "Preparing your wallet address"
+                  : watching
+                    ? `Watching for your transfer on ${network.networkName}`
+                    : `Getting ready to watch for your transfer on ${network.networkName}`}
               </SpotlightShimmer>
             </p>
           </div>

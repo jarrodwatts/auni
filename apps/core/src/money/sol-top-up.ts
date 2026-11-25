@@ -189,7 +189,7 @@ const buysSol = (from: FeeCoin["from"], token: string, usdc: bigint, by: string)
 });
 
 /** A pay-in is asked for at least a dollar: what's left over pays the wallet's next fees. */
-const LEAST_PAY_IN_USDC = 1_000_000n;
+export const LEAST_PAY_IN_USDC = 1_000_000n;
 
 /** The USDC `lamports` of SOL cost at `usdPrice`, in base units. */
 const usdcFor = (lamports: bigint, usdPrice: number, over = 1) =>

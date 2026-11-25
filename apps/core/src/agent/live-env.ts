@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,6 +15,11 @@ if (!["localhost", "127.0.0.1"].includes(hostname) || !pathname.endsWith("_test"
 /** The port the live core listens on, clear of a dev core on 4000. */
 const LIVE_PORT = 4517;
 
+const scratch = mkdtempSync(join(tmpdir(), "auni-live-"));
+process.once("exit", () => rmSync(scratch, { recursive: true, force: true }));
+const home = join(scratch, "data");
+mkdirSync(home, { mode: 0o700 });
+
 Object.assign(process.env, {
   DATABASE_URL: url,
   PORT: String(LIVE_PORT),
@@ -22,7 +27,7 @@ Object.assign(process.env, {
   WEB_ORIGIN: "http://localhost:3999",
   // The tests' own secret, so cards sealed in a recording still check out when a test replays it.
   TURN_TOKEN_SECRET: "t".repeat(32),
-  AUNI_HOME: mkdtempSync(join(tmpdir(), "auni-live-")),
+  AUNI_HOME: home,
   WALLET: "",
   ELFA_AUTO_API_KEY: "",
 });

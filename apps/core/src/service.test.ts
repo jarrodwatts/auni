@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir, userInfo } from "node:os";
+import { readFileSync } from "node:fs";
+import { userInfo } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "./test/temp-dir.ts";
 import { selfCommand } from "./release/layout.ts";
 import {
   enableLinger,
@@ -38,7 +39,7 @@ afterEach(() => {
 
 describe("auni service", () => {
   it("writes a systemd user unit for this machine, carrying where things are, and starts it", () => {
-    const home = mkdtempSync(join(tmpdir(), "auni-service-"));
+    const home = tempDir("auni-service-");
     vi.stubEnv("HOME", home);
     vi.stubEnv("PATH", "/opt/100%/bin:/usr/bin");
     vi.stubEnv("AUNI_HOME", join(home, "auni data"));
@@ -100,7 +101,7 @@ describe("auni service", () => {
     "reads back the command it wrote on %s, however its paths are spelled",
     (platform) => {
       machine.platform = platform;
-      vi.stubEnv("HOME", mkdtempSync(join(tmpdir(), "auni-service-")));
+      vi.stubEnv("HOME", tempDir("auni-service-"));
       self.command = ['/opt/100% "odd" \\ <node>', "/home/me/auni & co/apps/core/bin/auni.mjs"];
       try {
         expect(serviceCommand()).toBeNull();

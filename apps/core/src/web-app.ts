@@ -19,7 +19,9 @@ const WEB = join(REPO, "apps/web");
 const STAMP = join(WEB, ".next/auni-build");
 // The web app exits when Auni does, however Auni ends (a kill -9 too), rather than keep its port
 // from the next start: Node closes the IPC channel to a child when its parent dies.
-const EXIT_WITH_PARENT = `--import=data:text/javascript,process.on("disconnect",()=>process.exit(0))`;
+const EXIT_WITH_PARENT =
+  "--import=data:text/javascript," +
+  encodeURIComponent('process.on("disconnect",()=>process.exit(0))');
 
 const next = () => createRequire(join(WEB, "package.json")).resolve("next/dist/bin/next");
 
@@ -54,10 +56,10 @@ export async function buildWebApp({
     // The image optimizer keeps what it served for a month by address, so a picture changed in
     // place (a network's mark) would show as it was: a new build starts with none kept.
     rmSync(join(WEB, ".next/cache/images"), { recursive: true, force: true });
-    const build = spawn(process.execPath, [next(), "build"], {
+    const build = spawn(process.execPath, [EXIT_WITH_PARENT, next(), "build"], {
       cwd: WEB,
       env: childEnv,
-      stdio: childOutput(quiet),
+      stdio: [...childOutput(quiet), "ipc"],
     });
     passOnErrors(build);
     const [code] = (await once(build, "exit")) as [number | null];

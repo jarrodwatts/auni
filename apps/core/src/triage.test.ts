@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "./test/temp-dir.ts";
 import { doctor } from "./doctor.ts";
 import { agentEnv, prepareTriage } from "./triage.ts";
 
@@ -16,7 +16,7 @@ vi.mock("./service.ts", () => ({
 
 /** A data folder as a running Auni leaves it: its settings, secrets, keys, database and output. */
 function dataFolder(): string {
-  const data = mkdtempSync(join(tmpdir(), "auni-triage-"));
+  const data = tempDir("auni-triage-");
   vi.stubEnv("AUNI_HOME", data);
   writeFileSync(
     join(data, ".env"),

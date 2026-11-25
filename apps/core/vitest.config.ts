@@ -12,7 +12,7 @@ export const testEnv = {
   WALLET: "",
   BRAIN: "",
   AUNI_ANTHROPIC_API_KEY: "",
-  // The data folder is each worker's own, set in src/test/no-real-keys.ts.
+  // Each test file has its own data folder, set in src/test/no-real-keys.ts.
   ALCHEMY_API_KEY: "test",
   ...Object.fromEntries(NETWORK_KEYS.map((chain) => [`RPC_URL_${chain.toUpperCase()}`, ""])),
   TURN_TOKEN_SECRET: "t".repeat(32),
@@ -44,6 +44,7 @@ const WRITES_SRC = "src/apps/scaffold.test.ts";
 export default defineConfig({
   test: {
     env: testEnv,
+    globalSetup: ["src/test/temp-root.ts"],
     setupFiles: ["src/test/no-real-keys.ts"],
     testTimeout: TEST_TIMEOUT_MS,
     // Tests that read src as a tree (held-to-card.test.ts, apps.test.ts) would see its

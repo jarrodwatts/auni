@@ -1,11 +1,9 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { AppAbout } from "@auni/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { sourcesJob } from "../automations/sources.ts";
 import { channelsJob, listenOnChannels } from "../channels/hub.ts";
 import { saveSetting, saveSwitch } from "../settings.ts";
@@ -88,17 +86,14 @@ vi.mock(import("../apps/index.generated.ts"), async (original) => {
 });
 
 const real = process.env.AUNI_HOME;
-let home: string;
 let runner: Runner | undefined;
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "auni-loops-"));
-  process.env.AUNI_HOME = home;
+  process.env.AUNI_HOME = tempDir("auni-loops-");
   started.length = 0;
 });
 afterEach(async () => {
   await runner?.stop();
   runner = undefined;
-  rmSync(home, { recursive: true, force: true });
   process.env.AUNI_HOME = real;
   for (const each of [CHAT.settings.token.env, NEWS.settings.key.env, "APPS_OFF"])
     delete process.env[each];

@@ -43,7 +43,10 @@ const WIDTHS = [
  * Starts the demo and resolves with the link that signs a browser in: its seeded owner, or with
  * `--first-run` a new one, before their first take.
  */
-function startDemo(...flags: readonly string[]): {
+function startDemo(
+  signal: AbortSignal,
+  ...flags: readonly string[]
+): {
   readonly link: Promise<string>;
   stop(): Promise<void>;
 } {
@@ -60,22 +63,67 @@ function startDemo(...flags: readonly string[]): {
       ...flags,
     ],
     // The demo's owner lives in this process's time zone (demo/seed.ts).
-    { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, TZ: TIME_ZONE } },
+    { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, TZ: TIME_ZONE }, signal },
+  );
+  const stop = () => {
+    demo.kill("SIGTERM");
+  };
+  process.once("exit", stop);
+  const closed = new Promise<void>((resolve) =>
+    demo.once("close", () => {
+      process.off("exit", stop);
+      resolve();
+    }),
   );
   const link = new Promise<string>((found, failed) => {
     createInterface({ input: demo.stdout }).on("line", (line) => {
       const open = /Open (\S+#pair=\S+)/u.exec(line);
       if (open) found(open[1]!);
     });
-    demo.once("exit", (code) => failed(new Error(`The demo stopped (${code}) before it was up.`)));
+    demo.on("error", failed);
+    demo.once("close", (code, signal) =>
+      failed(new Error(`The demo stopped (${code ?? signal}) before it was up.`)),
+    );
   });
   return {
     link,
-    async stop() {
-      demo.kill("SIGTERM");
-      await new Promise((stopped) => demo.once("exit", stopped));
+    stop() {
+      stop();
+      return closed;
     },
   };
+}
+
+const interrupt = new AbortController();
+process.on("SIGINT", () => interrupt.abort(130));
+process.on("SIGTERM", () => interrupt.abort(143));
+process.on("SIGHUP", () => interrupt.abort(129));
+
+async function withDemo(
+  look: (typeof LOOKS)[number],
+  flags: readonly string[],
+  capture: (page: Page, origin: string) => Promise<void>,
+): Promise<void> {
+  const { signal } = interrupt;
+  const browser = await launch(undefined, signal);
+  try {
+    signal.throwIfAborted();
+    const demo = startDemo(signal, ...flags);
+    try {
+      const link = await demo.link;
+      const { page } = browser;
+      await page.look(look);
+      await page.standAt(Date.parse(AT), TIME_ZONE);
+      await page.open(link);
+      // The demo's link lands on a new chat, signed in once the code is off the address.
+      await page.until("location.pathname.startsWith('/app') && !location.hash");
+      await capture(page, new URL(link).origin);
+    } finally {
+      await demo.stop();
+    }
+  } finally {
+    await browser.close();
+  }
 }
 
 /** "Buy $250 of Nvidia" as "buy-250-of-nvidia". */
@@ -149,17 +197,7 @@ async function take(
  */
 async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
   mkdirSync(out, { recursive: true });
-  const browser = await launch();
-  const demo = startDemo();
-  try {
-    const { page } = browser;
-    await page.look(look);
-    await page.standAt(Date.parse(AT), TIME_ZONE);
-    const link = await demo.link;
-    const origin = new URL(link).origin;
-    await page.open(link);
-    // The demo's link lands on a new chat, signed in once the code is off the address.
-    await page.until("location.pathname.startsWith('/app') && !location.hash");
+  await withDemo(look, [], async (page, origin) => {
     const core = <T>(path: string) =>
       page.evaluate<T>(`fetch("/core/${path}").then((response) => response.json())`);
     const { threads } = await core<{
@@ -231,37 +269,28 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       const name = slug(thread.title ?? thread.id);
       await take(page, out, `chat-${name}`, `${origin}/app/chat/${thread.id}`, "end");
     }
-  } finally {
-    await browser.close();
-    await demo.stop();
-  }
+  });
 }
 
 /**
  * First run, as a new owner meets it (`auni demo --first-run`): the local setup wizard.
  */
 async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
-  const browser = await launch();
-  const demo = startDemo("--first-run");
-  try {
-    const { page } = browser;
-    await page.look(look);
-    await page.standAt(Date.parse(AT), TIME_ZONE);
-    const link = await demo.link;
-    const origin = new URL(link).origin;
-    await page.open(link);
-    await page.until("location.pathname.startsWith('/app') && !location.hash");
-    await take(page, out, "first-run", `${origin}/app/new`, "top");
-  } finally {
-    await browser.close();
-    await demo.stop();
-  }
+  await withDemo(look, ["--first-run"], (page, origin) =>
+    take(page, out, "first-run", `${origin}/app/new`, "top"),
+  );
 }
 
-rmSync(OUT, { recursive: true, force: true });
-for (const look of LOOKS) {
-  const out = look === "light" ? OUT : join(OUT, look);
-  await shoot(look, out);
-  await shootFirstRun(look, out);
+try {
+  rmSync(OUT, { recursive: true, force: true });
+  for (const look of LOOKS) {
+    const out = look === "light" ? OUT : join(OUT, look);
+    await shoot(look, out);
+    await shootFirstRun(look, out);
+  }
+  interrupt.signal.throwIfAborted();
+  console.log(`\nThe demo's screens are in ${OUT}`);
+} catch (error) {
+  if (!interrupt.signal.aborted) throw error;
+  process.exitCode = interrupt.signal.reason;
 }
-console.log(`\nThe demo's screens are in ${OUT}`);

@@ -1,10 +1,7 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { requireOwner } from "../auth/middleware.ts";
 import { mintPairingCode, pair, SESSION_COOKIE, signOutEverywhere } from "../auth/owner.ts";
 import { publishThread } from "../conversation/threads.ts";
@@ -100,7 +97,7 @@ describe("GET /live", () => {
   });
 
   it("says each time a setting is saved, so a tab reads its apps again, and no more once the tab goes", async () => {
-    const home = mkdtempSync(join(tmpdir(), "auni-live-"));
+    const home = tempDir("auni-live-");
     const real = process.env.AUNI_HOME;
     process.env.AUNI_HOME = home;
     try {
@@ -115,7 +112,6 @@ describe("GET /live", () => {
       // A save after the tab has gone writes to no closed stream.
       await saveSwitch("aave", false);
     } finally {
-      rmSync(home, { recursive: true, force: true });
       process.env.AUNI_HOME = real;
       delete process.env.APPS_OFF;
     }

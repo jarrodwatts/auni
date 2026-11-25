@@ -11,11 +11,11 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { ReleaseRefused, sourceTag } from "./check.ts";
 import { makeRelease, publishRelease, ReleaseNotMade, releaseKeys, type Made } from "./make.ts";
 import { readRelease } from "./manifest.ts";
@@ -27,7 +27,7 @@ import { readRelease } from "./manifest.ts";
 
 const INSTALLER = readFileSync(resolve(import.meta.dirname, "../../../../install.sh"), "utf8");
 
-let scratch: string;
+const scratch = tempDir("auni-release-test-", afterAll);
 let repo: string;
 let releases: string;
 let first: Made;
@@ -121,7 +121,6 @@ function sign(file: string, name: string) {
 }
 
 beforeAll(() => {
-  scratch = mkdtempSync(join(tmpdir(), "auni-release-test-"));
   mkdirSync(join(scratch, "keys"));
   for (const name of ["owner", "old", "stranger"])
     execFileSync("ssh-keygen", [
@@ -164,8 +163,6 @@ beforeAll(() => {
     process.env.PATH = path;
   }
 }, 60_000);
-afterAll(() => rmSync(scratch, { recursive: true, force: true }));
-
 describe("a release", { timeout: 30_000 }, () => {
   it("is three files, which install.sh takes, printing the release it checked", () => {
     const checked = install(releasesWith("v0.1.0"));

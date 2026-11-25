@@ -2,7 +2,6 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   symlinkSync,
@@ -10,11 +9,11 @@ import {
 } from "node:fs";
 import { type ChildProcess, spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { dataDir } from "../data-dir.ts";
 import {
   appDir,
@@ -92,7 +91,7 @@ let port: number;
 const afterwards: (() => void)[] = [];
 
 beforeEach(async () => {
-  vi.stubEnv("AUNI_HOME", mkdtempSync(join(tmpdir(), "auni-update-")));
+  vi.stubEnv("AUNI_HOME", tempDir("auni-update-"));
   mkdirSync(join(appDir(), "bin"), { recursive: true });
   writeFileSync(launcher(), LAUNCHER);
   chmodSync(launcher(), 0o755);

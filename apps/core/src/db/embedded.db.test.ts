@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -9,20 +8,20 @@ import { promisify } from "node:util";
 import postgres from "postgres";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { openPostgres, postgresRunning, PostgresMismatch, stopPostgres } from "./embedded.ts";
 
 // A real Postgres in a throwaway data folder: the one Auni runs when DATABASE_URL names none.
 
 let dir: string;
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "auni-embedded-"));
+  dir = tempDir("auni-embedded-");
   vi.stubEnv("AUNI_HOME", dir);
 });
 afterEach(async () => {
   // A test that failed midway may leave its server running.
   if (await postgresRunning()) await stopPostgres();
   vi.unstubAllEnvs();
-  rmSync(dir, { recursive: true, force: true });
 });
 
 async function query<T extends object>(url: string, text: string): Promise<T[]> {

@@ -19,7 +19,7 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "eslint --cache .",
     "knip": "knip --no-progress",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r --no-bail run test",
     "format": "prettier --write .",
     "gen": "node scripts/gen-apps.ts",
     "gen:check": "node scripts/gen-apps.ts --check",

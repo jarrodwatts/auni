@@ -1,7 +1,7 @@
 // A headless Chrome, driven over its DevTools protocol with nothing but Node: enough to open a
 // page, wait until it has settled, and take its picture at a given width. `scripts/demo-shots.ts`
 // uses it to capture every screen of the demo.
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -57,10 +57,13 @@ export interface Browser {
  * Starts a headless Chrome and gives its one tab. Its profile is a folder of its own, removed as
  * it closes, unless `keptProfile` names one to keep, so a sign-in carries over to the next run.
  */
-export async function launch(keptProfile?: string): Promise<Browser> {
-  const profile = keptProfile ?? mkdtempSync(join(tmpdir(), "auni-shots-"));
-  const chrome: ChildProcess = spawn(
-    chromePath(),
+export async function launch(keptProfile?: string, signal?: AbortSignal): Promise<Browser> {
+  const executable = chromePath();
+  signal?.throwIfAborted();
+  const scratch = mkdtempSync(join(tmpdir(), "auni-shots-"));
+  const profile = keptProfile ?? join(scratch, "profile");
+  const chrome = spawn(
+    executable,
     [
       "--headless=new",
       "--no-sandbox",
@@ -70,27 +73,82 @@ export async function launch(keptProfile?: string): Promise<Browser> {
       `--user-data-dir=${profile}`,
       "about:blank",
     ],
-    { stdio: ["ignore", "ignore", "pipe"] },
+    {
+      stdio: ["ignore", "ignore", "pipe"],
+      // Chrome can create other scratch folders besides its profile.
+      env: { ...process.env, TMPDIR: scratch, TEMP: scratch, TMP: scratch },
+      signal,
+      // On cancellation Chrome may be stuck serving a request. Its profile is disposable.
+      killSignal: "SIGKILL",
+    },
   );
-  // Chrome says where its DevTools listens on its first lines.
-  const endpoint = await new Promise<string>((resolve, reject) => {
-    const lines = createInterface({ input: chrome.stderr! });
-    lines.on("line", (line) => {
-      const found = /DevTools listening on (ws:\/\/\S+)/u.exec(line);
-      if (found) resolve(found[1]!);
-    });
-    chrome.once("exit", (code) =>
-      reject(new Error(`Chrome exited (${code}) before it was ready.`)),
-    );
+  const remove = () => rmSync(scratch, { recursive: true, force: true });
+  const onExit = () => {
+    chrome.kill("SIGKILL");
+    remove();
+  };
+  process.once("exit", onExit);
+  const exited = new Promise<void>((resolve) => {
+    chrome.once("exit", () => resolve());
+    // A failed spawn emits close without exit.
+    chrome.once("close", () => resolve());
   });
+  const close = async () => {
+    chrome.kill();
+    const force = setTimeout(() => chrome.kill("SIGKILL"), 2_000);
+    try {
+      await exited;
+    } finally {
+      clearTimeout(force);
+      chrome.stderr.destroy();
+      remove();
+      process.off("exit", onExit);
+    }
+  };
 
-  const socket = new WebSocket(endpoint);
-  await new Promise((resolve, reject) => {
-    socket.addEventListener("open", resolve, { once: true });
-    socket.addEventListener("error", reject, { once: true });
-  });
+  try {
+    // Chrome says where its DevTools listens on its first lines.
+    const endpoint = await new Promise<string>((resolve, reject) => {
+      createInterface({ input: chrome.stderr }).on("line", (line) => {
+        const found = /DevTools listening on (ws:\/\/\S+)/u.exec(line);
+        if (found) resolve(found[1]!);
+      });
+      chrome.on("error", reject);
+      chrome.once("exit", (code, signal) =>
+        reject(new Error(`Chrome stopped (${code ?? signal}) before it was ready.`)),
+      );
+    });
+    const socket = new WebSocket(endpoint);
+    try {
+      await new Promise((resolve, reject) => {
+        socket.addEventListener("open", resolve, { once: true });
+        socket.addEventListener("error", reject, { once: true });
+      });
+      const page = await openPage(socket, signal);
+      return {
+        page,
+        async close() {
+          socket.close();
+          await close();
+        },
+      };
+    } catch (error) {
+      socket.close();
+      throw error;
+    }
+  } catch (error) {
+    await close();
+    throw error;
+  }
+}
+
+async function openPage(socket: WebSocket, signal?: AbortSignal): Promise<Page> {
   let sent = 0;
   const waiting = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
+  socket.addEventListener("close", () => {
+    for (const { reject } of waiting.values()) reject(new Error("Chrome disconnected."));
+    waiting.clear();
+  });
   // Requests still in flight, and when the last one started or ended: how `settled` knows.
   const loading = new Set<string>();
   let lastLoad = Date.now();
@@ -128,6 +186,8 @@ export async function launch(keptProfile?: string): Promise<Browser> {
   const attached: { session?: string } = {};
   const send = <T>(method: string, params: Record<string, unknown> = {}): Promise<T> =>
     new Promise<T>((resolve, reject) => {
+      signal?.throwIfAborted();
+      if (socket.readyState !== WebSocket.OPEN) throw new Error("Chrome disconnected.");
       const id = ++sent;
       waiting.set(id, { resolve: resolve as (value: unknown) => void, reject });
       socket.send(
@@ -182,6 +242,7 @@ export async function launch(keptProfile?: string): Promise<Browser> {
     async until(expression, timeoutMs = 30_000) {
       const deadline = Date.now() + timeoutMs;
       while (!(await page.evaluate<boolean>(`Boolean(${expression})`).catch(() => false))) {
+        signal?.throwIfAborted();
         if (Date.now() > deadline) throw new Error(`The page never reached: ${expression}`);
         await sleep(100);
       }
@@ -190,7 +251,7 @@ export async function launch(keptProfile?: string): Promise<Browser> {
       const deadline = Date.now() + 20_000;
       // Quiet for a moment, and the fonts in: what is drawn now is what stays.
       while (Date.now() < deadline && (loading.size > 0 || Date.now() - lastLoad < 700))
-        await sleep(100);
+        await sleep(100, undefined, { signal });
       await page.evaluate("document.fonts.ready.then(() => true)");
     },
     async look(look) {
@@ -228,13 +289,5 @@ export async function launch(keptProfile?: string): Promise<Browser> {
     },
   };
 
-  return {
-    page,
-    async close() {
-      socket.close();
-      chrome.kill();
-      await new Promise((resolve) => chrome.once("exit", resolve));
-      if (!keptProfile) rmSync(profile, { recursive: true, force: true });
-    },
-  };
+  return page;
 }

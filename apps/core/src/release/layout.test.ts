@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, readlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import {
   appDir,
   BUILT,
@@ -15,7 +15,7 @@ import {
   versionDir,
 } from "./layout.ts";
 
-beforeEach(() => vi.stubEnv("AUNI_HOME", mkdtempSync(join(tmpdir(), "auni-layout-"))));
+beforeEach(() => vi.stubEnv("AUNI_HOME", tempDir("auni-layout-")));
 afterEach(() => vi.unstubAllEnvs());
 
 function version(tag: string, built = true): string {
@@ -54,7 +54,7 @@ describe("the install layout", () => {
   });
 
   it("runs a checkout through its own entry, on this Node", () => {
-    const root = mkdtempSync(join(tmpdir(), "auni-checkout-"));
+    const root = tempDir("auni-checkout-");
     expect(installed(root)).toBe(false);
     expect(selfCommand(root)).toEqual([process.execPath, join(root, "apps/core/bin/auni.mjs")]);
     // This test runs from the repo, a checkout.

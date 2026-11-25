@@ -1,11 +1,11 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
 import type { AppAbout } from "@auni/shared";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "./test/temp-dir.ts";
 import { defineApp } from "./apps/contract.ts";
 import { PrivateFieldRefused } from "./private-fields.ts";
 import {
@@ -54,13 +54,12 @@ const real = process.env.AUNI_HOME;
 beforeAll(async () => void (await import("./apps/registry.ts")), 60_000);
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "auni-settings-"));
+  home = tempDir("auni-settings-");
   process.env.AUNI_HOME = home;
   delete process.env[TOKEN];
   delete process.env.APPS_OFF;
 });
 afterEach(() => {
-  rmSync(home, { recursive: true, force: true });
   process.env.AUNI_HOME = real;
   delete process.env[TOKEN];
   delete process.env.APPS_OFF;

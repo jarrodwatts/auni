@@ -1,25 +1,17 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { takeHome } from "./home.ts";
 
 // A demo's home sits at a name anyone can guess under the shared temporary folder, and what an
 // earlier demo left there (a postmaster.pid naming a process that may since be any other) is
 // cleared as it starts. Clearing it must touch nothing that isn't a demo's own.
 
-const scratch = mkdtempSync(join(tmpdir(), "auni-demo-home-"));
+const scratch = tempDir("auni-demo-home-", afterAll);
 const running: ChildProcess[] = [];
 
 /** A process that runs until stopped, shown by `ps` as `argv0` and `args`. */
@@ -44,9 +36,13 @@ function leftHome(name: string, pid: number): string {
   return home;
 }
 
-afterAll(() => {
-  for (const child of running) child.kill("SIGKILL");
-  rmSync(scratch, { recursive: true, force: true });
+afterAll(async () => {
+  await Promise.all(
+    running.map(async (child) => {
+      child.kill("SIGKILL");
+      await exited(child);
+    }),
+  );
 });
 
 describe("a demo's home", () => {

@@ -10,7 +10,7 @@ export default defineConfig({
   test: {
     include: ["src/**/*.db.test.ts"],
     maxWorkers: DB_WORKERS,
-    globalSetup: ["src/test/db-global-setup.ts"],
+    globalSetup: ["src/test/temp-root.ts", "src/test/db-global-setup.ts"],
     setupFiles: ["src/test/db-worker.ts", "src/test/no-real-keys.ts", "src/test/db-setup.ts"],
     env: testEnv,
     testTimeout: TEST_TIMEOUT_MS,

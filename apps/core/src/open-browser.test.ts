@@ -1,21 +1,18 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "./test/temp-dir.ts";
 import { canOpenBrowser, openBrowser } from "./open-browser.ts";
 
 describe.runIf(process.platform === "linux")("openBrowser", () => {
-  const bins: string[] = [];
   afterEach(() => {
     vi.unstubAllEnvs();
-    for (const bin of bins.splice(0)) rmSync(bin, { recursive: true, force: true });
   });
   /** An xdg-open stand-in that exits with `code`. */
   function opener(code: number) {
-    const bin = mkdtempSync(join(tmpdir(), "auni-opener-"));
-    bins.push(bin);
+    const bin = tempDir("auni-opener-");
     writeFileSync(join(bin, "xdg-open"), `#!/bin/sh\nexit ${code}\n`);
     chmodSync(join(bin, "xdg-open"), 0o755);
     vi.stubEnv("PATH", `${bin}:${process.env.PATH}`);
@@ -34,8 +31,7 @@ describe.runIf(process.platform === "linux")("openBrowser", () => {
   it("hands the link to Windows' own browser from WSL, which needs no screen of its own", async () => {
     vi.stubEnv("SSH_CONNECTION", "");
     vi.stubEnv("SSH_TTY", "");
-    const bin = mkdtempSync(join(tmpdir(), "auni-opener-"));
-    bins.push(bin);
+    const bin = tempDir("auni-opener-");
     writeFileSync(join(bin, "cmd.exe"), `#!/bin/sh\nprintf '%s|' "$@" > "${bin}/args"\n`);
     chmodSync(join(bin, "cmd.exe"), 0o755);
     vi.stubEnv("PATH", `${bin}:${process.env.PATH}`);

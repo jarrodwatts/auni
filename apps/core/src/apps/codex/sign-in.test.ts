@@ -1,9 +1,9 @@
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import type { SignInShows } from "../contract.ts";
 import { signIn } from "./sign-in.ts";
 
@@ -13,7 +13,7 @@ import { signIn } from "./sign-in.ts";
  * then account/login/completed comes once the owner entered it there, as `outcome` says.
  */
 function codexWhoseSignIn(outcome: { success: boolean; error?: string }): string {
-  const dir = mkdtempSync(join(tmpdir(), "auni-codex-"));
+  const dir = tempDir("auni-codex-");
   const script = `#!/usr/bin/env node
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 require("node:readline").createInterface({ input: process.stdin }).on("line", (line) => {

@@ -1,10 +1,7 @@
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { getBase58Decoder } from "@solana/kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import { actions } from "../../db/schema.ts";
 import { signedTxs } from "./tables.ts";
 import { walletDocument } from "../../money/typed-data.ts";
@@ -31,10 +28,10 @@ const EVM_ADDRESS = "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23";
 
 beforeEach(() => wipe(actions, signedTxs));
 
-const folder = () => mkdtemp(join(tmpdir(), "auni-"));
-const wallet = async () => localKeyWalletIn(keyStore(await folder(), noKeychain));
+const folder = () => tempDir("auni-");
+const wallet = () => localKeyWalletIn(keyStore(folder(), noKeychain));
 const made = async () => {
-  const theirs = await wallet();
+  const theirs = wallet();
   await theirs.create();
   return theirs;
 };
@@ -43,7 +40,7 @@ const signer = async () =>
 
 describe("localKeyWallet", () => {
   it("makes nothing until the owner chooses: no addresses, keys or signer", async () => {
-    const theirs = await wallet();
+    const theirs = wallet();
     expect(await theirs.addresses()).toEqual({ evm: null, solana: null });
     expect(await theirs.addresses()).toEqual({ evm: null, solana: null });
     await expect(theirs.revealKeys()).rejects.toBeInstanceOf(NoWallet);
@@ -53,7 +50,7 @@ describe("localKeyWallet", () => {
   });
 
   it("makes its keys when asked, once, and answers with the same addresses after", async () => {
-    const theirs = await wallet();
+    const theirs = wallet();
     const addresses = await theirs.create();
     expect(addresses.evm).toMatch(/^0x[0-9a-fA-F]{40}$/u);
     expect(addresses.solana).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/u);
@@ -65,7 +62,7 @@ describe("localKeyWallet", () => {
 
   // Two processes on one database (or two taps at once) must never make two wallets.
   it("makes one wallet however many ask at once", async () => {
-    const dir = await folder();
+    const dir = folder();
     const processes = Array.from({ length: 4 }, () => localKeyWalletIn(keyStore(dir, noKeychain)));
     const tried = await Promise.allSettled(processes.map((each) => each.create()));
     const won = tried.filter((each) => each.status === "fulfilled");
@@ -76,7 +73,7 @@ describe("localKeyWallet", () => {
   });
 
   it("holds the keys it made, never reading the store again", async () => {
-    const store = keyStore(await folder(), noKeychain);
+    const store = keyStore(folder(), noKeychain);
     let reads = 0;
     let locked = false;
     const counted: KeyStore = {
@@ -114,11 +111,11 @@ describe("localKeyWallet", () => {
   });
 
   it("has no sponsor, so it pays its own gas everywhere", async () => {
-    expect((await wallet()).sponsored).toBeUndefined();
+    expect(wallet().sponsored).toBeUndefined();
   });
 
   it("knows nothing of a send it never journalled, such as another wallet's", async () => {
-    const theirs = await wallet();
+    const theirs = wallet();
     expect(await theirs.sendStatus("privy-transaction-id")).toBe("pending");
     expect(await theirs.sendStatus("7a1f7a5e-0c4b-4b0e-9a55-3d2f0c1b9e10")).toBe("pending");
   });
@@ -152,7 +149,7 @@ describe("localKeyWallet", () => {
 
 describe("bringing keys the owner holds", () => {
   it("shows the addresses they sign for, then takes them in and signs with them", async () => {
-    const theirs = await wallet();
+    const theirs = wallet();
     const field = theirs.bring!;
     expect(field.inputs.map(({ name }) => name)).toEqual(["keys", "solana"]);
     const checked = await field.check({ keys: EVM_KEY, solana: "" });
@@ -168,7 +165,9 @@ describe("bringing keys the owner holds", () => {
   it("refuses over a wallet Auni holds already, and changes nothing", async () => {
     const theirs = await made();
     const before = await theirs.revealKeys();
-    await expect(field(theirs).check({ keys: EVM_KEY })).rejects.toBeInstanceOf(PrivateFieldRefused);
+    await expect(field(theirs).check({ keys: EVM_KEY })).rejects.toBeInstanceOf(
+      PrivateFieldRefused,
+    );
     await expect(field(theirs).accept({ keys: EVM_KEY })).rejects.toBeInstanceOf(
       PrivateFieldRefused,
     );
@@ -177,7 +176,7 @@ describe("bringing keys the owner holds", () => {
 
   // Brought with its EVM key alone, it had no Solana address and no way to gain one.
   it("makes the Solana key an EVM key brought alone lacks, keeping the EVM key", async () => {
-    const theirs = await wallet();
+    const theirs = wallet();
     await field(theirs).accept({ keys: EVM_KEY, solana: "" });
     const added = await theirs.addMissing!();
     expect(added.evm).toBe(EVM_ADDRESS);
@@ -190,11 +189,11 @@ describe("bringing keys the owner holds", () => {
     // It holds both now, so there is nothing to add; with no wallet there is nothing to add to.
     await expect(theirs.addMissing!()).rejects.toBeInstanceOf(WalletExists);
     expect(await theirs.revealKeys()).toEqual(keys);
-    await expect((await wallet()).addMissing!()).rejects.toBeInstanceOf(NoWallet);
+    await expect(wallet().addMissing!()).rejects.toBeInstanceOf(NoWallet);
   });
 
   it("refuses keys that aren't keys before touching the store", async () => {
-    const theirs = await wallet();
+    const theirs = wallet();
     await expect(field(theirs).accept({ keys: "0x1234" })).rejects.toBeInstanceOf(
       PrivateFieldRefused,
     );
@@ -204,7 +203,7 @@ describe("bringing keys the owner holds", () => {
 
 describe("bringing a Solana key beside an EVM key brought alone", () => {
   const evmAlone = async () => {
-    const theirs = await wallet();
+    const theirs = wallet();
     await field(theirs).accept({ keys: EVM_KEY, solana: "" });
     return theirs;
   };
@@ -239,7 +238,7 @@ describe("bringing a Solana key beside an EVM key brought alone", () => {
     await expect((await made()).bringSolana!.accept({ solana: second })).rejects.toBeInstanceOf(
       PrivateFieldRefused,
     );
-    await expect((await wallet()).bringSolana!.accept({ solana: second })).rejects.toBeInstanceOf(
+    await expect(wallet().bringSolana!.accept({ solana: second })).rejects.toBeInstanceOf(
       PrivateFieldRefused,
     );
   });

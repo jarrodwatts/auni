@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -11,6 +10,7 @@ import {
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { auniCapabilityTools } from "../agent/auni-tools.ts";
 import { pair, sessionOf, signOutEverywhere } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
@@ -40,12 +40,12 @@ const prevHome = process.env.AUNI_HOME;
 beforeEach(async () => {
   await wipe();
   proof.here = false;
-  home = mkdtempSync(join(tmpdir(), "auni-system-test-"));
+  home = join(tempDir("auni-system-test-"), "home");
+  mkdirSync(home);
   process.env.AUNI_HOME = home;
 });
 
 afterEach(() => {
-  rmSync(home, { recursive: true, force: true });
   if (prevHome === undefined) delete process.env.AUNI_HOME;
   else process.env.AUNI_HOME = prevHome;
   delete process.env.RPC_URL_BASE;

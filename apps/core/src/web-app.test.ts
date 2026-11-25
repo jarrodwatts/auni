@@ -1,16 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { tempDir } from "./test/temp-dir.ts";
 import { buildVersion } from "./web-app.ts";
 
 // The web app is built again only when what it is built from changes; an app's own card is
 // part of that, though it lives in core's folders.
 
-const repo = mkdtempSync(join(tmpdir(), "auni-build-version-"));
+const repo = tempDir("auni-build-version-", afterAll);
 const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "ignore" });
 const write = (file: string, text: string) => {
   mkdirSync(dirname(join(repo, file)), { recursive: true });
@@ -28,8 +28,6 @@ write("apps/core/src/apps/elfa/tape.card.tsx", "card");
 write("apps/core/src/apps/elfa/tape.schema.ts", "schema");
 write("apps/core/src/apps/elfa/request.ts", "server");
 commit();
-
-afterAll(() => rmSync(repo, { recursive: true, force: true }));
 
 describe("buildVersion", () => {
   it("changes when an app's card or its schema does, and not for its other code", () => {

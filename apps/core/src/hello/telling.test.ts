@@ -1,10 +1,10 @@
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { renderScene, standingX, type SceneState } from "./scene.ts";
 import { redraw } from "./stage.ts";
 import { colorMode, plainTelling, scenePlays, takeOutput } from "./telling.ts";
@@ -144,7 +144,7 @@ describe("what else is printed under the scene", () => {
     const { terminal, out, err } = streams();
     const route = takeOutput(out, err);
     out.write("API listening\n");
-    route.toLog(join(mkdtempSync(join(tmpdir(), "auni-log-")), "auni.log"));
+    route.toLog(join(tempDir("auni-log-"), "auni.log"));
     err.write("Base's RPC keeps no past balances\n");
     expect(terminal).toEqual([]);
   });
@@ -152,7 +152,7 @@ describe("what else is printed under the scene", () => {
   it("keeps what was held, then each later line, in order, in the log", () => {
     const { out, err } = streams();
     const route = takeOutput(out, err);
-    const file = join(mkdtempSync(join(tmpdir(), "auni-log-")), "auni.log");
+    const file = join(tempDir("auni-log-"), "auni.log");
     out.write("one\n");
     route.toLog(file);
     err.write("two\n");
@@ -172,7 +172,7 @@ describe("what else is printed under the scene", () => {
   it("is the terminal's after the log, too, once Auni stops", () => {
     const { terminal, out, err } = streams();
     const route = takeOutput(out, err);
-    route.toLog(join(mkdtempSync(join(tmpdir(), "auni-log-")), "auni.log"));
+    route.toLog(join(tempDir("auni-log-"), "auni.log"));
     out.write("a turn ran\n");
     route.toTerminal();
     out.write("Auni is stopping\n");
@@ -204,9 +204,7 @@ describe("what else is printed under the scene", () => {
   it("stays in the log as Auni exits, once it went there", () => {
     const { terminal, out, err } = streams();
     const ends = new EventEmitter();
-    takeOutput(out, err, { ends }).toLog(
-      join(mkdtempSync(join(tmpdir(), "auni-log-")), "auni.log"),
-    );
+    takeOutput(out, err, { ends }).toLog(join(tempDir("auni-log-"), "auni.log"));
     out.write("a turn ran\n");
     ends.emit("exit", 0);
     expect(terminal).toEqual([]);

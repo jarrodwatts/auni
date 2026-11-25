@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { dataDir } from "../data-dir.ts";
 import { env } from "../env.ts";
 import { insertAction, insertThread } from "../test/db.ts";
@@ -17,7 +17,7 @@ import { fills, messages } from "./schema.ts";
 // An export loaded into a database Auni never used must hold, row for row and to the last
 // digit, what the database it was written from holds.
 
-const scratch = mkdtempSync(join(tmpdir(), "auni-export-test-"));
+const scratch = tempDir("auni-export-test-", afterAll);
 const file = join(scratch, "auni.jsonl.gz");
 const admin = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
 /** An empty database beside this worker's, for the import. */
@@ -56,7 +56,6 @@ beforeAll(fresh);
 afterAll(async () => {
   await admin.unsafe(`drop database if exists "${emptyName}" with (force)`);
   await admin.end();
-  rmSync(scratch, { recursive: true, force: true });
 });
 
 describe("an export", () => {

@@ -1,9 +1,9 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import type { SignInShows } from "../contract.ts";
 
 /**
@@ -17,7 +17,7 @@ vi.mock("./cli.ts", () => ({ claudeCli: () => cli.path }));
 const { signIn } = await import("./sign-in.ts");
 
 function fakeClaude(): void {
-  const dir = mkdtempSync(join(tmpdir(), "auni-claude-"));
+  const dir = tempDir("auni-claude-");
   cli.path = join(dir, "claude");
   cli.heard = join(dir, "heard");
   writeFileSync(

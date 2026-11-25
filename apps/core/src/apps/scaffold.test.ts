@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { expectKindsKept } from "../test/venue-rules.ts";
 import type { App } from "./contract.ts";
 import { hasSwitch } from "./registry.ts";
@@ -139,15 +139,11 @@ describe("pnpm scaffold", () => {
   }, 120_000);
 
   it("refuses an id that isn't a folder name, one core uses, and a folder that's taken", async () => {
-    const appsDir = await mkdtemp(path.join(tmpdir(), "auni-scaffold-"));
-    try {
-      await expect(scaffold("My_Dex", [], appsDir)).rejects.toThrow(/isn't an app id/u);
-      for (const taken of ["base", "wallet", "auni", "demo", "evm", "xstocks", "solana-swap"])
-        await expect(scaffold(taken, [], appsDir)).rejects.toThrow(/already uses/u);
-      await scaffold("my-dex", ["moves"], appsDir);
-      await expect(scaffold("my-dex", [], appsDir)).rejects.toThrow(/already exists/u);
-    } finally {
-      await rm(appsDir, { recursive: true, force: true });
-    }
+    const appsDir = tempDir("auni-scaffold-");
+    await expect(scaffold("My_Dex", [], appsDir)).rejects.toThrow(/isn't an app id/u);
+    for (const taken of ["base", "wallet", "auni", "demo", "evm", "xstocks", "solana-swap"])
+      await expect(scaffold(taken, [], appsDir)).rejects.toThrow(/already uses/u);
+    await scaffold("my-dex", ["moves"], appsDir);
+    await expect(scaffold("my-dex", [], appsDir)).rejects.toThrow(/already exists/u);
   });
 });

@@ -25,9 +25,10 @@ A move's states and steps, who takes each and what a restart does are one file,
    `queueExecution`), with two lanes (`executionKeys`), so two moves that would race on one wallet
    or one holding run in turn, and an allowed move always has a job. A Decline cancels it and
    wakes its thread the same way, so the agent always hears of a no.
-5. `executeAction` claims the row once (a redelivery finds it claimed and stops), checks that
-   proof again (`assertStepUp`), gets a signer from the wallet app
-   (`money/wallets.ts`), and runs the recipe's `execute`. Execute quotes again and refuses anything
+5. `executeAction` claims the row once (a redelivery finds it claimed and stops), or takes back
+   one allowed on a card from before that didn't show a permission it leaves: with its plan while
+   none of it has started, else that leg alone, paused (`startRun`). It checks that proof again
+   (`assertStepUp`), gets a signer from the wallet app (`money/wallets.ts`), and runs the recipe's `execute`. Execute quotes again and refuses anything
    outside what the card showed (`money/approved.ts`).
 6. Each transaction is kept the moment it is sent (`keepTxsSafely`), so a failure halfway leaves an
    honest trail. A recipe that may have sent throws `MayHaveSent`; one that knows nothing moved

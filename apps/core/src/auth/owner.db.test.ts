@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import { CARD_FORMAT } from "@auni/shared";
+import { createHash, randomUUID } from "node:crypto";
 import { request } from "node:http";
 
 import { eq } from "drizzle-orm";
@@ -10,7 +11,7 @@ import { actions, ownerSessions } from "../db/schema.ts";
 import { env } from "../env.ts";
 import { handoverRouter } from "../handover/routes.ts";
 import { allowAction } from "../money/decide.ts";
-import { actionsRouter } from "../money/routes.ts";
+import { actionsRouter, proposalsRouter } from "../money/routes.ts";
 import { meRouter } from "../routes/me.ts";
 import { ownerRouter } from "../routes/owner.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
@@ -38,6 +39,7 @@ const url = serve(
     .use("/owner", ownerRouter)
     .use("/me", requireOwner, meRouter)
     .use("/actions", requireOwner, actionsRouter)
+    .use("/proposals", requireOwner, proposalsRouter)
     .use("/handover", requireOwner, handoverRouter),
 );
 
@@ -275,8 +277,9 @@ describe("proof that the owner is there", () => {
       headers: { origin: env.WEB_ORIGIN, ...(cookie ? { cookie } : {}) },
       body,
     });
-  const allow = (id: string, cookie: string | null, body: unknown = {}) =>
-    post(`/actions/${id}/allow`, cookie, body);
+  /** A tap from the web app as it is now, which names the card format it drew. */
+  const allow = (id: string, cookie: string | null) =>
+    post(`/actions/${id}/allow`, cookie, { cardFormat: CARD_FORMAT });
 
   /** Still waiting, with no proof recorded: nothing an executor would run. */
   async function expectUntouched(id: string): Promise<void> {
@@ -363,7 +366,12 @@ describe("proof that the owner is there", () => {
         origin: env.WEB_ORIGIN,
         "x-paired-at": now,
       },
-      body: { pairedAt: now, freshlyPaired: true, proof: { freshlyPaired: true } },
+      body: {
+        cardFormat: CARD_FORMAT,
+        pairedAt: now,
+        freshlyPaired: true,
+        proof: { freshlyPaired: true },
+      },
     });
     expect(claimed).toMatchObject({ status: 403, body: { error: "pair_again" } });
     await expectUntouched(card.id);
@@ -386,6 +394,27 @@ describe("proof that the owner is there", () => {
     const card = await insertAction({ status: "awaiting_permission" });
     expect((await allow(card.id, cookie)).status).toBe(200);
     expect(await rowOf(card.id)).toMatchObject({ status: "running", stepUpAt: null });
+  });
+
+  // A tab left open across an update runs the web app from before, which may not draw all a fresh
+  // card says (a first sale's lasting permission): its tap names no card format, so it allows
+  // nothing, single card or plan, and the tab is told to reload.
+  it("allows nothing from a web app that draws cards as they were before", async () => {
+    const cookie = await newlyPaired();
+    const card = await insertAction({ status: "awaiting_permission" });
+    const plan = randomUUID();
+    const leg = await insertAction({ status: "awaiting_permission", proposalId: plan });
+    for (const [path, body] of [
+      [`/actions/${card.id}/allow`, {}],
+      [`/actions/${card.id}/allow`, { cardFormat: CARD_FORMAT - 1 }],
+      [`/proposals/${plan}/allow`, {}],
+    ] as const)
+      expect(await post(path, cookie, body)).toMatchObject({
+        status: 409,
+        body: { error: "out_of_date", message: "Reload Auni to see this card." },
+      });
+    await expectUntouched(card.id);
+    await expectUntouched(leg.id);
   });
 
   describe("showing the wallet's keys", () => {

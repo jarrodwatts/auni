@@ -9,7 +9,7 @@ import { PICKS, stagedLeg } from "../money/proposal-order.ts";
 import { advanceProposal, stalledProposals } from "../money/proposal-run.ts";
 import { markCrashed, requireAction, settleLanding } from "../money/record.ts";
 import { reconcileStuckActions } from "../money/reconcile.ts";
-import { retractStale } from "../money/waiting.ts";
+import { takeBackStale } from "../money/waiting.ts";
 import { actionKind, landingKind, proposalKind, wakeThread } from "./kinds.ts";
 import { defineJob, jobKind, type Executor } from "./queue.ts";
 
@@ -67,7 +67,7 @@ export const proposalJob = defineJob({
     const patient = Date.now() - job.createdAt.getTime() < PATIENT_MS;
     const advanced = await advanceProposal(proposalId, patient);
     if (advanced.wake) {
-      await wakeThread(advanced.wake.threadId, advanced.wake.reason.slice(0, 2_000), {
+      await wakeThread(advanced.wake.threadId, advanced.wake.reason, {
         key: advanced.wake.id,
       });
     }
@@ -97,14 +97,14 @@ export const reconcileJob = defineJob({
 });
 
 /**
- * Every 10 minutes, takes back the cards that have waited a day for the owner's tap (see
- * retractStale), and tells their threads' open tabs.
+ * Every 10 minutes, takes back the cards that have waited a day for the owner's tap, or were drawn
+ * before cards said all they say now (see retractStale), and tells their threads' open tabs.
  */
 export const staleCardsJob = defineJob({
   kind: jobKind("stale-cards", z.object({})),
   every: 10 * 60_000,
   run: async () => {
-    for (const threadId of await retractStale(db)) await publishThread(threadId);
+    await takeBackStale();
   },
 });
 
@@ -154,7 +154,7 @@ async function tellSettled(executor: Executor, row: ActionRow): Promise<void> {
   if (!row.threadId) return;
   const settled = await settledOutcome(row);
   if (!settled) return;
-  await wakeThread(row.threadId, settled.reason.slice(0, 2_000), {
+  await wakeThread(row.threadId, settled.reason, {
     key: settled.id,
     tx: executor,
   });

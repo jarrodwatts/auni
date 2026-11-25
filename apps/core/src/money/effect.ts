@@ -1,4 +1,4 @@
-import type { ActionLine } from "@auni/shared";
+import { LETS_LINE, listed, type ActionLine } from "@auni/shared";
 
 import { feeLabel, shortAddress, usdLabel } from "./format.ts";
 
@@ -37,6 +37,13 @@ export interface Grant {
    * put in a venue's wallet or account of their own.
    */
   readonly reach: "wallet" | "venue";
+  /**
+   * An order the owner places, which the venue fills later on its own (a resting limit, a
+   * stop-loss): one of the move's own terms, which its face says among its figures. Absent for a
+   * permission, which core says on every card in its own words, whoever wrote its face (see
+   * withPermissions).
+   */
+  readonly order?: true;
 }
 
 /** Part of what a move costs, in dollars. */
@@ -186,7 +193,7 @@ export const LINES = {
   sends: "You send",
   to: "To",
   costs: "Costs",
-  lets: "Lets",
+  lets: LETS_LINE,
 } as const;
 
 /**
@@ -215,9 +222,17 @@ export function effectLines(effect: Effect): ActionLine[] {
     ...(to ? [[to.label, to.value] as [string, string]] : []),
     [LINES.gets, got.join(", ") || null],
     [LINES.costs, costsLabel(effect.costs ?? [])],
-    [LINES.lets, grants.map(({ lets }) => lets).join(" and ") || null],
+    [LINES.lets, letsSaid(grants)],
   ];
   return lines.flatMap(([label, value]) => (value ? [{ label, value }] : []));
+}
+
+/**
+ * A move's Lets line: every lasting power it leaves, orders it places included, as each card and
+ * plan draws it, and as the fit check measures it (see tooMuchToWarn); null when it leaves none.
+ */
+export function letsSaid(grants: readonly Grant[]): string | null {
+  return grants.length > 0 ? listed(grants.map(({ lets }) => lets)) : null;
 }
 
 /** What several moves cost, each kind summed across them, in the order each first comes. */

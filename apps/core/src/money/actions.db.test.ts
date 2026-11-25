@@ -1,27 +1,32 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { actionWireSchema, HELD } from "@auni/shared";
+import { actionWireSchema, CARD_FORMAT, HELD, NETWORKS, RETRACTED } from "@auni/shared";
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { accounts } from "../apps/registry.ts";
 import { db } from "../db/client.ts";
 import { actions, fills, jobs, threads } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { actionKind, turnKind } from "../jobs/kinds.ts";
 import { queued } from "../test/jobs.ts";
-import { stubRecipe } from "../test/recipe.ts";
+import { FACE, stubRecipe } from "../test/recipe.ts";
 import {
   actionWire,
   decideActions,
   executeAction,
+  LEG_SAID,
+  pausedSaid,
   prepareLeg,
   proposeAction,
   recordActions,
+  SETTLED_SAID,
 } from "./actions.ts";
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
 import { MayHaveSent, NothingMoved, type Recipe } from "./recipe.ts";
+import { PLAN_LEGS } from "./tools.ts";
 import { parseUnits } from "./usd.ts";
 import type { SignerOptions } from "./wallets.ts";
 
@@ -120,6 +125,8 @@ describe("executeAction", () => {
         amountUsd: "0.00",
         input: { account: "acct" },
         details: { after: id },
+        // Its card is the one that showed it.
+        cardFormat: CARD_FORMAT,
       }),
     ]);
     // Its own job, due then, not before.
@@ -128,6 +135,288 @@ describe("executeAction", () => {
       .from(jobs)
       .where(sql`${jobs.data}->>'actionId' = ${later[0]!.id}`);
     expect(job?.runAt.getTime()).toBe(at.getTime());
+  });
+
+  // Found in review: a move the owner allowed on a card from before cards said every permission,
+  // still queued as Auni updated, ran and left a permission that card never showed.
+  describe("allowed on a card drawn before cards said all they say now", () => {
+    const LETS = {
+      label: "Lets",
+      value: "Polymarket's exchanges trade the shares in your Polymarket wallet",
+    };
+    const PLAN = "00000000-0000-4000-8000-0000000000b1";
+    // The face its app wrote, which left the permission out, as a Polymarket sale's did.
+    const old = (fields: Parameters<typeof insertAction>[0] = {}) =>
+      insertAction({ input: { usd: "10" }, cardFormat: 1, lines: [LETS], card: FACE, ...fields });
+    const wakes = async () => (await queued("turn")).map(({ data }) => data.reason);
+    beforeEach(async () => {
+      signing.options = undefined;
+      await wipe(jobs);
+    });
+
+    it("is taken back before anything is signed, and its thread is woken to put it up again", async () => {
+      const thread = await insertThread();
+      const { id } = await old({ threadId: thread.id });
+      const row = await executeAction(id);
+      expect(row).toMatchObject({ status: "retracted", error: RETRACTED.unshown, startedAt: null });
+      expect(executions).toBe(0);
+      expect(signing.options).toBeUndefined();
+      expect(await wakes()).toEqual([expect.stringContaining(RETRACTED.unshown)]);
+      // A second delivery of its job changes nothing and wakes no one again.
+      await executeAction(id);
+      expect(executions).toBe(0);
+      expect(await wakes()).toHaveLength(1);
+    });
+
+    // Found in review: one tried again before the update, whose first run sent nothing, ran.
+    it("is taken back when it was tried again but nothing of it was ever sent", async () => {
+      const { id } = await old({ attempts: 2 });
+      expect(await executeAction(id)).toMatchObject({ status: "retracted" });
+      expect(executions).toBe(0);
+    });
+
+    // Found in review: one whose earlier run sent only a swap first ran, granting what its card
+    // left out; what an earlier run sent never says it granted that.
+    it("pauses one tried again whose earlier run sent something", async () => {
+      const { id } = await old({
+        attempts: 2,
+        txs: [{ chain: "polygon", hash: "0xa", setup: true }],
+      });
+      expect(await executeAction(id)).toMatchObject({
+        status: "failed",
+        failureKind: "unshown",
+        txs: [{ hash: "0xa" }],
+        // What that try sent is on its record; nothing says its cash is where it started.
+        error: pausedSaid("polygon", true),
+      });
+      expect(executions).toBe(0);
+    });
+
+    it("runs when its card showed every permission it leaves, or leaves none, or is drawn now", async () => {
+      const shown = await old({
+        card: { ...FACE, warning: `It lets ${LETS.value} afterwards.` },
+      });
+      const plain = await old({ card: null });
+      const none = await old({ lines: [] });
+      const now = await old({ cardFormat: CARD_FORMAT });
+      for (const { id } of [shown, plain, none, now]) await executeAction(id);
+      expect(executions).toBe(4);
+    });
+
+    it("takes back the whole plan while none of it has started, waking its thread once", async () => {
+      const thread = await insertThread();
+      const legs = [
+        await old({ threadId: thread.id, proposalId: PLAN, lines: [] }),
+        await old({ threadId: thread.id, proposalId: PLAN }),
+      ];
+      // The first stage's leg grants nothing itself; the plan's card still left the sale's out.
+      await Promise.all(legs.map(({ id }) => executeAction(id)));
+      expect(executions).toBe(0);
+      for (const { id } of legs)
+        expect(await actionRow(id)).toMatchObject({
+          status: "retracted",
+          error: RETRACTED.unshown,
+        });
+      expect(await wakes()).toEqual([expect.stringContaining(`Every leg of proposal ${PLAN}`)]);
+    });
+
+    // The cash its funding move brought: done, and sent, so the plan has started.
+    const funded = (fields: Parameters<typeof insertAction>[0] = {}) =>
+      old({
+        proposalId: PLAN,
+        lines: [],
+        status: "done",
+        startedAt: new Date(),
+        txs: [{ chain: "polygon", hash: "0xbridge" }],
+        ...fields,
+      });
+
+    // Found in review: a first Polymarket buy behind a funding move already sent ran on, and let
+    // Polymarket's exchanges trade the shares, which its plan's card never showed.
+    it("pauses a leg that would leave what its card didn't show once its plan has started, saying where its cash is", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id });
+      const pick = await old({ threadId: thread.id, proposalId: PLAN, amountUsd: "25" });
+      lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
+      try {
+        const row = await executeAction(pick.id);
+        expect(row).toMatchObject({
+          status: "failed",
+          failureKind: "unshown",
+          startedAt: null,
+          txs: [],
+          error:
+            "Paused before sending: its card didn't show a permission it leaves. Its cash is in, or headed to, your wallet on Polygon. Auni will put it up again.",
+        });
+      } finally {
+        lookup.recipe = buy;
+      }
+      expect(executions).toBe(0);
+      expect(signing.options).toBeUndefined();
+      // It settled the plan, so its thread hears, once, with where the cash is.
+      const [wake, ...more] = await wakes();
+      expect(more).toEqual([]);
+      expect(wake).toContain(`Every leg of proposal ${PLAN}`);
+      expect(wake).toContain("Its cash is in, or headed to, your wallet on Polygon.");
+      // Only a fresh card runs it.
+      expect(await executeAction(pick.id)).toMatchObject({ status: "failed" });
+      expect(executions).toBe(0);
+      expect(await wakes()).toHaveLength(1);
+    });
+
+    // Found in review: an 11-leg plan's one wake ran out on its done legs' long summaries before
+    // it named the two legs paused, why, or where their cash was, so nothing put them up again.
+    it("tells the agent every paused leg, why and where its cash is, before the legs that went through", async () => {
+      const thread = await insertThread();
+      const plan = { threadId: thread.id };
+      await funded({
+        ...plan,
+        summary: "Bridge $225 in USDC to Polygon",
+        createdAt: new Date(2026, 0, 1),
+      });
+      for (let index = 1; index < 9; index++)
+        await funded({
+          ...plan,
+          createdAt: new Date(2026, 0, index + 1),
+          summary: `Buy $25 of Yes on “Will the published year-end figures for market ${index} meet or exceed the target in the December announcement, using the final release and any revisions made before the close of the calendar year?”`,
+        });
+      const picks = await Promise.all(
+        [1, 2].map((day) =>
+          old({
+            ...plan,
+            proposalId: PLAN,
+            amountUsd: "25",
+            summary: `Polymarket pick ${day}`,
+            createdAt: new Date(2026, 1, day),
+          }),
+        ),
+      );
+      lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
+      try {
+        await Promise.all(picks.map(({ id }) => executeAction(id)));
+      } finally {
+        lookup.recipe = buy;
+      }
+      expect(executions).toBe(0);
+      const [reason, ...more] = await wakes();
+      expect(more).toEqual([]);
+      const wake = String(reason);
+      expect(wake).toContain(
+        `Paused (put each up again on a fresh card): ${picks.map(({ id }) => id).join(", ")}. Why: ${pausedSaid("polygon", false)}`,
+      );
+      for (const [index, { id }] of picks.entries()) {
+        const told = `Action ${id} (Polymarket pick ${index + 1}) finished as failed`;
+        expect(wake).toContain(told);
+        expect(wake.indexOf(told)).toBeLessThan(wake.indexOf("finished as done"));
+      }
+    });
+
+    // Found in review: at the biggest plan, one bridge done and eleven picks paused, the wake ran
+    // out of room after six of them, so the agent never heard of the other five.
+    it("names every leg that didn't go through, and what to do, at the biggest plan", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id, createdAt: new Date(2026, 0, 1) });
+      const picks = await Promise.all(
+        Array.from({ length: PLAN_LEGS - 1 }, (_, index) =>
+          old({
+            threadId: thread.id,
+            proposalId: PLAN,
+            amountUsd: "25",
+            summary: `Buy $25 of Yes on “Will the Federal Reserve cut interest rates by 25 basis points at its December 2026 meeting? (${index + 1})”`,
+            createdAt: new Date(2026, 1, index + 1),
+          }),
+        ),
+      );
+      lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
+      try {
+        await Promise.all(picks.map(({ id }) => executeAction(id)));
+      } finally {
+        lookup.recipe = buy;
+      }
+      expect(executions).toBe(0);
+      const [reason, ...more] = await wakes();
+      expect(more).toEqual([]);
+      const wake = String(reason);
+      expect(wake.length).toBeLessThanOrEqual(SETTLED_SAID);
+      // Every one, its instruction, and where its cash is, said once for them all.
+      expect(wake).toContain(
+        `${PLAN_LEGS - 1} of ${PLAN_LEGS} didn't go through:\nPaused (put each up again on a fresh card): ${picks.map(({ id }) => id).join(", ")}. Why: ${pausedSaid("polygon", false)}\n`,
+      );
+      expect(wake.split(pausedSaid("polygon", false))).toHaveLength(2);
+    });
+
+    it("says each leg's own reason in its line when its group's legs don't share one", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id, createdAt: new Date(2026, 0, 1) });
+      const picks = await Promise.all(
+        ["polygon", "base"].map((place, index) =>
+          old({
+            threadId: thread.id,
+            proposalId: PLAN,
+            input: { usd: "10", place },
+            summary: `Pick on ${place}`,
+            createdAt: new Date(2026, 1, index + 1),
+          }),
+        ),
+      );
+      lookup.recipe = {
+        ...buy,
+        fundedFrom: ({ input }) => String(input.place),
+      } satisfies Recipe;
+      try {
+        await Promise.all(picks.map(({ id }) => executeAction(id)));
+      } finally {
+        lookup.recipe = buy;
+      }
+      const wake = String((await wakes())[0]);
+      expect(wake).toContain(
+        `Paused (put each up again on a fresh card): ${picks.map(({ id }) => id).join(", ")}.\n`,
+      );
+      for (const [index, place] of ["polygon", "base"].entries())
+        expect(wake).toContain(
+          `Action ${picks[index]!.id} (Pick on ${place}) finished as failed: ${pausedSaid(place, false)}`,
+        );
+    });
+
+    // The agent reads each leg's first LEG_SAID characters (settledOutcome): what stopped it, where
+    // its cash is, and that Auni puts it up again, wherever that cash is.
+    it("says each paused or taken-back leg whole within the agent's cut of it", () => {
+      const places = [...Object.keys(NETWORKS), ...accounts().map(({ about }) => about.id)];
+      const said = [
+        ...Object.values(RETRACTED),
+        pausedSaid(null, false),
+        pausedSaid("polygon", true),
+        ...places.map((place) => pausedSaid(place, false)),
+      ];
+      for (const each of said) expect(each.length, each).toBeLessThanOrEqual(LEG_SAID);
+      expect(pausedSaid("hyperliquid", false)).toContain("your Hyperliquid account.");
+    });
+
+    it("runs a remaining leg that leaves nothing its card didn't show", async () => {
+      await funded();
+      const rest = await old({ proposalId: PLAN, lines: [] });
+      expect(await executeAction(rest.id)).toMatchObject({ status: "done" });
+      expect(executions).toBe(1);
+    });
+
+    it("lets a leg already sending finish, and wakes the thread only once every leg settled", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id });
+      // Started before the update: its run goes on, and a second delivery of its job leaves it.
+      const sending = await old({ threadId: thread.id, proposalId: PLAN, startedAt: new Date() });
+      const pick = await old({ threadId: thread.id, proposalId: PLAN });
+      expect(await executeAction(pick.id)).toMatchObject({
+        status: "failed",
+        failureKind: "unshown",
+      });
+      expect(await executeAction(sending.id)).toMatchObject({
+        status: "running",
+        phase: "sending",
+      });
+      expect(executions).toBe(0);
+      // Its plan hasn't settled, so its thread hears when the sending leg's run ends.
+      expect(await wakes()).toEqual([]);
+    });
   });
 
   // A done move reads as money moved everywhere (a specialist's moves, the activity).
@@ -323,6 +612,31 @@ describe("recordActions", () => {
     expect(recorded.map((row) => row.status).sort()).toEqual(["awaiting_permission", "running"]);
   });
 
+  // A move whose face its app wrote, which leaves a lasting permission it doesn't mention.
+  it("stores every permission a move grants on its card, whoever wrote the face", async () => {
+    const sale = stubRecipe({
+      describe: async () => ({
+        summary: "Sell 10 Yes shares",
+        amountUsd: "0",
+        effect: {
+          gives: [{ text: "10 Yes shares" }],
+          gets: [],
+          grants: [
+            {
+              lets: "Polymarket's exchanges trade the shares in your Polymarket wallet",
+              reach: "venue",
+            },
+          ],
+        },
+        card: { ...FACE, title: "Sell Yes" },
+      }),
+    });
+    const { rows } = await recordActions({ threadId: null }, [await prepareLeg(sale, {})], null);
+    expect(rows[0]?.card?.warning).toBe(
+      "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
+    );
+  });
+
   it("acts on its own only in an active Auto thread with a positive budget", async () => {
     const places = [
       await insertThread({ actMode: "ask_first", budgetUsd: "100" }),
@@ -381,10 +695,7 @@ describe("recordActions", () => {
       lookup.recipe = buy;
     }
     expect(
-      await db
-        .select({ threadId: fills.threadId })
-        .from(fills)
-        .where(eq(fills.actionId, id)),
+      await db.select({ threadId: fills.threadId }).from(fills).where(eq(fills.actionId, id)),
     ).toEqual([{ threadId: ai.id }]);
     const [after] = await db.select().from(threads).where(eq(threads.id, ai.id));
     expect(after?.budgetUsd).toBe("60.00");

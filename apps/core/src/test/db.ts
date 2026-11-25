@@ -1,3 +1,4 @@
+import { CARD_FORMAT } from "@auni/shared";
 import { getTableName, sql } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 
@@ -92,6 +93,8 @@ export async function insertAction(fields: Partial<typeof actions.$inferInsert> 
       tool: "stock_trade",
       input: {},
       endedAt: ended,
+      // As a money tool records it now (see recordActions).
+      cardFormat: CARD_FORMAT,
       ...fields,
       status,
       phase: status === "running" ? phase : null,

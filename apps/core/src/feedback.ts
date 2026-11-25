@@ -262,6 +262,7 @@ const STOPPED: Record<FailureKind, string> = {
   unfilled: "Nobody filled the order",
   fees: "The coin it bought for its network fee hadn't arrived",
   sent: "It stopped after something may have gone out",
+  unshown: "Its card, from before, didn't show a permission it leaves",
   unknown: "Auni doesn't know yet",
 };
 

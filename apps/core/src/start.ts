@@ -18,6 +18,7 @@ import {
   type Runner,
 } from "./jobs/runner.ts";
 import { lendToHandover, packHere } from "./handover/hand-over.ts";
+import { takeBackStale } from "./money/waiting.ts";
 import { takingOver, handedOver } from "./handover/marks.ts";
 import { listen } from "./server.ts";
 import type { BrainFound } from "./hello/stage.ts";
@@ -156,6 +157,8 @@ export async function start(
             "The Auni stopped a moment ago is still finishing what it was running. This one starts as soon as it has.",
           ),
       });
+      // Before any tab can see one: a card from before this version doesn't wait looking allowable.
+      await takeBackStale();
       // A handover to another machine stops the runner while it hands Auni over (handover/).
       lendToHandover({
         stopJobs: async () => {

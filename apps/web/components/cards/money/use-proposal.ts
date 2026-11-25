@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { NOT_REACHED, RUNNING_POLL_MS } from "@/lib/data/actions";
+import { RUNNING_POLL_MS, tapFailed } from "@/lib/data/actions";
 import { decideProposal, getProposal, type LiveProposal } from "@/lib/data/proposals";
 
 type Decision = "allow" | "decline";
@@ -44,9 +44,9 @@ export function useProposal(
     setError(null);
     try {
       queryClient.setQueryData<LiveProposal>(queryKey, await decideProposal(proposalId, decision));
-    } catch {
+    } catch (caught) {
       void queryClient.invalidateQueries({ queryKey });
-      setError(NOT_REACHED);
+      setError(tapFailed(caught));
     } finally {
       setPending(null);
     }

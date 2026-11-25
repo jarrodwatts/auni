@@ -10,18 +10,13 @@ import {
 } from "@auni/shared";
 import type { z } from "zod";
 
-import {
-  APPROVED_PRICE_AT_LEAST,
-  APPROVED_PRICE_AT_MOST,
-  APPROVED_PROCEEDS,
-  approvedTokens,
-} from "./approved.ts";
+import { APPROVED_PRICE_AT_LEAST, APPROVED_PRICE_AT_MOST, APPROVED_PROCEEDS } from "./approved.ts";
 import { isSavings, ledgerAt, appById } from "../apps/registry.ts";
 import type { ActionRow } from "../db/schema.ts";
-import { fitted, plainFace } from "./card-face.ts";
+import { fitted, LINE_MOST, plainFace, warnedFirst } from "./card-face.ts";
 import { LINES } from "./effect.ts";
 import { feeCoinsSaid } from "./fee-coin-said.ts";
-import { goneForGood } from "./gone-for-good.ts";
+import { lostSaid } from "./gone-for-good.ts";
 import { placeName } from "./chains.ts";
 import { tokenKey } from "./fill-key.ts";
 import { withdrawalFeeUsd } from "./funding.ts";
@@ -142,6 +137,7 @@ export function moveCards(rows: readonly ActionRow[]): PlanMove[] {
 function moveCard(row: ActionRow): PlanMove {
   const { draws, lands } = stagedLeg(row);
   const amount = dollars(row.amountUsd);
+  const lets = row.lines.find(({ label }) => label === LINES.lets)?.value.slice(0, LINE_MOST);
   const [name, from] = fromSavings(row)
     ? [`Take ${amount} out of savings`, "your savings"]
     : row.tool === "convert_to_cash"
@@ -168,6 +164,8 @@ function moveCard(row: ActionRow): PlanMove {
     ...(from ? { from } : {}),
     ...(lands ? { lands } : {}),
     status: row.status,
+    // Whatever it leaves able to act on the money, which one Allow grants with the rest.
+    ...(lets ? { lets } : {}),
   };
 }
 
@@ -234,10 +232,9 @@ export async function subjectLogo(
  * showed it sending. Whoever wrote the face, it can't leave that out.
  */
 function withLoss(row: Pick<ActionRow, "details">, face: CardFace): CardFace {
-  const to = row.details.leavesTo?.split(",").filter(Boolean) ?? [];
-  const lost = goneForGood(to, approvedTokens(row)?.sends);
+  const lost = lostSaid(row);
   if (!lost) return face;
-  return { ...face, warning: [lost, face.warning].filter(Boolean).join(" ").slice(0, 500) };
+  return { ...face, warning: warnedFirst(lost, face.warning) };
 }
 
 /** The web's `action` card for one money action. */
@@ -253,7 +250,7 @@ export async function actionCard(
     summary: row.summary.slice(0, 500),
     lines: row.lines.map(({ label, value }) => ({
       label: label.slice(0, 60),
-      value: value.slice(0, 500),
+      value: value.slice(0, LINE_MOST),
     })),
     details: Object.fromEntries(
       Object.entries(row.details).map(([key, value]) => [

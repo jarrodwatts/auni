@@ -1,5 +1,7 @@
 import { isAddress } from "viem";
 
+import type { ActionRow } from "../db/schema.ts";
+import { approvedTokens } from "./approved.ts";
 import { sameDestination } from "./effect.ts";
 import { shortAddress } from "./format.ts";
 
@@ -57,4 +59,10 @@ export function goneForGood(to: readonly string[], tokens: readonly string[] = [
     return [];
   });
   return said.length > 0 ? `${said.join(" ")} What this sends there is gone for good.` : null;
+}
+
+/** What a move's card says of money it sends for good, from where its action pinned money going. */
+export function lostSaid(row: Pick<ActionRow, "details">): string | null {
+  const to = row.details.leavesTo?.split(",").filter(Boolean) ?? [];
+  return goneForGood(to, approvedTokens(row)?.sends);
 }

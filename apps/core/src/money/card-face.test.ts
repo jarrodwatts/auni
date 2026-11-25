@@ -8,6 +8,8 @@ import {
   tradeFace,
   withdrawalFace,
   withFace,
+  tooMuchToWarn,
+  withPermissions,
   type AppTerms,
   type TradeTerms,
 } from "./card-face.ts";
@@ -148,7 +150,7 @@ const deposit: AppTerms = {
 describe("the face of a transaction the agent built for an app", () => {
   const said = { summary: "Put $50 of USDC into Aave on Base", moves: true };
 
-  it("reads a deposit as the app's, and always says a permission left behind", () => {
+  it("reads a deposit as the app's", () => {
     const content = fillFace(appFace(deposit, said), usdc("50000000"));
     expect(content).toMatchObject({
       title: "Put USDC into Aave",
@@ -160,7 +162,6 @@ describe("the face of a transaction the agent built for an app", () => {
         { label: "You get back", value: "50 aBasUSDC", note: "$50" },
       ],
       finePrint: "It goes through 0xa238…4c4e.",
-      warning: "It lets 0x2222…2222 spend your USDC afterwards.",
       receipt: { title: "Put USDC into Aave" },
     });
   });
@@ -508,5 +509,70 @@ describe("withFace", () => {
     expect(action("0")).toBe("Sell Nvidia");
     expect(action("0", { returnsUsd: "0.00" })).toBe("Sell Nvidia");
     expect(action("5.00")).toBe("Sell {amount}");
+  });
+});
+
+describe("withPermissions", () => {
+  const face = tradeFace(stockBuy, MOVES);
+
+  it("says every permission a move leaves, whoever wrote its face", () => {
+    const granted = withPermissions(face, {
+      grants: [
+        { lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" },
+        {
+          lets: "Polymarket's exchanges trade the shares in your Polymarket wallet",
+          reach: "venue",
+        },
+      ],
+    });
+    expect(granted.warning).toBe(
+      "From now on, it lets 0x1a2b…9f8e spend your USDC and Polymarket's exchanges trade the shares in your Polymarket wallet.",
+    );
+  });
+
+  it("says them before a warning the face has, and nothing for a move that grants none", () => {
+    const warned = { ...face, warning: "0x0000…dEaD is a burn address." };
+    expect(
+      withPermissions(warned, {
+        grants: [{ lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" }],
+      }).warning,
+    ).toBe("From now on, it lets 0x1a2b…9f8e spend your USDC. 0x0000…dEaD is a burn address.");
+    expect(withPermissions(face, { grants: [] })).toBe(face);
+  });
+
+  it("leaves an order the owner places to the face, which says it among its terms", () => {
+    const stop = {
+      lets: "Hyperliquid close the whole position",
+      reach: "venue",
+      order: true,
+    } as const;
+    expect(withPermissions(face, { grants: [stop] })).toBe(face);
+  });
+});
+
+const FACE_OF_TRADE = tradeFace(stockBuy, MOVES);
+
+describe("tooMuchToWarn", () => {
+  const spend = (index: number) => ({
+    lets: `0x${String(index).repeat(4)}…${String(index).repeat(4)} spend your USDC`,
+    reach: "wallet" as const,
+  });
+  const few = { grants: [spend(1), spend(2), spend(3)] };
+
+  // A card says every permission its move grants, or there is no card.
+  it("refuses a move that leaves more than a card can say whole, and passes one that fits", () => {
+    const many = { grants: Array.from({ length: 20 }, (_, index) => spend(index % 10)) };
+    expect(tooMuchToWarn(many, null)).toMatch(/^It leaves 20 permissions, more than one card/u);
+    expect(tooMuchToWarn(few, null)).toBeNull();
+    expect(tooMuchToWarn({ grants: [] }, "x".repeat(600))).toBeNull();
+    expect(fitted(withPermissions(FACE_OF_TRADE, few)).warning).toMatch(/spend your USDC\.$/u);
+  });
+
+  it("counts what the card says first, where money is gone for good", () => {
+    const burns = Array.from(
+      { length: 7 },
+      () => "0x0000…dEaD is a burn address: nobody can ever spend from it.",
+    ).join(" ");
+    expect(tooMuchToWarn(few, burns)).toMatch(/and sends money where it is gone for good/u);
   });
 });

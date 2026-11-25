@@ -238,7 +238,6 @@ describe("send_evm_transaction", () => {
       context: "Uniswap on Base",
       price: "$4,000.00",
       finePrint: "It goes through 0x2222…2222.",
-      warning: null,
     });
     expect(figureOf(bought, "You get, about")).toBe("0.00125 WETH");
     expect(figureOf(bought, "Vs market")).toBe("About even");

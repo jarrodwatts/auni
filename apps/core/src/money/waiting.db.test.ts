@@ -1,4 +1,4 @@
-import { CARD_WAITS_MS, RETRACTED } from "@auni/shared";
+import { ASK_TOOL_NAMES, CARD_FORMAT, CARD_WAITS_MS, RETRACTED } from "@auni/shared";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -9,8 +9,10 @@ import { actions, jobs, threads } from "../db/schema.ts";
 import { staleCardsJob } from "../jobs/action.ts";
 import { waitingCardsContext } from "../conversation/context.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
-import { stubRecipe } from "../test/recipe.ts";
+import { FACE, stubRecipe } from "../test/recipe.ts";
+import { queued } from "../test/jobs.ts";
 import { decideActions, prepareLeg, recordActions } from "./actions.ts";
+import { retractStale } from "./waiting.ts";
 import { moneyTools } from "./tools.ts";
 
 // Every money tool is this one stand-in, which sends USDC and says what the call asked it to.
@@ -181,5 +183,68 @@ describe("a card that waited a day", () => {
     expect(await decideActions({ actionId: old.id }, "allow")).toEqual([]);
     expect(await statusOf(old.id)).toMatchObject({ status: "retracted", error: RETRACTED.stale });
     expect(await db.select().from(jobs)).toEqual([]);
+  });
+});
+
+// A card from before an update may not show all its move grants (a first sale's lasting
+// permission): Allow refuses it, so it is taken back as Auni starts and on the cron rather than
+// sit there looking allowable, and the agent is told, so it can put the move up again.
+describe("a card drawn before cards said all they say now", () => {
+  it("is taken back as it was shown, saying why, and its thread is told", async () => {
+    const thread = await insertThread();
+    const card = FACE;
+    const old = await insertAction({
+      threadId: thread.id,
+      status: "awaiting_permission",
+      summary: "Sell half of the Fed bet",
+      cardFormat: CARD_FORMAT - 1,
+      card,
+    });
+    const fresh = await insertAction({ threadId: thread.id, status: "awaiting_permission" });
+    const ask = await insertAction({
+      threadId: thread.id,
+      status: "awaiting_permission",
+      tool: ASK_TOOL_NAMES[0],
+      cardFormat: CARD_FORMAT - 1,
+    });
+    const done = await insertAction({ status: "done", cardFormat: CARD_FORMAT - 1 });
+    expect(await db.transaction(retractStale)).toEqual([thread.id]);
+    expect(await statusOf(old.id)).toMatchObject({
+      status: "retracted",
+      error: RETRACTED.outOfDate,
+      card,
+      cardFormat: CARD_FORMAT - 1,
+    });
+    for (const left of [fresh, ask])
+      expect((await statusOf(left.id))?.status).toBe("awaiting_permission");
+    expect((await statusOf(done.id))?.status).toBe("done");
+    const [woke, ...more] = await queued("turn");
+    expect(more).toEqual([]);
+    expect(woke?.data).toMatchObject({ threadId: thread.id });
+    expect(woke?.data.reason).toContain(`"Sell half of the Fed bet" (card ${old.id})`);
+    // The card says what that wake is for, so the owner isn't asked for what Auni will do itself.
+    expect(RETRACTED.outOfDate).toContain("Auni will put it up again");
+    expect(RETRACTED.outOfDate).not.toMatch(/ask again/iu);
+    // Once: the cron finds nothing more to take back or tell.
+    await staleCardsJob.run({}, {} as never);
+    expect(await queued("turn")).toHaveLength(1);
+  });
+
+  // Found in review: a wake keeps its first 4,000 characters, and a card's summary has no cap.
+  it("names every card it took back, however long what one asked", async () => {
+    const thread = await insertThread();
+    const old = [];
+    for (const summary of ["x".repeat(5_000), "Sell half of the Fed bet"])
+      old.push(
+        await insertAction({
+          threadId: thread.id,
+          status: "awaiting_permission",
+          summary,
+          cardFormat: CARD_FORMAT - 1,
+        }),
+      );
+    await db.transaction(retractStale);
+    const [woke] = await queued("turn");
+    for (const card of old) expect(woke?.data.reason).toContain(card.id);
   });
 });

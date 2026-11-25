@@ -20,7 +20,14 @@ import { deliverKind } from "../jobs/kinds.ts";
 import { defineJob, jobKind } from "../jobs/queue.ts";
 import type { Channel, ChannelEvent } from "../apps/contract.ts";
 import { channels, offered } from "../apps/registry.ts";
-import { allowAction, allowProposal, declineAction, declineProposal } from "../money/decide.ts";
+import {
+  allowAction,
+  allowProposal,
+  declineAction,
+  declineProposal,
+  outOfDate,
+  takenBack,
+} from "../money/decide.ts";
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
@@ -248,7 +255,7 @@ const TYPING_MOST_MS = 3 * 60_000;
  * next message from the chat app is read meanwhile.
  */
 async function typingWhileAnswering(found: Found, chat: string, threadId: string): Promise<void> {
-  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until; ) {
+  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until;) {
     await found.channel.typing(chat).catch(() => undefined);
     await sleep(TYPING_SHOWS_MS);
     const thread = await threadById(threadId).catch(() => undefined);
@@ -365,7 +372,13 @@ async function allowed(
     if (outcome.kind === "not_waiting") return NOT_WAITING;
     if (outcome.kind === "in_its_field")
       return { won: false, answer: "Paste it in the app, never in a chat." };
+    if (outcome.kind === "out_of_date") return { won: false, answer: outcome.said };
     return { won: true, answer: "Allowed." };
+  }
+  // Said before asking for money a plan that can never run would need.
+  if (outOfDate(legs)) {
+    const refused = await takenBack(legs);
+    return refused ? { won: false, answer: refused.said } : NOT_WAITING;
   }
   const waiting = legs.filter((leg) => leg.status === "awaiting_permission");
   if ((await Promise.all(waiting.map((leg) => needsStepUp(leg)))).some(Boolean)) return TAKES_PROOF;
@@ -377,6 +390,7 @@ async function allowed(
       answer: `Add ${dollars(funding.needUsd)} to your wallet first, then tap Allow again.`,
     };
   const rows = await allowProposal(target.proposalId);
+  if (!Array.isArray(rows)) return { won: false, answer: rows.said };
   return rows.length > 0 ? { won: true, answer: "Allowed." } : NOT_WAITING;
 }
 

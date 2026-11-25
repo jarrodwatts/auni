@@ -1,3 +1,4 @@
+import { CARD_FORMAT } from "@auni/shared";
 import { once } from "node:events";
 import { statSync } from "node:fs";
 import { createServer, request, type IncomingHttpHeaders, type Server } from "node:http";
@@ -208,6 +209,7 @@ describe("the door, always on", () => {
     const allowed = await send(`/core/actions/${card.id}/allow`, {
       method: "POST",
       headers: withOrigin(FROM_THE_OWNERS_PHONE),
+      body: { cardFormat: CARD_FORMAT },
     });
     expect(allowed.status).toBe(200);
     const [row] = await db.select().from(actions).where(eq(actions.id, card.id));

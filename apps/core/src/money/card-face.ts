@@ -1,13 +1,19 @@
 import {
   AMOUNT,
+  CARD_FORMAT,
   formatExactUsd,
+  isAsk,
+  LETS_LINE,
+  permissionsSaid,
   SUMMARY_VERBS,
   type ActionCardWire,
   type CardFace,
 } from "@auni/shared";
 
+import type { ActionRow } from "../db/schema.ts";
 import type { AppLogo } from "./app-logo.ts";
-import { sentTo } from "./effect.ts";
+import { letsSaid, sentTo, type Effect } from "./effect.ts";
+import { lostSaid } from "./gone-for-good.ts";
 import { moneyOf, type ActionPreview } from "./recipe.ts";
 import { parseUnits } from "./usd.ts";
 
@@ -281,7 +287,7 @@ function logoOf({ logo, app }: AppTerms): NonNullable<CardFace["logo"]> {
 function appWords(terms: AppTerms, said: Said): CardFace {
   const act = (verb: string) => (said.moves ? `${verb} ${AMOUNT}` : verb);
   const onChain = `${terms.app} on ${terms.chain}`;
-  const warning = terms.leaves ? `It lets ${terms.leaves} afterwards.` : null;
+  // A permission it leaves is said by withPermissions, as on every card.
   const safe = terms.leaves ? null : "Nothing is left able to spend your money afterwards.";
   const fee = terms.networkFee ? `Network fee about ${terms.networkFee}.` : null;
   // The app's name may be the agent's word, so the contract it calls is said too, to catch a misnamed one.
@@ -314,7 +320,6 @@ function appWords(terms: AppTerms, said: Said): CardFace {
         terms.networkFee ? { label: "Network fee", value: terms.networkFee } : null,
       ),
       finePrint: via,
-      warning,
       price: terms.price,
       receipt: buys
         ? { title: `Bought ${name}`, detail: `About ${leg(got)}`, amount: "spent" }
@@ -332,7 +337,6 @@ function appWords(terms: AppTerms, said: Said): CardFace {
       // Only what the simulation shows: whether it earns or can be taken out is the app's to say.
       figures: figures(sends("You put in"), gets("You get back")),
       finePrint: sentence(safe, fee, via),
-      warning,
       receipt: { title, detail: onChain, amount: "spent" },
     };
   }
@@ -346,7 +350,6 @@ function appWords(terms: AppTerms, said: Said): CardFace {
       figures: figures(sends("You send"), gets("You get here")),
       scene: { kind: "route", from: terms.chain, sends: leg(sent), to: terms.toChain },
       finePrint: sentence("Bridges usually take a few minutes to land.", fee, via),
-      warning,
       // Done here is sent on its way; the other chain has it a few minutes later.
       receipt: {
         title: `Sent ${sent.symbol} to ${terms.toChain}`,
@@ -370,13 +373,82 @@ function appWords(terms: AppTerms, said: Said): CardFace {
     context,
     figures: figures(sends("You send"), back),
     finePrint: sentence(safe, fee, via),
-    warning,
     receipt: {
       title: known ? [known.past, ...rest].join(" ") : said.summary,
       detail: context,
       amount: said.moves ? "spent" : null,
     },
   };
+}
+
+/** The most a card's warning says, and a line's value (see cardFaceSchema). */
+const WARNING_MOST = 500;
+export const LINE_MOST = 500;
+
+/**
+ * A card's warning that says `first` whole, then `rest` as far as a card takes: what core must
+ * say (a permission, money gone for good) goes first, so a cut only ever reaches the rest.
+ */
+export function warnedFirst(first: string | null, rest: string | null | undefined): string | null {
+  return sentence(first, rest ?? null)?.slice(0, WARNING_MOST) ?? null;
+}
+
+/**
+ * What a card's warning says of the lasting permissions a move leaves, in core's words from its
+ * effect, or null when it leaves none. An order the owner places (a stop-loss) is one of the
+ * move's terms, which its face says itself (see Grant.order), so it is left out here.
+ */
+function permissionsWarned(effect: Pick<Effect, "grants">): string | null {
+  const lets = effect.grants.filter(({ order }) => !order).map(({ lets }) => lets);
+  return lets.length > 0 ? permissionsSaid(lets) : null;
+}
+
+/**
+ * A face that says, first among its warnings, each lasting permission the move leaves behind,
+ * whoever wrote it: the permissions a move grants can't depend on its writer remembering them.
+ */
+export function withPermissions(face: CardFace, effect: Pick<Effect, "grants">): CardFace {
+  const said = permissionsWarned(effect);
+  return said ? { ...face, warning: warnedFirst(said, face.warning) } : face;
+}
+
+/**
+ * Why a move gets no card, or null. It measures exactly what a card draws of what the move
+ * leaves, each where a card would cut it: the Lets line (every permission and order, which a
+ * plain face and a plan show), and the start of the warning, where money it sends for good
+ * (`lost`) comes before its permissions (see withLoss in action-card.ts). A card says all a move
+ * grants, or there is no card.
+ */
+export function tooMuchToWarn(effect: Pick<Effect, "grants">, lost: string | null): string | null {
+  const line = letsSaid(effect.grants);
+  if (!line) return null;
+  const warned = sentence(lost, permissionsWarned(effect)) ?? "";
+  return line.length > LINE_MOST || warned.length > WARNING_MOST
+    ? `It leaves ${effect.grants.length} permissions${lost ? " and sends money where it is gone for good" : ""}, more than one card can show whole, so no card was made. Each transaction can leave fewer.`
+    : null;
+}
+
+/** What a move's row recorded of the card it was allowed on. */
+type OldCard = Pick<ActionRow, "lines" | "card" | "cardFormat" | "tool" | "proposalId" | "details">;
+
+/**
+ * Whether a card drawn before cards said all they say now (CARD_FORMAT) left out a lasting
+ * permission one of its moves leaves, as its recorded Lets line names them, so the owner allowed
+ * it unseen: a plan's card drew no move's Lets line, and a lone move's card showed it whole only
+ * when core drew its face from its lines and the line fit (LINE_MOST, where a figure was cut), or
+ * the move's own words warned of it whole, as the card drew them: after what it sends for good,
+ * and cut where a warning was (withLoss in action-card.ts). An old row doesn't
+ * mark which of what it lets is an order its face showed among its terms (Grant.order), so each
+ * counts as a permission.
+ */
+export function leftOutPermission(legs: readonly OldCard[]): boolean {
+  return legs.some((leg) => {
+    const lets = leg.lines.find(({ label }) => label === LETS_LINE)?.value;
+    if (!lets || leg.cardFormat >= CARD_FORMAT || isAsk(leg.tool)) return false;
+    if (leg.proposalId !== null) return true;
+    if (leg.card === null) return lets.length > LINE_MOST;
+    return !warnedFirst(lostSaid(leg), leg.card.warning)?.includes(lets);
+  });
 }
 
 /** What the plain face reads of a card: core's sentence, its lines, and its money as the card carries it. */
@@ -438,7 +510,7 @@ export function fitted(face: CardFace): CardFace {
     context: cutOr(face.context, 500),
     figures: face.figures.map((figure) => ({
       label: cut(figure.label, 60),
-      value: cut(figure.value, 500),
+      value: cut(figure.value, LINE_MOST),
       ...(figure.note === undefined ? {} : { note: cutOr(figure.note, 40) }),
     })),
     ...(scene

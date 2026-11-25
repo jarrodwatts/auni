@@ -57,6 +57,9 @@ const CHECKED_TAP =
   "device through Tailscale, where Auni runs always on, or from a browser paired in the last 15 " +
   "minutes; otherwise the card says to run `auni pair` and open its link";
 
+/** The most legs the agent puts on one plan's card, before the moves that only bring their cash. */
+export const PLAN_LEGS = 12;
+
 const planLeg = z.object({
   tool: z.string().min(1).describe('A money tool, e.g. "stock_trade" or "evm_swap".'),
   input: z.record(z.string(), z.unknown()).describe("Exactly what you would pass that tool."),
@@ -345,7 +348,7 @@ function proposeActions(context: ToolTurn): AuniTool {
         .min(1)
         .max(80)
         .describe('What the card does, plainly: "Weight-loss drug picks" or "Close your Fed rate bets".'),
-      legs: z.array(planLeg).min(1).max(12),
+      legs: z.array(planLeg).min(1).max(PLAN_LEGS),
       pays_with: payWithInput,
       replaces: replacesInput,
     },

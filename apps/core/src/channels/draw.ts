@@ -11,6 +11,7 @@ import {
 import type { ActionRow, ChannelQuestion } from "../db/schema.ts";
 import type { ChannelButton, ChannelMessage } from "../apps/contract.ts";
 import { pricedLater } from "../money/action-card.ts";
+import { LINES } from "../money/effect.ts";
 import { feeCoinsSaid } from "../money/fee-coin-said.ts";
 
 // What the hub sends on a channel, drawn from core's own records: a card's words and buttons come
@@ -86,12 +87,34 @@ function wholeCard(legs: readonly ActionRow[]): string[] {
     ];
   // A trade waiting on the plan's money moves is priced again when its turn comes, said before the tap.
   const later = waiting.length > 0 ? pricedLater(legs) : null;
+  const together = planHead(legs).length > 1;
   return [
-    `**A plan of ${legs.length} moves, one tap for all of them**`,
-    ...legs.map((leg, index) => `${index + 1}. ${literal(leg.summary)}: ${legStatus(leg)}`),
+    ...planHead(legs),
+    // Each waiting leg's permissions too, as a lone move's lines say them, since Allow here
+    // grants them; once decided, where it stands is what the plan says, as the app's does.
+    ...legs.flatMap((leg, index) => [
+      `${index + 1}. ${literal(leg.summary)}${together ? "" : `: ${legStatus(leg)}`}`,
+      ...(leg.status === "awaiting_permission"
+        ? leg.lines
+            .filter(({ label }) => label === LINES.lets)
+            .map((line) => `${literal(line.label)}: ${literal(line.value)}`)
+        : []),
+    ]),
     ...said,
     ...(later ? [literal(later)] : []),
   ];
+}
+
+/**
+ * What says what a plan is and where it stands, which one too long to show whole keeps: one tap
+ * for all of its moves while it waits, and after, where every move stands when all stand alike
+ * (taken back together, say), said once rather than on each.
+ */
+function planHead(legs: readonly ActionRow[]): string[] {
+  if (waitingOn(legs)) return [`**A plan of ${legs.length} moves, one tap for all of them**`];
+  const [first, ...rest] = legs.map(legStatus);
+  const alike = first !== undefined && rest.every((status) => status === first);
+  return [`**A plan of ${legs.length} moves**`, ...(alike ? [first] : [])];
 }
 
 /** Whether every word of the card fits its one message; one that doesn't is decided in the app. */
@@ -108,8 +131,18 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   const [only] = legs;
   const full = wholeCard(legs);
   const whole = fitsHere(legs);
-  // Too long, it keeps what says what the card is and where it stands.
-  const body = whole ? full : legs.length === 1 && only ? [full[0]!, legStatus(only)] : [full[0]!];
+  // Too long, it keeps what says what the card is and where it stands; a decided plan whose moves
+  // stand apart says where to see each.
+  const head = planHead(legs);
+  const apart = !whole && !waiting && legs.length > 1 && head.length === 1;
+  const body = whole
+    ? full
+    : legs.length === 1 && only
+      ? [full[0]!, legStatus(only)]
+      : [
+          ...head,
+          ...(apart ? ["It's too long to show here in full: the app shows each move."] : []),
+        ];
   const said = waiting
     ? view.inTheApp
       ? [
@@ -124,7 +157,7 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   // A held move is checked again or closed in the app: neither tap has a grant here.
   const held = legs.some((leg) => leg.phase === "needs_owner");
   const buttons: ChannelButton[][] =
-    (waiting && view.inTheApp) || held
+    (waiting && view.inTheApp) || held || apart
       ? [[{ label: "Open in the app", url: view.link }]]
       : waiting && grant
         ? [

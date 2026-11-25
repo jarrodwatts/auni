@@ -15,11 +15,18 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { approvedEffect, assertStillAsShown } from "./approved.ts";
+import { fitted, tooMuchToWarn, withPermissions } from "./card-face.ts";
 import { approval as approvalOf } from "./effect.ts";
 import { rawEffect } from "./raw-transaction.ts";
 import { revertOf } from "./refused.ts";
+import { FACE } from "../test/recipe.ts";
 import { evmRawEffect } from "./recipes/evm.ts";
-import { simulateEffect, walletEffect, type SimulatedEffect } from "./wallet-effect.ts";
+import {
+  simulateEffect,
+  walletEffect,
+  type SimulatedEffect,
+  type TokenName,
+} from "./wallet-effect.ts";
 
 /** Alchemy's RPC and the chain's public one, as a test sets them. */
 const rpcs: { alchemy: object; public: object | null } = { alchemy: {}, public: null };
@@ -274,6 +281,32 @@ const send = (recipient: Address) => ({
     functionName: "transfer",
     args: [recipient, 5_000_000n],
   }),
+});
+
+describe("a raw batch's permissions on its card", () => {
+  // Any contract names itself, at any length; a long name must not push a second approval off
+  // the card, so a move that can't say them all gets none.
+  it("makes no card for a batch whose approvals can't all be said whole", () => {
+    const junk: Address = "0x9999999999999999999999999999999999999999";
+    const long = new Map<string, TokenName>([
+      ...names,
+      [junk, { symbol: "FREE ".repeat(100), decimals: 18 }],
+    ]);
+    const spends = (token: Address) => ({
+      out: [],
+      in: [],
+      grants: [
+        { kind: "spend" as const, token, to: LENDER },
+        { kind: "spend" as const, token: USDC, to: FRIEND },
+      ],
+    });
+    expect(tooMuchToWarn(rawEffect(spends(junk), long), null)).toMatch(/^It leaves 2 permissions/u);
+    const fits = rawEffect(spends(TOKEN), long);
+    expect(tooMuchToWarn(fits, null)).toBeNull();
+    expect(fitted(withPermissions(FACE, fits)).warning).toBe(
+      "From now on, it lets 0x4444…4444 spend your PRL and 0x7777…7777 spend your USDC.",
+    );
+  });
 });
 
 describe("walletEffect", () => {

@@ -1,5 +1,6 @@
 import { rmSync } from "node:fs";
 
+import { RETRACTED } from "@auni/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -410,6 +411,31 @@ describe("approving a card", () => {
     expect(String(edits.at(-1)!.text)).toMatch(/Done\nAllowed here\.$/u);
   });
 
+  // A card recorded before cards said every permission, still waiting as Auni updated.
+  it("refuses a card drawn before cards said all they say now, and sends nothing", async () => {
+    const action = await waiting({ cardFormat: 1 });
+    await deliverCard(action);
+    expect(
+      await press({ from: OWNER }, await messageIdOf(action.id), `allow:${grantOnCard()}`),
+    ).toBe(RETRACTED.outOfDate);
+    // Taken back in the same press, so no surface shows it waiting to be allowed again.
+    expect(await statusOf(action.id)).toBe("retracted");
+    expect(signer.calls).toBe(0);
+  });
+
+  // Its Decline is the owner's no, which the thread hears as one, not that it can go up again.
+  it("declines a card drawn before cards said all they say now, and tells the thread", async () => {
+    const action = await waiting({ cardFormat: 1 });
+    await deliverCard(action);
+    expect(
+      await press({ from: OWNER }, await messageIdOf(action.id), `decline:${grantOnCard()}`),
+    ).toBe("Declined.");
+    expect(await statusOf(action.id)).toBe("cancelled");
+    expect((await queued("turn")).flatMap(({ data }) => data.reason ?? [])).toEqual([
+      expect.stringContaining(`declined action ${action.id}`),
+    ]);
+  });
+
   it("applies an ask on the owner's press, through the same path, with nothing to sign", async () => {
     const ask = await waitingAsk();
     await deliverCard(ask);
@@ -743,6 +769,38 @@ describe("approving a plan", () => {
       "Allowed.",
     );
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual(["done", "done"]);
+  });
+
+  // An old plan's message, sent without each leg's permissions, pressed before it is redrawn.
+  it("refuses a plan with a leg drawn before cards said all they say now", async () => {
+    const legs = await planLegs({ cardFormat: 1 });
+    await deliverPlan(PLAN);
+    // Short of cash, it still says it can never run, not to add money first.
+    funding.needUsd = "5.00";
+    expect(await press({ from: OWNER }, await planMessage(), `allow:${grantOnCard()}`)).toBe(
+      RETRACTED.outOfDate,
+    );
+    // Taken back in the same press, so no surface shows it waiting to be allowed again.
+    expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
+      "retracted",
+      "retracted",
+    ]);
+    expect(signer.calls).toBe(0);
+  });
+
+  it("declines a plan with a leg drawn before cards said all they say now, and tells the thread", async () => {
+    const legs = await planLegs({ cardFormat: 1 });
+    await deliverPlan(PLAN);
+    expect(await press({ from: OWNER }, await planMessage(), `decline:${grantOnCard()}`)).toBe(
+      "Declined.",
+    );
+    expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
+      "cancelled",
+      "cancelled",
+    ]);
+    expect((await queued("turn")).flatMap(({ data }) => data.reason ?? [])).toEqual([
+      expect.stringContaining(`declined proposal ${PLAN}`),
+    ]);
   });
 
   // The grant rides in a button a channel can deliver twice; a press that decided nothing spends

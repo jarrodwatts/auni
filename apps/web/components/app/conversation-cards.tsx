@@ -2,7 +2,9 @@
 
 import type { CardWire } from "@auni/shared";
 import { ChevronRight, RotateCw } from "lucide-react";
-import { useId, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 
 import { ConversationCardBoundary } from "@/components/app/conversation-card-boundary";
 import { AgentCard } from "@/components/cards/agent-card";
@@ -21,15 +23,72 @@ export function ConversationCards({
   /** Failed attempts a later try fixed: each folds to a line that opens to its card. */
   readonly retried?: ReadonlySet<string>;
 }) {
-  return cards.map((card) => (
-    <ConversationCardBoundary card={card} key={card.id}>
-      {retried?.has(card.id) ? (
+  const search = useSearchParams();
+  const status = search.get("status");
+  const target = status ?? search.get("card");
+  return cards.map((card) => {
+    const id =
+      card.kind === "action_plan"
+        ? card.proposalId
+        : "actionReference" in card
+          ? card.actionReference
+          : card.id;
+    const linked = target === id || target === card.id;
+    const contents =
+      retried?.has(card.id) && !linked ? (
         <RetriedAttempt card={card} />
       ) : (
         <AgentCard card={card} onAskAgent={onAskAgent} />
-      )}
-    </ConversationCardBoundary>
-  ));
+      );
+    return (
+      <ConversationCardBoundary card={card} key={card.id}>
+        {linked ? (
+          <LinkedCard
+            checkStatus={status !== null}
+            privateField={card.kind === "ask" && !!card.field}
+          >
+            {contents}
+          </LinkedCard>
+        ) : (
+          contents
+        )}
+      </ConversationCardBoundary>
+    );
+  });
+}
+
+function LinkedCard({
+  children,
+  checkStatus,
+  privateField,
+}: {
+  readonly children: ReactNode;
+  readonly checkStatus: boolean;
+  readonly privateField: boolean;
+}) {
+  const frame = useRef<HTMLDivElement>(null);
+  const { stopScroll } = useStickToBottomContext();
+  useEffect(() => {
+    // The transcript normally follows the newest message as history and live cards load.
+    stopScroll();
+    const animation = requestAnimationFrame(() => {
+      const card = frame.current;
+      if (!card) return;
+      const check = checkStatus
+        ? card.querySelector<HTMLButtonElement>("[data-check-status]")
+        : null;
+      const target = check ?? card;
+      target.scrollIntoView({ block: "center" });
+      // The private field focuses itself once it has loaded.
+      if (!privateField) target.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(animation);
+  }, [checkStatus, privateField, stopScroll]);
+  return (
+    <div ref={frame} tabIndex={-1}>
+      {children}
+    </div>
+  );
 }
 
 /** A first try that didn't go through, quiet because the retry below it did. */

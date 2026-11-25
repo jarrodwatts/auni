@@ -19,6 +19,7 @@ import {
   messages,
   ownerSessions,
   threads,
+  valueSnapshots,
   type ActionRow,
   type ThreadRow,
 } from "../../db/schema.ts";
@@ -317,6 +318,7 @@ describe("pairing", () => {
     expect(firstGrant).not.toBe(secondGrant);
     expect(await deliveryOf(held.id)).toMatchObject({ grantHash: null });
     expect(await deliveryOf(proof.id)).toMatchObject({ grantHash: null });
+    expect(replies.at(-1)).toMatchObject({ text: "1 more waiting in Auni" });
     expect(replies.some(({ text }) => String(text).includes("Status unknown"))).toBe(true);
     expect(replies.some(({ text }) => String(text).includes("Confirm it's you first."))).toBe(true);
     expect(
@@ -325,15 +327,61 @@ describe("pairing", () => {
         .from(channelDeliveries)
         .where(eq(channelDeliveries.actionId, unpublished.id)),
     ).toEqual([]);
-    expect(
-      replies.find(({ text }) => String(text).includes("Unpublished order"))?.reply_markup,
-    ).toBeUndefined();
+    expect(replies.some(({ text }) => String(text).includes("Unpublished order"))).toBe(false);
     expect(await queued("turn")).toEqual([]);
     const buyNvidia = replies.find(({ text }) => String(text).includes("Buy Nvidia"));
     const callback = /allow:[^"]+/u.exec(JSON.stringify(buyNvidia?.reply_markup))?.[0];
     expect(callback).toBeTruthy();
     expect(await press({ from: OWNER }, await messageIdOf(first.id), callback!)).toBe("Allowed.");
     expect(await statusOf(second.id)).toBe("awaiting_permission");
+  });
+
+  it("opens the exact plan and held card in Auni and links the queue overflow", async () => {
+    const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };
+    const origin = "https://evo-t1.example.ts.net";
+    try {
+      Object.assign(env, { WEB_ORIGIN: origin, TAILSCALE_OWNER: "owner@example.com" });
+      const proposalId = crypto.randomUUID();
+      await waiting({ proposalId, lines: [{ label: "Terms", value: "x".repeat(3_500) }] });
+      await waiting({ proposalId });
+      const held = await waiting({ status: "running", phase: "needs_owner" });
+      const others = [];
+      for (let i = 0; i < 3; i += 1) others.push(await waiting());
+      await answer(thread.id, [
+        {
+          type: "data-cards",
+          data: {
+            cards: [
+              { kind: "action_plan", proposalId, title: "A plan" },
+              ...[held, ...others].map((row) => ({
+                kind: "action",
+                actionReference: row.id,
+                title: row.summary,
+              })),
+            ],
+          },
+        },
+      ]);
+      await waiting(); // No sealed card for this row yet.
+      fake.calls.length = 0;
+      fake.message({ from: OWNER }, "/pending");
+      await fake.handled();
+      const replies = fake.sent("sendMessage");
+      const chat = `${origin}/app/chat/${thread.id}`;
+      expect(replies).toHaveLength(5);
+      expect(replies[0]?.reply_markup).toEqual({
+        inline_keyboard: [[{ text: "Open in Auni", url: `${chat}?card=${proposalId}` }]],
+      });
+      expect(replies[1]?.reply_markup).toEqual({
+        inline_keyboard: [[{ text: "Check status", url: `${chat}?status=${held.id}` }]],
+      });
+      expect(replies.at(-1)).toMatchObject({
+        text: "1 more waiting in Auni",
+        reply_markup: { inline_keyboard: [[{ text: "Open Money", url: `${origin}/app` }]] },
+      });
+    } finally {
+      Object.assign(env, saved);
+    }
   });
 
   it("reads cash and the value of each take for /money without a local-only link", async () => {
@@ -348,19 +396,27 @@ describe("pairing", () => {
       cash: false,
       priceId: null,
     };
+    const loose = { ...position, chain: "monad", symbol: "MON", usdValue: "20.00" };
     vi.mocked(portfolioNow).mockResolvedValue({
-      totalUsd: "225.00",
+      totalUsd: "255.00",
       observedAt: new Date().toISOString(),
       unavailable: [],
       looking: [],
-      assets: { usdValue: "200.00", holdings: [position] },
+      assets: { usdValue: "220.00", holdings: [position, loose] },
       cash: { usdValue: "25.00", holdings: [] },
-      onTheWay: { usdValue: "0.00", moves: [] },
-      holdings: [position],
+      onTheWay: {
+        usdValue: "10.00",
+        moves: [{ actionId: crypto.randomUUID(), lands: "Base", usdValue: "10.00" }],
+      },
+      holdings: [position, loose],
     });
     await db.update(threads).set({ title: "ETH take" }).where(eq(threads.id, thread.id));
     const other = await insertThread({ title: "Other ETH take" });
-    for (const threadId of [thread.id, other.id]) {
+    const now = Date.now();
+    for (const [threadId, quantity] of [
+      [thread.id, "1.5"],
+      [other.id, "1"],
+    ] as const) {
       const action = await waiting({ threadId, status: "done" });
       await db.insert(fills).values({
         actionId: action.id,
@@ -368,10 +424,15 @@ describe("pairing", () => {
         chain: "base",
         instrument: "native",
         side: "buy",
-        quantity: "1",
+        quantity,
+        createdAt: new Date(now - (quantity === "1.5" ? 72 : 71) * 60 * 60_000),
         usdValue: "100",
       });
     }
+    await db.insert(valueSnapshots).values([
+      { usdValue: "243", holdings: [], takenAt: new Date(now - 48 * 60 * 60_000) },
+      { usdValue: "255", holdings: [], takenAt: new Date(now - 10) },
+    ]);
     fake.calls.length = 0;
     fake.message({ from: STRANGER }, "/money");
     fake.message({ from: OWNER }, "/money");
@@ -379,7 +440,7 @@ describe("pairing", () => {
     expect(fake.sent("sendMessage")).toMatchObject([
       {
         chat_id: String(OWNER),
-        text: "<b>Money</b>\n\n<blockquote>Total: $225\nCash: $25\nETH take: $100\nOther ETH take: $100</blockquote>",
+        text: "<b>Money</b>\n\n<blockquote>Total: $255 (+$12 today)\nCash: $25\nETH take: $150\nOther ETH take: $50\nOther holdings: $20\nOn the way: $10</blockquote>",
       },
     ]);
     expect(fake.sent("sendMessage")[0]?.reply_markup).toBeUndefined();

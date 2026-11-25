@@ -4,7 +4,7 @@ import {
   AMOUNT,
   ASK_DONE,
   HELD,
-  HELD_SAFE,
+  SUMMARY_VERBS,
   filledUsd,
   NETWORKS,
   isAsk,
@@ -66,6 +66,7 @@ export function drawLink(
 /** A card as one message shows it. */
 export interface CardView extends AppDestination {
   readonly legs: readonly ActionRow[];
+  readonly statusLink?: string | null;
   /** It takes proof, needs a private field, or is too long to review here in full. */
   readonly inTheApp: boolean;
   readonly proof?: boolean;
@@ -99,7 +100,8 @@ function faceWords(leg: ActionRow, text: string): string {
 
 function planName(legs: readonly ActionRow[]): string {
   const money = moneyLine(cardMoneys(legs));
-  return `${legs.length} moves${money ? ` (${money})` : ""}`;
+  const amount = money?.endsWith(" in") ? `${money.slice(0, -3)} total` : money;
+  return `${legs.length} moves${amount ? `, ${amount}` : ""}`;
 }
 
 function actionLabel(legs: readonly ActionRow[]): string {
@@ -187,16 +189,53 @@ function receipt(leg: ActionRow): string | null {
     .join("\n");
 }
 
-function cardText(legs: readonly ActionRow[], whole: boolean): string {
-  const title = `**${literal(planName(legs))}**`;
-  if (legs.length > 1 && !whole) {
-    const counts = Map.groupBy(legs, (leg) => legStatus(leg, false));
-    return [
-      title,
-      quote([...counts].map(([status, group]) => `${status.replace(/\.$/u, "")}: ${group.length}`)),
-    ].join("\n");
+const RECEIPT_VERBS = new Set(Object.values(SUMMARY_VERBS).map(({ past }) => past.toLowerCase()));
+
+/** A short outcome that can follow a number without losing what happened. */
+function planOutcome(leg: ActionRow): string {
+  if (leg.run.settledBy === "owner") return "closed";
+  switch (leg.status) {
+    case "awaiting_permission":
+      return "waiting on you";
+    case "running":
+      if (leg.phase === "needs_owner") return "with status unknown";
+      if (leg.phase === "landing") return "on the way";
+      if (leg.phase === "unsure") return "being checked";
+      return leg.phase === "queued" ? "queued to send" : "sending";
+    case "done": {
+      if (leg.error) return "sent, awaiting confirmation";
+      if (leg.run.lands) return "landed";
+      const verb = receipt(leg)?.split(/\s+/u)[0]?.toLowerCase() ?? "";
+      return RECEIPT_VERBS.has(verb) ? verb : "completed";
+    }
+    case "failed":
+      return "didn't go through";
+    case "cancelled":
+      return "declined";
+    case "replaced":
+      return "replaced";
+    case "retracted":
+      return "taken back";
   }
-  const one = legs.length === 1 ? legs[0] : undefined;
+}
+
+function planProgress(legs: readonly ActionRow[]): string {
+  return [...Map.groupBy(legs, planOutcome)]
+    .map(([outcome, group]) =>
+      outcome === "waiting on you" || outcome === "with status unknown"
+        ? `${group.length} ${group.length === 1 ? "move" : "moves"} ${outcome}`
+        : `${group.length} ${outcome}`,
+    )
+    .join(", ");
+}
+
+function cardText(legs: readonly ActionRow[], whole: boolean): string {
+  const one = legs.length === 1;
+  const compactPlan = !one && !whole;
+  const settledPlan =
+    !one && legs.every(({ status }) => status !== "awaiting_permission" && status !== "running");
+  const notes = whole ? tapNotes(legs) : "";
+  const waitingPlan = !one && legs.some(({ status }) => status === "awaiting_permission");
   const text = legs.map((leg, index) => {
     const filled = whole ? receipt(leg) : null;
     const [title, ...detail] = filled?.split("\n") ?? [];
@@ -207,17 +246,38 @@ function cardText(legs: readonly ActionRow[], whole: boolean): string {
         ? detail.map(literal)
         : [...detail.map(literal), ...reviewLines(leg)]
       : [];
-    const state = filled ? "" : legStatus(leg, whole);
+    const showState =
+      !filled &&
+      !compactPlan &&
+      (!waitingPlan || leg.status !== "awaiting_permission") &&
+      (!settledPlan || leg.status === "failed" || leg.error);
+    // Compact plans still name every leg, sharing the available space between their titles.
+    const name = literal(heading);
+    const limit = compactPlan ? Math.floor(2_000 / legs.length) : 250;
+    const shortName = name.slice(0, limit - 1).replace(/\\+$/u, "") + "…";
     return [
-      `**${prefix}${literal(heading.slice(0, whole ? heading.length : 250))}**`,
+      `**${prefix}${whole || name.length <= limit ? name : shortName}**`,
       quote(facts),
-      state,
+      one && notes,
+      showState && legStatus(leg, whole),
     ]
       .filter(Boolean)
       .join("\n");
   });
   if (one) return text[0]!;
-  return [title, ...text].join("\n\n");
+  const title = `**${literal(planName(legs))}**`;
+  const heldNotes = compactPlan
+    ? [...new Set(legs.filter((leg) => leg.phase === "needs_owner").map(heldStatus))]
+    : [];
+  return [
+    title,
+    ...text,
+    notes,
+    (compactPlan || settledPlan || waitingPlan) && planProgress(legs),
+    ...heldNotes,
+  ]
+    .filter(Boolean)
+    .join(compactPlan ? "\n" : "\n\n");
 }
 
 function tapNotes(legs: readonly ActionRow[]): string {
@@ -230,7 +290,7 @@ function tapNotes(legs: readonly ActionRow[]): string {
 
 /** Whether every fact of the card fits in one message. */
 export function fitsHere(legs: readonly ActionRow[]): boolean {
-  return cardText(legs, true).length + tapNotes(legs).length <= CARD_CHARS;
+  return cardText(legs, true).length <= CARD_CHARS;
 }
 
 /** A card's message. A grant is drawn only on an approval that fits here in full. */
@@ -249,8 +309,11 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
           ? "review the full card"
           : "see the full card"
         : "review this card";
-  const destination =
-    appOnly || held || !whole ? viaApp(view, held ? "Check status" : "Open in Auni", task) : null;
+  const destination = held
+    ? viaApp({ ...view, link: view.statusLink ?? view.link }, "Check status", task)
+    : appOnly || !whole
+      ? viaApp(view, "Open in Auni", task)
+      : null;
   const label = waiting && grant && !appOnly ? actionLabel(legs) : null;
   const decline = { label: "Decline", press: `decline:${grant}` };
   const approve = label ? { label: compactApproval(label), press: `allow:${grant}` } : null;
@@ -275,7 +338,6 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
     text: [
       view.threadName && `*${literal(view.threadName.slice(0, 160))}*`,
       cardText(legs, whole),
-      whole && tapNotes(legs),
       note,
       where,
       !destination?.buttons && destination?.text,
@@ -315,14 +377,16 @@ export function shownKey(view: CardView, digest: string): string {
 
 function legStatus(leg: ActionRow, whole: boolean): string {
   const error = whole && leg.error ? ` ${literal(leg.error)}` : "";
-  if (leg.run.settledBy === "owner") return `Closed.${error || ` ${heldOutcome(leg)}`}`;
+  if (leg.run.settledBy === "owner") {
+    const why = leg.run.held ? HELD[leg.run.held] : "Auni couldn't confirm whether money moved.";
+    return `Closed.${error || ` ${why}`}`;
+  }
   switch (leg.status) {
     case "awaiting_permission":
       return "Waiting on you";
     case "running":
       if (leg.phase === "queued") return "Queued to send";
-      if (leg.phase === "needs_owner")
-        return `Status unknown. ${heldOutcome(leg)}${leg.run.held ? "" : error} ${HELD_SAFE}`;
+      if (leg.phase === "needs_owner") return heldStatus(leg);
       if (leg.phase === "unsure")
         return "Checking whether it went through. Auni can't yet tell whether money moved.";
       if (leg.phase === "landing")
@@ -355,25 +419,23 @@ function legStatus(leg: ActionRow, whole: boolean): string {
   }
 }
 
-function heldOutcome(leg: ActionRow): string {
-  if (leg.run.held === "unrecorded") return "Money moved. Auni couldn't confirm what came back.";
-  if (leg.run.held) return HELD[leg.run.held];
-  return "Auni can't confirm whether money moved.";
+function heldStatus(leg: ActionRow): string {
+  const money = "Your Money page shows what you hold.";
+  switch (leg.run.held) {
+    case "unrecorded":
+      return `Money moved, but Auni couldn't confirm what came back and won't send it again. ${money}`;
+    case "overdue":
+      return `Status unknown. Still unconfirmed after a day, so Auni won't send it again. ${money}`;
+    case "unanswered":
+      return `Status unknown. Auni sent this and never heard back, so it won't send it again. ${money}`;
+    default:
+      return `Status unknown. Auni can't confirm whether money moved and won't send it again. ${money}`;
+  }
 }
 
 /** A status notice for a held move without a sealed card to re-send. */
-export function drawHeldNotice(leg: ActionRow, where: AppDestination): ChannelMessage {
-  const destination = viaApp(where, "Check status", "check status");
-  return {
-    text: [
-      literal(leg.summary),
-      `Status unknown. ${heldOutcome(leg)} ${HELD_SAFE}`,
-      !destination.buttons && destination.text,
-    ]
-      .filter(Boolean)
-      .join("\n\n"),
-    ...(destination.buttons && { buttons: destination.buttons }),
-  };
+export function drawHeldNotice(leg: ActionRow): ChannelMessage {
+  return { text: `${literal(leg.summary)}\n\n${heldStatus(leg)}` };
 }
 
 function failedOutcome(leg: ActionRow): string {

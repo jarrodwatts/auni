@@ -135,24 +135,28 @@ describe("drawCard", () => {
     });
     const legs = [leg(), sell];
     const drawn = drawCard(view(legs), "g");
-    expect(drawn.text).toContain(`**${literal("2 moves ($15 in)")}**`);
+    expect(drawn.text).toContain(`**${literal("2 moves, $15 total")}**`);
     expect(drawn.text).toContain("> You give: 10 USDC");
     expect(drawn.text).toContain("> Price cap: $50 per share");
     expect(drawn.buttons?.flat()).toContainEqual({ label: "Buy both for $15", press: "allow:g" });
 
     const oversized = [leg(), { ...sell, lines: [{ label: "Terms", value: "x".repeat(3_500) }] }];
     expect(fitsHere(oversized)).toBe(false);
-    expect(drawCard(view(oversized), "g").buttons?.flat()).toEqual([
+    const waiting = drawCard(view(oversized), "g");
+    expect(waiting.text).toContain(
+      "**1. Buy about $10 of Nvidia**\n**2. Buy $5 of Tesla**\n2 moves waiting on you",
+    );
+    expect(waiting.buttons?.flat()).toEqual([
       { label: "Open in Auni", url: "https://auni.example/app/chat/t" },
     ]);
     const settled = drawCard(
       view([
-        { ...oversized[0]!, status: "done" },
+        { ...oversized[0]!, status: "done", run: { filled: "Bought 0.1 NVDAx" } },
         { ...oversized[1]!, status: "failed" },
       ]),
       null,
     );
-    expect(settled.text).toContain("> Done: 1\n> Didn't go through. Nothing left your wallet: 1");
+    expect(settled.text).toContain("1 bought, 1 didn't go through");
     expect(settled.buttons?.flat()).toEqual([
       { label: "Open in Auni", url: "https://auni.example/app/chat/t" },
     ]);
@@ -195,10 +199,25 @@ describe("drawCard", () => {
       [leg({ status: "running", phase: "needs_owner" }), "can't confirm whether money moved"],
       [
         leg({ status: "running", phase: "needs_owner", run: { held: "unrecorded" } }),
-        "Money moved. Auni couldn't confirm what came back.",
+        "Money moved, but Auni couldn't confirm what came back",
       ],
     ] as const)
       expect(drawCard(view([row]), null).text).toContain(words);
+  });
+
+  it("puts the network fee purchase alongside the facts above the status", () => {
+    const row = leg({
+      details: {
+        feeCoinOn: "monad",
+        feeCoinFrom: "monad",
+        feeCoinToken: "native",
+        feeCoinAmount: "500000000000000",
+        feeCoinUsd: "0.50",
+        feeCoinBy: "KyberSwap",
+      },
+    });
+    const text = drawCard(view([row]), "g").text;
+    expect(text).toMatch(/> You get: NVDAx\n> Also buys [^\n]+\nWaiting on you/u);
   });
 
   it("keeps the amount and route on a landed bridge receipt and sizes the plan's button", () => {

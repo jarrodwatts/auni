@@ -26,8 +26,11 @@ import { allowAction, allowProposal, declineAction, declineProposal } from "../m
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
-import { allFills, holdingsOfThread, threadBooks, worthUsd } from "../money/books.ts";
+import { centsToUsd, parseUnits, signedUsdToCents, usdToCents } from "../money/usd.ts";
+import { allFills, holdersOf, threadBooks } from "../money/books.ts";
+import { fillIdentity, QUANTITY_DECIMALS } from "../money/fill-key.ts";
 import { portfolioNow } from "../money/portfolio.ts";
+import { valueHistory } from "../money/value-history.ts";
 import {
   appDestination,
   hashOf,
@@ -35,7 +38,7 @@ import {
   legsOf,
   recordSent,
   sendCard,
-  resendPendingCard,
+  pendingCard,
   spendGrant,
   syncCards,
   syncDelivery,
@@ -204,13 +207,23 @@ async function pending(found: Found, chat: string): Promise<void> {
     .select()
     .from(actions)
     .where(or(eq(actions.status, "awaiting_permission"), eq(actions.phase, "needs_owner")))
-    .orderBy(actions.createdAt);
-  let sent = false;
+    .orderBy(actions.createdAt, actions.id);
+  let ready = 0;
   for (const group of Map.groupBy(rows, (row) => row.proposalId ?? row.id).values()) {
     const row = group.find(({ phase }) => phase === "needs_owner") ?? group[0]!;
-    if (await resendPendingCard(found, chat, row)) sent = true;
+    const send = await pendingCard(found, chat, row);
+    if (!send) continue;
+    ready += 1;
+    if (ready <= 4) await send();
   }
-  if (!sent)
+  if (ready > 4) {
+    const { link } = appDestination("/app");
+    await found.channel.send(chat, {
+      text: `${ready - 4} more waiting in Auni`,
+      ...(link && { buttons: [[{ label: "Open Money", url: link }]] }),
+    });
+  }
+  if (ready === 0)
     await found.channel.send(chat, {
       text: rows.length
         ? "No cards are ready to review yet."
@@ -227,29 +240,77 @@ async function money(found: Found, chat: string): Promise<void> {
   await found.channel.send(chat, { text: `**Money**\n\n${summary}`, buttons });
 }
 
+function moneyChange(points: Awaited<ReturnType<typeof valueHistory>>["points"]): string {
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last || first === last) return "";
+  const change = signedUsdToCents(last.madeUsd) - signedUsdToCents(first.madeUsd);
+  const amount = dollars(centsToUsd(change < 0n ? -change : change));
+  const sign = change < 0n ? "-" : change > 0n ? "+" : "";
+  return ` (${sign}${amount} today)`;
+}
+
 async function readMoney(): Promise<string> {
   const [portfolio, fills] = await Promise.all([portfolioNow(), allFills(db)]);
-  const ids = [...threadBooks(fills).keys()];
-  const takes = ids.length
-    ? await db
-        .select({ id: threads.id, title: threads.title })
-        .from(threads)
-        .where(inArray(threads.id, ids))
-        .orderBy(threads.title, threads.id)
-    : [];
-  const values = takes.flatMap(({ id, title }) => {
-    const holdings = holdingsOfThread(id, portfolio.assets.holdings, fills);
-    if (!holdings.length) return [];
-    const value = holdings.every(({ usdValue }) => usdValue === null)
-      ? "Value unavailable"
-      : dollars(worthUsd(holdings));
-    return [`> ${literal(title || "Untitled take")}: ${value}`];
+  const books = threadBooks(fills);
+  const ids = [...books.keys()];
+  const [takes, history] = await Promise.all([
+    ids.length
+      ? db
+          .select({ id: threads.id, title: threads.title })
+          .from(threads)
+          .where(inArray(threads.id, ids))
+          .orderBy(threads.title, threads.id)
+      : [],
+    valueHistory("Today").catch(() => null),
+  ]);
+  const values = new Map<string, { cents: bigint; priced: boolean }>();
+  let looseHoldings = false;
+  let loosePriced = false;
+  // Allocate each holding once, even if several takes bought more than the wallet now holds.
+  for (const holding of portfolio.assets.holdings) {
+    const units = parseUnits(holding.quantity, QUANTITY_DECIMALS);
+    if (units === 0n) continue;
+    const { threads: owners, other: loose } = holdersOf(
+      holding.short ? -units : units,
+      books,
+      fillIdentity(holding),
+    );
+    if (loose > 0n) {
+      looseHoldings = true;
+      if (holding.usdValue !== null) loosePriced = true;
+    }
+    for (const [id, share] of owners) {
+      const value = values.get(id) ?? { cents: 0n, priced: false };
+      if (holding.usdValue !== null) {
+        value.cents += (usdToCents(holding.usdValue) * share) / units;
+        value.priced = true;
+      }
+      values.set(id, value);
+    }
+  }
+  // Unassigned holdings and cents left from splitting a holding belong on their own line.
+  let other = usdToCents(portfolio.assets.usdValue);
+  const lines = takes.flatMap(({ id, title }) => {
+    const value = values.get(id);
+    if (!value) return [];
+    other -= value.cents;
+    const amount = value.priced ? dollars(centsToUsd(value.cents)) : "Value unavailable";
+    return [`> ${literal(title || "Untitled take")}: ${amount}`];
   });
   const missing = [...new Set([...portfolio.unavailable, ...portfolio.looking])];
   return [
-    `> Total: ${dollars(portfolio.totalUsd)}`,
+    `> Total: ${dollars(portfolio.totalUsd)}${moneyChange(history?.points ?? [])}`,
     `> Cash: ${dollars(portfolio.cash.usdValue)}`,
-    ...values,
+    ...lines,
+    ...(other || looseHoldings
+      ? [
+          `> Other holdings: ${other || loosePriced ? dollars(centsToUsd(other)) : "Value unavailable"}`,
+        ]
+      : []),
+    ...(portfolio.onTheWay.moves.length
+      ? [`> On the way: ${dollars(portfolio.onTheWay.usdValue)}`]
+      : []),
     ...(missing.length ? [`\nStill missing balances from ${literal(missing.join(", "))}.`] : []),
   ].join("\n");
 }

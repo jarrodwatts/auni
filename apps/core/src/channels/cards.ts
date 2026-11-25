@@ -116,6 +116,9 @@ export function appDestination(path: string) {
 const threadPath = (threadId: string | null) =>
   threadId ? `/app/chat/${threadId}` : "/app/activity";
 
+const cardPath = (threadId: string, id: string, status = false) =>
+  `${threadPath(threadId)}?${new URLSearchParams({ [status ? "status" : "card"]: id })}`;
+
 /** A card asking for a secret, which is typed into its field in the app and never into a chat. */
 const asksForSecret = (leg: Pick<ActionRow, "tool">) => leg.tool === "request_secret";
 
@@ -123,9 +126,10 @@ async function viewOf(
   delivery: Pick<ChannelDeliveryRow, "id" | "threadId" | "cardDigest"> | null,
   legs: readonly ActionRow[],
   target: CardTarget,
+  threadId = delivery?.threadId ?? legs[0]?.threadId ?? null,
 ): Promise<CardView> {
   const waiting = waitingOn(legs);
-  const threadId = delivery?.threadId ?? legs[0]?.threadId ?? null;
+  const id = "actionId" in target ? target.actionId : target.proposalId;
   const thread = threadId ? await threadById(threadId) : null;
   const [secret] = legs.filter(asksForSecret);
   const fits = fitsHere(legs);
@@ -142,8 +146,8 @@ async function viewOf(
     proof,
     secret: secret !== undefined,
     decidedIn: waiting || !delivery?.cardDigest ? null : await whereDecided(target, delivery.id),
-    // A secret's card links to itself, where its field waits with the cursor in it.
-    ...appDestination(`${threadPath(threadId)}${secret ? `?card=${secret.id}` : ""}`),
+    ...appDestination(threadId ? cardPath(threadId, id) : threadPath(null)),
+    statusLink: threadId ? appDestination(cardPath(threadId, id, true)).link : null,
     threadName: thread?.title,
   };
 }
@@ -172,8 +176,9 @@ async function drawn(
   delivery: Pick<ChannelDeliveryRow, "id" | "threadId" | "cardDigest"> | null,
   legs: readonly ActionRow[],
   target: CardTarget,
+  threadId?: string,
 ) {
-  const view = await viewOf(delivery, legs, target);
+  const view = await viewOf(delivery, legs, target, threadId);
   const digest = legsDigest(legs);
   const waiting = waitingOn(legs);
   const grant = waiting && !view.inTheApp ? newGrant() : null;
@@ -220,22 +225,22 @@ export async function sendCard(
           : {},
       );
     }
-    const message = drawNotice(card, appDestination(threadPath(threadId)));
+    const message = drawNotice(card, appDestination(cardPath(threadId, card.id)));
     return recordSent(app, threadId, await app.channel.send(chat, message, replyTo, replace), {});
   }
-  const { message, row } = await drawn(null, legs, target);
+  const { message, row } = await drawn(null, legs, target, threadId);
   await recordSent(app, threadId, await app.channel.send(chat, message, replyTo, replace), {
     ...("actionId" in target ? { actionId: target.actionId } : { proposalId: target.proposalId }),
     ...row,
   });
 }
 
-/** Resends only a card core sealed and stored, with a grant bound to the new message. */
-export async function resendPendingCard(
+/** Finds a sealed card to resend, or a read-only notice for a held move without one. */
+export async function pendingCard(
   app: { readonly id: string; readonly channel: Channel },
   chat: string,
   row: ActionRow,
-): Promise<boolean> {
+): Promise<(() => Promise<void>) | null> {
   const marker = row.proposalId
     ? { kind: "action_plan", proposalId: row.proposalId }
     : { actionReference: row.id };
@@ -253,18 +258,14 @@ export async function resendPendingCard(
         ? segment.card.kind === "action_plan" && segment.card.proposalId === row.proposalId
         : "actionReference" in segment.card && segment.card.actionReference === row.id),
   );
-  if (source && segment?.kind === "card") {
-    await sendCard(app, chat, source.threadId, segment.card);
-    return true;
-  }
-  // A move can be held before its turn saves a card. It still deserves a status notice.
-  if (row.phase !== "needs_owner") return false;
-  const refs = await app.channel.send(
-    chat,
-    drawHeldNotice(row, appDestination(threadPath(row.threadId))),
-  );
-  if (row.threadId) await recordSent(app, row.threadId, refs, {});
-  return true;
+  if (source && segment?.kind === "card")
+    return () => sendCard(app, chat, source.threadId, segment.card);
+  if (row.phase !== "needs_owner") return null;
+  // There is no card to open yet. The notice itself gives the known status.
+  return async () => {
+    const refs = await app.channel.send(chat, drawHeldNotice(row));
+    if (row.threadId) await recordSent(app, row.threadId, refs, {});
+  };
 }
 
 /** Keeps each message a send took, so a reply to any of them joins the thread; `last` has the buttons. */
@@ -339,7 +340,7 @@ async function depositMessage(
   depositWallet: typeof readWallet,
 ) {
   const wallet = !card.landed && !expired ? await depositWallet() : undefined;
-  return drawNotice(card, appDestination(threadPath(threadId)), wallet, expired);
+  return drawNotice(card, appDestination(cardPath(threadId, card.id)), wallet, expired);
 }
 
 async function syncDeposit(

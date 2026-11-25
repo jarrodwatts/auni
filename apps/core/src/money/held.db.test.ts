@@ -1,4 +1,4 @@
-import { CLOSED, HELD, HELD_SAFE, type HeldWhy } from "@auni/shared";
+import { CLOSED, HELD, type HeldWhy } from "@auni/shared";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -575,10 +575,12 @@ describe("a run cut off after its order went out with no answer", () => {
       moneyLine: "Not confirmed: Sell 40 Yes shares of Fed cuts in December",
       moving: null,
     });
-    // A channel's copy of the card: the same words, and the way to its two taps.
+    // A channel's copy gives the known outcome and a way to check it in the app.
     const link = "https://evo-t1.example.ts.net/app";
     const drawn = drawCard({ legs: [row], inTheApp: false, decidedIn: null, link }, null);
-    expect(drawn.text).toContain(`Status unknown. ${HELD.unanswered} ${HELD_SAFE}`);
+    expect(drawn.text).toContain(
+      "Status unknown. Auni sent this and never heard back, so it won't send it again. Your Money page shows what you hold.",
+    );
     expect(drawn.buttons).toEqual([[{ label: "Check status", url: link }]]);
     // The agent: woken once, told what is known and not to send it again.
     const [turn] = await jobsOf("turn");

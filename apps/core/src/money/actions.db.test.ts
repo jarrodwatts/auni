@@ -26,16 +26,16 @@ import {
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
 import { MayHaveSent, NothingMoved, type Recipe } from "./recipe.ts";
+import { recipeForTool } from "./recipes/index.ts";
 import { PLAN_LEGS } from "./tools.ts";
 import { parseUnits } from "./usd.ts";
 import type { SignerOptions } from "./wallets.ts";
 
 // Every tool resolves to `buy`, so no venue is called, and wallets are a stub rather than a wallet app's read.
+// Spy mode, so every module that reads the registry sees the stub, whichever loads first.
 const lookup = vi.hoisted(() => ({ recipe: undefined as unknown }));
-vi.mock("./recipes/index.ts", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  recipeForTool: () => lookup.recipe,
-}));
+vi.mock("./recipes/index.ts", { spy: true });
+vi.mocked(recipeForTool).mockImplementation(() => lookup.recipe as Recipe);
 // What a sale's holding reads as just before it runs.
 const held = vi.hoisted(() => ({ units: null as bigint | null }));
 vi.mock("./portfolio.ts", async (importOriginal) => ({

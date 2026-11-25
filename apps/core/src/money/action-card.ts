@@ -14,14 +14,13 @@ import {
   APPROVED_PRICE_AT_LEAST,
   APPROVED_PRICE_AT_MOST,
   APPROVED_PROCEEDS,
-  approvedTokens,
 } from "./approved.ts";
 import { isSavings, ledgerAt, appById } from "../apps/registry.ts";
 import type { ActionRow } from "../db/schema.ts";
 import { fitted, plainFace } from "./card-face.ts";
 import { LINES } from "./effect.ts";
 import { feeCoinsSaid } from "./fee-coin-said.ts";
-import { goneForGood } from "./gone-for-good.ts";
+import { lostSaid } from "./gone-for-good.ts";
 import { placeName } from "./chains.ts";
 import { tokenKey } from "./fill-key.ts";
 import { withdrawalFeeUsd } from "./funding.ts";
@@ -234,8 +233,7 @@ export async function subjectLogo(
  * showed it sending. Whoever wrote the face, it can't leave that out.
  */
 function withLoss(row: Pick<ActionRow, "details">, face: CardFace): CardFace {
-  const to = row.details.leavesTo?.split(",").filter(Boolean) ?? [];
-  const lost = goneForGood(to, approvedTokens(row)?.sends);
+  const lost = lostSaid(row);
   if (!lost) return face;
   return { ...face, warning: [lost, face.warning].filter(Boolean).join(" ").slice(0, 500) };
 }

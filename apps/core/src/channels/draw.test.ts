@@ -119,6 +119,22 @@ describe("drawCard", () => {
     expect(drawn.buttons).toHaveLength(1);
   });
 
+  it("says each leg's permissions on a plan, since one Allow grants them all", () => {
+    const sale = leg({
+      id: "a2",
+      summary: "Sell 10 Yes shares",
+      lines: [
+        {
+          label: "Lets",
+          value: "Polymarket's exchanges trade the shares in your Polymarket wallet",
+        },
+      ],
+    });
+    expect(drawCard(view([leg(), sale]), "g").text).toContain(
+      "2. Sell 10 Yes shares: Waiting for you\nLets: Polymarket's exchanges trade the shares in your Polymarket wallet",
+    );
+  });
+
   it("says, while a plan waits, that a trade behind its money moves is priced again then", () => {
     const bridge = leg({
       id: "a1",

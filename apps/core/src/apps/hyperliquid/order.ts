@@ -211,7 +211,7 @@ export const hyperliquidOrder: Recipe<typeof input> = {
       ...(takeProfit
         ? [`Hyperliquid take profit on the whole position at market at ${takeProfit}`]
         : []),
-    ].map((lets) => ({ lets, reach: "venue" as const }));
+    ].map((lets) => ({ lets, reach: "venue" as const, order: true as const }));
     // How far the price can go against the position before it is liquidated (see about).
     const wipedOut = liquidationMove(order.side === "long", order.leverage, market.maxLeverage);
     // The stops in place now that its own replace, and those left over that come off with them.

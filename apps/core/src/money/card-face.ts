@@ -1,13 +1,14 @@
 import {
   AMOUNT,
   formatExactUsd,
+  permissionsSaid,
   SUMMARY_VERBS,
   type ActionCardWire,
   type CardFace,
 } from "@auni/shared";
 
 import type { AppLogo } from "./app-logo.ts";
-import { sentTo } from "./effect.ts";
+import { sentTo, type Effect } from "./effect.ts";
 import { moneyOf, type ActionPreview } from "./recipe.ts";
 import { parseUnits } from "./usd.ts";
 
@@ -281,7 +282,7 @@ function logoOf({ logo, app }: AppTerms): NonNullable<CardFace["logo"]> {
 function appWords(terms: AppTerms, said: Said): CardFace {
   const act = (verb: string) => (said.moves ? `${verb} ${AMOUNT}` : verb);
   const onChain = `${terms.app} on ${terms.chain}`;
-  const warning = terms.leaves ? `It lets ${terms.leaves} afterwards.` : null;
+  // A permission it leaves is said by withPermissions, as on every card.
   const safe = terms.leaves ? null : "Nothing is left able to spend your money afterwards.";
   const fee = terms.networkFee ? `Network fee about ${terms.networkFee}.` : null;
   // The app's name may be the agent's word, so the contract it calls is said too, to catch a misnamed one.
@@ -314,7 +315,6 @@ function appWords(terms: AppTerms, said: Said): CardFace {
         terms.networkFee ? { label: "Network fee", value: terms.networkFee } : null,
       ),
       finePrint: via,
-      warning,
       price: terms.price,
       receipt: buys
         ? { title: `Bought ${name}`, detail: `About ${leg(got)}`, amount: "spent" }
@@ -332,7 +332,6 @@ function appWords(terms: AppTerms, said: Said): CardFace {
       // Only what the simulation shows: whether it earns or can be taken out is the app's to say.
       figures: figures(sends("You put in"), gets("You get back")),
       finePrint: sentence(safe, fee, via),
-      warning,
       receipt: { title, detail: onChain, amount: "spent" },
     };
   }
@@ -346,7 +345,6 @@ function appWords(terms: AppTerms, said: Said): CardFace {
       figures: figures(sends("You send"), gets("You get here")),
       scene: { kind: "route", from: terms.chain, sends: leg(sent), to: terms.toChain },
       finePrint: sentence("Bridges usually take a few minutes to land.", fee, via),
-      warning,
       // Done here is sent on its way; the other chain has it a few minutes later.
       receipt: {
         title: `Sent ${sent.symbol} to ${terms.toChain}`,
@@ -370,13 +368,41 @@ function appWords(terms: AppTerms, said: Said): CardFace {
     context,
     figures: figures(sends("You send"), back),
     finePrint: sentence(safe, fee, via),
-    warning,
     receipt: {
       title: known ? [known.past, ...rest].join(" ") : said.summary,
       detail: context,
       amount: said.moves ? "spent" : null,
     },
   };
+}
+
+/**
+ * A face that says, first among its warnings, each lasting permission the move leaves behind, in
+ * core's words from its effect, whoever wrote it: a face says the move's terms, and the
+ * permissions it grants can't depend on its writer remembering them. An order the owner places
+ * (a stop-loss) is one of those terms, which the face says itself (see Grant.order).
+ */
+export function withPermissions(face: CardFace, effect: Pick<Effect, "grants">): CardFace {
+  const lets = effect.grants.filter(({ order }) => !order).map(({ lets }) => lets);
+  if (lets.length === 0) return face;
+  return { ...face, warning: [permissionsSaid(lets), face.warning].filter(Boolean).join(" ") };
+}
+
+/** The most a card's warning says (see cardFaceSchema). */
+const WARNING_MOST = 500;
+
+/**
+ * Why a move gets no card, or null: its warning must say whole both where it sends money for
+ * good (`lost`, which a card says first) and every permission and order it leaves, which its
+ * Lets line, read by a plan, says too. A card says all a move grants, or there is no card.
+ */
+export function tooMuchToWarn(effect: Pick<Effect, "grants">, lost: string | null): string | null {
+  const lets = effect.grants.map(({ lets }) => lets);
+  if (lets.length === 0) return null;
+  const said = [lost, permissionsSaid(lets)].filter(Boolean).join(" ");
+  return said.length > WARNING_MOST
+    ? `It leaves ${lets.length} permissions${lost ? " and sends money where it is gone for good" : ""}, more than one card can show whole, so no card was made. Each transaction can leave fewer.`
+    : null;
 }
 
 /** What the plain face reads of a card: core's sentence, its lines, and its money as the card carries it. */

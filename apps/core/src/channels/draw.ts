@@ -11,6 +11,7 @@ import {
 import type { ActionRow, ChannelQuestion } from "../db/schema.ts";
 import type { ChannelButton, ChannelMessage } from "../apps/contract.ts";
 import { pricedLater } from "../money/action-card.ts";
+import { LINES } from "../money/effect.ts";
 import { feeCoinsSaid } from "../money/fee-coin-said.ts";
 
 // What the hub sends on a channel, drawn from core's own records: a card's words and buttons come
@@ -88,7 +89,13 @@ function wholeCard(legs: readonly ActionRow[]): string[] {
   const later = waiting.length > 0 ? pricedLater(legs) : null;
   return [
     `**A plan of ${legs.length} moves, one tap for all of them**`,
-    ...legs.map((leg, index) => `${index + 1}. ${literal(leg.summary)}: ${legStatus(leg)}`),
+    // Each leg's permissions too, as a lone move's lines say them, since Allow here grants them.
+    ...legs.flatMap((leg, index) => [
+      `${index + 1}. ${literal(leg.summary)}: ${legStatus(leg)}`,
+      ...leg.lines
+        .filter(({ label }) => label === LINES.lets)
+        .map((line) => `${literal(line.label)}: ${literal(line.value)}`),
+    ]),
     ...said,
     ...(later ? [literal(later)] : []),
   ];

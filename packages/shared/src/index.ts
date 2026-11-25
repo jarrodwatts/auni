@@ -19,6 +19,8 @@ export {
   type FailureKind,
   failureKindSchema,
   filledUsd,
+  LETS_LINE,
+  permissionsSaid,
   type ProposalWire,
   proposalWireSchema,
 } from "./action.ts";

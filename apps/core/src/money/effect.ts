@@ -1,4 +1,4 @@
-import type { ActionLine } from "@auni/shared";
+import { LETS_LINE, type ActionLine } from "@auni/shared";
 
 import { feeLabel, shortAddress, usdLabel } from "./format.ts";
 
@@ -37,6 +37,13 @@ export interface Grant {
    * put in a venue's wallet or account of their own.
    */
   readonly reach: "wallet" | "venue";
+  /**
+   * An order the owner places, which the venue fills later on its own (a resting limit, a
+   * stop-loss): one of the move's own terms, which its face says among its figures. Absent for a
+   * permission, which core says on every card in its own words, whoever wrote its face (see
+   * withPermissions).
+   */
+  readonly order?: true;
 }
 
 /** Part of what a move costs, in dollars. */
@@ -186,7 +193,7 @@ export const LINES = {
   sends: "You send",
   to: "To",
   costs: "Costs",
-  lets: "Lets",
+  lets: LETS_LINE,
 } as const;
 
 /**

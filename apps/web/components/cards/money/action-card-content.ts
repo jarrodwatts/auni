@@ -1,4 +1,12 @@
-import { fillFace, type ActionCardWire, type CardFace, type FilledFace } from "@auni/shared";
+import {
+  fillFace,
+  LETS_LINE,
+  permissionsSaid,
+  type ActionCardWire,
+  type ActionPlanCardWire,
+  type CardFace,
+  type FilledFace,
+} from "@auni/shared";
 
 import { dollarsToBaseUnits } from "@/lib/data/usdc";
 
@@ -88,4 +96,20 @@ export function figureWidth(
   const length = value.length + (note ? note.length + 2 : 0);
   if (address || length > 24) return "row";
   return length > 16 ? "wide" : "column";
+}
+
+/**
+ * What each of a plan's moves leaves able to act on the owner's money, one sentence a move, under
+ * its name, since one tap grants it all. Read from each move's own recorded line, which says every
+ * permission and standing order it leaves, whether its face says them (a stop-loss among its
+ * terms) or it has no face of its own.
+ */
+export function planPermissions(
+  legs: readonly Pick<ActionPlanCardWire["legs"][number], "summary" | "lines">[],
+): string[] {
+  return legs.flatMap(({ summary, lines }) =>
+    lines
+      .filter(({ label }) => label === LETS_LINE)
+      .map(({ value }) => `${summary}: ${permissionsSaid([value])}`),
+  );
 }

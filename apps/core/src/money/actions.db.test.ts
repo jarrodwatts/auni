@@ -10,7 +10,7 @@ import { actions, fills, jobs, threads } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { actionKind, turnKind } from "../jobs/kinds.ts";
 import { queued } from "../test/jobs.ts";
-import { stubRecipe } from "../test/recipe.ts";
+import { FACE, stubRecipe } from "../test/recipe.ts";
 import {
   actionWire,
   decideActions,
@@ -321,6 +321,31 @@ describe("recordActions", () => {
       .from(actions)
       .where(eq(actions.threadId, own.id));
     expect(recorded.map((row) => row.status).sort()).toEqual(["awaiting_permission", "running"]);
+  });
+
+  // A move whose face its app wrote, which leaves a lasting permission it doesn't mention.
+  it("stores every permission a move grants on its card, whoever wrote the face", async () => {
+    const sale = stubRecipe({
+      describe: async () => ({
+        summary: "Sell 10 Yes shares",
+        amountUsd: "0",
+        effect: {
+          gives: [{ text: "10 Yes shares" }],
+          gets: [],
+          grants: [
+            {
+              lets: "Polymarket's exchanges trade the shares in your Polymarket wallet",
+              reach: "venue",
+            },
+          ],
+        },
+        card: { ...FACE, title: "Sell Yes" },
+      }),
+    });
+    const { rows } = await recordActions({ threadId: null }, [await prepareLeg(sale, {})], null);
+    expect(rows[0]?.card?.warning).toBe(
+      "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
+    );
   });
 
   it("acts on its own only in an active Auto thread with a positive budget", async () => {

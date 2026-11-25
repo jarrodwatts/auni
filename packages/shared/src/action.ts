@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { dollarsSchema } from "./money.ts";
 import { CASH_KEYS } from "./networks.ts";
+import { listed } from "./words.ts";
 import { actionRecordIdSchema, proposalIdSchema, threadIdSchema, timestampSchema } from "./shared.ts";
 
 /**
@@ -129,6 +130,16 @@ export type FailureKind = z.infer<typeof failureKindSchema>;
 /** One line of a move's card, in the order core wrote them: "Network: Base". */
 const actionLineSchema = z.object({ label: z.string(), value: z.string() });
 export type ActionLine = z.infer<typeof actionLineSchema>;
+
+/**
+ * The label of a move's line that says every lasting power it leaves anyone over the owner's
+ * money, orders it places included: "Lets: 0x1a2b…9f8e spend your USDC".
+ */
+export const LETS_LINE = "Lets";
+
+/** How a card says the lasting permissions a move leaves, wherever it's drawn. */
+export const permissionsSaid = (lets: readonly string[]): string =>
+  `From now on, it lets ${listed(lets)}.`;
 
 /** One money action as core serves it, to the web and to the agent. */
 export const actionWireSchema = z.object({

@@ -90,9 +90,10 @@ export const CARD_WAITS_MS = 24 * 60 * 60_000;
  * it allows one, as the format it drew. Raise it whenever cards start saying something they
  * didn't: a card recorded before is taken back, never allowed or tried again as it was shown, and
  * a tab still running the web app from before is told to reload (core's money/decide.ts).
- * 2 says every permission a move leaves.
+ * 2 says every permission a move leaves. 3 names whoever holds one over the main wallet by their
+ * whole address, which is what Allow now vouches for (core's money/effect.ts, unshownGrant).
  */
-export const CARD_FORMAT = 2;
+export const CARD_FORMAT = 3;
 
 /**
  * Why Auni took back a card still waiting for the owner's tap, in the words its card, its

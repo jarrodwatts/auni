@@ -1,12 +1,16 @@
 import {
   AMOUNT,
+  CARD_FORMAT,
   formatExactUsd,
+  isAsk,
+  LETS_LINE,
   permissionsSaid,
   SUMMARY_VERBS,
   type ActionCardWire,
   type CardFace,
 } from "@auni/shared";
 
+import type { ActionRow } from "../db/schema.ts";
 import type { AppLogo } from "./app-logo.ts";
 import { letsSaid, sentTo, type Effect } from "./effect.ts";
 import { moneyOf, type ActionPreview } from "./recipe.ts";
@@ -421,6 +425,25 @@ export function tooMuchToWarn(effect: Pick<Effect, "grants">, lost: string | nul
   return line.length > LINE_MOST || warned.length > WARNING_MOST
     ? `It leaves ${effect.grants.length} permissions${lost ? " and sends money where it is gone for good" : ""}, more than one card can show whole, so no card was made. Each transaction can leave fewer.`
     : null;
+}
+
+/** What a move's row recorded of the card it was allowed on. */
+type OldCard = Pick<ActionRow, "lines" | "card" | "cardFormat" | "tool" | "proposalId">;
+
+/**
+ * Whether a card drawn before cards said all they say now (CARD_FORMAT) left out a lasting
+ * permission one of its moves leaves, as its recorded Lets line names them, so the owner allowed
+ * it unseen: a plan's card drew no move's Lets line, and a lone move's card drew it only when core
+ * drew its face from its lines, or the move's own words warned of it whole. An old row doesn't
+ * mark which of what it lets is an order its face showed among its terms (Grant.order), so each
+ * counts as a permission.
+ */
+export function leftOutPermission(legs: readonly OldCard[]): boolean {
+  return legs.some((leg) => {
+    const lets = leg.lines.find(({ label }) => label === LETS_LINE)?.value;
+    if (!lets || leg.cardFormat >= CARD_FORMAT || isAsk(leg.tool)) return false;
+    return leg.proposalId !== null || (leg.card !== null && !leg.card.warning?.includes(lets));
+  });
 }
 
 /** What the plain face reads of a card: core's sentence, its lines, and its money as the card carries it. */

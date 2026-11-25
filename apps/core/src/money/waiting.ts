@@ -1,4 +1,4 @@
-import { ASK_TOOL_NAMES, CARD_FORMAT, CARD_WAITS_MS, isAsk, LETS_LINE } from "@auni/shared";
+import { ASK_TOOL_NAMES, CARD_FORMAT, CARD_WAITS_MS } from "@auni/shared";
 import { and, eq, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -148,22 +148,6 @@ export async function retractStale(tx: Tx): Promise<string[]> {
       { tx },
     );
   return [...new Set([...stale, ...old].flatMap((row) => row.threadId ?? []))];
-}
-
-/**
- * Whether a card drawn before cards said all they say now (CARD_FORMAT) left out a lasting
- * permission one of its moves leaves, as its recorded Lets line names them, so the owner allowed
- * it unseen: a plan's card drew no move's Lets line, and a lone move's card drew it only when core
- * drew its face from its lines, or the move's own words warned of it whole. An old row doesn't
- * mark which of what it lets is an order its face showed among its terms (Grant.order), so each
- * counts as a permission.
- */
-export function leftOutPermission(legs: readonly ActionRow[]): boolean {
-  return legs.some((leg) => {
-    const lets = leg.lines.find(({ label }) => label === LETS_LINE)?.value;
-    if (!lets || leg.cardFormat >= CARD_FORMAT || isAsk(leg.tool)) return false;
-    return leg.proposalId !== null || (leg.card !== null && !leg.card.warning?.includes(lets));
-  });
 }
 
 /** Takes back every card that can no longer be allowed as shown (retractStale), and tells their threads' open tabs. */

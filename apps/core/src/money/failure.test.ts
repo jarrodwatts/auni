@@ -5,6 +5,7 @@ import { assertApprovedSpend, PriceMoved } from "./approved.ts";
 import { failureKind, retryRefusal } from "./failure.ts";
 import { FeesUnpaid, MayHaveSent, NothingMoved } from "./recipe.ts";
 import { Refused, refused } from "./refused.ts";
+import { FACE } from "../test/recipe.ts";
 
 describe("failureKind", () => {
   it("knows a price past what was approved by its refusal, whatever it says", () => {
@@ -24,6 +25,9 @@ describe("failureKind", () => {
       details: {},
       txs: [{ chain: "monad", hash: "0xbought", setup: true as const, buysFees: "0xorder" }],
       cardFormat: CARD_FORMAT,
+      lines: [],
+      card: null,
+      proposalId: null,
     };
     expect(retryRefusal(row)).toBeNull();
   });
@@ -116,6 +120,9 @@ describe("retryRefusal", () => {
     details: {},
     txs: [],
     cardFormat: CARD_FORMAT,
+    lines: [],
+    card: null,
+    proposalId: null,
   };
 
   it("lets a blip, a busy venue, a moved price or anything unknown run again", () => {
@@ -141,8 +148,16 @@ describe("retryRefusal", () => {
   });
 
   // Its run may grant what that card never showed, such as a first sale's lasting permission.
-  it("never runs a card drawn before cards said all they say now again", () => {
-    expect(retryRefusal({ ...failed, cardFormat: CARD_FORMAT - 1 })).toBe("not_retryable");
+  it("never runs again a card drawn before cards said all they say now that left a permission out", () => {
+    const lets = { label: "Lets", value: "Polymarket's exchanges trade your shares" };
+    const old = { ...failed, cardFormat: CARD_FORMAT - 1, lines: [lets], card: FACE };
+    expect(retryRefusal(old)).toBe("not_retryable");
+    expect(retryRefusal({ ...old, proposalId: "plan" })).toBe("not_retryable");
+    // Found in review: one that leaves nothing, or showed what it leaves, can still finish its plan.
+    expect(retryRefusal({ ...old, lines: [] })).toBeNull();
+    expect(
+      retryRefusal({ ...old, card: { ...FACE, warning: `It lets ${lets.value} afterwards.` } }),
+    ).toBeNull();
   });
 
   it("never runs money leaving the person, or anything the owner's proof vouched for, again on a tap", () => {

@@ -11,7 +11,7 @@ import { actions, threads, type ActionRow } from "../db/schema.ts";
 import { actionKind, wakeThread } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";
-import { fitted, tooMuchToWarn, withPermissions } from "./card-face.ts";
+import { fitted, leftOutPermission, tooMuchToWarn, withPermissions } from "./card-face.ts";
 import { approval, effectLines, pinnedApproval } from "./effect.ts";
 import { failureKind, retryRefusal } from "./failure.ts";
 import { fillIdentity, tokenKey, type FillKey } from "./fill-key.ts";
@@ -41,7 +41,7 @@ import {
 } from "./recipe.ts";
 import { recipeForTool, toolRecipe } from "./recipes/index.ts";
 import { Refused } from "./refused.ts";
-import { leftOutPermission, replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
+import { replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
 import { errorWords } from "../safe-words.ts";
 import { settleFromReceipts } from "./reconcile.ts";
 import {
@@ -414,9 +414,11 @@ export async function executeAction(actionId: string): Promise<ActionRow> {
   }
 }
 
-/** Nothing of it has started: never claimed, never run before, nothing sent or kept to send. */
-const unstarted = (leg: ActionRow): boolean =>
-  leg.phase === "queued" && leg.startedAt === null && leg.attempts === 1 && leg.txs.length === 0;
+/**
+ * Nothing of it has started: queued, and nothing sent or kept to send, by this run or one before
+ * it that failed (each send is kept before it goes, a wallet's journalled one with it).
+ */
+const unstarted = (leg: ActionRow): boolean => leg.phase === "queued" && leg.txs.length === 0;
 
 /**
  * The one place a run starts: claims a queued move, with every leg of its plan locked, so no two

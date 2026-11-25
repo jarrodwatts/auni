@@ -163,6 +163,20 @@ describe("executeAction", () => {
       expect(await wakes()).toHaveLength(1);
     });
 
+    // Found in review: one tried again before the update, whose first run sent nothing, ran.
+    it("is taken back when it was tried again but nothing of it was ever sent", async () => {
+      const { id } = await old({ attempts: 2 });
+      expect(await executeAction(id)).toMatchObject({ status: "retracted" });
+      expect(executions).toBe(0);
+      // One whose earlier run sent its approval has granted it already, and runs on.
+      const approved = await old({
+        attempts: 2,
+        txs: [{ chain: "polygon", hash: "0xa", setup: true }],
+      });
+      expect(await executeAction(approved.id)).toMatchObject({ status: "done" });
+      expect(executions).toBe(1);
+    });
+
     it("runs when its card showed every permission it leaves, or leaves none, or is drawn now", async () => {
       const shown = await old({
         card: { ...FACE, warning: `It lets ${LETS.value} afterwards.` },

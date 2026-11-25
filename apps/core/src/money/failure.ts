@@ -1,7 +1,8 @@
-import { CARD_FORMAT, type FailureKind, isAsk } from "@auni/shared";
+import { type FailureKind, isAsk } from "@auni/shared";
 
 import type { ActionRow } from "../db/schema.ts";
 import { PriceMoved } from "./approved.ts";
+import { leftOutPermission } from "./card-face.ts";
 import { stepUpReason } from "./effect.ts";
 import { FeesUnpaid, NothingMoved } from "./recipe.ts";
 import { Refused } from "./refused.ts";
@@ -53,14 +54,25 @@ export type RetryRefusal = "not_failed" | "not_retryable" | "needs_proof";
  * A step stopped behind another runs again only with it (see legsToRetry).
  */
 export function retryRefusal(
-  row: Pick<ActionRow, "status" | "failureKind" | "tool" | "details" | "txs" | "cardFormat">,
+  row: Pick<
+    ActionRow,
+    | "status"
+    | "failureKind"
+    | "tool"
+    | "details"
+    | "txs"
+    | "cardFormat"
+    | "lines"
+    | "card"
+    | "proposalId"
+  >,
 ): RetryRefusal | null {
   if (row.status !== "failed") return "not_failed";
   // An ask that failed found Auni changed since its card: only a new card can ask again.
   if (isAsk(row.tool)) return "not_retryable";
-  // A card drawn before cards said all they say now may have left out what its run grants (see
-  // CARD_FORMAT): the owner's tap allowed what they saw, so only a fresh card runs it.
-  if (row.cardFormat < CARD_FORMAT) return "not_retryable";
+  // A card drawn before cards said all they say now that left out a permission its run leaves
+  // (see leftOutPermission): the owner's tap allowed what they saw, so only a fresh card runs it.
+  if (leftOutPermission([row])) return "not_retryable";
   if (row.tool === WITHDRAW_TOOL || stepUpReason(row.details, []) !== null) return "needs_proof";
   // A step that failed before kinds were recorded may have been one that crashed after its
   // order reached the venue, and recorded nothing to show it: only a known kind runs again.

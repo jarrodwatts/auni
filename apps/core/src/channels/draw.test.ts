@@ -298,6 +298,25 @@ describe("drawCard", () => {
     );
   });
 
+  // Found in review: a card whose warning already says its permission said it twice.
+  it("says a permission once when the card's warning already says it", () => {
+    const lets = "Polymarket's exchanges trade the shares in your Polymarket wallet";
+    const sale = leg({
+      summary: "Sell 10 Yes shares",
+      lines: [{ label: "Lets", value: lets }],
+      card: {
+        title: "Sell 10 Yes shares",
+        figures: [],
+        warning: `From now on, it lets ${lets}.`,
+      } as unknown as ActionRow["card"],
+    });
+    const text = drawCard(view([sale]), "g").text;
+    expect(text.split(literal(lets))).toHaveLength(2);
+    expect(text).not.toContain("Lets:");
+    // With no warning saying it, the Lets line stays.
+    expect(drawCard(view([{ ...sale, card: null }]), "g").text).toContain(`Lets: ${literal(lets)}`);
+  });
+
   it("says once why a plan was taken back, even one too long to show whole, and offers no tap", () => {
     const why = "Out of date: Auni's cards now say more about each move.";
     const plan = (length: number) =>

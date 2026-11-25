@@ -157,10 +157,11 @@ function compactApproval(label: string): string {
 
 function reviewLines(leg: ActionRow, showLets: boolean): string[] {
   const { card } = leg;
-  const lines = leg.lines
-    .filter(({ label }) => showLets || label !== LETS_LINE)
-    .map(({ label, value }) => `${literal(label)}: ${literal(value)}`);
   const warning = lossWarning(leg, card?.warning);
+  // The warning says each permission in a sentence already; the line stays for orders it leaves out.
+  const lines = leg.lines
+    .filter(({ label, value }) => label !== LETS_LINE || (showLets && !warning?.includes(value)))
+    .map(({ label, value }) => `${literal(label)}: ${literal(value)}`);
   if (!card) return warning ? [...lines, literal(warning)] : lines;
   const figures = card.figures.map(
     ({ label, value, note }) =>

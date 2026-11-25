@@ -24,6 +24,9 @@ export const ROW_CLASS_NAME =
 export const ROW_LINE_CLASS_NAME =
   "h-9 gap-2.5 px-3 text-ui group-data-mobile/sidebar:h-11 group-data-mobile/sidebar:text-reading";
 
+/** A row with a second line under its title. */
+export const ROW_DETAIL_CLASS_NAME = "h-12 group-data-mobile/sidebar:h-14";
+
 export const ROW_ACTIVE_CLASS_NAME =
   "before:bg-foreground/[0.06] hover:before:bg-foreground/[0.06]";
 
@@ -58,6 +61,7 @@ export function PlaceRow({
   onClick,
   mark,
   title,
+  titleClassName,
   detail,
   keys,
   status,
@@ -72,6 +76,7 @@ export function PlaceRow({
   readonly onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   readonly mark: ReactNode;
   readonly title: string;
+  readonly titleClassName?: string;
   readonly detail?: ReactNode;
   readonly keys?: readonly [shown: string, aria: string];
   readonly status?: string;
@@ -90,7 +95,7 @@ export function PlaceRow({
       className={cn(
         ROW_CLASS_NAME,
         ROW_LINE_CLASS_NAME,
-        detail !== undefined && "h-12 group-data-mobile/sidebar:h-14",
+        detail !== undefined && ROW_DETAIL_CLASS_NAME,
         active && ROW_ACTIVE_CLASS_NAME,
         className,
       )}
@@ -102,7 +107,9 @@ export function PlaceRow({
       ) : null}
       <MarkBox>{mark}</MarkBox>
       {detail === undefined ? (
-        <span className={cn("min-w-0 flex-1 truncate text-ink", FOLD_FADE)}>{title}</span>
+        <span className={cn("min-w-0 flex-1 truncate text-ink", titleClassName, FOLD_FADE)}>
+          {title}
+        </span>
       ) : (
         <span className={cn("flex min-w-0 flex-1 flex-col", FOLD_FADE)}>
           <span className="truncate leading-5 font-medium text-ink">{title}</span>

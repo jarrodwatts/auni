@@ -11,6 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const PRESET_BUDGETS = [100, 250, 500, 1_000] as const;
@@ -22,9 +23,8 @@ function formatBudget(usd: string | number): string {
 }
 
 /**
- * Thread autonomy selector beneath the composer (right side): works on every
- * thread and on a new thread. Switches between "Ask first" and "Auto" within
- * a dollar spending cap, with a quiet warning when running locally on a laptop.
+ * What a chat may spend on its own, in its inspector: "Ask first", or "Auto" within a dollar
+ * budget, with a quiet word when the computer it runs on sleeps.
  */
 export function AutonomyPicker({
   actMode,
@@ -63,7 +63,7 @@ export function AutonomyPicker({
   };
 
   const auto = actMode === "within_limits";
-  const label = auto ? `Auto ${formatBudget(budgetUsd)}` : "Ask first";
+  const label = auto ? "Auto" : "Ask first";
   const parsedBudget = Number(draftBudget);
   const validBudget =
     Number.isFinite(parsedBudget) && parsedBudget > 0 && parsedBudget <= 1_000_000;
@@ -93,12 +93,11 @@ export function AutonomyPicker({
           disabled={disabled}
           data-testid="autonomy-picker"
           data-mode={auto ? "auto" : "ask"}
-          aria-label={`${label}. Change thread spending permissions.`}
+          aria-label={`${label}. Change what this chat may spend.`}
           className={cn(
-            "flex h-7 items-center gap-1.5 rounded-control px-2 text-meta whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-            auto
-              ? "bg-primary/[0.08] font-medium text-primary hover:bg-primary/[0.13] data-[state=open]:bg-primary/[0.13]"
-              : "text-muted-foreground hover:bg-foreground/[0.045] hover:text-ink data-[state=open]:bg-foreground/[0.05] data-[state=open]:text-ink",
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "-mr-2 gap-1.5 px-2 data-[state=open]:bg-foreground/[0.05]",
+            auto && "text-primary hover:text-primary",
           )}
         >
           {auto ? (
@@ -113,16 +112,16 @@ export function AutonomyPicker({
 
       <DropdownMenuContent
         align="end"
-        side="top"
+        side="bottom"
         sideOffset={8}
         onCloseAutoFocus={(event) => event.preventDefault()}
         className="w-[332px] rounded-card border-foreground/[0.08] p-2 shadow-float"
       >
         <div className="px-2 pt-1 pb-2">
-          <p className="text-ui font-semibold tracking-[-0.01em] text-ink">Thread permissions</p>
-          <p className="mt-0.5 truncate text-caption text-muted-foreground">
-            {threadTitle ?? "Applies when this thread starts"}
-          </p>
+          <p className="text-ui font-semibold tracking-[-0.01em] text-ink">Spending</p>
+          {threadTitle ? (
+            <p className="mt-0.5 truncate text-caption text-muted-foreground">{threadTitle}</p>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-1">
@@ -140,7 +139,7 @@ export function AutonomyPicker({
             <span className="min-w-0 flex-1">
               <span className="block text-ui font-medium text-ink">Ask first</span>
               <span className="mt-0.5 block text-caption leading-[1.4] text-muted-foreground">
-                Every move waits for your tap on a card. Nothing spends without you.
+                Every move waits for your tap on a card.
               </span>
             </span>
             {actMode === "ask_first" ? (
@@ -160,9 +159,9 @@ export function AutonomyPicker({
               <Zap aria-hidden className="size-3.5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-ui font-medium text-ink">Auto within budget</span>
+              <span className="block text-ui font-medium text-ink">Auto within a budget</span>
               <span className="mt-0.5 block text-caption leading-[1.4] text-muted-foreground">
-                Buys and sells stocks, tokens, savings, and market bets inside a dollar cap. Perps,
+                Buys and sells stocks, tokens, savings, and market bets up to a dollar limit. Perps,
                 bridges, and withdrawals still ask.
               </span>
             </span>
@@ -176,7 +175,7 @@ export function AutonomyPicker({
           <div className="mt-2 rounded-control bg-surface p-2.5">
             <div className="flex items-center justify-between gap-2">
               <label htmlFor="auni-auto-budget" className="text-caption font-medium text-ink-soft">
-                Spending budget
+                Budget
               </label>
               {auto && freeBudgetUsd != null ? (
                 <span className="text-caption text-muted-foreground tabular-nums">
@@ -245,8 +244,7 @@ export function AutonomyPicker({
               <div className="mt-2.5 flex items-start gap-2 rounded-control bg-surface px-2.5 py-2 text-caption leading-[1.4] text-ink-soft">
                 <Laptop aria-hidden className="mt-0.5 size-3.5 flex-none" />
                 <span>
-                  Running locally on {me.reach.machine}. Auto actions pause when this computer
-                  sleeps.{" "}
+                  Auto pauses while {me.reach.machine} sleeps.{" "}
                   <button
                     type="button"
                     onClick={() => {

@@ -12,7 +12,8 @@ const PLACES: readonly (readonly [string, string])[] = [
   ["/app/specialists", "/app"],
   ["/app/s", "/app"],
   ["/app/chat", "/app/new"],
-  ["/app/chats", "/app/new"],
+  ["/app/threads", "/app/chats"],
+  ["/app/inbox", "/app/needs-you"],
   ["/app/history", "/app"],
   ["/app/apps/:app", "/app/apps?app=:app"],
   ["/app/settings", "/app?settings=general"],
@@ -27,6 +28,8 @@ const OUTSIDE_APP: readonly (readonly [string, string])[] = [
   ["/activity", "/app"],
   ["/apps", "/app/apps"],
   ["/new", "/app/new"],
+  ["/chats", "/app/chats"],
+  ["/needs-you", "/app/needs-you"],
 ];
 
 /** Each of PLACES, the same without its "/app" ("/portfolio", "/settings"), and OUTSIDE_APP. */

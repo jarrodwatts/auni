@@ -572,7 +572,7 @@ describe("a run cut off after its order went out with no answer", () => {
     // The thread's row in the sidebar: it needs the owner, and nothing is said to be moving.
     expect(await readThreadWire(thread.id)).toMatchObject({
       status: "needs_user",
-      moneyLine: "Not confirmed: Sell 40 Yes shares of Fed cuts in December",
+      moneyLine: "Status unknown: Sell 40 Yes shares of Fed cuts in December",
       moving: null,
     });
     // A channel's copy gives the known outcome and a way to check it in the app.

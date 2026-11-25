@@ -34,7 +34,7 @@ function heldBy(thread: Thread): { archive: boolean; delete: boolean; why: strin
     return {
       archive: true,
       delete: true,
-      why: "A card here waits for your answer. Once you answer it, even with Not now, this thread can go.",
+      why: "A card here waits for your tap. Once you allow or decline it, this chat can go.",
     };
   if (thread.state === "running")
     return { archive: false, delete: true, why: "Auni is answering here. Delete it once it has." };
@@ -116,7 +116,7 @@ export function ChatMenu({
           {thread.archived ? (
             <DropdownMenuItem className={ITEM} onSelect={() => tidy.restore()}>
               <ArchiveRestore aria-hidden className="size-4" />
-              Bring back to Threads
+              Restore
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem
@@ -151,8 +151,8 @@ export function ChatMenu({
         onOpenChange={(next) => (next ? setAsking("rename") : close())}
       />
       <ConfirmDialog
-        title="Delete this thread for good?"
-        body={`“${thread.title}” and everything said in it go for good. Money moved here stays in Activity and your portfolio, as it is.`}
+        title="Delete this chat?"
+        body={`“${thread.title}” and everything said in it are deleted. Money moved here stays where it is, and its moves stay in Money.`}
         verb="Delete"
         open={asking === "delete"}
         onOpenChange={(next) => (next ? setAsking("delete") : close())}
@@ -178,8 +178,8 @@ export function useTidyChat(thread: Thread) {
 
   const restore = () =>
     void changeThread(thread.id, { archived: false }).then(
-      () => toast.success("Back in Threads"),
-      () => toast.error("That thread couldn’t be brought back. Try again."),
+      () => toast.success("Chat restored"),
+      () => toast.error("That chat couldn’t be restored. Try again."),
     );
 
   return {
@@ -195,19 +195,19 @@ export function useTidyChat(thread: Thread) {
     archive: (refused: (why: string) => void) =>
       void changeThread(thread.id, { archived: true }).then(
         () =>
-          toast.success("Thread archived", {
+          toast.success("Chat archived", {
             description: "Search still finds it.",
             action: { label: "Undo", onClick: restore },
           }),
-        said(refused, "That thread couldn’t be archived. Try again."),
+        said(refused, "That chat couldn’t be archived. Try again."),
       ),
     remove: (refused: (why: string) => void) =>
       void deleteThread(thread.id).then(
         () => {
           if (route.kind === "chat" && route.id === thread.id) router.replace("/app/new");
-          toast.success("Thread deleted");
+          toast.success("Chat deleted");
         },
-        said(refused, "That thread couldn’t be deleted. Try again."),
+        said(refused, "That chat couldn’t be deleted. Try again."),
       ),
   };
 }
@@ -244,14 +244,14 @@ function RenameForm({ thread, onDone }: { readonly thread: Thread; readonly onDo
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       <div className="px-6 pt-6 pb-5">
-        <DialogTitle className={auniDialogTitleClass}>Rename thread</DialogTitle>
+        <DialogTitle className={auniDialogTitleClass}>Rename chat</DialogTitle>
         <DialogDescription className="mt-1.5 text-ui text-muted-foreground">
           The name it goes by in your sidebar and search.
         </DialogDescription>
       </div>
       <div className="px-6 pb-1">
         <input
-          aria-label="Thread name"
+          aria-label="Chat name"
           value={title}
           maxLength={MAX_TITLE_CHARS}
           spellCheck={false}

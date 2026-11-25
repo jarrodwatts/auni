@@ -95,7 +95,7 @@ async function waitingAsks(threadIds: readonly string[]): Promise<Map<string, st
   for (const action of waiting) {
     if (!action.threadId || asks.has(action.threadId)) continue;
     if (action.phase === "needs_owner") {
-      asks.set(action.threadId, `Not confirmed: ${action.summary}`);
+      asks.set(action.threadId, `Status unknown: ${action.summary}`);
       continue;
     }
     const legs = action.proposalId

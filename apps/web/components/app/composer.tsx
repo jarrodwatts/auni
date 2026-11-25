@@ -72,10 +72,8 @@ interface ComposerProps {
   readonly initialMessage?: string;
   /** Docked above the words, inside the same enclosure: a question waiting on the person. */
   readonly lead?: ReactNode;
-  /** Inline control inside the bottom-right of the composer box beside Send (model picker). */
+  /** The one quiet control inside the box, at its bottom left: which AI answers, and how hard it thinks. */
   readonly inlineControl?: ReactNode;
-  /** Quiet control strip directly beneath the composer box (environment left, autonomy right). */
-  readonly footerStrip?: ReactNode;
   readonly placeholder: string;
   /** Keeps the box grounded and typeable while holding submit until messages finish loading. */
   readonly sendDisabled?: boolean;
@@ -89,7 +87,6 @@ export function Composer({
   busy = false,
   disabled = false,
   draftKey,
-  footerStrip,
   initialMessage = "",
   inlineControl,
   lead,
@@ -207,8 +204,8 @@ export function Composer({
               "overflow-y-auto disabled:cursor-not-allowed disabled:opacity-60",
             )}
           />
-          <div className="flex items-center justify-end gap-1.5">
-            {inlineControl}
+          <div className="flex items-center gap-1.5">
+            <div className="-ml-1 flex min-w-0 flex-1 items-center">{inlineControl}</div>
             {/* Send: a 34px disc in a 38px target, quiet grey until there is something to send, then ink. */}
             <button
               className="group/submit flex size-9 flex-none items-center justify-center rounded-full text-background outline-none active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100"
@@ -232,9 +229,6 @@ export function Composer({
           </div>
         </div>
       </form>
-      {footerStrip ? (
-        <div className="mt-1.5 flex items-center justify-between gap-2 px-1">{footerStrip}</div>
-      ) : null}
     </div>
   );
 }

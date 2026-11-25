@@ -37,39 +37,24 @@ describe("moneyProgress", () => {
 });
 
 describe("chatStatus", () => {
-  it("shimmers while Auni works, and marks nothing else then", () => {
+  it("shimmers while Auni works, and rings nothing then", () => {
     expect(chatStatus(thread({ state: "running" }))).toEqual({
       working: true,
       unread: false,
-      mark: null,
+      money: null,
     });
-  });
-
-  it("says it is your turn while a card or a question waits", () => {
-    expect(chatStatus(thread({ state: "needs_user" })).mark).toEqual({ kind: "turn" });
-    expect(chatStatus(thread({ asking: true })).mark).toEqual({ kind: "turn" });
   });
 
   it("rings the money while it moves, and while Auni works on what it did", () => {
     const moving = { done: 1, failed: 0, total: 2 };
-    expect(chatStatus(thread({ moving })).mark).toEqual({
-      kind: "money",
-      done: 1,
-      total: 2,
-      status: "now",
-    });
+    expect(chatStatus(thread({ moving })).money).toEqual({ done: 1, total: 2, status: "now" });
     expect(chatStatus(thread({ state: "running", moving })).working).toBe(true);
-    expect(chatStatus(thread({ state: "running", moving })).mark).toMatchObject({ kind: "money" });
-  });
-
-  it("puts your turn ahead of money already on its way", () => {
-    const moving = { done: 0, failed: 0, total: 1 };
-    expect(chatStatus(thread({ asking: true, moving })).mark).toEqual({ kind: "turn" });
+    expect(chatStatus(thread({ state: "running", moving })).money?.status).toBe("now");
   });
 
   it("keeps a landed ring beside an unread reply, as both wait to be read", () => {
     const status = chatStatus(thread({ unread: true, moving: { done: 2, failed: 0, total: 2 } }));
     expect(status.unread).toBe(true);
-    expect(status.mark).toMatchObject({ kind: "money", status: "done" });
+    expect(status.money?.status).toBe("done");
   });
 });

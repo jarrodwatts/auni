@@ -112,7 +112,6 @@ export function ConversationLaunchStage() {
           <Composer
             busy={!brainless}
             draftKey="launch"
-            footerStrip={<div aria-hidden className="h-7" />}
             onStop={() => undefined}
             onSubmit={() => undefined}
             placeholder={placeholder}

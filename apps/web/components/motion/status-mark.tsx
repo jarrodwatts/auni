@@ -58,9 +58,6 @@ const BARE_ARRIVE: Record<Status, Motion> = {
   failed: BARE_LAND,
 };
 
-/** How a glyph leaves and arrives, for a slot that hands over between marks of its own. */
-export const glyphMotion = { leave: LEAVE, appear: APPEAR } as const;
-
 const GLYPH: Record<Status, string | undefined> = {
   waiting: "border-[1.5px] border-dashed border-ink/[0.2]",
   now: styles.arc,

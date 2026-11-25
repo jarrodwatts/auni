@@ -30,33 +30,21 @@ export function moneyProgress(moving: Thread["moving"]): MoneyProgress | null {
   return { done, total, status };
 }
 
-/** What trails a thread's title: your turn, in words, or the ring of its money. */
-export type ChatMark =
-  { readonly kind: "turn" } | ({ readonly kind: "money" } & MoneyProgress) | null;
-
 /** How a thread's row reads: do I need to look, and is anything happening. */
 export interface ChatStatus {
   /** Auni is writing in it: its title shimmers. */
   readonly working: boolean;
   /** Auni answered since the person last looked: its title is heavier. */
   readonly unread: boolean;
-  readonly mark: ChatMark;
+  /** Its money's ring, while that moves and until how it went is read. */
+  readonly money: MoneyProgress | null;
 }
 
-/**
- * A thread's row, from its live state. Something waiting on the person outranks
- * money already on its way, which needs nothing from them.
- */
+/** A thread's row, from its live state. Whether it waits on the person is its group's to say. */
 export function chatStatus(thread: Thread): ChatStatus {
-  const money = moneyProgress(thread.moving);
   return {
     working: thread.state === "running",
     unread: thread.unread,
-    mark:
-      attentionOf(thread) === "waiting"
-        ? { kind: "turn" }
-        : money
-          ? { kind: "money", ...money }
-          : null,
+    money: moneyProgress(thread.moving),
   };
 }

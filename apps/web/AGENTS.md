@@ -43,13 +43,15 @@ network on purpose, as a later `-H` wins.
   `components/feedback/` (`feedback-body.tsx`, shared by `feedback-card.tsx` and the report a
   failed card or an app's sheet opens, `report-dialog.tsx`).
 - Tool names the web knows: `packages/shared/src/tools.ts` (an app's from `apps.generated.ts`).
-- Threads sidebar and workspace (`/app/chat/<id>`): `components/places/place-list.tsx`,
-  `components/places/chat-place.tsx` (chat + on-demand right-hand inspector pane
-  `components/places/thread-inspector-pane.tsx`), and `components/places/pane-sections.tsx`
-  (Auto budget, positions, watches, working notes, record).
-- Composer controls: model and thinking effort picker (`components/app/model-picker.tsx`),
-  machine/environment status strip (`components/app/environment-picker.tsx`), and per-thread Auto
-  budget control (`components/app/autonomy-picker.tsx`).
+- The shell (`components/places/`): on a wide screen the sidebar (`sidebar.tsx`,
+  `place-list.tsx`): New take, Money, Apps, then each chat in one place (`use-places.ts`): Needs
+  you while a card or question waits on the owner, Your takes while it holds positions (its value
+  from `use-takes.ts`), and Chats. On a phone a tab bar instead (`tab-bar.tsx`: Chats, Money,
+  Needs you, More), with `/app/chats` and `/app/needs-you` as pages. A chat (`/app/chat/<id>`,
+  `chat-place.tsx`) shows its take's value in its header and opens its inspector
+  (`thread-inspector-pane.tsx`, `pane-sections.tsx`): positions, watches, spending, notes, moves.
+- The composer holds one control, the AI and its effort (`components/app/model-picker.tsx`); what
+  a chat may spend on its own is set in its inspector (`components/app/autonomy-picker.tsx`).
 - Apps (`/app/apps`): `components/apps/`, on core's `GET /apps` (`lib/data/apps.ts`): the list
   (`apps-screen.tsx`) and each app's sheet (`app-sheet.tsx`): what is held there, its keys
   (`app-keys.tsx`, each a `SecretInput` to its private field), its switch, and for one Auni

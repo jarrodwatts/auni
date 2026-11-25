@@ -17,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { buttonVariants } from "@/components/ui/button";
 import { useBrains } from "@/lib/data/brains";
 import { cn } from "@/lib/utils";
 
@@ -133,7 +134,10 @@ export function ModelPicker({
           type="button"
           disabled={disabled}
           aria-label={`Model ${active.model.name}${active.effort ? `, ${effortLabel(active.effort)} effort` : ""}. Change model or effort.`}
-          className="flex h-8 max-w-[220px] items-center gap-1.5 rounded-full px-2.5 text-meta transition-colors duration-150 outline-none hover:bg-foreground/[0.05] focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:bg-foreground/[0.06]"
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "max-w-[240px] gap-1.5 px-2 data-[state=open]:bg-foreground/[0.06]",
+          )}
         >
           {logo ? (
             <Image
@@ -265,7 +269,7 @@ export function ModelPicker({
               }}
               className="flex w-full items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-meta text-muted-foreground transition-colors hover:bg-foreground/[0.045] hover:text-ink"
             >
-              <span>Connect another AI brain</span>
+              <span>Connect another AI</span>
               <ExternalLink aria-hidden className="size-3.5 text-faint" />
             </button>
           </div>

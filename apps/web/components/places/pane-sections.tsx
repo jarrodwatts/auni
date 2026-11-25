@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { PlaceLink } from "./open-place";
 
-/** Recent items the record shows before pointing to Activity. */
+/** Recent moves the record shows before pointing to all of them. */
 const RECORD_ITEMS = 5;
 
 function Section({ title, children }: { readonly title: string; readonly children: ReactNode }) {
@@ -98,14 +98,14 @@ export function PaneNotes({ notes }: { readonly notes: string | null }) {
   );
 }
 
-/** Recent money activity opened in this thread, with a link to all of it in Activity. */
+/** The take's recent moves, with a link to all of them in Money. */
 export function PaneRecord({ thread }: { readonly thread: Thread }) {
   const activity = useActivity(thread.id).data;
   const items = activity?.items ?? [];
   if (items.length === 0) return null;
   return (
-    <Section title="Activity">
-      <ul className="divide-y divide-foreground/[0.05]">
+    <Section title="Moves">
+      <ul className="divide-y divide-border">
         {items.slice(0, RECORD_ITEMS).map((item) => (
           <li key={item.id} className="flex items-center gap-3 py-2.5">
             <span className="min-w-0 flex-1">
@@ -129,7 +129,7 @@ export function PaneRecord({ thread }: { readonly thread: Thread }) {
         href={`/app/activity?${new URLSearchParams({ thread: thread.id })}`}
         className="auni-text-link mt-2 inline-block text-meta"
       >
-        All thread activity
+        All moves in this take
       </PlaceLink>
     </Section>
   );

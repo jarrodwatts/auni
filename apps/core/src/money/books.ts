@@ -279,35 +279,56 @@ export function holdingsOfThread(
   holdings: readonly Holding[],
   everyFill: readonly BookFill[],
 ): Holding[] {
+  return holdingsByThread(holdings, everyFill).threads.get(threadId) ?? [];
+}
+
+/**
+ * Each live holding split among the threads whose fills hold it, in order of each thread's
+ * first fill as far as the wallet goes (see holdersOf), and what no thread holds: so the
+ * threads' shares and the rest add up to the wallet, and every screen gives a thread the same.
+ */
+export function holdingsByThread(
+  holdings: readonly Holding[],
+  everyFill: readonly BookFill[],
+): { threads: Map<string, Holding[]>; loose: Holding[] } {
   const books = threadBooks(everyFill);
-  if (!books.has(threadId)) return [];
-  const mine: Holding[] = [];
+  const threads = new Map<string, Holding[]>();
+  const loose: Holding[] = [];
   for (const holding of holdings) {
     const total = parseUnits(holding.quantity, QUANTITY_DECIMALS);
     if (total === 0n) continue;
-    const { threads } = holdersOf(
-      holding.short ? -total : total,
-      books,
-      fillIdentity(holding),
-      threadId,
-    );
-    const share = threads.find(([id]) => id === threadId)?.[1] ?? 0n;
-    if (share <= 0n) continue;
-    if (share === total) {
-      mine.push(holding);
-      continue;
-    }
-    const cents = holding.usdValue === null ? null : usdToCents(holding.usdValue);
-    mine.push({
-      ...holding,
-      quantity: formatUnits(
-        share / 10n ** BigInt(QUANTITY_DECIMALS - holding.decimals),
-        holding.decimals,
-      ),
-      usdValue: cents === null ? null : centsToUsd((cents * share) / total),
-    });
+    const held = holdersOf(holding.short ? -total : total, books, fillIdentity(holding));
+    for (const [threadId, units] of held.threads)
+      threads.set(threadId, [...(threads.get(threadId) ?? []), shareOf(holding, units, total)]);
+    if (held.other > 0n) loose.push(shareOf(holding, held.other, total));
   }
-  return mine;
+  return { threads, loose };
+}
+
+/** `units` of a holding's `total` (both in QUANTITY_DECIMALS units), its value in proportion. */
+function shareOf(holding: Holding, units: bigint, total: bigint): Holding {
+  if (units === total) return holding;
+  const cents = holding.usdValue === null ? null : usdToCents(holding.usdValue);
+  return {
+    ...holding,
+    quantity: formatUnits(
+      units / 10n ** BigInt(QUANTITY_DECIMALS - holding.decimals),
+      holding.decimals,
+    ),
+    usdValue: cents === null ? null : centsToUsd((cents * units) / total),
+  };
+}
+
+/**
+ * What a holding cost, in cents, from what one unit cost on average: a perp's is the margin its
+ * entry put up (its size at the entry price over its leverage), so what it made is its value
+ * less that. Null when nothing records the cost, or it has no price now to compare.
+ */
+export function costCents(holding: Holding): bigint | null {
+  if (!holding.averageCostUsd || holding.usdValue === null) return null;
+  const units = Number(holding.quantity) * Number(holding.averageCostUsd);
+  const cost = isMargined(holding) ? units / (holding.leverage ?? 1) : units;
+  return Number.isFinite(cost) ? BigInt(Math.round(cost * 100)) : null;
 }
 
 /** Cents carried 18 places further, so the cost left after selling most of something stays exact. */

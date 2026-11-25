@@ -7,8 +7,8 @@ import { Fragment, type MouseEvent, type ReactNode } from "react";
 
 import { useStartNew } from "@/components/app/use-start-conversation";
 import { AssetLogo, LogoImage } from "@/components/brand/marks";
-import { Mascot } from "@/components/brand/mascot";
 import { PlaceLink } from "@/components/places/open-place";
+import { buttonVariants } from "@/components/ui/button";
 import { chatHref } from "@/lib/app-links";
 import type { Thread } from "@/lib/data/views";
 import { formatUsd } from "@/lib/money";
@@ -20,6 +20,11 @@ type ThreadRef = Pick<Thread, "id" | "title"> | undefined;
 
 const OUTSIDE_RING = "flex rounded-full ring-2 ring-negative/70 ring-offset-1";
 
+/**
+ * What an item is about: its asset's logo, else for a move of cash alone the logo of where the
+ * cash went (Hyperliquid's, for cash taken out of it), else a neutral glyph. One a venue did
+ * that leaves the owner something to decide wears a ring in the loss colour.
+ */
 export function ItemMark({
   item,
   size,
@@ -27,24 +32,16 @@ export function ItemMark({
   readonly item: ActivityItemWire;
   readonly size: number;
 }) {
-  if (!item.logo) return <AuniMark size={size} />;
-  const logo = <AssetLogo holding={{ logoUrl: item.logo.src }} size={size} />;
+  const src =
+    item.logo?.src ??
+    (item.kind === "move"
+      ? (item.receipt.steps.find((step) => step.logoUrl)?.logoUrl ?? null)
+      : null);
+  const logo = <AssetLogo holding={{ logoUrl: src }} size={size} />;
   return item.kind === "outside" && item.decision ? (
     <span className={OUTSIDE_RING}>{logo}</span>
   ) : (
     logo
-  );
-}
-
-function AuniMark({ size }: { readonly size: number }) {
-  return (
-    <span
-      aria-hidden
-      className="flex flex-none items-center justify-center rounded-full bg-muted"
-      style={{ width: size, height: size }}
-    >
-      <Mascot alt="" size={Math.round(size * 0.66)} />
-    </span>
   );
 }
 
@@ -98,11 +95,7 @@ function HowAuniDidIt({
   return (
     <>
       {receipt.story ? <Story story={receipt.story} /> : <Steps steps={receipt.steps} />}
-      {thread ? (
-        <PrimaryLink href={chatHref(thread.id)} thread={thread}>
-          Open {thread.title}
-        </PrimaryLink>
-      ) : null}
+      {thread ? <TakeLink thread={thread} /> : null}
     </>
   );
 }
@@ -145,7 +138,7 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
           {story.links.map(({ label, url }) => (
             <a
               key={url}
-              className="flex h-9 items-center gap-1.5 rounded-full border border-foreground/[0.08] px-4 text-meta font-medium text-ink transition-colors duration-150 hover:bg-surface focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
               href={url}
               rel="noreferrer"
               target="_blank"
@@ -243,7 +236,11 @@ function WhatHappened({
         <Side label="After" value={receipt.after} />
       </div>
       <p className="mt-4 text-center text-ui leading-[1.55] text-muted-foreground">{receipt.why}</p>
-      {!decision ? null : thread ? (
+      {!decision ? (
+        thread ? (
+          <TakeLink thread={thread} />
+        ) : null
+      ) : thread ? (
         <PrimaryLink href={chatHref(thread.id)} thread={thread}>
           Ask Auni what now
         </PrimaryLink>
@@ -315,8 +312,26 @@ function WhatArrived({
   );
 }
 
-const PRIMARY =
-  "mt-6 flex h-10 w-full items-center justify-center rounded-full bg-foreground px-5 text-ui font-semibold text-background transition-[background-color,transform] duration-200 ease-settle hover:bg-foreground/85 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.97]";
+const PRIMARY = buttonVariants({ className: "mt-6 w-full" });
+
+/** The take a move belongs to, and the way to its chat. */
+function TakeLink({ thread }: { readonly thread: NonNullable<ThreadRef> }) {
+  return (
+    <div className="mt-6 flex items-center gap-3 border-t border-border pt-4">
+      <div className="min-w-0 flex-1">
+        <p className="text-caption text-muted-foreground">Take</p>
+        <p className="truncate text-ui font-medium text-ink">{thread.title}</p>
+      </div>
+      <PlaceLink
+        href={chatHref(thread.id)}
+        thread={thread.id}
+        className={buttonVariants({ variant: "secondary", size: "sm" })}
+      >
+        View chat
+      </PlaceLink>
+    </div>
+  );
+}
 
 function PrimaryLink({
   href,

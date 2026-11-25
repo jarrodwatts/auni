@@ -19,7 +19,13 @@ import { setupRouter } from "./routes/setup.ts";
 import { siteMarksRouter } from "./routes/site-marks.ts";
 import { startingPointsRouter } from "./routes/starting-points.ts";
 import { systemRouter } from "./routes/system.ts";
-import { actionsRouter, activityRouter, portfolioRouter, proposalsRouter } from "./money/routes.ts";
+import {
+  actionsRouter,
+  activityRouter,
+  portfolioRouter,
+  proposalsRouter,
+  takesRouter,
+} from "./money/routes.ts";
 import { withdrawalsRouter } from "./money/withdrawal-routes.ts";
 import { whileHandingOver } from "./handover/hand-over.ts";
 import { handoverRouter } from "./handover/routes.ts";
@@ -51,6 +57,7 @@ export function coreApp(): Express {
   app.use("/proposals", requireOwner, proposalsRouter);
   app.use("/portfolio", requireOwner, portfolioRouter);
   app.use("/activity", requireOwner, activityRouter);
+  app.use("/takes", requireOwner, takesRouter);
   app.use("/withdrawals", requireOwner, withdrawalsRouter);
   app.use("/automations", requireOwner, automationsRouter);
   app.use("/channels", requireOwner, channelsRouter);

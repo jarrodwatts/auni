@@ -4,7 +4,7 @@
 //   pnpm demo:shots [folder] [light|dark]   (default: demo-shots/, which git ignores; both looks)
 //
 // It starts `auni demo` on a port of its own, signs a headless Chrome in with the link the demo
-// prints, and visits the portfolio, the activity list, the apps (the list, a sheet in each
+// prints, and visits Money (a take opened up, a receipt), the apps (the list, a sheet in each
 // state the demo's owner has one in, and one Auni itself runs on), a new chat, each pane of
 // Settings, every conversation the demo's owner has, and the states between them (the search
 // palette, a thread's details pane, a phone's menu, a turn's work opened up, a page that isn't
@@ -180,6 +180,9 @@ const PRESS = (label: string) => `(() => {
   return Boolean(button);
 })()`;
 
+/** Opens the receipt of the latest move on Money. */
+const OPEN_RECEIPT = `document.querySelector('[aria-label="Recent"] ul button')?.click()`;
+
 /** Opens the search palette, as its shortcut does. */
 const SEARCH: Opener = {
   does: `void window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`,
@@ -236,8 +239,12 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       threads: { id: string; title: string | null }[];
     }>("threads");
 
-    await take(page, out, "portfolio", `${origin}/app`, "top");
-    await take(page, out, "activity", `${origin}/app/activity`, "top");
+    await take(page, out, "money", `${origin}/app`, "top");
+    // Money with its largest take opened up, and a move's receipt open over it.
+    const { takes } = await core<{ takes: { threadId: string }[] }>("takes");
+    if (takes[0])
+      await take(page, out, "money-take", `${origin}/app?take=${takes[0].threadId}`, "top");
+    await take(page, out, "money-receipt", `${origin}/app`, "top", OPEN_RECEIPT, { once: true });
     await take(page, out, "apps", `${origin}/app/apps`, "top");
     // One sheet for each state an app the owner acts through is in: with money there, needing a
     // key, and what its switch says when pressed (the question, or why it must stay on).

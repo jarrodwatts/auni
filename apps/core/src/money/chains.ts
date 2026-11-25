@@ -88,6 +88,13 @@ export function placeName(place: CashPlace): string {
     : (appListing(place)?.name ?? place);
 }
 
+/** Where cash waits, as its mark: its network's logo, or the logo of the app that keeps it. */
+export function placeLogo(place: CashPlace): string | null {
+  return Object.hasOwn(NETWORKS, place)
+    ? NETWORKS[place as NetworkKey].logo
+    : (appListing(place)?.logo ?? null);
+}
+
 /** viem's entry for another EVM chain recorded as eip155:N, which names it and its coin. */
 export function viemChain(chain: string): Chain | undefined {
   const id = Number(/^eip155:(\d+)$/u.exec(chain)?.[1]);

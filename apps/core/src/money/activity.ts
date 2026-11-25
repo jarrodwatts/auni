@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import {
+  isAsk,
   isVenueTool,
   knownAsset,
   appListing,
@@ -19,7 +20,7 @@ import { actions, arrivals, fills, owner, threads, type ActionRow } from "../db/
 import { accounts, ledgerAt } from "../apps/registry.ts";
 import { PNL_DECIMALS } from "./books.ts";
 import { subjectLogo } from "./action-card.ts";
-import { chainLabel, chainName, explorerTx, placeName } from "./chains.ts";
+import { chainLabel, chainName, explorerTx, placeLogo, placeName } from "./chains.ts";
 import { coinName } from "./coins.ts";
 import { QUANTITY_DECIMALS, tokenKey } from "./fill-key.ts";
 import { formatAmount, priceLabel, shortAddress } from "./format.ts";
@@ -145,6 +146,19 @@ function cashStep(move: CashMove): string {
       return `Moved cash from ${placeName(move.from)} to ${placeName(move.to)}`;
     case "to_account":
       return `Moved cash to ${placeName(move.place)}`;
+  }
+}
+
+/** The mark of where a move of cash went: the account it left or reached, or the wallet it reached. */
+function cashLogo(move: CashMove): string | null {
+  switch (move.kind) {
+    case "from_savings":
+      return null;
+    case "from_account":
+    case "to_account":
+      return placeLogo(move.place);
+    case "between_wallets":
+      return placeLogo(move.to);
   }
 }
 
@@ -285,12 +299,12 @@ export function stepsOf(legs: readonly Leg[]): Step[] {
   const sales = legs.flatMap((leg) => (leg.does.kind === "sale" ? [leg.does] : []));
   const moves = legs.flatMap(({ does }) => (does.kind === "cash" ? [does] : []));
   const intoAccount = moves.some(({ move }) => move.kind === "to_account");
-  const cash = new Map<string, string[]>();
+  const cash = new Map<string, { usd: string[]; logoUrl: string | null }>();
   for (const kind of CASH_ORDER)
     for (const { move, usd } of moves) {
       if (move.kind !== kind || (kind === "between_wallets" && intoAccount)) continue;
       const step = cashStep(move);
-      cash.set(step, [...(cash.get(step) ?? []), usd]);
+      cash.set(step, { usd: [...(cash.get(step)?.usd ?? []), usd], logoUrl: cashLogo(move) });
     }
   const steps: Step[] = [
     ...(sales.length === 0
@@ -305,7 +319,7 @@ export function stepsOf(legs: readonly Leg[]): Step[] {
             logoUrl: sales.length === 1 ? (sales[0]!.logo?.src ?? null) : null,
           },
         ]),
-    ...[...cash].map(([text, usd]) => ({ text, amountUsd: sumUsd(usd), logoUrl: null })),
+    ...[...cash].map(([text, { usd, logoUrl }]) => ({ text, amountUsd: sumUsd(usd), logoUrl })),
     ...legs.flatMap(({ does }) =>
       does.kind === "pick"
         ? [{ text: does.step, amountUsd: does.money?.usd ?? null, logoUrl: does.logo?.src ?? null }]
@@ -439,8 +453,11 @@ export async function readActivity(only: string | null): Promise<ActivityWire> {
   const { activitySeenAt, timeZone } = await theOwner();
   const fillsOf = Map.groupBy(recorded, (fill) => fill.actionId);
   const own = (row: ActionRow) => fillsOf.get(row.id) ?? [];
+  // An ask changed Auni, not money: it stays in its thread, as the card the owner allowed.
   const legs = await Promise.all(
-    rows.filter((row) => !isVenueTool(row.tool)).map((row) => legsOf(row, own(row), names)),
+    rows
+      .filter((row) => !isVenueTool(row.tool) && !isAsk(row.tool))
+      .map((row) => legsOf(row, own(row), names)),
   );
   const payoutTools = new Set<string>(
     accounts().flatMap(({ account }) => (account.payouts ? [account.payouts.tool] : [])),

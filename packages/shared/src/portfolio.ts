@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { dollarsSchema } from "./money.ts";
 import { NETWORK_KEYS } from "./networks.ts";
+import { threadIdSchema } from "./shared.ts";
 
 /** One holding as a person reads it, on GET /portfolio and in a thread's inspector. */
 export const holdingWireSchema = z.object({
@@ -81,3 +82,32 @@ export const otherTokensWireSchema = z.object({
   ),
 });
 export type OtherTokensWire = z.infer<typeof otherTokensWireSchema>;
+
+/**
+ * A take: a thread that holds positions now, by the fills Auni recorded in it, with its share of
+ * each holding (never more than the wallet holds), what that is worth, and what it has made.
+ */
+const takeWireSchema = z.object({
+  threadId: threadIdSchema,
+  title: z.string(),
+  /** What its holdings are worth now. */
+  valueUsd: dollarsSchema,
+  /**
+   * Signed: what the holdings it has now made since they were bought, from what each cost
+   * (a perp's margin, from its entry price and leverage); null when nothing records any cost.
+   */
+  changeUsd: dollarsSchema.nullable(),
+  /** What the holdings `changeUsd` counts cost; null with it. */
+  costUsd: dollarsSchema.nullable(),
+  /** Largest first. */
+  holdings: z.array(holdingWireSchema),
+});
+export type TakeWire = z.infer<typeof takeWireSchema>;
+
+/** Core's GET /takes: every take, largest first, and the holdings no take holds. */
+export const takesWireSchema = z.object({
+  takes: z.array(takeWireSchema),
+  /** Every non-cash holding, or the part of one, that no take holds, largest first. */
+  loose: z.array(holdingWireSchema),
+});
+export type TakesWire = z.infer<typeof takesWireSchema>;

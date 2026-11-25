@@ -108,7 +108,12 @@ describe("folding moves", () => {
         steps: [
           { text: "Sold 4 things you held loose", amountUsd: "18.70", logoUrl: null },
           // The bridge was only on its way into Hyperliquid, so the move in says it.
-          { text: "Moved cash to Hyperliquid", amountUsd: "17.00", logoUrl: null },
+          // Wearing the mark of where the cash went.
+          {
+            text: "Moved cash to Hyperliquid",
+            amountUsd: "17.00",
+            logoUrl: "/logos/hyperliquid.svg",
+          },
           {
             text: "Opened Pearl, 1x long",
             amountUsd: "16.50",

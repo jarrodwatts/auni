@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { savingsTokens } from "../apps/registry.ts";
 import {
   buildPortfolio,
+  costCents,
   holdersOf,
   holdingsOfThread,
   ownedMoveFills,
@@ -94,6 +95,35 @@ describe("holdingsOfThread", () => {
   });
 });
 
+describe("costCents", () => {
+  const held = (fields: Partial<Holding>): Holding => ({
+    venue: "wallet",
+    chain: "monad",
+    instrument: "0xaa",
+    symbol: "NVDAx",
+    quantity: "2",
+    decimals: 18,
+    usdValue: "250.00",
+    cash: false,
+    priceId: null,
+    ...fields,
+  });
+
+  it("is what the units cost at their average", () => {
+    expect(costCents(held({ averageCostUsd: "100.505" }))).toBe(20_101n);
+  });
+
+  it("is a perp's margin: its size at the entry price over its leverage", () => {
+    const long = { venue: "hyperliquid", chain: "hyperliquid", instrument: "BTC", leverage: 3 };
+    expect(costCents(held({ ...long, quantity: "0.01", averageCostUsd: "60000" }))).toBe(20_000n);
+  });
+
+  it("is unknown without an average cost or a price now", () => {
+    expect(costCents(held({}))).toBeNull();
+    expect(costCents(held({ averageCostUsd: "100", usdValue: null }))).toBeNull();
+  });
+});
+
 describe("ownedMoveFills", () => {
   const savings = (side: "buy" | "sell", amount: string) =>
     fill(side, amount, amount, savingsTokens("monad")[0]!.token, "monad");
@@ -176,12 +206,12 @@ describe("saleOwners and sharedFill", () => {
   it("shares what a swap brought in by the same weights, so a swapped holding stays its thread's", () => {
     const owners = saleOwners(units("4"), null, held);
     const bought = fill("buy", "8", "40", "tsla");
-    expect(sharedFill(bought, owners).map(({ threadId, quantity }) => [threadId, quantity])).toEqual(
-      [
-        [null, "2"],
-        ["ai", "6"],
-      ],
-    );
+    expect(
+      sharedFill(bought, owners).map(({ threadId, quantity }) => [threadId, quantity]),
+    ).toEqual([
+      [null, "2"],
+      ["ai", "6"],
+    ]);
   });
 
   it("shares its dollars so the pieces add up to the whole exactly", () => {

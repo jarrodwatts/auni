@@ -118,7 +118,7 @@ export function WithdrawReview({
           value ? (
             <div key={label} className="flex items-center justify-between py-2">
               <dt className="text-muted-foreground">{label}</dt>
-              <dd className="font-medium text-ink">{value}</dd>
+              <dd className="font-medium text-ink tabular-nums">{value}</dd>
             </div>
           ) : null,
         )}

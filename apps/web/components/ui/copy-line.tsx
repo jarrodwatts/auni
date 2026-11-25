@@ -50,7 +50,7 @@ export function CopyLine({
           autoFocus={focused}
           onClick={() => clipboard.copy(value)}
           aria-label={copied ? "Copied" : `Copy ${label ?? value}`}
-          className="flex h-8 flex-none items-center gap-1.5 self-center rounded-control px-2.5 text-meta font-medium text-muted-foreground transition-colors hover:bg-card hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
+          className="flex h-8 flex-none items-center gap-1.5 self-center rounded-control px-2.5 text-meta font-medium text-muted-foreground transition-colors hover:bg-card hover:text-ink focus-ring"
         >
           {copied ? (
             <Check aria-hidden className="size-3.5 text-ink" />

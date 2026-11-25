@@ -61,7 +61,7 @@ export function AppTile({ app, onOpen }: { readonly app: AppWire; readonly onOpe
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              "block truncate text-ink",
+              "block truncate text-ink tabular-nums",
               standing.tone === "money"
                 ? "text-title"
                 : "text-ui leading-6 font-semibold tracking-[-0.01em]",

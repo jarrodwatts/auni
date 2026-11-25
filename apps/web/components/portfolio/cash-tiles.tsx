@@ -94,7 +94,7 @@ function MoneyTile({
       <AssetLogo holding={holding} size={34} className="flex-none" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-body font-medium text-ink">{name}</p>
-        <p className="mt-0.5 flex items-baseline justify-between gap-2 leading-5">
+        <p className="mt-0.5 flex items-baseline justify-between gap-2 leading-5 tabular-nums">
           <span className="text-ui font-semibold tracking-[-0.01em] text-ink">
             {formatUsdcBalance(BigInt(holding.value.baseUnits))}
           </span>

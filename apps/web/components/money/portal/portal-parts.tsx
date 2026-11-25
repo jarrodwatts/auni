@@ -295,7 +295,7 @@ export function AddressRow({
       <span className="min-w-0">
         <span
           className={cn(
-            "block text-body leading-5 font-semibold whitespace-nowrap text-ink",
+            "block text-body leading-5 font-semibold whitespace-nowrap text-ink tabular-nums",
             blocked && "font-mono text-meta break-all whitespace-normal select-all",
           )}
         >

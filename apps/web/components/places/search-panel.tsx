@@ -249,7 +249,9 @@ function Row({
         ) : null}
       </span>
       {item.trailing ? (
-        <span className="flex-none text-meta text-muted-foreground">{item.trailing}</span>
+        <span className="flex-none text-meta text-muted-foreground tabular-nums">
+          {item.trailing}
+        </span>
       ) : null}
     </>
   );

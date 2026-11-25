@@ -304,4 +304,34 @@
   [class*="text-hero-money"] {
     font-variant-numeric: tabular-nums;
   }
+
+  /* With forced colours on, the system's own colours replace these and drop every box-shadow, so
+     a focus ring drawn as a shadow vanished there (2026-11-25 council). Whatever has the keyboard
+     shows the system's highlight, even where a screen turned the outline off. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 2px solid Highlight !important;
+    }
+  }
+}
+
+/* Where the keyboard is: a solid ring in `--ring`, 3:1 or more on every surface in both looks
+   (tokens.test.ts), outside the control. `focus-ring-inset` draws it just inside, for a field
+   (over its edge) or a row that runs to its list's edge, where an outside ring would be cut off.
+   Only its style switches on focus, and a style can't be eased, so a control that eases its
+   colours shows the ring at once, never a dark one turning blue. */
+@utility focus-ring {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:focus-visible {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-inset {
+  outline: 2px none var(--ring);
+  outline-offset: -2px;
+  &:focus-visible {
+    outline-style: solid;
+  }
 }

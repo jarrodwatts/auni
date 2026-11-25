@@ -320,7 +320,7 @@ function Note({
       </span>
       <span
         className={cn(
-          "block truncate",
+          "block truncate tabular-nums",
           compact ? "text-caption leading-[14px]" : "text-caption leading-[15px]",
           NOTE_LINE_TONE[note.lineTone],
         )}

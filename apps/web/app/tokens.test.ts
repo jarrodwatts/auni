@@ -297,6 +297,8 @@ const PAIRS: readonly (readonly [string, readonly string[], number])[] = [
   ["glyph-ink", ["glyph-plate"], 4.5],
   // A field's edge.
   ["input", ["background", "sidebar", "card", "popover", "muted", "surface"], 3],
+  // The focus ring, on whatever the focused control sits on.
+  ["ring", [...SURFACES, "waiting-surface"], 3],
 ];
 
 describe("contrast", () => {
@@ -325,6 +327,36 @@ describe("figures", () => {
     expect(body).not.toContain("font-variant-numeric");
     expect(code(TOKENS_CSS)).toMatch(
       /\[class\*="text-card-money"\],\s*\[class\*="text-hero-money"\]\s*\{\s*font-variant-numeric: tabular-nums;/u,
+    );
+  });
+
+  // Taking tabular figures off the body took them off every figure that leaned on it: the live
+  // timer changed width each second, and amounts stopped lining up (2026-11-25 council).
+  it("stay tabular where they tick or stand in a column", () => {
+    for (const file of [
+      "components/conversation/live-elapsed.tsx",
+      "components/conversation/work-panel.tsx",
+      "components/places/pane-holdings.tsx",
+      "components/withdraw/withdraw-review.tsx",
+      "components/cards/money/pick-detail.tsx",
+      "components/cards/money/action-card.tsx",
+    ])
+      expect(readFileSync(join(WEB, file), "utf8"), file).toContain("tabular-nums");
+  });
+});
+
+describe("focus", () => {
+  // A focus ring drawn as a faint shadow read 1.78:1 on the page and vanished with forced
+  // colours on (2026-11-25 council). The primitives wear the solid outline instead.
+  it("is the solid outline on every primitive, never a shadow ring", () => {
+    const shadowed = readdirSync(join(WEB, "components/ui"))
+      .filter((name) => name.endsWith(".tsx") && !name.endsWith(".test.tsx"))
+      .filter((name) =>
+        /focus(-visible)?:ring-/u.test(readFileSync(join(WEB, "components/ui", name), "utf8")),
+      );
+    expect(shadowed, "use focus-ring or focus-ring-inset (tokens.css)").toEqual([]);
+    expect(code(TOKENS_CSS)).toMatch(
+      /forced-colors: active[^}]*:focus-visible\s*\{\s*outline: 2px solid Highlight/u,
     );
   });
 });

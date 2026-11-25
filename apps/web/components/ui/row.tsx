@@ -26,10 +26,14 @@ type RowParts = {
   readonly end?: React.ReactNode;
 };
 
-/** A row that only says something. Anything under its meta line goes in as children. */
+/**
+ * A row that only says something. Anything under its meta line goes in as children. It takes no
+ * onClick: a row that presses is a `PressedRow`, else it's a div no keyboard can reach.
+ */
 type StillRow = RowParts &
   Omit<React.ComponentProps<"div">, "title" | "onClick"> & {
     readonly asChild?: false;
+    readonly onClick?: never;
   };
 
 /**
@@ -47,7 +51,7 @@ const ROW = "flex min-h-14 min-w-0 items-center gap-3 py-3";
 
 /** Out to the list's edge by its own padding, so a pressed row's fill doesn't crowd its words. */
 const PRESSES =
-  "auni-touch-target -mx-2 w-[calc(100%+--spacing(4))] cursor-pointer rounded-control px-2 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.04] focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-60";
+  "auni-touch-target -mx-2 w-[calc(100%+--spacing(4))] cursor-pointer rounded-control px-2 text-left transition-colors duration-150 hover:bg-foreground/[0.04] focus-ring-inset disabled:cursor-not-allowed disabled:opacity-60";
 
 /** One row: a mark (a logo, an icon), its title and a line under it, and what ends it. */
 function Row(props: StillRow | PressedRow) {

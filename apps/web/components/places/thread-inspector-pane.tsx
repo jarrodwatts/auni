@@ -78,7 +78,7 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
 
           {auto ? (
             <div className="mt-3">
-              <div className="flex items-baseline justify-between gap-2 text-meta">
+              <div className="flex items-baseline justify-between gap-2 text-meta tabular-nums">
                 <span className="flex items-center gap-1.5 font-medium text-ink">
                   <Zap aria-hidden className="size-3.5 text-primary" />
                   {formatUsdCompact(state.data?.freeBudgetUsd ?? thread.budgetUsd)} remaining
@@ -126,7 +126,7 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
         <section aria-label="Positions opened here" className="mt-7 px-6">
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <h3 className="text-meta font-medium text-faint">Positions opened here</h3>
-            <span className="text-ui font-semibold text-ink">
+            <span className="text-ui font-semibold text-ink tabular-nums">
               {formatUsdcBalance(totalBaseUnits)}
             </span>
           </div>

@@ -137,7 +137,7 @@ export function QuestionPicker({
                 <span
                   aria-hidden
                   className={cn(
-                    "flex size-[22px] flex-none items-center justify-center rounded-control text-caption font-medium transition-colors duration-150",
+                    "flex size-[22px] flex-none items-center justify-center rounded-control text-caption font-medium transition-colors duration-150 tabular-nums",
                     on
                       ? "bg-foreground text-background"
                       : question.multiple

@@ -157,7 +157,7 @@ export function MoveList({
               <span className="min-w-0 flex-1 text-body font-medium text-muted-foreground transition-colors group-hover:text-ink">
                 {rest.length} more
               </span>
-              <span className="flex-none text-body font-semibold text-muted-foreground">
+              <span className="flex-none text-body font-semibold text-muted-foreground tabular-nums">
                 {restLabel(rest.flatMap((row) => (row.pick ? [row.pick] : [])))}
               </span>
               {begun ? <StatusMark status={overall(rest)} /> : null}
@@ -292,7 +292,7 @@ function Row({
       )}
       {/* Centered on the whole row, so the amount reads as the row's value, not the name's. */}
       {row.meta ? (
-        <span className="flex-none self-center text-body leading-5 font-semibold tracking-[-0.01em] text-ink">
+        <span className="flex-none self-center text-body leading-5 font-semibold tracking-[-0.01em] text-ink tabular-nums">
           <TextSwap text={row.meta} />
         </span>
       ) : row.status === "now" ? (

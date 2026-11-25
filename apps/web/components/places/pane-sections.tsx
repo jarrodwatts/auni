@@ -114,7 +114,10 @@ export function PaneRecord({ thread }: { readonly thread: Thread }) {
             </span>
             {item.amount ? (
               <span
-                className={cn("flex-none text-ui font-semibold", TONE_CLASS_NAME[item.amount.tone])}
+                className={cn(
+                  "flex-none text-ui font-semibold tabular-nums",
+                  TONE_CLASS_NAME[item.amount.tone],
+                )}
               >
                 {amountText(item.amount)}
               </span>

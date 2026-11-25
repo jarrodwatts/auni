@@ -179,7 +179,7 @@ export function AutonomyPicker({
                 Spending budget
               </label>
               {auto && freeBudgetUsd != null ? (
-                <span className="text-caption text-muted-foreground">
+                <span className="text-caption text-muted-foreground tabular-nums">
                   {formatBudget(freeBudgetUsd)} left of {formatBudget(budgetUsd)}
                 </span>
               ) : null}
@@ -194,7 +194,7 @@ export function AutonomyPicker({
                     type="button"
                     onClick={() => setDraftBudget(String(preset))}
                     className={cn(
-                      "h-7 rounded-control text-caption font-medium transition-colors outline-none",
+                      "h-7 rounded-control text-caption font-medium transition-colors outline-none tabular-nums",
                       activePreset
                         ? "bg-foreground text-background"
                         : "bg-background text-ink-soft ring-1 ring-foreground/[0.08] hover:text-ink",
@@ -229,7 +229,7 @@ export function AutonomyPicker({
                   step="any"
                   value={draftBudget}
                   onChange={(event) => setDraftBudget(event.target.value)}
-                  className="h-8 w-full rounded-control bg-background pr-2.5 pl-6 text-meta text-ink ring-1 ring-foreground/[0.1] outline-none focus:ring-ring"
+                  className="h-8 w-full rounded-control bg-background pr-2.5 pl-6 text-meta text-ink ring-1 ring-foreground/[0.1] outline-none focus:ring-ring tabular-nums"
                 />
               </div>
               <button

@@ -126,7 +126,7 @@ export function PortfolioMark({
 }
 
 const TAG_CLASS_NAME =
-  "flex h-5 min-w-5 flex-none items-center justify-center rounded-full px-1.5 text-caption font-semibold";
+  "flex h-5 min-w-5 flex-none items-center justify-center rounded-full px-1.5 text-caption font-semibold tabular-nums";
 
 /** Something waits on the person: "Your turn" on a thread, "1 needs your OK" on a card. */
 export function TurnTag({ children }: { readonly children: ReactNode }) {

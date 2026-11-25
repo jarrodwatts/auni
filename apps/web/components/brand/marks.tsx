@@ -151,7 +151,7 @@ export function Change({
     <span
       title={`${text} ${period}`}
       className={cn(
-        "whitespace-nowrap",
+        "whitespace-nowrap tabular-nums",
         up ? "text-positive" : down ? "text-negative" : "text-muted-foreground",
         className,
       )}

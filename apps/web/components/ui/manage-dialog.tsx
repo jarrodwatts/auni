@@ -10,6 +10,7 @@ import {
   auniDialogPrimaryButtonClass,
 } from "@/components/ui/auni-dialog";
 import { DialogContent } from "@/components/ui/dialog";
+import { inputClass } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
@@ -94,5 +95,5 @@ export function ManageFooter({
   );
 }
 
-export const manageFieldClass =
-  "block w-full rounded-control border border-foreground/[0.09] bg-background px-3.5 py-2.5 text-body leading-6 text-ink outline-none transition-colors placeholder:text-faint focus:border-foreground/[0.28]";
+/** A field in a manage dialog: the shared field, a size up, for a name or a few lines. */
+export const manageFieldClass = cn(inputClass, "block h-auto px-3.5 py-2.5 text-body leading-6");

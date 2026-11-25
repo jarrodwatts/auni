@@ -102,14 +102,14 @@ function Row({
             {name}
           </span>
           {value ? (
-            <span className="flex-none text-reading leading-[22px] font-semibold tracking-[-0.01em] text-ink">
+            <span className="flex-none text-reading leading-[22px] font-semibold tracking-[-0.01em] text-ink tabular-nums">
               {value}
             </span>
           ) : null}
         </span>
         <span className="flex items-baseline gap-3 text-meta">
           <span className="min-w-0 flex-1 truncate text-muted-foreground">{note}</span>
-          {move ? <span className="flex-none">{move}</span> : null}
+          {move ? <span className="flex-none tabular-nums">{move}</span> : null}
         </span>
       </span>
     </>

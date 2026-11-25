@@ -52,7 +52,7 @@ export function AccountMenu() {
             </span>
             <span className={cn("relative z-[1] min-w-0 flex-1", FOLD_FADE)}>
               <span className="block truncate text-ui font-semibold text-ink">{name}</span>
-              <span className="mt-0.5 block truncate text-caption text-muted-foreground">
+              <span className="mt-0.5 block truncate text-caption text-muted-foreground tabular-nums">
                 <ResolvingValue
                   pending={portfolioLoading}
                   placeholderClassName="my-[3px] h-[11px] w-20 rounded-full"

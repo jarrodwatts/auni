@@ -50,7 +50,7 @@ function Segment({
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={2}>
         {holding.name}
-        <span className="ml-2 text-background/60">{width.toFixed(0)}%</span>
+        <span className="ml-2 text-background/60 tabular-nums">{width.toFixed(0)}%</span>
       </TooltipContent>
     </Tooltip>
   );
@@ -102,7 +102,7 @@ function HoldingRow({ holding, total }: { readonly holding: Holding; readonly to
       <AssetLogo holding={holding} size={40} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-body font-medium text-ink">{holding.name}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-meta text-muted-foreground">
+        <p className="mt-0.5 flex items-center gap-1.5 text-meta text-muted-foreground tabular-nums">
           <span
             aria-hidden
             className="size-1.5 flex-none rounded-full"
@@ -112,7 +112,7 @@ function HoldingRow({ holding, total }: { readonly holding: Holding; readonly to
         </p>
       </div>
       <div className="flex-none text-right">
-        <p className="text-body font-semibold text-ink">{formatUsdcBalance(value)}</p>
+        <p className="text-body font-semibold text-ink tabular-nums">{formatUsdcBalance(value)}</p>
         {change === null ? null : (
           <Change
             pct={changePercent(change, value)}

@@ -46,8 +46,8 @@ body {
 
 .auni-text-link:focus-visible {
   border-radius: var(--radius-control);
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 30%, transparent);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .skip-link {

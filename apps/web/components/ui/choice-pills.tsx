@@ -35,7 +35,7 @@ export function ChoicePills<Value extends string>({
           disabled={disabled}
           onClick={() => onChange(option.value)}
           className={cn(
-            "relative h-8 min-w-11 rounded-full px-3 text-meta font-medium transition-colors duration-200 after:absolute after:inset-x-0 after:-inset-y-1.5 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-60",
+            "relative h-8 min-w-11 rounded-full px-3 text-meta font-medium transition-colors duration-200 after:absolute after:inset-x-0 after:-inset-y-1.5 focus-ring disabled:opacity-60",
             option.value === value
               ? "bg-foreground/[0.07] text-ink"
               : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-ink",

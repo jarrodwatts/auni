@@ -271,7 +271,7 @@ function Holdings({ app }: { readonly app: AppWire }) {
                 {holding.detail}
               </span>
             </span>
-            <span className="flex-none text-reading leading-[22px] font-semibold tracking-[-0.01em] text-ink">
+            <span className="flex-none text-reading leading-[22px] font-semibold tracking-[-0.01em] text-ink tabular-nums">
               {formatUsd(holding.usdValue)}
             </span>
           </li>

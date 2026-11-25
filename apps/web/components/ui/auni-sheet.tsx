@@ -100,7 +100,7 @@ export function AuniSheet({
           ) : null}
           <SheetPrimitive.Close
             className={cn(
-              "absolute z-10 flex size-8 items-center justify-center rounded-control text-faint transition-colors hover:bg-foreground/[0.05] hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none",
+              "absolute z-10 flex size-8 items-center justify-center rounded-control text-faint transition-colors hover:bg-foreground/[0.05] hover:text-ink focus-ring",
               // A phone closes by tapping out or dragging; the button stays for keyboards and screen readers.
               side === "right"
                 ? "top-5 right-4"

@@ -133,7 +133,7 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
           {story.facts.map(({ label, value }) => (
             <div key={label} className={cn("min-w-0", value.length > 18 && "col-span-2")}>
               <dt className="text-caption font-medium text-muted-foreground">{label}</dt>
-              <dd className="mt-0.5 text-body leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink">
+              <dd className="mt-0.5 text-body leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
                 {value}
               </dd>
             </div>
@@ -180,7 +180,7 @@ function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
             )}
           />
           <span className="min-w-0 flex-1 text-ui text-muted-foreground">{label}</span>
-          <span className="flex-none text-body font-semibold tracking-[-0.01em] text-ink">
+          <span className="flex-none text-body font-semibold tracking-[-0.01em] text-ink tabular-nums">
             {price}
           </span>
         </li>
@@ -214,7 +214,7 @@ function Steps({
             />
             <span className="min-w-0 flex-1 text-ui leading-5 text-ink">{step.text}</span>
             {step.amountUsd ? (
-              <span className="flex-none text-ui text-muted-foreground">
+              <span className="flex-none text-ui text-muted-foreground tabular-nums">
                 {formatUsd(step.amountUsd)}
               </span>
             ) : null}
@@ -272,7 +272,7 @@ function Side({
       <p className="text-caption font-medium text-faint">{label}</p>
       <p
         className={cn(
-          "mt-0.5 text-body leading-5 font-semibold break-words",
+          "mt-0.5 text-body leading-5 font-semibold break-words tabular-nums",
           TONE_CLASS_NAME[tone],
         )}
       >
@@ -308,7 +308,7 @@ function WhatArrived({
           className="flex items-baseline gap-4 py-2.5 text-ui [&:not(:first-child)]:border-t [&:not(:first-child)]:border-foreground/[0.06]"
         >
           <dt className="flex-none text-muted-foreground">{label}</dt>
-          <dd className="min-w-0 flex-1 text-right break-words text-ink">{value}</dd>
+          <dd className="min-w-0 flex-1 text-right break-words text-ink tabular-nums">{value}</dd>
         </div>
       ))}
     </dl>

@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  * actions; `icon` and `icon-sm` are square. A control's corner, never a pill.
  */
 const buttonVariants = cva(
-  "auni-touch-target relative inline-flex shrink-0 items-center justify-center gap-2 rounded-control font-medium whitespace-nowrap outline-none transition-[background-color,color,opacity,scale] duration-150 ease-settle select-none focus-visible:ring-[3px] focus-visible:ring-ring/40 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50 motion-reduce:active:scale-100 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "auni-touch-target relative inline-flex shrink-0 items-center justify-center gap-2 rounded-control font-medium whitespace-nowrap transition-[background-color,color,opacity,scale] duration-150 ease-settle select-none focus-ring active:scale-[0.985] disabled:pointer-events-none disabled:opacity-50 motion-reduce:active:scale-100 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

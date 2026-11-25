@@ -13,7 +13,7 @@ it("becomes the button or link it's given, with its parts inside and a focus rin
       </button>
     </Row>,
   );
-  expect(html).toMatch(/^<button type="button" data-slot="row" class="[^"]*focus-visible:ring/u);
+  expect(html).toMatch(/^<button type="button" data-slot="row" class="[^"]*focus-ring-inset/u);
   expect(html).toContain("auni-touch-target");
   expect(html).toContain("Hyperliquid");
   expect(html).toContain("<span>under</span>");
@@ -28,8 +28,10 @@ it("becomes the button or link it's given, with its parts inside and a focus rin
   expect(link).toMatch(/^<a href="\/app" data-slot="row"/u);
 });
 
-it("stays a quiet div when it only says something", () => {
+it("stays a quiet div when it only says something, and can't be given a click", () => {
   const html = renderToStaticMarkup(<Row title="Kintsu" />);
+  // @ts-expect-error A row that presses is given its button or link (asChild), never an onClick.
+  void (<Row title="Kintsu" onClick={() => {}} />);
   expect(html).toMatch(/^<div data-slot="row"/u);
   expect(html).not.toContain("cursor-pointer");
 });

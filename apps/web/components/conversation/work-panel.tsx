@@ -325,7 +325,7 @@ export function WorkPanel({
             startedAt={clockStartedAt}
           />
         ) : finalDuration !== null ? (
-          <span aria-hidden className="flex-none text-meta text-muted-foreground/75">
+          <span aria-hidden className="flex-none text-meta text-muted-foreground/75 tabular-nums">
             <TextSwap align="end" text={finalDuration} />
           </span>
         ) : null}

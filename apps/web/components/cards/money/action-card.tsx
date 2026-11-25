@@ -310,7 +310,7 @@ export function ActionCard({
               >
                 <dt className="text-caption text-muted-foreground">{figure.label}</dt>
                 {/* Every value is read whole: it wraps, and a whole address is drawn to be checked. */}
-                <dd className="mt-0.5 text-body leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink">
+                <dd className="mt-0.5 text-body leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
                   {address ? (
                     <FullAddress
                       address={figure.value}
@@ -511,7 +511,7 @@ function Route({
       <LogoImage fallback={null} size={26} src={CHAIN_LOGOS[chain] ?? null} />
       <div className="min-w-0">
         <p className="truncate text-caption text-muted-foreground">{label}</p>
-        <p className="mt-0.5 truncate text-body font-semibold tracking-[-0.01em] text-ink">
+        <p className="mt-0.5 truncate text-body font-semibold tracking-[-0.01em] text-ink tabular-nums">
           {value}
         </p>
       </div>
@@ -554,7 +554,7 @@ function Receipt({
         {detail ? (
           <p
             className={cn(
-              "mt-0.5 text-meta leading-[1.4] text-pretty text-muted-foreground",
+              "mt-0.5 text-meta leading-[1.4] text-pretty text-muted-foreground tabular-nums",
               !whole && "line-clamp-2",
             )}
           >
@@ -563,7 +563,7 @@ function Receipt({
         ) : null}
       </div>
       {amount ? (
-        <span className="flex-none self-center text-body leading-5 font-semibold tracking-[-0.01em] text-ink">
+        <span className="flex-none self-center text-body leading-5 font-semibold tracking-[-0.01em] text-ink tabular-nums">
           {amount}
         </span>
       ) : null}

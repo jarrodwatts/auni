@@ -112,7 +112,7 @@ export function ActivityRow({
       {result === undefined && duration === undefined ? null : (
         <span
           className={cn(
-            "flex max-w-[52%] min-w-0 flex-none items-center text-meta",
+            "flex max-w-[52%] min-w-0 flex-none items-center text-meta tabular-nums",
             result && duration && "gap-2",
           )}
         >

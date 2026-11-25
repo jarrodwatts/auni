@@ -190,7 +190,7 @@ export function WithdrawDialog({
                   placeholder="0.00"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
-                  className={cn(FIELD, "pr-16 pl-7")}
+                  className={cn(FIELD, "pr-16 pl-7 tabular-nums")}
                 />
                 <button
                   type="button"

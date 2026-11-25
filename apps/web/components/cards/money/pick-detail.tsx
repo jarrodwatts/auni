@@ -66,7 +66,7 @@ function PickDetailBody({ leg }: { readonly leg: Leg }) {
             <span className="text-card-money text-ink">
               <RollingNumber value={valueLabel(detail.kind, scrubbed?.value ?? detail.now)} />
             </span>
-            <span className="text-meta text-muted-foreground">
+            <span className="text-meta text-muted-foreground tabular-nums">
               {scrubbed ? (
                 DATE.format(new Date(scrubbed.at))
               ) : detail.today === null ? (
@@ -102,7 +102,9 @@ function PickDetailBody({ leg }: { readonly leg: Leg }) {
                 style={{ "--fact": index } as CSSProperties}
               >
                 <dt className="text-caption leading-4 text-muted-foreground">{fact.label}</dt>
-                <dd className="truncate text-ui leading-5 font-semibold text-ink">{fact.value}</dd>
+                <dd className="truncate text-ui leading-5 font-semibold text-ink tabular-nums">
+                  {fact.value}
+                </dd>
               </div>
             ))}
           </dl>

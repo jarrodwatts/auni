@@ -2,11 +2,18 @@ import { z } from "zod";
 
 import { dollarsSchema } from "./money.ts";
 import { CASH_KEYS } from "./networks.ts";
-import { actionRecordIdSchema, proposalIdSchema, threadIdSchema, timestampSchema } from "./shared.ts";
+import { listed } from "./words.ts";
+import {
+  actionRecordIdSchema,
+  proposalIdSchema,
+  threadIdSchema,
+  timestampSchema,
+} from "./shared.ts";
 
 /**
  * Where a money action is. Cancelled: the owner declined it. Replaced: a newer card took its
- * place. Retracted: Auni took it back before any tap, for the reason RETRACTED names.
+ * place. Retracted: Auni took it back, for the reason RETRACTED names: before any tap, or allowed
+ * on a card that showed less than it grants, before anything of it started.
  */
 export const actionStatusSchema = z.enum([
   "awaiting_permission",
@@ -79,13 +86,27 @@ export const HELD_SAFE =
 export const CARD_WAITS_MS = 24 * 60 * 60_000;
 
 /**
+ * How a money card recorded now is drawn, which core stamps on its row and the web app names when
+ * it allows one, as the format it drew. Raise it whenever cards start saying something they
+ * didn't: a card recorded before is taken back, never allowed or tried again as it was shown, and
+ * a tab still running the web app from before is told to reload (core's money/decide.ts).
+ * 2 says every permission a move leaves.
+ */
+export const CARD_FORMAT = 2;
+
+/**
  * Why Auni took back a card still waiting for the owner's tap, in the words its card, its
- * channel message and the agent all read: it waited a day (CARD_WAITS_MS) or Auni no longer
- * stands behind it.
+ * channel message and the agent all read: it waited a day (CARD_WAITS_MS), Auni no longer
+ * stands behind it, or it was drawn before cards said all they say now (CARD_FORMAT). Each fits
+ * whole in the agent's cut of a plan's leg (core's LEG_SAID).
  */
 export const RETRACTED = {
   stale: "Taken back after a day without a tap. Ask again if you still want it.",
   agent: "Taken back by Auni: it no longer fits.",
+  outOfDate:
+    "Out of date: Auni's cards now say more about each move. Auni will put it up again fresh if it still fits.",
+  unshown:
+    "Stopped before anything was sent: its card didn't show a permission it leaves, which Auni's cards now show. Auni will put it up again fresh if it still fits.",
 } as const;
 
 /** How a held move the owner closed reads afterwards: when its money had moved, and when nothing showed it had. */
@@ -108,9 +129,11 @@ export function filledUsd(run: MoveRun): string | null {
  * approved, a venue's rule, stopped because a move before it didn't go, an
  * order nobody filled that was closed with nothing moved, the coin its card
  * bought for its network fee not come (fees: the purchase went out once and is
- * never made again, so the move itself can run again), or something sent, or a
- * run that died partway and may have (never run again as it is). Unknown is
- * anything else.
+ * never made again, so the move itself can run again), something sent, or a
+ * run that died partway and may have (never run again as it is), or paused
+ * before sending because it was allowed on a card from before that didn't show a
+ * permission it leaves (unshown: only a fresh card runs it, which Auni puts up
+ * itself). Unknown is anything else.
  */
 export const failureKindSchema = z.enum([
   "funds",
@@ -122,6 +145,7 @@ export const failureKindSchema = z.enum([
   "unfilled",
   "fees",
   "sent",
+  "unshown",
   "unknown",
 ]);
 export type FailureKind = z.infer<typeof failureKindSchema>;
@@ -129,6 +153,16 @@ export type FailureKind = z.infer<typeof failureKindSchema>;
 /** One line of a move's card, in the order core wrote them: "Network: Base". */
 const actionLineSchema = z.object({ label: z.string(), value: z.string() });
 export type ActionLine = z.infer<typeof actionLineSchema>;
+
+/**
+ * The label of a move's line that says every lasting power it leaves anyone over the owner's
+ * money, orders it places included: "Lets: 0x1a2b…9f8e spend your USDC".
+ */
+export const LETS_LINE = "Lets";
+
+/** How a card says the lasting permissions a move leaves, wherever it's drawn. */
+export const permissionsSaid = (lets: readonly string[]): string =>
+  `From now on, it lets ${listed(lets)}.`;
 
 /** One money action as core serves it, to the web and to the agent. */
 export const actionWireSchema = z.object({

@@ -16,6 +16,7 @@ import {
 import { env } from "../env.ts";
 import type { Channel } from "../apps/contract.ts";
 import { channels, offered } from "../apps/registry.ts";
+import { outOfDate } from "../money/decide.ts";
 import { SETTLED } from "../money/life.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { walletAddresses } from "../money/wallets.ts";
@@ -132,14 +133,17 @@ async function viewOf(
   const id = "actionId" in target ? target.actionId : target.proposalId;
   const thread = threadId ? await threadById(threadId) : null;
   const [secret] = legs.filter(asksForSecret);
+  const stale = outOfDate(legs);
   const fits = fitsHere(legs);
   const proof =
     waiting &&
+    !stale &&
     fits &&
     !secret &&
     (await Promise.all(legs.map((leg) => needsStepUp(leg)))).some(Boolean);
   return {
     legs,
+    outOfDate: stale,
     // A plan's one Allow carries no proof (see allowProposal), so one that takes the owner's is the
     // app's; so is a card asking for a secret, whose field is drawn only there.
     inTheApp: waiting && (!fits || secret !== undefined || proof),
@@ -181,7 +185,7 @@ async function drawn(
   const view = await viewOf(delivery, legs, target, threadId);
   const digest = legsDigest(legs);
   const waiting = waitingOn(legs);
-  const grant = waiting && !view.inTheApp ? newGrant() : null;
+  const grant = waiting && !view.inTheApp && !view.outOfDate ? newGrant() : null;
   return {
     message: drawCard(view, grant),
     view,
@@ -309,7 +313,7 @@ export async function syncDelivery(
   }
   const view = await viewOf(delivery, legs, target);
   const digest = legsDigest(legs);
-  const tapping = waitingOn(legs) && !view.inTheApp;
+  const tapping = waitingOn(legs) && !view.inTheApp && !view.outOfDate;
   const grantLive =
     delivery.grantHash !== null &&
     delivery.grantExpiresAt !== null &&

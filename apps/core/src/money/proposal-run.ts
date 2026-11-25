@@ -3,7 +3,7 @@ import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { publishThread } from "../conversation/threads.ts";
 import { db } from "../db/client.ts";
 import { actions } from "../db/schema.ts";
-import { queueExecution, settledOutcome } from "./actions.ts";
+import { lockLegs, queueExecution, settledOutcome } from "./actions.ts";
 import { cashCents } from "./funding.ts";
 import { step } from "./life.ts";
 import { awaitedCash, nextStep, stagedLeg } from "./proposal-order.ts";
@@ -35,9 +35,13 @@ export async function advanceProposal(proposalId: string, patient: boolean): Pro
   if (next.kind === "none") return { waiting: false, wake: null };
   if (next.kind === "stop") {
     // Only legs still queued: one the executor already claimed runs its course.
-    const stopped = await step(db, "skip", inArray(actions.id, [...next.ids]), {
-      error: STOPPED,
-      failureKind: "stopped",
+    // Locked as a leg's start locks them, so stopping several as another leg starts never deadlocks.
+    const stopped = await db.transaction(async (tx) => {
+      await lockLegs(tx, eq(actions.proposalId, proposalId));
+      return step(tx, "skip", inArray(actions.id, [...next.ids]), {
+        error: STOPPED,
+        failureKind: "stopped",
+      });
     });
     const [first] = stopped;
     if (!first) return { waiting: false, wake: null };

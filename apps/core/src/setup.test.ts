@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { userInfo } from "node:os";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ON_WINDOWS } from "./agent/brain.ts";
-import { nextStep, said, SETUP_STEPS, spareKey, type SetupFacts } from "./setup.ts";
+import { nextStep, said, SETUP_STEPS, spareKey, tunnelHint, type SetupFacts } from "./setup.ts";
+
+afterEach(() => vi.unstubAllEnvs());
 
 /** A machine where everything the terminal does is done. */
 const ready: SetupFacts = {
@@ -200,9 +204,30 @@ describe("nextStep", () => {
     }
     // Only with no screen here does it say how a browser on another computer reaches this one.
     expect(up("no-screen").say).toContain("no screen");
-    expect(up("no-screen").say).toContain("`ssh -L 3000:127.0.0.1:3000 <this computer>`");
     expect(up("not-opened").say).not.toContain("ssh");
   });
+
+  it.each([undefined, "2001:db8::1 43210 2001:db8::2 2222"])(
+    "gives headless JSON the same shell command as human setup (SSH_CONNECTION=%s)",
+    (connection) => {
+      vi.stubEnv("SSH_CONNECTION", connection);
+      const facts: SetupFacts = {
+        ...thinking,
+        running: { running: true, webAnswers: true, browser: "no-screen" },
+      };
+      const { say, ...rest } = nextStep(facts);
+      expect(rest).toEqual({
+        step: "start",
+        next: "tell",
+        waitSeconds: 15,
+        done: ["tools", "install", "brain"],
+      });
+      const command = say.match(/ssh -L [^\n`]+/u)?.[0];
+      expect(command).toBeDefined();
+      expect(() => execFileSync("sh", ["-n", "-c", command!])).not.toThrow();
+      expect(command).toBe(said(facts).match(/ssh -L [^\n]+/u)?.[0]);
+    },
+  );
 
   it("speaks to the owner in every answer, leaving what the agent must never do to the skill", () => {
     const answers = [
@@ -236,8 +261,42 @@ describe("nextStep", () => {
     }
   });
 
+  it("shows the tunnel before the pairing command when the other computer needs it", () => {
+    vi.stubEnv("SSH_CONNECTION", "192.0.2.1 43210 192.0.2.2 22");
+    const facts: SetupFacts = {
+      ...thinking,
+      running: { running: true, webAnswers: true, browser: "no-screen" },
+    };
+    const output = said(facts);
+    expect(output).toContain(`ssh -L 3000:127.0.0.1:3000 ${userInfo().username}@192.0.2.2`);
+    expect(output.indexOf("ssh -L")).toBeLessThan(output.indexOf("Run auni pair"));
+    expect(said({ ...facts, running: { ...facts.running, browser: "not-opened" } })).not.toContain(
+      "ssh -L",
+    );
+  });
+
+  it("uses the SSH server's IPv6 address and custom port when known", () => {
+    vi.stubEnv("SSH_CONNECTION", "2001:db8::1 43210 2001:db8::2 2222");
+    expect(tunnelHint()).toContain(
+      `ssh -L 3000:127.0.0.1:3000 -p 2222 ${userInfo().username}@2001:db8::2\n` +
+        "If that address doesn't work from your computer, add -L as shown to your usual SSH command.\n",
+    );
+  });
+
+  it("explains the placeholder when the SSH address is unknown", () => {
+    vi.stubEnv("SSH_CONNECTION", undefined);
+    const hint = tunnelHint();
+    expect(hint).toContain("ssh -L 3000:127.0.0.1:3000 ssh-host\n");
+    expect(hint).toContain("Replace ssh-host with the address or user@host");
+    expect(hint).toContain("Leave that SSH session open");
+  });
+
   it("reads as plain words, with the command to run", () => {
-    expect(said(nextStep(thinking))).toMatch(/Run: auni$/u);
+    expect(said(thinking)).toMatch(/^Auni isn't running\.\nRun auni/u);
+    expect(said({ ...thinking, webBuilt: false })).toContain(
+      "The web app builds on the first start (about a minute).",
+    );
+    expect(nextStep(thinking).run).toEqual({ command: "auni", background: true });
   });
 });
 

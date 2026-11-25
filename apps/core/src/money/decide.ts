@@ -1,10 +1,12 @@
-import { and, eq, sql } from "drizzle-orm";
+import { CARD_FORMAT, isAsk } from "@auni/shared";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { ProofRefusal } from "../auth/proof.ts";
 import { db } from "../db/client.ts";
 import { actions, type ActionRow } from "../db/schema.ts";
-import { actionById, decideActions } from "./actions.ts";
+import { actionById, decideActions, proposalActions } from "./actions.ts";
 import { stepUpRefusal } from "./step-up.ts";
+import { takeBackStale } from "./waiting.ts";
 
 // The owner's Allow and Decline, whichever app their tap came from: the web app's routes
 // (money/routes.ts) and every channel (channels/hub.ts) decide a card only through here, so one
@@ -12,8 +14,49 @@ import { stepUpRefusal } from "./step-up.ts";
 // computer. decideActions queues an allowed move, and wakes a declined card's thread, in the
 // transaction that decides it.
 
+/**
+ * Whether any waiting money card here was drawn before cards said all they say now (see
+ * CARD_FORMAT): the owner saw less than a card says today, so a tap on it allows nothing. An ask's
+ * card says what it changes in Auni, which no format has changed. Such a plan asks for no money
+ * either, since it can never run. The tap takes it back (takenBack).
+ */
+export function outOfDate(rows: readonly ActionRow[]): boolean {
+  return rows.some(
+    (row) =>
+      row.status === "awaiting_permission" && !isAsk(row.tool) && row.cardFormat < CARD_FORMAT,
+  );
+}
+
+/** A tap refused on a card drawn before cards said all they say now, and what it is told. */
+type OutOfDate = { readonly kind: "out_of_date"; readonly said: string };
+
+/**
+ * Takes back every card that can no longer be allowed as shown (takeBackStale), so its thread is
+ * told and a reload never shows it waiting, and says what that did to the one tapped, in the words
+ * its card now says (RETRACTED): out of date, so Auni puts it up again, or a day old as well, so
+ * the owner asks again. Null when a tap elsewhere decided it first.
+ */
+export async function takenBack(legs: readonly ActionRow[]): Promise<OutOfDate | null> {
+  await takeBackStale();
+  const [now] = await db
+    .select({ error: actions.error })
+    .from(actions)
+    .where(
+      and(
+        inArray(
+          actions.id,
+          legs.filter(({ status }) => status === "awaiting_permission").map(({ id }) => id),
+        ),
+        eq(actions.status, "retracted"),
+      ),
+    );
+  return now?.error ? { kind: "out_of_date", said: now.error } : null;
+}
+
 type Allowed =
   | { readonly kind: "allowed"; readonly action: ActionRow }
+  /** Its card was drawn before cards said all they say now (see outOfDate). */
+  | OutOfDate
   /** It takes proof the owner is there, which this tap didn't carry. */
   | { readonly kind: "refused"; readonly reason: ProofRefusal }
   /** It isn't waiting any more: decided already, or replaced. */
@@ -28,6 +71,8 @@ type Allowed =
 export async function allowAction(actionId: string, ownerHere = false): Promise<Allowed> {
   const waiting = await actionById(actionId);
   if (waiting?.tool === "request_secret") return { kind: "in_its_field" };
+  if (waiting && outOfDate([waiting]))
+    return (await takenBack([waiting])) ?? { kind: "not_waiting" };
   if (waiting?.status === "awaiting_permission") {
     const refusal = await stepUpRefusal(waiting, ownerHere);
     if (refusal) return { kind: "refused", reason: refusal };
@@ -42,8 +87,13 @@ export async function declineAction(actionId: string): Promise<ActionRow | null>
   return declined ?? null;
 }
 
-/** Allows every waiting leg of a proposal and queues its first stage: the legs it allowed. */
-export function allowProposal(proposalId: string): Promise<ActionRow[]> {
+/**
+ * Allows every waiting leg of a proposal and queues its first stage: the legs it allowed, or, for
+ * a card drawn before cards said all they say now, which allows none, what its tap is told.
+ */
+export async function allowProposal(proposalId: string): Promise<ActionRow[] | OutOfDate> {
+  const legs = await proposalActions(proposalId);
+  if (outOfDate(legs)) return (await takenBack(legs)) ?? [];
   return decideActions({ proposalId }, "allow");
 }
 

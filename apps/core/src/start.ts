@@ -1,9 +1,8 @@
 import type { ChildProcess } from "node:child_process";
 import type { Server } from "node:http";
 
-import { brainSeen, nothingToThinkWith, onBrainReady, proveLogins } from "./agent/brain.ts";
+import { brainSeen, onBrainReady, proveLogins, terminalBrainLine } from "./agent/brain.ts";
 import { lastPaired, mintPairingCode, pairingLink, theOwner } from "./auth/owner.ts";
-import { doorSocket } from "./auth/tailscale.ts";
 import { closeDatabaseConnection } from "./db/client.ts";
 import { postgresLog, type Postgres } from "./db/embedded.ts";
 import { migrateDatabase } from "./db/migrations.ts";
@@ -18,12 +17,13 @@ import {
   type Runner,
 } from "./jobs/runner.ts";
 import { lendToHandover, packHere } from "./handover/hand-over.ts";
+import { takeBackStale } from "./money/waiting.ts";
 import { takingOver, handedOver } from "./handover/marks.ts";
 import { listen } from "./server.ts";
-import type { BrainFound } from "./hello/stage.ts";
 import { plainTelling, type Telling } from "./hello/telling.ts";
 import { canOpenBrowser, noteBrowserTry, openBrowser } from "./open-browser.ts";
 import { runningAuni, runsAs, where } from "./running.ts";
+import { auniCommand, tunnelHint } from "./setup.ts";
 import { startWebApp } from "./web-app.ts";
 
 /**
@@ -47,6 +47,8 @@ export async function start(
     readonly onceUp?: () => Promise<void>;
     /** Prints the pairing link where no browser opens: only a demo's, whose owner is made up. */
     readonly printsLink?: boolean;
+    /** How to stop when it runs without a terminal. */
+    readonly stopHint?: string;
     /** The page of the app the browser is brought to, where it isn't the app's first. */
     readonly landsOn?: string;
     /** How the start is told: the terminal's scene, or plain lines (hello/telling.ts). */
@@ -89,7 +91,7 @@ export async function start(
       await database?.stopping();
       if (runner)
         console.log(
-          `Auni is stopping: running moves finish first${runsAs() === "terminal" ? " (Ctrl-C again stops at once)" : ""}.`,
+          `Stopping Auni. Moves in progress will finish first${runsAs() === "terminal" ? " (press Ctrl-C again to stop immediately)" : ""}.`,
         );
       webApp?.kill();
       // No new requests; one in flight, such as a money tool call waiting on its send, carries on.
@@ -101,7 +103,7 @@ export async function start(
       await database?.release();
     } catch (error) {
       // Stopping ends in an exit whatever failed on the way, said once, never an unhandled crash.
-      console.error("Auni stopped, but not cleanly:", error);
+      console.error("Auni stopped with an error:", error);
       code = 1;
     }
     process.exit(code);
@@ -117,7 +119,7 @@ export async function start(
     stopping = true;
     told.abandon();
     console.error(
-      `Auni's database stopped (its log: ${postgresLog()}), so Auni stops too. ${runsAs() === "service" ? "Its service starts it again." : "Start it again with: auni"}`,
+      `Auni's database stopped, so Auni is stopping too. A move in progress may still have gone through. Check its card after Auni restarts. See ${postgresLog()}. ${runsAs() === "service" ? "Its background service will restart it." : `Run ${auniCommand()} to start it again.`}`,
     );
     webApp?.kill();
     process.exit(1);
@@ -125,7 +127,7 @@ export async function start(
 
   if (takingOver()) {
     console.error(
-      "Auni is on its way into this machine from your laptop, and isn't in place yet: run the auni take-over command again to finish.",
+      "Auni is still moving from the other computer and isn't ready yet. Run the auni take-over command again to finish.",
     );
     return void (await stop(1));
   }
@@ -147,15 +149,17 @@ export async function start(
       if (!held) throw new AlreadyRunning();
       runner = { stop: () => held.close() };
       console.log(
-        `Auni moved to ${handed.machine} (${handed.to}), so this copy runs nothing. Your data and keys stay here until you remove them: auni uninstall.`,
+        `Auni moved to ${handed.machine} (${handed.to}), so this copy is paused. Your local data and keys stay here until you run auni uninstall.`,
       );
     } else if (runJobs) {
       runner = await startRunnerWhenFree(jobs, coreServing, {
         onWait: () =>
           told.waiting(
-            "The Auni stopped a moment ago is still finishing what it was running. This one starts as soon as it has.",
+            "A previous Auni process is still finishing work in progress. Starting as soon as it finishes.",
           ),
       });
+      // Before any tab can see one: a card from before this version doesn't wait looking allowable.
+      await takeBackStale();
       // A handover to another machine stops the runner while it hands Auni over (handover/).
       lendToHandover({
         stopJobs: async () => {
@@ -168,18 +172,18 @@ export async function start(
         },
         pack: packHere,
       });
-    } else console.log("Auni's jobs are off (--no-jobs): nothing runs in the background.");
+    } else told.say("Background work is off.");
     servers = await listen();
-    told.log(`Auni's API is listening on ${env.HOST}:${env.PORT}.`);
-    if (env.TAILSCALE_OWNER) told.say(`Its door for Tailscale is open: ${doorSocket()}.`);
+    if (env.TAILSCALE_OWNER) told.log("Tailscale access is ready.");
     await onceUp?.();
+    if (!web) told.log(`API ready at http://${env.HOST}:${env.PORT}`);
     if (web) {
       // Its banner and chatter never reach the terminal, scene or plain: only Auni's own lines do.
       webApp = await startWebApp({ quiet: true, onBuild: () => told.pageBuilding() });
       webApp.once("exit", (exitCode) => {
         if (stopping) return;
         told.abandon();
-        console.error(`The web app stopped (${exitCode}), so Auni stops too.`);
+        console.error(`The web app exited (code ${exitCode}), so Auni is stopping too.`);
         void stop(exitCode || 1);
       });
     }
@@ -191,18 +195,22 @@ export async function start(
       console.log(
         holder ? `Auni is already running ${where(holder)}.` : "Auni is already running.",
       );
-      await openOwner({ open, printsLink, landsOn });
+      await openOwner({ web, open, printsLink, landsOn });
       await stop(0);
       return;
     }
     if (error instanceof StillStopping) console.log(error.message);
-    else console.error(error);
+    else {
+      console.error(`Auni couldn't start. Run ${auniCommand()} doctor\n`);
+      console.error(error);
+    }
     await stop(1);
     return;
   }
 
   const opened = await openOwner({
-    open: open && web,
+    web,
+    open,
     printsLink,
     landsOn,
     say: told.say,
@@ -210,9 +218,14 @@ export async function start(
     opening: () => told.leaving(),
   }).catch((error: unknown) => {
     told.abandon();
-    console.error("couldn't open Auni in the browser", error);
+    console.error(`Couldn't open Auni in your browser. Run ${auniCommand()} doctor\n`, error);
     return false;
   });
+  const mode = runsAs();
+  if (mode === "terminal") told.say("Keep this terminal open. Ctrl-C stops Auni.");
+  else if (options.stopHint) told.say(options.stopHint);
+  else if (!runJobs && !handed) told.say("Stop this process to shut down Auni.");
+  else told.say(`Auni is running ${where({ as: mode })}. Stop it with ${auniCommand()} stop.`);
   told.up(opened);
 }
 
@@ -258,12 +271,14 @@ async function coreServing(): Promise<boolean> {
  * made up, prints its link instead (`printsLink`). Either way the browser lands on `landsOn`.
  */
 export async function openOwner({
+  web,
   open,
   printsLink = false,
   landsOn = "/app",
   say = (line) => console.log(line),
   opening = () => {},
 }: {
+  readonly web: boolean;
   readonly open: boolean;
   readonly printsLink?: boolean;
   readonly landsOn?: string | undefined;
@@ -272,9 +287,10 @@ export async function openOwner({
   /** Told as the browser opens: the terminal's Auni leaps into it. */
   readonly opening?: () => void;
 }): Promise<boolean> {
+  if (!web) return false;
   // Through Tailscale there is nothing to pair, and this machine's own browser is never let in.
   if (env.TAILSCALE_OWNER) {
-    say(`\nAuni is at ${env.WEB_ORIGIN}, for your devices signed in to your Tailscale account.`);
+    say(`\nOpen Auni from a device signed in to Tailscale.\n${env.WEB_ORIGIN}`);
     return false;
   }
   const paired = (await lastPaired()) !== null;
@@ -290,18 +306,18 @@ export async function openOwner({
     );
     if (opened) {
       noteBrowserTry("opened");
-      say(`\nAuni is open in your browser, at ${env.WEB_ORIGIN}`);
+      say(`\nAuni is open in your browser.\n${env.WEB_ORIGIN}`);
       return true;
     }
   }
   noteBrowserTry(open && !screen ? "no-screen" : "not-opened");
-  say(`\nAuni is at ${env.WEB_ORIGIN}`);
-  if (paired) return false;
-  say(
-    printsLink
-      ? `Open ${pairingLink(await mintPairingCode(), landsOn)} to sign in (works once, for 15 minutes).`
-      : "Run `auni pair` for a link that pairs your browser with Auni.",
-  );
+  const tunnel = screen ? "" : tunnelHint();
+  const link = paired
+    ? `Open Auni at ${env.WEB_ORIGIN}`
+    : printsLink
+      ? `Open ${pairingLink(await mintPairingCode(), landsOn)}\nThis link works once and expires after 15 minutes.`
+      : `Auni is at ${env.WEB_ORIGIN}\nRun ${auniCommand()} pair to get a sign-in link.`;
+  say(`\n${tunnel}${link}`);
   return false;
 }
 
@@ -310,15 +326,10 @@ export async function openOwner({
  * can. A running Auni goes on to prove the login with one tiny question (proveLogins), which its
  * first turn waits on; saying what the check saw needn't.
  */
-async function brainFound(): Promise<BrainFound> {
-  const picked = await brainSeen().catch((error: unknown) => {
-    console.error("couldn't check the brains", error);
-    return { fixes: [] as string[] };
-  });
-  return "about" in picked
-    ? {
-        name: picked.about.name,
-        line: `Auni thinks with ${picked.about.name}, on ${picked.login}.`,
-      }
-    : { name: null, line: nothingToThinkWith(picked.fixes) };
+function brainFound() {
+  const auni = auniCommand();
+  return brainSeen(auni).catch(() => ({
+    name: null,
+    line: terminalBrainLine(undefined, null, auni),
+  }));
 }

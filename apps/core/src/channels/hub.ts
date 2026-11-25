@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import { RETRACTED } from "@auni/shared";
 import { and, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -22,7 +23,14 @@ import { deliverKind } from "../jobs/kinds.ts";
 import { defineJob, jobKind } from "../jobs/queue.ts";
 import type { Channel, ChannelEvent } from "../apps/contract.ts";
 import { channels, offered } from "../apps/registry.ts";
-import { allowAction, allowProposal, declineAction, declineProposal } from "../money/decide.ts";
+import {
+  allowAction,
+  allowProposal,
+  declineAction,
+  declineProposal,
+  outOfDate,
+  takenBack,
+} from "../money/decide.ts";
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
@@ -469,8 +477,16 @@ async function decide(
   if (!target || legs.length === 0) answer = "That card is gone. Nothing moved.";
   else if (legsDigest(legs) !== delivery.cardDigest)
     answer = "This card changed, so nothing moved. Review the updated card first.";
-  else if (!waitingOn(legs)) answer = "Already decided.";
-  else if (!showsFullReview(delivery.shown)) answer = "Review the updated card first.";
+  else if (!waitingOn(legs))
+    answer =
+      verb === "allow" &&
+      legs.every(({ status, error }) => status === "retracted" && error === RETRACTED.outOfDate)
+        ? RETRACTED.outOfDate
+        : "Already decided.";
+  // A newer layout needs a fresh Allow. An out-of-date card can only be taken back, and
+  // Decline still records the owner's no on a card they were already shown.
+  else if (!outOfDate(legs) && !showsFullReview(delivery.shown))
+    answer = "Review the updated card first.";
   else {
     const decided = verb === "allow" ? await allowed(target, legs) : await declined(target);
     if (decided.won)
@@ -507,7 +523,13 @@ async function allowed(
     if (outcome.kind === "not_waiting") return NOT_WAITING;
     if (outcome.kind === "in_its_field")
       return { won: false, answer: "Enter this in Auni's private field, never in chat." };
+    if (outcome.kind === "out_of_date") return { won: false, answer: outcome.said };
     return { won: true, answer: "Allowed." };
+  }
+  // Said before asking for money a plan that can never run would need.
+  if (outOfDate(legs)) {
+    const refused = await takenBack(legs);
+    return refused ? { won: false, answer: refused.said } : NOT_WAITING;
   }
   const waiting = legs.filter((leg) => leg.status === "awaiting_permission");
   if ((await Promise.all(waiting.map((leg) => needsStepUp(leg)))).some(Boolean)) return TAKES_PROOF;
@@ -519,6 +541,7 @@ async function allowed(
       answer: `Add ${dollars(funding.needUsd)} to your wallet first, then try again.`,
     };
   const rows = await allowProposal(target.proposalId);
+  if (!Array.isArray(rows)) return { won: false, answer: rows.said };
   return rows.length > 0 ? { won: true, answer: "Allowed." } : NOT_WAITING;
 }
 

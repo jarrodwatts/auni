@@ -1,3 +1,4 @@
+import { CARD_FORMAT } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -339,7 +340,16 @@ describe("legsToRetry", () => {
     each: Row,
     status: RetryLeg["status"],
     failureKind: RetryLeg["failureKind"] = null,
-  ): RetryLeg => ({ ...each, status, failureKind, txs: [] });
+  ): RetryLeg => ({
+    ...each,
+    status,
+    failureKind,
+    txs: [],
+    cardFormat: CARD_FORMAT,
+    lines: [],
+    card: null,
+    proposalId: "plan",
+  });
   const retried = (rows: readonly RetryLeg[], pricedPast: readonly string[] = []) =>
     legsToRetry(rows, new Set(pricedPast));
 
@@ -370,6 +380,14 @@ describe("legsToRetry", () => {
       ]),
     ).toEqual(["savings", "ether"]);
     expect(retried([as(bridge, "failed", "rule"), as(ether, "failed", "stopped")])).toBeNull();
+  });
+
+  it("runs nothing when a leg it would run was drawn before cards said all they say now, leaving a permission its plan didn't show", () => {
+    const old = { ...as(bridge, "failed", "glitch"), cardFormat: CARD_FORMAT - 1 };
+    const lets = [{ label: "Lets", value: "Polymarket's exchanges trade your shares" }];
+    expect(retried([{ ...old, lines: lets }, as(ether, "failed", "stopped")])).toBeNull();
+    // One that leaves nothing finishes its plan as before.
+    expect(retried([old, as(ether, "failed", "stopped")])).toEqual(["bridge", "ether"]);
   });
 
   it("runs nothing while a leg still runs, or once something went out", () => {

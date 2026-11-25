@@ -4,6 +4,8 @@ import {
   AMOUNT,
   ASK_DONE,
   HELD,
+  LETS_LINE,
+  RETRACTED,
   SUMMARY_VERBS,
   filledUsd,
   NETWORKS,
@@ -69,6 +71,7 @@ export interface CardView extends AppDestination {
   readonly statusLink?: string | null;
   /** It takes proof, needs a private field, or is too long to review here in full. */
   readonly inTheApp: boolean;
+  readonly outOfDate?: boolean;
   readonly proof?: boolean;
   readonly secret?: boolean;
   readonly decidedIn: string | null;
@@ -80,9 +83,9 @@ export const waitingOn = (legs: readonly Pick<ActionRow, "status">[]): boolean =
 
 /** The buttons' grant stands in by this while working out whether a message changed. */
 const SOME_GRANT = "grant";
-const REVIEW_LAYOUT = "review-v3:";
+const REVIEW_LAYOUT = "review-v4:";
 
-/** Earlier messages could omit a permanent-loss warning. */
+/** Earlier messages could omit terms in the current review. */
 export function showsFullReview(shown: string | null): boolean {
   return shown?.startsWith(REVIEW_LAYOUT) ?? false;
 }
@@ -152,9 +155,11 @@ function compactApproval(label: string): string {
   return `Allow ${amount[0]}`;
 }
 
-function reviewLines(leg: ActionRow): string[] {
+function reviewLines(leg: ActionRow, showLets: boolean): string[] {
   const { card } = leg;
-  const lines = leg.lines.map(({ label, value }) => `${literal(label)}: ${literal(value)}`);
+  const lines = leg.lines
+    .filter(({ label }) => showLets || label !== LETS_LINE)
+    .map(({ label, value }) => `${literal(label)}: ${literal(value)}`);
   const warning = lossWarning(leg, card?.warning);
   if (!card) return warning ? [...lines, literal(warning)] : lines;
   const figures = card.figures.map(
@@ -243,9 +248,20 @@ function compactPlanState(leg: ActionRow): string {
   return "";
 }
 
+function takenOff(legs: readonly ActionRow[]): boolean {
+  return legs.every(({ status }) => status === "retracted" || status === "replaced");
+}
+
+function sharedEnd(legs: readonly ActionRow[]): string | null {
+  if (!takenOff(legs)) return null;
+  const [first, ...rest] = legs.map((leg) => legStatus(leg, true));
+  return first !== undefined && rest.every((status) => status === first) ? first : null;
+}
+
 function cardText(legs: readonly ActionRow[], whole: boolean): string {
   const one = legs.length === 1;
   const compactPlan = !one && !whole;
+  const end = !one ? sharedEnd(legs) : null;
   const settledPlan =
     !one && legs.every(({ status }) => status !== "awaiting_permission" && status !== "running");
   const notes = whole ? tapNotes(legs) : "";
@@ -260,15 +276,20 @@ function cardText(legs: readonly ActionRow[], whole: boolean): string {
     const [title, ...detail] = filled?.split("\n") ?? [];
     const heading = title ?? (leg.card ? faceWords(leg, leg.card.title) : leg.summary);
     const prefix = one ? "" : `${index + 1}. `;
-    const facts = whole
-      ? filled && leg.run.filled
-        ? detail.map(literal)
-        : [...detail.map(literal), ...reviewLines(leg)]
-      : [];
+    const facts =
+      whole && !end
+        ? filled && leg.run.filled
+          ? detail.map(literal)
+          : [
+              ...detail.map(literal),
+              ...reviewLines(leg, one || leg.status === "awaiting_permission"),
+            ]
+        : [];
     const showState =
       !filled &&
+      !end &&
       (!waitingPlan || leg.status !== "awaiting_permission") &&
-      (!settledPlan || leg.status === "failed" || leg.error);
+      (!settledPlan || leg.status === "failed" || leg.status === "retracted" || leg.error);
     const name = literal(heading);
     const shortName = name.slice(0, limit - 1).replace(/\\+$/u, "") + "…";
     return [
@@ -282,9 +303,15 @@ function cardText(legs: readonly ActionRow[], whole: boolean): string {
   });
   if (one) return text[0]!;
   const title = `**${literal(planName(legs))}**`;
-  return [title, ...text, notes, (compactPlan || settledPlan || waitingPlan) && planProgress(legs)]
+  if (compactPlan && end) return [title, end].join("\n");
+  const progress = !end && (compactPlan || settledPlan || waitingPlan) && planProgress(legs);
+  const body = [title, end, ...text, notes, progress]
     .filter(Boolean)
     .join(compactPlan ? "\n" : "\n\n");
+  // Even the numbered summaries can overflow when a plan has many legs.
+  return compactPlan && body.length > CARD_CHARS
+    ? [title, progress].filter(Boolean).join("\n")
+    : body;
 }
 
 function tapNotes(legs: readonly ActionRow[]): string {
@@ -304,6 +331,10 @@ export function fitsHere(legs: readonly ActionRow[]): boolean {
 export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   const { legs } = view;
   const waiting = waitingOn(legs);
+  if (view.outOfDate) {
+    const name = legs.length === 1 ? legs[0]!.summary.slice(0, 250) : planName(legs);
+    return { text: `**${literal(name)}**\n${RETRACTED.outOfDate}` };
+  }
   const whole = fitsHere(legs);
   const held = legs.some((leg) => leg.phase === "needs_owner");
   const appOnly = waiting && (view.inTheApp || !whole);
@@ -318,7 +349,7 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
         : "review this card";
   const destination = held
     ? viaApp({ ...view, link: view.statusLink ?? view.link }, "Check status", task)
-    : appOnly || !whole
+    : appOnly || (!whole && !takenOff(legs))
       ? viaApp(view, "Open in Auni", task)
       : null;
   const label = waiting && grant && !appOnly ? actionLabel(legs) : null;
@@ -339,7 +370,9 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
         : !whole
           ? "This card is too long to show in full here."
           : null
-    : null;
+    : !whole && legs.length > 1 && !takenOff(legs)
+      ? "This plan is too long to show in full here. Auni shows each move."
+      : null;
   const where = decisionLine(legs, view.decidedIn);
   return {
     text: [
@@ -356,8 +389,7 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
 }
 
 function decisionLine(legs: readonly ActionRow[], where: string | null): string | null {
-  if (!where || legs.every(({ status }) => status === "replaced" || status === "retracted"))
-    return null;
+  if (!where || takenOff(legs)) return null;
   const place = where === "here" ? where : `in ${literal(where)}`;
   return `${legs.every(({ status }) => status === "cancelled") ? "Declined" : "Allowed"} ${place}.`;
 }
@@ -373,7 +405,10 @@ function transactionButtons(legs: readonly ActionRow[]): ChannelButton[][] | und
 
 /** What a card's message shows, as a digest, whichever grant its buttons carry. */
 export function shownKey(view: CardView, digest: string): string {
-  const drawn = drawCard(view, waitingOn(view.legs) && !view.inTheApp ? SOME_GRANT : null);
+  const drawn = drawCard(
+    view,
+    waitingOn(view.legs) && !view.inTheApp && !view.outOfDate ? SOME_GRANT : null,
+  );
   return (
     REVIEW_LAYOUT +
     createHash("sha256")
@@ -417,13 +452,14 @@ function legStatus(leg: ActionRow, whole: boolean): string {
           ? "Landed"
           : "Done";
     case "failed":
+      if (leg.failureKind === "unshown" && leg.error) return literal(leg.error);
       return `Didn't go through.${error} ${failedOutcome(leg)}`;
     case "cancelled":
       return "Declined";
     case "replaced":
       return "Replaced by a newer card";
     case "retracted":
-      return whole && leg.error ? literal(leg.error) : "Taken back by Auni";
+      return leg.error ? literal(leg.error) : "Taken back by Auni";
   }
 }
 

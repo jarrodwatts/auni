@@ -1,9 +1,9 @@
-import { RAW_TRANSACTION_TOOLS, type actionWireSchema } from "@auni/shared";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { CARD_FORMAT, RAW_TRANSACTION_TOOLS, RETRACTED, type actionWireSchema } from "@auni/shared";
+import { and, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { toolInput } from "../agent/tool.ts";
-import { appById, closedHere } from "../apps/registry.ts";
+import { appById, closedHere, ledgerAt } from "../apps/registry.ts";
 import { applyAsk, isAsk } from "../asks.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
@@ -11,12 +11,13 @@ import { actions, threads, type ActionRow } from "../db/schema.ts";
 import { actionKind, wakeThread } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";
-import { fitted } from "./card-face.ts";
+import { fitted, leftOutPermission, tooMuchToWarn, withPermissions } from "./card-face.ts";
 import { approval, effectLines, pinnedApproval } from "./effect.ts";
 import { failureKind, retryRefusal } from "./failure.ts";
 import { fillIdentity, tokenKey, type FillKey } from "./fill-key.ts";
 import { begins, SETTLED, step } from "./life.ts";
 import { feeCoinFor, payingFees, topUpFor } from "./fee-coin.ts";
+import { lostSaid } from "./gone-for-good.ts";
 import { feeCoinTrades, feeCoinUsd, pinned, withFeeCoin, withoutFeeCoin } from "./fee-coin-said.ts";
 import { unpaid } from "./funding.ts";
 import { countBeforeTrading } from "./other-tokens.ts";
@@ -32,6 +33,7 @@ import {
   MayHaveSent,
   NothingMoved,
   type ActionPreview,
+  type CashPlace,
   type ExecuteResult,
   type KeptTx,
   type Later,
@@ -59,7 +61,7 @@ import {
 import { dollars } from "./summaries.ts";
 import { normalizeUsd, parseUnits } from "./usd.ts";
 import { signerFor } from "./wallets.ts";
-import { chainKey } from "./chains.ts";
+import { chainKey, placeName } from "./chains.ts";
 
 export interface ActionContext {
   /** Null for a move started outside every conversation (a withdrawal from Settings). */
@@ -117,6 +119,9 @@ export async function prepareLeg(
   // there is no card (see buyingSolOnce).
   const bought = described.sends ? await feeCoinFor(described.sends) : null;
   const preview = bought ? withFeeCoin(withoutFeeCoin(described), bought) : described;
+  const lost = lostSaid({ details: approvedDetails(preview) });
+  const unshowable = tooMuchToWarn(preview.effect, lost);
+  if (unshowable) throw new Error(unshowable);
   // The most it may spend, which a tap allows and execute holds it to (see assertApprovedSpend).
   return {
     recipe,
@@ -242,11 +247,7 @@ export async function recordActions(
     await lockCards(tx);
     // Lock the thread row so two plans in an auto thread can't both spend its free cash.
     const [thread] = context.threadId
-      ? await tx
-          .select()
-          .from(threads)
-          .where(eq(threads.id, context.threadId))
-          .for("update")
+      ? await tx.select().from(threads).where(eq(threads.id, context.threadId)).for("update")
       : [];
     const actsOnItsOwn =
       thread?.archivedAt === null &&
@@ -287,7 +288,11 @@ export async function recordActions(
           lines: effectLines(leg.preview.effect),
           details: approvedDetails(leg.preview),
           // Cut to the lengths a card takes, so words from outside can't make one that fails to draw.
-          card: leg.preview.card ? fitted(leg.preview.card) : null,
+          // Saying every permission the move leaves, whoever wrote its face.
+          card: leg.preview.card
+            ? fitted(withPermissions(leg.preview.card, leg.preview.effect))
+            : null,
+          cardFormat: CARD_FORMAT,
         })),
       )
       .returning();
@@ -325,7 +330,7 @@ export function approvedDetails(preview: ActionPreview): Record<string, string> 
  * from that statement once it shows there (see recordOwnFills).
  */
 export async function executeAction(actionId: string): Promise<ActionRow> {
-  const [claimed] = await step(db, "claim", eq(actions.id, actionId));
+  const claimed = await db.transaction((tx) => startRun(tx, actionId));
   if (!claimed) return requireAction(actionId);
 
   let result: ExecuteResult;
@@ -410,6 +415,85 @@ export async function executeAction(actionId: string): Promise<ActionRow> {
   }
 }
 
+/**
+ * Nothing of it has started: queued, and nothing sent or kept to send, by this run or one before
+ * it that failed (each send is kept before it goes, a wallet's journalled one with it).
+ */
+const unstarted = (leg: ActionRow): boolean => leg.phase === "queued" && leg.txs.length === 0;
+
+/**
+ * The one place a run starts: claims a queued move, with every leg of its plan locked, so no two
+ * legs start, or are stopped, at once. A move the owner allowed on a card drawn before cards said
+ * all they say now, which didn't show a permission it leaves (leftOutPermission), never runs:
+ * while none of its plan has started, the whole card is taken back, so nothing moves for a pick
+ * that won't run; once some has, that leg is paused while still queued, its card saying where
+ * its cash now is, and the rest run on. Its thread is woken in the same write once that settles every leg, keyed
+ * as a run's end tells it (tellSettled), so it hears once. Null when it isn't queued, or wasn't run.
+ */
+async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
+  const [row] = await tx
+    .select({ proposalId: actions.proposalId })
+    .from(actions)
+    .where(eq(actions.id, actionId));
+  if (!row) return null;
+  const card = await lockLegs(
+    tx,
+    row.proposalId ? eq(actions.proposalId, row.proposalId) : eq(actions.id, actionId),
+  );
+  const leg = card.find(({ id }) => id === actionId);
+  let stopped: ActionRow[] = [];
+  if (card.every(unstarted) && leftOutPermission(card)) {
+    const legs = inArray(
+      actions.id,
+      card.map(({ id }) => id),
+    );
+    stopped = await step(tx, "recall", legs, { error: RETRACTED.unshown });
+  } else if (leg?.phase === "queued" && leftOutPermission([leg])) {
+    // Even one tried again whose first run sent something: what it sent doesn't say it granted
+    // what its card left out (a swap first, say), and pausing it moves nothing.
+    stopped = await step(tx, "skip", eq(actions.id, actionId), {
+      error: pausedSaid(stagedLeg(leg).draws, leg.txs.length > 0),
+      failureKind: "unshown",
+    });
+  }
+  if (stopped.length === 0) {
+    const [claimed] = await step(tx, "claim", eq(actions.id, actionId));
+    return claimed ?? null;
+  }
+  const [first] = stopped;
+  const told = first?.threadId ? await settledOutcome(first, tx) : null;
+  if (first?.threadId && told)
+    await wakeThread(first.threadId, told.reason, { key: told.id, tx });
+  return null;
+}
+
+/**
+ * Locks these legs, in one order (by id), for the rest of the transaction. Every write to several
+ * legs of one plan that may run as one of them starts takes this first: two that each lock rows
+ * in their own order can each hold what the other waits for, and Postgres aborts one.
+ */
+export function lockLegs(tx: Tx, which: SQL): Promise<ActionRow[]> {
+  return tx.select().from(actions).where(which).orderBy(actions.id).for("update");
+}
+
+/**
+ * What a paused leg's card says: what stopped it, where the cash it was to spend sits now, which
+ * the moves before it may have brought there, and that Auni puts it up again, all within the
+ * agent's cut of it (LEG_SAID). Of one an earlier try sent from (a fee coin, a swap), only its
+ * record says where that went. Its summary names the amount.
+ */
+export function pausedSaid(draws: CashPlace | null, triedBefore: boolean): string {
+  const place =
+    draws && (ledgerAt(draws) ? `${placeName(draws)} account` : `wallet on ${placeName(draws)}`);
+  // The moves before it may still be landing it there: a stage starts once patience runs out.
+  const where = triedBefore
+    ? "An earlier try sent only what its record shows."
+    : place
+      ? `Its cash is in, or headed to, your ${place}.`
+      : "Nothing of it moved.";
+  return `Paused before sending: its card didn't show a permission it leaves. ${where} Auni will put it up again.`;
+}
+
 export async function actionById(actionId: string): Promise<ActionRow | null> {
   const [row] = await db.select().from(actions).where(eq(actions.id, actionId));
   return row ?? null;
@@ -451,8 +535,9 @@ export async function decideActions(
 ): Promise<ActionRow[]> {
   let stale: string[] = [];
   const rows = await db.transaction(async (tx) => {
-    // A card past its day is taken back first, so no tap allows one (see retractStale).
-    stale = await retractStale(tx);
+    // A card that can no longer be allowed as shown is taken back before an Allow, so none is
+    // (see retractStale). A Decline is the owner's no, which the agent hears as one, whatever card.
+    if (decision === "allow") stale = await retractStale(tx);
     const decided = await step(
       tx,
       decision,
@@ -611,6 +696,7 @@ async function recordLater(tx: Tx, action: ActionRow, later: readonly Later[] = 
         input: move.input,
         // The move whose card showed it, and whose tap allowed it.
         details: { after: action.id },
+        cardFormat: action.cardFormat,
       })
       .returning();
     await queueExecution(tx, rows, move.at);
@@ -631,28 +717,75 @@ export async function startProposal(executor: Executor, rows: readonly ActionRow
     );
 }
 
+/** How much of each leg's error the agent reads when its plan settles: Auni's own words fit whole. */
+export const LEG_SAID = 160;
+
+/** The most one settled wake says: a plan's grouped list of what didn't go through always fits. */
+export const SETTLED_SAID = 2_000;
+
+/**
+ * What the agent does about a leg that didn't go through, which groups it with the rest of its
+ * plan's that need the same. Every one but a paused leg is as its error says.
+ */
+function outcomeGroup(leg: Pick<ActionRow, "status" | "failureKind">): string {
+  if (leg.status === "failed")
+    return leg.failureKind === "unshown"
+      ? "Paused (put each up again on a fresh card)"
+      : leg.failureKind === "stopped"
+        ? "Skipped"
+        : "Failed";
+  if (leg.status === "retracted") return "Taken back";
+  if (leg.status === "cancelled") return "Declined";
+  return "Replaced by a newer card";
+}
+
 /**
  * What to tell the agent once an action finishes: a lone action reports alone, a
  * proposal's leg only once every leg has settled (one wake for the whole
  * card). Null while it (its result not yet recorded) or other legs are still
  * waiting or running. `id` names the wake, so two legs settling at once wake
  * once, and each run of a step tried again wakes anew.
+ *
+ * A plan's starts with every leg that didn't go through, by id, grouped by what to do, with the
+ * reason a group shares said once, so it fits the cut whatever the plan's size; each leg's
+ * summary, its own reason, and what a done one did come after, as far as the cut allows.
  */
 export async function settledOutcome(
   action: ActionRow,
+  executor: Pick<typeof db, "select"> = db,
 ): Promise<{ readonly reason: string; readonly id: string } | null> {
   if (!SETTLED.includes(action.status)) return null;
   if (!action.proposalId)
-    return { reason: actionOutcome(action), id: `action-settled-${action.id}-a${action.attempts}` };
-  const legs = await proposalActions(action.proposalId);
+    return {
+      reason: actionOutcome(action).slice(0, SETTLED_SAID),
+      id: `action-settled-${action.id}-a${action.attempts}`,
+    };
+  const legs = await proposalActions(action.proposalId, executor);
   if (!legs.every((leg) => SETTLED.includes(leg.status))) return null;
+  const notDone = legs.filter((leg) => leg.status !== "done");
+  const cut = (leg: ActionRow) => leg.error?.slice(0, LEG_SAID) ?? null;
+  // The legs whose reason their group's line said, once for them all.
+  const said = new Set<string>();
+  const list = [...Map.groupBy(notDone, outcomeGroup)].map(([what, members]) => {
+    const [reason, ...others] = new Set(members.map(cut));
+    const shared = others.length === 0 && reason;
+    if (shared) for (const { id } of members) said.add(id);
+    return `${what}: ${members.map(({ id }) => id).join(", ")}.${shared ? ` Why: ${reason}` : ""}`;
+  });
+  const heading = `Every leg of proposal ${action.proposalId} has settled`;
   return {
     reason: [
-      `Every leg of proposal ${action.proposalId} has settled:`,
-      ...legs.map(
-        (leg) => `- ${actionOutcome({ ...leg, error: leg.error?.slice(0, 160) ?? null })}`,
+      notDone.length === 0
+        ? `${heading}:`
+        : `${heading}; ${String(notDone.length)} of ${String(legs.length)} didn't go through:`,
+      ...list,
+      // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
+      ...[...notDone, ...legs.filter((leg) => leg.status === "done")].map(
+        (leg) => `- ${actionOutcome({ ...leg, error: said.has(leg.id) ? null : cut(leg) })}`,
       ),
-    ].join("\n"),
+    ]
+      .join("\n")
+      .slice(0, SETTLED_SAID),
     id: `proposal-settled-${action.proposalId}-a${cardRuns(legs)}`,
   };
 }

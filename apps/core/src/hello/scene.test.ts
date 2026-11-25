@@ -35,6 +35,18 @@ describe("the terminal's scene", () => {
     expect(plain(lines.at(-1)!)).toBe("  Auni is open in your browser");
   });
 
+  it("wraps long fixes without leaving the frame or dropping the command", () => {
+    const fix =
+      "Claude Code: sign it in from Settings → AI Brains, on any of your devices (or run `claude auth login` where Auni runs)";
+    const notes = renderScene(at({ notes: [fix] }), "none")
+      .slice(SCENE_ROWS)
+      .map(plain);
+    expect(notes.length).toBeGreaterThan(1);
+    expect(notes.every((line) => line.length <= SCENE_WIDTH)).toBe(true);
+    expect(notes.join("\n")).toContain("`claude auth login`");
+    expect(notes.map((line) => line.trim()).join(" ")).toBe(fix);
+  });
+
   it("ticks each stone that's ready, and dashes the brain it couldn't find", () => {
     const found = renderScene(at({ stones: stones("ready") }), "none")
       .map(plain)

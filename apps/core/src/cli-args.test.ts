@@ -31,16 +31,39 @@ describe("parseArgs", () => {
       expect(parsed).not.toHaveProperty("command");
     }
     expect(parseArgs(["uninstall", "--help"])).toEqual({
-      help: expect.stringContaining("uninstall [--yes]  ") as string,
+      help: expect.stringContaining("Usage: auni uninstall [--yes]") as string,
     });
     expect(parseArgs(["--help"])).toEqual({ help: USAGE });
     expect(parseArgs(["help"])).toEqual({ help: USAGE });
   });
 
+  it("validates help arguments and recognizes the startup command", () => {
+    expect(parseArgs(["help", "--help"])).toEqual({ help: USAGE });
+    expect(parseArgs(["help", "-h"])).toEqual({ help: USAGE });
+    expect(parseArgs(["help", "--bogus"])).toHaveProperty("refused");
+    expect(parseArgs(["help", "doctor", "extra"])).toHaveProperty("refused");
+    expect(parseArgs(["start", "--help"])).toEqual(parseArgs(["help", "start"]));
+    expect(parseArgs(["start", "--no-web"])).toEqual(parseArgs(["--no-web"]));
+  });
+
+  it("keeps advanced flags in per-command help", () => {
+    expect(USAGE).toContain("Start here\n  auni");
+    expect(USAGE).not.toContain("--finish");
+    expect(parseArgs(["take-over", "--help"])).toEqual(parseArgs(["help", "take-over"]));
+    expect(parseArgs(["help", "start"])).toHaveProperty(
+      "help",
+      expect.stringContaining("--no-open"),
+    );
+    expect(parseArgs(["doctor", "--verbose"])).toEqual({
+      command: "doctor",
+      flags: new Map([["--verbose", true]]),
+    });
+  });
+
   it("refuses a flag the command doesn't take, with that command's usage", () => {
     expect(parseArgs(["stop", "--yes"])).toEqual({
       refused: expect.stringMatching(
-        /^auni stop doesn't take --yes\.\n\nUsage:\n {2}stop/u,
+        /^auni stop doesn't take --yes\.\n\nUsage: auni stop/u,
       ) as string,
     });
     expect(parseArgs(["--no-opne"])).toEqual({

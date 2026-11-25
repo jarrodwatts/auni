@@ -1,16 +1,25 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import type { StartingPoint } from "@auni/shared";
+import { CARD_FORMAT, type StartingPoint } from "@auni/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { sceneFor } from "./scenes.ts";
+import { demoPairCode } from "./test-pair.ts";
 
 // The demo, started as `auni demo` starts it, from an environment that names a home, a
 // database, a wallet and a brain of someone's own. It must make its owner by playing every
@@ -64,7 +73,7 @@ describe("auni demo", () => {
     await vi.waitFor(
       () => {
         if (demo.exitCode !== null) throw new Error(`The demo exited:\n${said}`);
-        if (!/Open http:\/\/localhost:\d+\/app\/new#pair=/u.test(said)) throw new Error(said);
+        if (!/API ready at http:\/\/\S+/u.test(said)) throw new Error(said);
       },
       { timeout: 120_000, interval: 200 },
     );
@@ -77,10 +86,18 @@ describe("auni demo", () => {
   });
 
   it("makes its owner through core, every scene of their past without one refusal", () => {
-    expect(said).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);
+    const log = readFileSync(
+      join(scratch, `auni-demo-${userInfo().uid}-${port}`, "auni.log"),
+      "utf8",
+    );
+    expect(said).toMatch(/^Demo mode\. Fake money only; your real data is untouched\./u);
+    expect(said).toContain("Preparing sample takes.");
+    expect(said).not.toContain("is held for the owner");
+    expect(said).not.toContain("owner is ready");
+    expect(log).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);
     const [, done, waiting, failed, held] =
       /owner is ready \([\d.]+ s\): (\d+) cards done, (\d+) waiting, (\d+) failed, (\d+) held/u.exec(
-        said,
+        log,
       ) ?? [];
     expect(Number(done)).toBeGreaterThanOrEqual(10);
     // Four moves and an offer of an app left for the owner to tap; the one move the story has
@@ -132,9 +149,9 @@ describe("auni demo", () => {
     const waiting = (await cards(thread)).filter(({ status }) => status === "awaiting_permission");
     expect(waiting.length).toBeGreaterThan(0);
     for (const proposal of new Set(waiting.flatMap(({ proposalId }) => proposalId ?? [])))
-      await ask(`/proposals/${proposal}/allow`, {});
+      await ask(`/proposals/${proposal}/allow`, { cardFormat: CARD_FORMAT });
     for (const { id, proposalId } of waiting)
-      if (!proposalId) await ask(`/actions/${id}/allow`, {});
+      if (!proposalId) await ask(`/actions/${id}/allow`, { cardFormat: CARD_FORMAT });
     const ended = async () => {
       const now = await cards(thread);
       return waiting.map(({ id }) => now.find((card) => card.id === id)?.status);
@@ -144,10 +161,11 @@ describe("auni demo", () => {
       .toSatisfy((statuses: string[]) => statuses.every((status) => status === ends));
   };
 
-  it("signs a browser in by the link it prints, which lands on a new chat", async () => {
-    const core = `http://127.0.0.1:${/API is listening on [\d.]+:(\d+)/u.exec(said)![1]}`;
+  it("pairs against the demo API with the web app turned off", async () => {
+    const core = /API ready at (http:\/\/\S+)/u.exec(said)![1]!;
     const origin = `http://localhost:${port}`;
-    const [, code] = /Open http:\/\/localhost:\d+\/app\/new#pair=(\S+)/u.exec(said)!;
+    expect(said).not.toContain("#pair=");
+    const code = await demoPairCode(scratch, port);
     const paired = await fetch(`${core}/owner/pair`, {
       method: "POST",
       headers: { origin, "content-type": "application/json" },
@@ -206,7 +224,7 @@ describe("auni demo", () => {
     // again finds nothing new, and Close ends it as closed by the owner, with nothing sold.
     const unheard = await type("demo: held");
     const [sale] = await cards(unheard);
-    await ask(`/actions/${sale!.id}/allow`, {});
+    await ask(`/actions/${sale!.id}/allow`, { cardFormat: CARD_FORMAT });
     const phase = async () => (await cards(unheard))[0]?.phase;
     await expect.poll(phase, { timeout: 60_000, interval: 250 }).toBe("needs_owner");
     await says(unheard, /never got an answer.*check again now, or close it/su);

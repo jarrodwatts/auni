@@ -5,6 +5,7 @@ import { walletsFor } from "../../test/wallets.ts";
 import type { ActionRow } from "../../db/schema.ts";
 import { publicClient } from "../../money/chains.ts";
 import { insideApproved, PriceMoved } from "../../money/approved.ts";
+import { withPermissions } from "../../money/card-face.ts";
 import { effectLines } from "../../money/effect.ts";
 import { moneyOf } from "../../money/recipe.ts";
 import { feeTerms, orderBook, postOrder } from "./clob.ts";
@@ -131,6 +132,19 @@ describe("polymarketOrder", () => {
     });
     approvedAlready(true);
     expect((await polymarketOrder.describe(buy, {})).effect.grants).toEqual([]);
+  });
+
+  // The web draws a face, not the lines, so the face a first sale stores must say it too.
+  it("says on a first sale's card the permission it grants, and none once granted", async () => {
+    const order = { market: "rain", outcome: "Yes", side: "sell" as const, shares: 10 };
+    approvedAlready(false);
+    const first = await polymarketOrder.describe(order, {});
+    expect(withPermissions(first.card!, first.effect).warning).toBe(
+      "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
+    );
+    approvedAlready(true);
+    const again = await polymarketOrder.describe(order, {});
+    expect(withPermissions(again.card!, again.effect).warning).toBeUndefined();
   });
 });
 

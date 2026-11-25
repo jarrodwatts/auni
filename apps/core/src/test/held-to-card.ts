@@ -9,7 +9,7 @@ import {
   parseTransferCheckedInstruction,
   TokenInstruction,
 } from "@solana-program/token";
-import { AMOUNT, cardFaceSchema } from "@auni/shared";
+import { AMOUNT, CARD_FORMAT, cardFaceSchema } from "@auni/shared";
 import { decodeFunctionData, erc20Abi, getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -124,6 +124,7 @@ function cardOf(
     details: approvedDetails(preview),
     run: {},
     card: preview.card ? fitted(preview.card) : null,
+    cardFormat: CARD_FORMAT,
     txs: [],
     error: null,
     failureKind: null,

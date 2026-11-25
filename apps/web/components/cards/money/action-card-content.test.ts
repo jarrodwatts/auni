@@ -1,7 +1,13 @@
 import { AMOUNT, filledUsd, type CardFace } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { actionCardContent, cardMark, figureWidth, withFilled } from "./action-card-content";
+import {
+  actionCardContent,
+  cardMark,
+  figureWidth,
+  planPermissions,
+  withFilled,
+} from "./action-card-content";
 
 const usdc = (baseUnits: string) => ({ baseUnits, currency: { code: "USDC", decimals: 6 } });
 
@@ -138,5 +144,57 @@ describe("figureWidth", () => {
     // What it is worth, said beside it, counts too.
     expect(figureWidth({ value: "18.97 WPRL", note: "$25.00" }, false)).toBe("wide");
     expect(figureWidth({ value: "0x97c5e2b14D8A6F3c0E9b7A51D2c4F86e3a1D0b91" }, true)).toBe("row");
+  });
+});
+
+describe("planPermissions", () => {
+  const leg = (summary: string, value?: string) => ({
+    summary,
+    lines: [
+      { label: "You give", value: "$50 of USDC" },
+      ...(value ? [{ label: "Lets", value }] : []),
+    ],
+  });
+  const resting = "Hyperliquid fill it at $90,000 or better until you cancel";
+
+  // One tap allows every move, so the plan says what each leaves before it, whoever wrote its face.
+  it("says what each move leaves able to act on the money, under its own name", () => {
+    expect(
+      planPermissions({
+        legs: [
+          leg("Move $50 to Arbitrum"),
+          leg("Send it", "0x1a2b…9f8e spend your USDC"),
+          leg("Place a limit order to go long BTC", resting),
+          leg("Place a limit order to go long ETH", resting),
+        ],
+        moves: [],
+      }),
+    ).toEqual([
+      "Send it: From now on, it lets 0x1a2b…9f8e spend your USDC.",
+      `Place a limit order to go long BTC: From now on, it lets ${resting}.`,
+      `Place a limit order to go long ETH: From now on, it lets ${resting}.`,
+    ]);
+  });
+
+  // Telegram draws every row's permissions; the web drew only its legs', never a cash move's.
+  it("says what a move that brings the plan's cash leaves too, first, as it runs first", () => {
+    expect(
+      planPermissions({
+        legs: [leg("Buy $5 of NVIDIA")],
+        moves: [
+          { name: "Move $5 from Base to Monad", lets: "0x1a2b…9f8e spend your USDC" },
+          { name: "Take $3 out of savings" },
+        ],
+      }),
+    ).toEqual(["Move $5 from Base to Monad: From now on, it lets 0x1a2b…9f8e spend your USDC."]);
+  });
+
+  it("says nothing for a plan that leaves none", () => {
+    expect(
+      planPermissions({
+        legs: [leg("Move $50 to Arbitrum"), { summary: "x", lines: [] }],
+        moves: [{ name: "Take $3 out of savings" }],
+      }),
+    ).toEqual([]);
   });
 });

@@ -32,6 +32,8 @@ describe.runIf(process.platform === "linux")("openBrowser", () => {
   });
 
   it("hands the link to Windows' own browser from WSL, which needs no screen of its own", async () => {
+    vi.stubEnv("SSH_CONNECTION", "");
+    vi.stubEnv("SSH_TTY", "");
     const bin = mkdtempSync(join(tmpdir(), "auni-opener-"));
     bins.push(bin);
     writeFileSync(join(bin, "cmd.exe"), `#!/bin/sh\nprintf '%s|' "$@" > "${bin}/args"\n`);
@@ -45,5 +47,11 @@ describe.runIf(process.platform === "linux")("openBrowser", () => {
     expect(readFileSync(join(bin, "args"), "utf8")).toBe(
       "/c|start||http://localhost:3000/app#pair=code|",
     );
+  });
+
+  it("doesn't open a browser on the remote computer over SSH", () => {
+    vi.stubEnv("DISPLAY", ":0");
+    vi.stubEnv("SSH_CONNECTION", "192.0.2.1 34567 192.0.2.2 22");
+    expect(canOpenBrowser()).toBe(false);
   });
 });

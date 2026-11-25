@@ -9,6 +9,7 @@ import { TextSwap } from "@/components/motion/text-swap";
 import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { formatExactUsd } from "@/lib/money";
 
+import { planPermissions } from "./action-card-content";
 import { ArrivedLine } from "./arrived-line";
 import { edgeScene } from "./edge-scene";
 import { needingYou } from "./failed-step";
@@ -58,6 +59,7 @@ export function ActionPlanCard({
   );
 
   const mixed = sum(card.legs, "in") > 0n && sum(card.legs, "back") > 0n;
+  const permissions = planPermissions(card);
   const legs: readonly Leg[] = card.legs.map((leg) =>
     withLive({ ...planLeg(leg), ...(mixed ? { verb: pickVerb(leg) } : {}) }, live.data?.legs),
   );
@@ -167,6 +169,17 @@ export function ActionPlanCard({
         <MoveList rows={rows} failed={step === "settled" ? failed : null} />
         {finished ? null : <PaysWith lines={card.paysWith ?? []} />}
         {step === "ready" || step === "fund" ? <Costs costs={card.costs} /> : null}
+        {/* Everything its moves leave able to act on the money, since one tap grants it all. */}
+        {step === "ready" || step === "fund"
+          ? permissions.map((says, index) => (
+              <p
+                key={index}
+                className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive"
+              >
+                {says}
+              </p>
+            ))
+          : null}
         {step === "ready" || step === "fund" ? <CardNote says={card.buysFirst} /> : null}
         {step === "ready" || step === "fund" ? <CardNote says={card.pricedLater} /> : null}
         <ArrivedLine />

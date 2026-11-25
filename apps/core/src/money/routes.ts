@@ -1,4 +1,5 @@
 import {
+  CARD_FORMAT,
   NETWORK_KEYS,
   valueRangeSchema,
   type ActionQuoteWire,
@@ -21,7 +22,7 @@ import { markActivitySeen, readActivity } from "./activity.ts";
 import { depositWire, recentDeposits } from "./arrivals.ts";
 import { listOtherTokens } from "./buckets.ts";
 import { actionById, actionsForThread, actionWire, proposalActions } from "./actions.ts";
-import { allowAction, allowProposal, declineAction, declineProposal } from "./decide.ts";
+import { allowAction, allowProposal, declineAction, declineProposal, outOfDate } from "./decide.ts";
 import { checkHeld, closeHeld } from "./held.ts";
 import { proposalFunding } from "./funding.ts";
 import { pickDetail } from "./pick-detail.ts";
@@ -36,6 +37,20 @@ import { sweepSoon } from "./sweep.ts";
 import { startOfDay, valueHistory } from "./value-history.ts";
 
 const uuid = z.uuid();
+
+/** What a tab running the web app from before an update is told when it taps Allow. */
+const RELOAD = "Reload Auni to see this card.";
+
+/**
+ * Whether the web app that sent this Allow draws cards as they are now (CARD_FORMAT), which it
+ * says in the tap: a tab left open across an update still runs the web app from before, and could
+ * show a fresh card without all it says, so its tap allows nothing and it is told to reload.
+ */
+function drawnFully(req: Request, res: Response): boolean {
+  const drawn = z.object({ cardFormat: z.literal(CARD_FORMAT) }).safeParse(req.body ?? {});
+  if (!drawn.success) res.status(409).json({ error: "out_of_date", message: RELOAD });
+  return drawn.success;
+}
 
 export const actionsRouter = Router();
 actionsRouter.use(express.json({ limit: "4kb" }));
@@ -78,6 +93,7 @@ actionsRouter.get("/:id/detail", async (req, res) => {
 actionsRouter.post("/:id/allow", async (req, res) => {
   const id = uuid.safeParse(req.params.id);
   if (!id.success) return void res.status(404).json({ error: "action_not_found" });
+  if (!drawnFully(req, res)) return;
   const allowed = await allowAction(id.data, ownerHere(req));
   switch (allowed.kind) {
     case "refused":
@@ -86,6 +102,8 @@ actionsRouter.post("/:id/allow", async (req, res) => {
       return void (await answerNotWaiting(id.data, res));
     case "in_its_field":
       return void res.status(409).json({ error: "in_its_field" });
+    case "out_of_date":
+      return void res.status(409).json({ error: "out_of_date", message: allowed.said });
     case "allowed":
       return void res.json({ action: actionWire(allowed.action) });
   }
@@ -179,7 +197,8 @@ async function answerProposal(proposalId: string, req: Request, res: Response): 
   if (legs.length === 0) return void res.status(404).json({ error: "proposal_not_found" });
   // A moved price is weighed when the card quotes it again, so none is left out here.
   const retrying = new Set(legsToRetry(legs, new Set()) ?? []);
-  const funding = await proposalFunding(legs);
+  // A plan that can never run (see outOfDate) asks for no money: its Allow says why.
+  const funding = outOfDate(legs) ? null : await proposalFunding(legs);
   res.json({
     // Each leg offers Try again only if a tap on the card would run it (see legsToRetry).
     actions: legs.map((leg) => ({ ...actionWire(leg), retryable: retrying.has(leg.id) })),
@@ -196,7 +215,10 @@ proposalsRouter.get("/:id", async (req, res) => {
 proposalsRouter.post("/:id/allow", async (req, res) => {
   const id = uuid.safeParse(req.params.id);
   if (!id.success) return void res.status(404).json({ error: "proposal_not_found" });
-  await allowProposal(id.data);
+  if (!drawnFully(req, res)) return;
+  const allowed = await allowProposal(id.data);
+  if (!Array.isArray(allowed))
+    return void res.status(409).json({ error: "out_of_date", message: allowed.said });
   await answerProposal(id.data, req, res);
 });
 

@@ -1,5 +1,5 @@
 {
-  "id": "a41c8aca-209b-4c8e-8b85-4002d502cb26",
+  "id": "24522d53-bd00-4dbe-b348-bd406762a4c5",
   "prevId": "421dff8f-a443-4cc7-89d2-9c80224fa15f",
   "version": "7",
   "dialect": "postgresql",
@@ -95,6 +95,13 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
+        },
+        "card_format": {
+          "name": "card_format",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
         },
         "txs": {
           "name": "txs",
@@ -856,12 +863,6 @@
         },
         "question": {
           "name": "question",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deposit": {
-          "name": "deposit",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false

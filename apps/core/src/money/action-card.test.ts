@@ -1,4 +1,10 @@
-import { actionCardSchema, AMOUNT, fillFace } from "@auni/shared";
+import {
+  actionCardSchema,
+  actionPlanCardSchema,
+  AMOUNT,
+  fillFace,
+  permissionsSaid,
+} from "@auni/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ActionRow } from "../db/schema.ts";
@@ -11,6 +17,8 @@ import {
   pricedLater,
   subjectLogo,
 } from "./action-card.ts";
+import { fitted, tooMuchToWarn, withPermissions } from "./card-face.ts";
+import { effectLines, letsSaid, type Grant } from "./effect.ts";
 import { recipeForTool } from "./recipes/index.ts";
 import { xStockCatalog, type XStock } from "./swaps/xstocks.ts";
 
@@ -300,6 +308,7 @@ describe("moveCards", () => {
       tool,
       input,
       amountUsd,
+      lines: [] as ActionRow["lines"],
       details: {},
       run: {},
       status: "running",
@@ -338,6 +347,25 @@ describe("moveCards", () => {
         status: "running",
       },
     ]);
+  });
+
+  // A web plan draws its moves from these alone, so a move's permission must come with it.
+  it("carries what a move leaves able to act on the money, as its Lets line says it", () => {
+    const bridge = {
+      ...row(
+        "00000000-0000-4000-8000-0000000000b1",
+        "bridge_usdc",
+        { from_chain: "base", to_chain: "monad", amount: "6" },
+        "6.00",
+      ),
+      lines: [
+        { label: "You give", value: "6 USDC" },
+        { label: "Lets", value: "0x1a2b…9f8e spend your USDC" },
+      ],
+    };
+    expect(moveCards([bridge])[0]?.lets).toBe("0x1a2b…9f8e spend your USDC");
+    expect(actionPlanCardSchema.shape.moves.element.parse(moveCards([bridge])[0])).toBeTruthy();
+    expect(moveCards([{ ...bridge, lines: [] }])[0]).not.toHaveProperty("lets");
   });
 
   it("names a token sold home as the sale it is, not a move of cash", () => {
@@ -431,6 +459,62 @@ describe("actionCard", () => {
       stubRecipe(),
     );
     expect(friend.card.warning).toBeUndefined();
+  });
+
+  // Found in review: the check measured other words than the card drew, so it passed a raw batch
+  // whose Lets line the card then cut, hiding its last permissions. One the check passes says all.
+  describe("a move the fit check passed", () => {
+    const spend = (index: number, symbol: string): Grant => {
+      const id = String(index).padStart(4, "0");
+      return { lets: `0x${id}…${id} spend your ${symbol}`, reach: "wallet" };
+    };
+    const twelve = (last: string) => [
+      ...Array.from({ length: 11 }, (_, index) => spend(index + 1, "TOKEN".padEnd(14, "N"))),
+      spend(12, last),
+    ];
+    const cases = {
+      // 18 approvals, 17 of one-letter tokens, in one Solana transaction.
+      eighteen: [
+        ...Array.from({ length: 17 }, (_, index) =>
+          spend(index + 1, String.fromCharCode(65 + index)),
+        ),
+        spend(18, "USDC"),
+      ],
+      // Its warning 496 characters, and its Lets line, said with "and" between each, 504.
+      twelve: twelve("USDC".padEnd(19, "C")),
+      // Its warning the whole 500 a card takes, before the face's own warning.
+      whole: twelve("USDC".padEnd(23, "C")),
+    };
+    const draw = (grants: Grant[], face: typeof FACE | null) =>
+      actionCard(
+        row({
+          lines: effectLines({ gives: [], gets: [], grants }),
+          card: face && fitted(withPermissions(face, { grants })),
+        }),
+        stubRecipe(),
+      );
+
+    it.each(Object.entries(cases))("%s: shows every permission whole", async (_, grants) => {
+      expect(tooMuchToWarn({ grants }, null)).toBeNull();
+      const lets = grants.map((grant) => grant.lets);
+      // No face of its own: its Lets line, which a plan shows too.
+      const plain = await draw(grants, null);
+      const line = plain.card.figures.find(({ label }) => label === "Lets")?.value;
+      expect(line).toBe(letsSaid(grants));
+      for (const each of lets) expect(line).toContain(each);
+      expect(plain.lines.find(({ label }) => label === "Lets")?.value).toBe(line);
+      // A face its app wrote, with a warning of its own after core's.
+      const faced = await draw(grants, { ...FACE, warning: "Its own words." });
+      expect(faced.card.warning?.startsWith(permissionsSaid(lets))).toBe(true);
+      expect(actionCardSchema.safeParse(faced).success).toBe(true);
+    });
+
+    it("is refused one more character on, rather than cut", () => {
+      expect(permissionsSaid(cases.whole.map((grant) => grant.lets))).toHaveLength(500);
+      expect(tooMuchToWarn({ grants: twelve("USDC".padEnd(24, "C")) }, null)).toMatch(
+        /^It leaves 12 permissions/u,
+      );
+    });
   });
 
   it("draws a card however long the agent's own sentence is", async () => {

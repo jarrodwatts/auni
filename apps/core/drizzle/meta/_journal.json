@@ -145,8 +145,15 @@
     {
       "idx": 20,
       "version": "7",
-      "when": 1795573333661,
-      "tag": "0020_channel_deposit_cards",
+      "when": 1795600692944,
+      "tag": "0020_card_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795645242906,
+      "tag": "0021_channel_deposit_cards",
       "breakpoints": true
     }
   ]

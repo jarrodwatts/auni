@@ -302,6 +302,7 @@ export const hyperliquidSetStops: Recipe<typeof stopsInput> = {
             {
               lets: `Hyperliquid ${does} at market at ${priceLabel(price)}`,
               reach: "venue" as const,
+              order: true as const,
             },
           ]
         : [];

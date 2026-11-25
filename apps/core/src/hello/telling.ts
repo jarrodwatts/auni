@@ -53,15 +53,19 @@ export interface Telling {
 
 /** Plain lines: what `auni` prints where no scene plays. */
 export function plainTelling(print: (line: string) => void): Telling {
+  let memory = false;
   return {
     say: print,
     log: print,
     waiting: print,
-    memoryReady: () => {},
+    memoryReady: () => {
+      if (!memory) print("Memory ready.");
+      memory = true;
+    },
     firstRun: () => {},
-    pageBuilding: () => print("Building the web app, once for each version of it…"),
+    pageBuilding: () => print("Building the web app."),
     pageReady: () => {},
-    brain: ({ name, line }) => print(name ? line : `\n${line}\n`),
+    brain: ({ line }) => print(line),
     leaving: () => {},
     up: () => {},
     abandon: () => {},
@@ -93,9 +97,9 @@ export function scenePlays(
  * (the last stone), else plain lines.
  */
 export function startTelling({ web }: { readonly web: boolean }): Telling {
-  return web && scenePlays(process.stdout, process.env)
-    ? sceneTelling(colorMode(process.env))
-    : plainTelling((line) => console.log(line));
+  if (web && scenePlays(process.stdout, process.env)) return sceneTelling(colorMode(process.env));
+  console.log("Starting Auni.");
+  return plainTelling((line) => console.log(line));
 }
 
 /** Where the process's own output goes while the scene owns the terminal (takeOutput). */

@@ -1,0 +1,1 @@
+ALTER TABLE "actions" ADD COLUMN "card_format" integer DEFAULT 1 NOT NULL;

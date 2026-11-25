@@ -282,6 +282,71 @@ describe("drawCard", () => {
     expect(drawn.text).not.toContain("Landed");
   });
 
+  it("says each leg's permissions on a plan, since one Allow grants them all", () => {
+    const sale = leg({
+      id: "a2",
+      summary: "Sell 10 Yes shares",
+      lines: [
+        {
+          label: "Lets",
+          value: "Polymarket's exchanges trade the shares in your Polymarket wallet",
+        },
+      ],
+    });
+    expect(drawCard(view([leg(), sale]), "g").text).toContain(
+      "**2. Sell 10 Yes shares**\n> Lets: Polymarket's exchanges trade the shares in your Polymarket wallet",
+    );
+  });
+
+  it("says once why a plan was taken back, even one too long to show whole, and offers no tap", () => {
+    const why = "Out of date: Auni's cards now say more about each move.";
+    const plan = (length: number) =>
+      Array.from({ length }, (_, index) =>
+        leg({
+          id: `a${index}`,
+          summary: `Sell ${index + 1} Yes shares`,
+          lines: [{ label: "Lets", value: "Polymarket's exchanges trade your shares. ".repeat(4) }],
+        }),
+      );
+    const takenBack = (legs: ActionRow[]) =>
+      legs.map((each) => ({ ...each, status: "retracted" as const, error: why }));
+    // Twelve fit while they wait, and still do taken back, saying why once.
+    expect(fitsHere(plan(12))).toBe(true);
+    const twelve = drawCard(view(takenBack(plan(12))), null);
+    expect(twelve.text).toContain(`moves, $120 total**\n\n${why}\n\n**1. Sell 1 Yes shares**`);
+    expect(twelve.text.split(why)).toHaveLength(2);
+    expect(twelve.buttons).toBeUndefined();
+    // Too long to show whole, it still says why.
+    expect(drawCard(view(takenBack(plan(200))), null)).toEqual({
+      text: `**200 moves, $2,000 total**\n${why}`,
+    });
+  });
+
+  // Found in review: a long plan that fit while it waited, once some moves went and one was
+  // paused, showed only its heading, saying neither which went nor where to look.
+  it("keeps a decided plan's permissions out, and sends one too long for its outcomes to the app", () => {
+    const lets = { label: "Lets", value: "Polymarket's exchanges trade your shares. ".repeat(4) };
+    const plan = Array.from({ length: 12 }, (_, index) =>
+      leg({ id: `a${index}`, summary: `Buy ${index + 1} Yes shares`, lines: [lets] }),
+    );
+    expect(fitsHere(plan)).toBe(true);
+    const went = plan.map((each, index) =>
+      index === 0
+        ? { ...each, status: "failed" as const, error: "Paused before sending. ".repeat(8) }
+        : { ...each, status: "done" as const },
+    );
+    expect(drawCard(view(went), null).text).not.toContain("Lets:");
+    const long = went.map((each) => ({ ...each, summary: `${each.summary} ${"x".repeat(240)}` }));
+    const drawn = drawCard(view(long), null);
+    expect(drawn.text).toContain(
+      "This plan is too long to show in full here. Auni shows each move.",
+    );
+    expect(drawn.text).toContain("1 didn't go through, 11 completed");
+    expect(drawn.buttons).toEqual([
+      [{ label: "Open in Auni", url: "https://auni.example/app/chat/t" }],
+    ]);
+  });
+
   it("says, while a plan waits, that a trade behind its money moves is priced again then", () => {
     const bridge = leg({
       id: "a1",

@@ -19,13 +19,7 @@ import type { AskAgentHandler } from "@/components/cards/ask-agent";
 import { LogoImage } from "@/components/brand/marks";
 import { TextSwap } from "@/components/motion/text-swap";
 import { WithdrawReviewDialog } from "@/components/withdraw/withdraw-review-dialog";
-import {
-  actionKey,
-  decideAction,
-  NOT_REACHED,
-  retryAction,
-  useLiveAction,
-} from "@/lib/data/actions";
+import { actionKey, decideAction, tapFailed, retryAction, useLiveAction } from "@/lib/data/actions";
 import { cn } from "@/lib/utils";
 
 import { actionCardContent, figureWidth, withFilled } from "./action-card-content";
@@ -124,7 +118,7 @@ export function ActionCard({
       if (mustPairAgain(caught)) return void setPairAgain(true);
       // It may have gone through regardless; the card reads where it stands.
       void queryClient.invalidateQueries({ queryKey });
-      setFailure(NOT_REACHED);
+      setFailure(tapFailed(caught));
     } finally {
       setPending(null);
     }
@@ -352,7 +346,8 @@ export function ActionCard({
         </p>
       ) : null}
       {content.warning ? (
-        <p className="mt-3 text-[12.5px] leading-[1.45] font-medium text-destructive">
+        // A token's name is its maker's, unbroken at any length: it wraps, never runs off the card.
+        <p className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive">
           {content.warning}
         </p>
       ) : null}

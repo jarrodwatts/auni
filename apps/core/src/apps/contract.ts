@@ -843,6 +843,8 @@ export class NoWallet extends Error {
  * (agent/translate.ts), so what a brain writes can never show a card core didn't make.
  */
 export interface Brain {
+  /** Short name in terminal status lines, when it differs from the app's name. */
+  readonly terminalName?: string;
   /**
    * Can it think on this machine right now? Makes no model call, so it costs nothing, and so can
    * only see that a login is there: core asks one tiny question (`run`) before it calls a brain

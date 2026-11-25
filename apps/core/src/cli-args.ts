@@ -1,36 +1,34 @@
-// What `auni` takes on its command line (cli.ts runs it). Each command lists the flags it knows,
-// and anything else is refused with that command's usage before it does anything: a mistyped or
-// unknown flag never runs a command as if it weren't there, and `--help` after one is its help.
+// Parse the whole command before booting. Help and typos never run a command.
 
 interface Command {
-  /** Its lines in `auni --help`. */
-  readonly usage: string;
-  /** The flags it takes: true for one followed by a value (`--version v0.1.2`). */
+  readonly summary: string;
+  readonly synopsis?: string;
+  readonly details?: string;
+  /** A true flag takes a value, as in --version v0.1.2. */
   readonly flags: Readonly<Record<string, boolean>>;
-  /** The words it takes in place of flags (`service install`). */
   readonly words?: readonly string[];
 }
 
 const COMMANDS: Readonly<Record<string, Command>> = {
   "": {
-    usage: `  auni [--no-open] [--no-web] [--no-jobs]
-                                 Start Auni: its database, the API, its jobs and the web app,
-                                 then open it in your browser (the first time, signed in as
-                                 yours). --no-open only says where it is; --no-web leaves the
-                                 web app to \`next dev\` (pnpm dev); --no-jobs runs nothing in
-                                 the background, as auni update does to see a version come up.`,
+    summary: "Start Auni and open it in your browser",
+    synopsis: "[--no-open] [--no-web] [--no-jobs]",
+    details: `  --no-open   Start without opening your browser.
+  --no-web    Run only the API, for use with pnpm dev.
+  --no-jobs   Run without background work (turns, watches, and moves).`,
     flags: { "--no-open": false, "--no-web": false, "--no-jobs": false },
   },
   demo: {
-    usage: `  demo [--no-open] [--no-web] [--port <n>] [--at <moment>] [--first-run]
-                                 Start a demo of Auni: the whole app in a throwaway home, with a
-                                 made-up owner, a scripted AI and a stand-in wallet and chains, so
-                                 it needs no login, calls no model and moves no money. Nothing
-                                 of yours is read or changed. --port is the web app's (3939).
-                                 --at stops the demo's clock at a moment (2026-11-11T12:00:00Z),
-                                 so every run shows the same thing: for pictures to compare.
-                                 --first-run starts it as a new owner's first run instead, with
-                                 no past and no money.`,
+    summary: "Try Auni with fake money",
+    synopsis: "[--first-run] [--port <n>] [--no-open] [--no-web] [--at <time>]",
+    details: `Runs in a temporary folder with fake money and no login. Your real data is
+untouched. Never send real money to a demo address.
+
+  --first-run   Start from your first take, with an empty wallet and no history.
+  --port <n>    Open the demo on this port (default 3939).
+  --no-open     Print the demo link instead of opening your browser.
+  --no-web      Run only the API.
+  --at <time>   Freeze the demo clock at a timestamp (e.g. 2026-11-11T12:00:00Z).`,
     flags: {
       "--no-open": false,
       "--no-web": false,
@@ -40,105 +38,143 @@ const COMMANDS: Readonly<Record<string, Command>> = {
     },
   },
   pair: {
-    usage: `  pair [--sign-out-everywhere]   Print a one-time link that pairs a browser as Auni's owner.
-  pair --channel <id>            Print the code that pairs you on a channel (telegram).`,
+    summary: "Get a one-time sign-in link",
+    synopsis: "[--sign-out-everywhere | --channel <id>]",
+    details: `The link works once and expires after 15 minutes.
+
+  --sign-out-everywhere   Sign out every browser before creating a new link.
+  --channel <id>          Pair a chat app such as Telegram instead.`,
     flags: { "--sign-out-everywhere": false, "--channel": true },
   },
   doctor: {
-    usage: `  doctor [--fix | --dry-run] [--json]
-                                 Check the version, the database, jobs, the service, chains' RPCs,
-                                 the brain, the wallet and the web app, and say what to fix. Where
-                                 a safe repair exists (the service, its start at boot, a restart)
-                                 it asks about each; --fix runs the recommended ones unasked, and
-                                 --dry-run only says what they are. None touches keys or money.`,
-    flags: { "--json": false, "--fix": false, "--dry-run": false },
+    summary: "Check Auni's health and see what to do next",
+    synopsis: "[--fix | --dry-run] [--verbose | --json]",
+    details: `  --verbose   Show every check, including technical details.
+  --fix       Run the recommended repairs without asking.
+  --dry-run   List possible repairs without making changes.
+  --json      Print the full findings as JSON.
+
+In a terminal, doctor asks about recommended repairs. With --verbose, it
+also offers optional repairs. Repairs never touch your money, keys, or data.`,
+    flags: { "--json": false, "--verbose": false, "--fix": false, "--dry-run": false },
   },
   triage: {
-    usage: `  triage [--brain <id>]          Start your own Claude Code or Codex (--brain claude-code or codex)
-                                 in this terminal to find out with you what's wrong with Auni, and
-                                 write it up as an issue for Auni's GitHub. It reads what auni
-                                 doctor finds, Auni's output and its source, never your keys or
-                                 settings, and asks before it changes or posts anything.`,
+    summary: "Investigate a problem with your AI",
+    synopsis: "[--brain <id>]",
+    details: `Choose claude-code or codex with --brain. Your AI uses the doctor report,
+Auni's logs, and its source to investigate and draft a GitHub issue. It asks
+before changing or posting anything.`,
     flags: { "--brain": true },
   },
   setup: {
-    usage: `  setup [--json]                 What to do next to get Auni running and open in your browser,
-                                 one step at a time, for you or a coding agent.`,
+    summary: "Show the next setup step",
+    synopsis: "[--json]",
+    details: "Use --json for machine-readable output (for coding agents).",
     flags: { "--json": false },
   },
   stop: {
-    usage: `  stop                           Stop the Auni running on this computer, whatever started it (a
-                                 terminal, the background or the service), letting running moves
-                                 finish first, as Ctrl-C does.`,
+    summary: "Stop Auni after any moves in progress finish",
     flags: {},
   },
   up: {
-    usage: `  up --always-on [--port <n>] [--json]
-                                 Make this machine Auni's always-on home, reached from your own
-                                 devices through Tailscale: Auni answers only this machine's
-                                 Tailscale account, runs as a service started at boot, and
-                                 \`tailscale serve\` sends https to it on --port, or on 443 or
-                                 the next port free there, which its address says.
-                                 It asks for root once, for \`tailscale serve\`; with --json it
-                                 asks nothing and says what to run. Safe to run again.`,
+    summary: "Keep Auni online for your devices over Tailscale",
+    synopsis: "--always-on [--port <n>] [--json]",
+    details: `Starts Auni on boot and makes it reachable from your other devices over
+Tailscale. Asks once for permission to configure Tailscale Serve.
+
+  --port <n>   Tailscale HTTPS port (default 443, or the next free port).
+  --json       Print the setup status and required command as JSON.`,
     flags: { "--always-on": false, "--port": true, "--json": false },
   },
   service: {
-    usage: `  service install|uninstall      Run Auni as a service of this machine (systemd or launchd),
-                                 started at login and again if it stops (hosts/).`,
+    summary: "Manage Auni's background service",
+    synopsis: "install|uninstall",
+    details: `  install     Start Auni now and restart it automatically when you sign in.
+  uninstall   Remove the background service without deleting your data.`,
     flags: {},
     words: ["install", "uninstall"],
   },
   export: {
-    usage: `  export [--to <file>]           Write everything Auni keeps (every row of its database, and your
-                                 routines) to one file, into the data folder's exports/ unless
-                                 --to names another. Not your wallet's keys or your settings.`,
+    summary: "Save a backup of your takes, activity, and routines",
+    synopsis: "[--to <file>]",
+    details: `Saves your database and routines to the exports folder in your data
+directory, or to --to <file>. Your wallet keys and settings stay on this
+computer and are not included.`,
     flags: { "--to": true },
   },
   import: {
-    usage: `  import --from <file>           Load an export into a database Auni has never used: a new
-                                 AUNI_HOME, or a DATABASE_URL naming an empty database.`,
+    summary: "Restore a backup into a fresh Auni",
+    synopsis: "--from <file>",
+    details: "Requires an empty Auni data folder or database (set AUNI_HOME or DATABASE_URL).",
     flags: { "--from": true },
   },
   "take-over": {
-    usage: `  take-over --from <address> [--finish]
-                                 Take Auni over here from your laptop, over Tailscale: its
-                                 database, your settings and your wallet's keys, with the code in
-                                 AUNI_HANDOVER_CODE. The command comes from Settings on the
-                                 laptop, whose Auni then stops for good; then Auni is set up here
-                                 to stay on. --finish completes one cut off midway, when the
-                                 laptop can't be asked again and its page says Auni moved here.`,
+    summary: "Move Auni from another computer over Tailscale",
+    synopsis: "--from <host> [--finish]",
+    details: `Copy the command from Settings on the computer where Auni runs now.
+It moves your database, settings, and wallet keys here, then stops the
+other copy.
+
+  --from <host>   The computer to move Auni from.
+  --finish        Resume an interrupted move after the other computer says
+                  Auni moved here.`,
     flags: { "--from": true, "--finish": false },
   },
   update: {
-    usage: `  update [--version <vX>] [--yes]
-                                 Check the newest release (or vX) is signed by Auni's release
-                                 key, say what changed and ask; then stop Auni, build it beside
-                                 this one and switch to it once it comes up, with the database
-                                 exported and copied first; back to this one, data and all, if
-                                 it doesn't; then start Auni again as it ran. --yes answers yes,
-                                 for when you've read what it is.`,
+    summary: "Update Auni to the latest release",
+    synopsis: "[--version <vX.Y.Z>] [--yes]",
+    details: `Verifies the release signature, backs up your database, and checks that
+the new version starts. If that check fails, Auni switches back automatically.
+
+  --version <vX.Y.Z>   Install a specific release.
+  --yes                Update without asking for confirmation.`,
     flags: { "--version": true, "--yes": false },
   },
   uninstall: {
-    usage: `  uninstall [--yes]              Stop Auni, then remove its app, its command and its service,
-                                 once you say yes (--yes answers it). Your data stays, and your
-                                 wallet's keys unless you type that you want them gone.`,
+    summary: "Remove Auni and keep your data",
+    synopsis: "[--yes]",
+    details: `Stops Auni and removes the app, command, and background service. Your
+data stays on disk. Removing wallet keys always requires a separate
+confirmation.
+
+  --yes   Confirm uninstalling without prompting (never removes keys).`,
     flags: { "--yes": false },
   },
   build: {
-    usage: `  build                          Build the web app now, as starting would first (an image does).`,
+    summary: "Build the web app",
     flags: {},
   },
   "--version": {
-    usage: `  --version                      The version of Auni this is.`,
+    summary: "Print your Auni version",
     flags: {},
   },
 };
 
-export const USAGE = `Usage: auni [command]\n\n${Object.values(COMMANDS)
-  .map(({ usage }) => usage)
-  .join("\n")}`;
+const GROUPS = [
+  ["Start here", "", "demo", "doctor", "pair", "setup", "stop"],
+  ["Devices", "up", "service", "take-over"],
+  ["Maintenance", "update", "export", "import", "uninstall", "triage", "build", "--version"],
+] as const;
+
+const OVERVIEW_ARGS: Readonly<Record<string, string>> = {
+  up: "--always-on",
+  "take-over": "--from <host>",
+  service: "install|uninstall",
+};
+
+export const USAGE = [
+  "Usage: auni [command]",
+  ...GROUPS.map(([heading, ...commands]) =>
+    [
+      heading,
+      ...commands.map((command) => {
+        const invocation = [command || "auni", OVERVIEW_ARGS[command]].filter(Boolean).join(" ");
+        return `  ${invocation.padEnd(27)}${COMMANDS[command]!.summary}`.trimEnd();
+      }),
+    ].join("\n"),
+  ),
+  "Run auni <command> --help for options, or auni help start for startup flags.",
+].join("\n\n");
 
 /** What to run: a command with its flags (a value, or true for a switch) and its one word. */
 export type Parsed =
@@ -153,13 +189,27 @@ export type Parsed =
 /** Reads `auni`'s arguments: bare flags are the start's, else the first word is the command. */
 export function parseArgs(argv: readonly string[]): Parsed {
   const [first, ...after] = argv;
-  if (first === "help" || first === "--help" || first === "-h") return { help: USAGE };
-  const starts = first === undefined || (first.startsWith("-") && first !== "--version");
-  if (!starts && (first === "" || !Object.hasOwn(COMMANDS, first!)))
-    return { refused: `auni has no command "${first}".\n\n${USAGE}` };
-  const command = starts ? "" : first!;
+  const wantsHelp = first === "help";
+  if (wantsHelp && after.length > 1) return { refused: "Usage: auni help [command]" };
+  if (
+    first === "--help" ||
+    first === "-h" ||
+    (wantsHelp && (after[0] === undefined || after[0] === "--help" || after[0] === "-h"))
+  )
+    return { help: USAGE };
+  const name = wantsHelp ? after[0] : first;
+  const starts =
+    !wantsHelp && (name === undefined || (name.startsWith("-") && name !== "--version"));
+  const namedStart = name === "start";
+  const command = namedStart || starts ? "" : name!;
+  if (!Object.hasOwn(COMMANDS, command) || name === "")
+    return { refused: `auni has no command "${name}".\n\nRun auni --help for commands.` };
   const spec = COMMANDS[command]!;
-  const own = `Usage:\n${spec.usage}`;
+  const invocation = ["auni", command, spec.synopsis].filter(Boolean).join(" ");
+  const own = [`Usage: ${invocation}`, `${spec.summary}.`, spec.details]
+    .filter(Boolean)
+    .join("\n\n");
+  if (wantsHelp) return { help: own };
   const rest = starts ? argv : after;
   const flags = new Map<string, string | true>();
   let word: string | undefined;

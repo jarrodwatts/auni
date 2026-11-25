@@ -156,8 +156,29 @@ describe("drawCard", () => {
     expect(twelve.text.split(why)).toHaveLength(2);
     expect(twelve.buttons).toBeUndefined();
     // Too long to show whole, it still says why.
-    expect(drawCard(view(takenBack(plan(30))), null)).toEqual({
-      text: `**A plan of 30 moves**\n${why}`,
+    expect(drawCard(view(takenBack(plan(200))), null)).toEqual({
+      text: `**A plan of 200 moves**\n${why}`,
+    });
+  });
+
+  // Found in review: a long plan that fit while it waited, once some moves went and one was
+  // paused, showed only its heading, saying neither which went nor where to look.
+  it("keeps a decided plan's permissions out, and sends one too long for its outcomes to the app", () => {
+    const lets = { label: "Lets", value: "Polymarket's exchanges trade your shares. ".repeat(4) };
+    const plan = Array.from({ length: 12 }, (_, index) =>
+      leg({ id: `a${index}`, summary: `Buy ${index + 1} Yes shares`, lines: [lets] }),
+    );
+    expect(fitsHere(plan)).toBe(true);
+    const went = plan.map((each, index) =>
+      index === 0
+        ? { ...each, status: "failed" as const, error: "Paused before sending. ".repeat(8) }
+        : { ...each, status: "done" as const },
+    );
+    expect(drawCard(view(went), null).text).not.toContain("Lets:");
+    const long = went.map((each) => ({ ...each, summary: `${each.summary} ${"x".repeat(240)}` }));
+    expect(drawCard(view(long), null)).toEqual({
+      text: "**A plan of 12 moves**\nIt's too long to show here in full: the app shows each move.",
+      buttons: [[{ label: "Open in the app", url: "https://auni.example/app/chat/t" }]],
     });
   });
 

@@ -90,12 +90,15 @@ function wholeCard(legs: readonly ActionRow[]): string[] {
   const together = planHead(legs).length > 1;
   return [
     ...planHead(legs),
-    // Each leg's permissions too, as a lone move's lines say them, since Allow here grants them.
+    // Each waiting leg's permissions too, as a lone move's lines say them, since Allow here
+    // grants them; once decided, where it stands is what the plan says, as the app's does.
     ...legs.flatMap((leg, index) => [
       `${index + 1}. ${literal(leg.summary)}${together ? "" : `: ${legStatus(leg)}`}`,
-      ...leg.lines
-        .filter(({ label }) => label === LINES.lets)
-        .map((line) => `${literal(line.label)}: ${literal(line.value)}`),
+      ...(leg.status === "awaiting_permission"
+        ? leg.lines
+            .filter(({ label }) => label === LINES.lets)
+            .map((line) => `${literal(line.label)}: ${literal(line.value)}`)
+        : []),
     ]),
     ...said,
     ...(later ? [literal(later)] : []),
@@ -128,12 +131,18 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   const [only] = legs;
   const full = wholeCard(legs);
   const whole = fitsHere(legs);
-  // Too long, it keeps what says what the card is and where it stands.
+  // Too long, it keeps what says what the card is and where it stands; a decided plan whose moves
+  // stand apart says where to see each.
+  const head = planHead(legs);
+  const apart = !whole && !waiting && legs.length > 1 && head.length === 1;
   const body = whole
     ? full
     : legs.length === 1 && only
       ? [full[0]!, legStatus(only)]
-      : planHead(legs);
+      : [
+          ...head,
+          ...(apart ? ["It's too long to show here in full: the app shows each move."] : []),
+        ];
   const said = waiting
     ? view.inTheApp
       ? [
@@ -148,7 +157,7 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   // A held move is checked again or closed in the app: neither tap has a grant here.
   const held = legs.some((leg) => leg.phase === "needs_owner");
   const buttons: ChannelButton[][] =
-    (waiting && view.inTheApp) || held
+    (waiting && view.inTheApp) || held || apart
       ? [[{ label: "Open in the app", url: view.link }]]
       : waiting && grant
         ? [

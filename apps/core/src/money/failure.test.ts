@@ -112,6 +112,8 @@ describe("failureKind", () => {
   });
 });
 
+const DEAD = "0x000000000000000000000000000000000000dEaD";
+
 describe("retryRefusal", () => {
   const failed: Parameters<typeof retryRefusal>[0] = {
     status: "failed",
@@ -164,9 +166,14 @@ describe("retryRefusal", () => {
         lines: [{ label: "Lets", value: `${lets.value} and `.repeat(20) }],
       }),
     ).toBe("not_retryable");
-    expect(
-      retryRefusal({ ...old, card: { ...FACE, warning: `It lets ${lets.value} afterwards.` } }),
-    ).toBeNull();
+    const warned = { ...old, card: { ...FACE, warning: `It lets ${lets.value} afterwards.` } };
+    expect(retryRefusal(warned)).toBeNull();
+    // Found in review: its card said first what it sends for good, and a warning stops at 500
+    // characters, so a permission its own words named late was cut from what the owner saw.
+    const late = `${"Read this. ".repeat(40)}It lets ${lets.value} afterwards.`;
+    const burns = { ...old, card: { ...FACE, warning: late }, details: { leavesTo: DEAD } };
+    expect(retryRefusal({ ...burns, details: {} })).toBeNull();
+    expect(retryRefusal(burns)).toBe("not_retryable");
   });
 
   it("never runs money leaving the person, or anything the owner's proof vouched for, again on a tap", () => {

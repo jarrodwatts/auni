@@ -125,8 +125,11 @@ export const doctorFindingWireSchema = z.object({
     .nullable(),
   /** The chats holding the cards the finding is about (held moves'), where the owner acts on them. */
   chats: z.array(z.object({ id: z.string(), title: z.string().nullable() })),
-  /** A held move in no chat, so with no card to open: Health checks or closes it in place. */
-  heldMove: z.string().nullable(),
+  /**
+   * A held move in no chat, so with no card to open: Health checks or dismisses it in place,
+   * under what it was (its card's summary), with why it is held.
+   */
+  heldMove: z.object({ id: z.string(), summary: z.string(), why: z.string() }).nullable(),
 });
 export type DoctorFindingWire = z.infer<typeof doctorFindingWireSchema>;
 

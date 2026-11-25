@@ -6,39 +6,54 @@ import type { FailedAction } from "@/components/cards/money/failed-step";
 import { useFailed } from "@/components/cards/money/use-failed";
 import { DIAGNOSTICS_KEY } from "@/lib/data/system";
 
-import { partName } from "./health";
 import { Setting, SETTINGS_BUTTON, SETTINGS_PRIMARY_BUTTON } from "./settings-layout";
+
+type Held = NonNullable<DoctorFindingWire["heldMove"]>;
 
 /**
  * Its card's taps, named apart from Health's own Check again above them, which reads every part
- * again. Only these show: a held move offers no Try again, and Ask Auni needs a chat.
+ * again. Only these show: a held move offers no Try again, and Ask Auni needs a chat. Dismissing
+ * never reads as cancelling the money, which it can't.
  */
 const LABEL: Partial<Record<FailedAction, readonly [idle: string, busy: string]>> = {
   check: ["Check status", "Checking"],
-  close: ["Close it", "Closing"],
-  keep: ["Not yet", "Not yet"],
+  close: ["Dismiss card", "Dismissing"],
+  keep: ["Keep checking", "Keep checking"],
 };
+
+/**
+ * Health's own words for a held move, apart from its card's: why it is held and what stays true,
+ * or, once Dismiss card was tapped, what that means, naming the move again so that with two held
+ * the owner can't dismiss the wrong one.
+ */
+function heldMoveWords({ summary, why }: Held, dismissing: boolean): string {
+  if (!dismissing)
+    return `${why} Auni won't send it again, and Money shows what you hold either way.`;
+  // Every card's summary starts with its verb ("Withdraw $20 to ..."), so it reads on from "to".
+  const move = summary.charAt(0).toLowerCase() + summary.slice(1);
+  return `Dismiss the card to ${move}? Auni stops checking it. Dismissing can't undo or cancel the move, and Money shows whether it went.`;
+}
 
 /** Never run: a held move offers no Try again (see failedStep). */
 const noRetry = async () => undefined;
 
 /**
  * A held move in no chat (a withdrawal started from Settings, or one whose chat was deleted),
- * which has no card to open: Health offers its card's own Check again (as Check status) and Close in place, and
- * reads itself again after either, so a move that settles leaves the list.
+ * which has no card to open: Health offers its card's own taps in place, under the move itself,
+ * and reads itself again after either, so a move that settles leaves the list.
  */
-export function HeldMove({ finding }: { readonly finding: DoctorFindingWire }) {
-  const id = finding.heldMove!;
-  const failure = { kind: null, said: finding.says, where: "", retryable: false, held: true };
-  const failed = useFailed([{ key: id, failure }], DIAGNOSTICS_KEY, noRetry, undefined);
-  const step = failed.steps.get(id)!;
-  const act = failed.act({ key: id, label: finding.says, reason: step.reason });
+export function HeldMove({ move }: { readonly move: Held }) {
+  const failure = { kind: null, said: move.why, where: "", retryable: false, held: true };
+  const failed = useFailed([{ key: move.id, failure }], DIAGNOSTICS_KEY, noRetry, undefined);
+  const step = failed.steps.get(move.id)!;
+  const words = heldMoveWords(move, step.actions.includes("keep"));
+  const act = failed.act({ key: move.id, label: move.summary, reason: words });
   return (
     <Setting
-      label={partName(finding.check)}
+      label={move.summary}
       hint={
         <>
-          {step.reason}
+          {words}
           {failed.problem ? (
             <span aria-live="polite" className="mt-1 block text-ink">
               {failed.problem}

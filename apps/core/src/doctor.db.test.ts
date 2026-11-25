@@ -417,7 +417,10 @@ describe("auni doctor", () => {
       const held = (await doctor()).filter(({ says }) => says.includes("needs checking"));
       expect(held).toEqual([
         expect.objectContaining({ status: "fix", chats: [{ id, title: "Fed bet" }] }),
-        expect.objectContaining({ status: "fix", heldMove: expect.any(String) }),
+        expect.objectContaining({
+          status: "fix",
+          heldMove: expect.objectContaining({ id: expect.any(String) }),
+        }),
       ]);
     } finally {
       await auni.end();
@@ -453,7 +456,11 @@ describe("auni doctor", () => {
           check: "runner",
           status: "fix",
           says: "Withdraw $20 to JAVqaE…6X8n on Solana needs checking. Auni sent it and never heard back, so it can't tell whether it went through.",
-          heldMove: withdrawal.id,
+          heldMove: {
+            id: withdrawal.id,
+            summary: "Withdraw $20 to JAVqaE…6X8n on Solana",
+            why: "Auni sent it and never heard back, so it can't tell whether it went through.",
+          },
         },
       ]);
       expect(held[1]!.says).not.toMatch(/chat/u);

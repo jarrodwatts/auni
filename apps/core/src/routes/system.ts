@@ -75,7 +75,13 @@ async function diagnosticsWire(): Promise<DiagnosticsWire> {
           }
         : null,
       chats: [...(f.chats ?? [])],
-      heldMove: f.heldMove ?? null,
+      heldMove: f.heldMove
+        ? {
+            id: f.heldMove.id,
+            summary: redactLogLine(f.heldMove.summary, extraSecrets),
+            why: redactLogLine(f.heldMove.why, extraSecrets),
+          }
+        : null,
     })),
     ranAt: new Date().toISOString(),
   };

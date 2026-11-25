@@ -64,8 +64,11 @@ export interface Finding {
   readonly repair?: { readonly id: RepairId; readonly recommended: boolean };
   /** The chats holding the cards this is about, where the owner acts on them, oldest first. */
   readonly chats?: readonly { readonly id: string; readonly title: string | null }[];
-  /** A held move in no chat, so with no card to open, which Health checks or closes in place. */
-  readonly heldMove?: string;
+  /**
+   * A held move in no chat, so with no card to open, which Health checks or dismisses in place:
+   * its id, what it was (its card's summary) and why it is held.
+   */
+  readonly heldMove?: { readonly id: string; readonly summary: string; readonly why: string };
 }
 
 const by = (id: RepairId, recommended = true): Finding["repair"] => ({ id, recommended });
@@ -284,14 +287,16 @@ const checkRunner: Check = async () => {
           : `${inChats.length} moves need checking. Open their cards in chat for details`,
       chats: [...heldIn.values()],
     });
-  for (const { id, summary, why, chat } of held)
-    if (chat === null)
-      findings.push({
-        check: "runner",
-        status: "fix",
-        says: `${summary} needs checking. ${why ? HELD[why] : "Auni couldn't confirm it."}`,
-        heldMove: id,
-      });
+  for (const { id, summary, why, chat } of held) {
+    if (chat !== null) continue;
+    const reason = why ? HELD[why] : "Auni couldn't confirm it.";
+    findings.push({
+      check: "runner",
+      status: "fix",
+      says: `${summary} needs checking. ${reason}`,
+      heldMove: { id, summary, why: reason },
+    });
+  }
   for (const { kind, jobs: many, error } of failed)
     findings.push({
       check: "runner",

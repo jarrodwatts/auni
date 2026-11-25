@@ -31,45 +31,70 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const withdrawal: DoctorFindingWire = {
-  check: "runner",
-  status: "fix",
-  says: "Withdraw $20 to JAVqaE…6X8n on Solana needs checking. Auni sent it and never heard back, so it can't tell whether it went through.",
-  repair: null,
-  chats: [],
-  heldMove: "a1",
-};
+type Held = NonNullable<DoctorFindingWire["heldMove"]>;
+const why = "Auni sent it and never heard back, so it can't tell whether it went through.";
+const twenty: Held = { id: "a1", summary: "Withdraw $20 to JAVqaE…6X8n on Solana", why };
+const seventy: Held = { id: "a2", summary: "Withdraw $70 to your exchange on Base", why };
 
-const buttons = () => [...host.querySelectorAll("button")].map((button) => button.textContent);
-const tap = (label: string) =>
+const rows = () => [...host.querySelectorAll<HTMLElement>("[data-held]")];
+const buttons = (row: HTMLElement) =>
+  [...row.querySelectorAll("button")].map((button) => button.textContent);
+const tap = (row: HTMLElement, label: string) =>
   act(async () => {
-    [...host.querySelectorAll("button")].find((button) => button.textContent === label)!.click();
+    [...row.querySelectorAll("button")].find((button) => button.textContent === label)!.click();
     await Promise.resolve();
   });
-
-// A withdrawal from Settings is in no chat, yet Health told the owner to open its card in
-// chat, with nowhere to go (2026-11-25).
-it("checks a held move in no chat in place, and closes it only on a second yes", async () => {
-  vi.mocked(heldTap).mockResolvedValue({ phase: "needs_owner" } as never);
+const show = (...moves: Held[]) =>
   act(() =>
     root.render(
       <QueryClientProvider client={new QueryClient()}>
-        <HeldMove finding={withdrawal} />
+        {moves.map((move) => (
+          <div key={move.id} data-held>
+            <HeldMove move={move} />
+          </div>
+        ))}
       </QueryClientProvider>,
     ),
   );
-  expect(host.textContent).toContain("Withdraw $20 to JAVqaE…6X8n on Solana needs checking.");
-  expect(host.textContent).toContain("Auni won't send it again");
-  expect(host.textContent).not.toMatch(/chat/u);
-  expect(buttons()).toEqual(["Check status", "Close it"]);
 
-  await tap("Check status");
+// A withdrawal from Settings is in no chat, yet Health told the owner to open its card in
+// chat, with nowhere to go (2026-11-25).
+it("checks a held move in no chat in place, under the move itself", async () => {
+  vi.mocked(heldTap).mockResolvedValue({ phase: "needs_owner" } as never);
+  show(twenty);
+  const [row] = rows();
+  expect(row!.textContent).toContain("Withdraw $20 to JAVqaE…6X8n on Solana");
+  expect(row!.textContent).toContain(why);
+  expect(row!.textContent).toContain("Money shows what you hold");
+  expect(row!.textContent).not.toMatch(/chat|portfolio/iu);
+  expect(buttons(row!)).toEqual(["Check status", "Dismiss card"]);
+
+  await tap(row!, "Check status");
   expect(heldTap).toHaveBeenCalledWith("a1", "check");
-  expect(host.textContent).toContain("Still no answer. Auni keeps checking by itself.");
+  expect(row!.textContent).toContain("Still no answer.");
+});
 
-  await tap("Close it");
+// With $20 and $70 withdrawals both held, tapping Close it on each turned both rows into the
+// same "Auni's work" confirmation, naming neither move (2026-11-25).
+it("names each move in its own dismiss confirmation, and dismisses only on a second yes", async () => {
+  vi.mocked(heldTap).mockResolvedValue({ phase: "done" } as never);
+  show(twenty, seventy);
+  const [first, second] = rows();
+  await tap(first!, "Dismiss card");
+  await tap(second!, "Dismiss card");
+  expect(heldTap).not.toHaveBeenCalled();
+  expect(first!.textContent).toContain(
+    "Dismiss the card to withdraw $20 to JAVqaE…6X8n on Solana? Auni stops checking it. Dismissing can't undo or cancel the move",
+  );
+  expect(second!.textContent).toContain(
+    "Dismiss the card to withdraw $70 to your exchange on Base?",
+  );
+  expect(second!.textContent).not.toContain("$20");
+  expect(buttons(first!)).toEqual(["Keep checking", "Dismiss card"]);
+
+  await tap(first!, "Keep checking");
+  expect(first!.textContent).not.toContain("Dismiss the card");
+  await tap(second!, "Dismiss card");
   expect(heldTap).toHaveBeenCalledTimes(1);
-  expect(host.textContent).toContain("Close it without a record?");
-  await tap("Close it");
-  expect(heldTap).toHaveBeenLastCalledWith("a1", "close");
+  expect(heldTap).toHaveBeenLastCalledWith("a2", "close");
 });

@@ -93,6 +93,23 @@ switch (command) {
     // sends the code to Auni on that channel, in a direct chat, becomes the owner there.
     await withDatabase(async () => {
       const channel = flags.get("--channel");
+      const { env } = await import("./env.ts");
+      if (typeof channel !== "string" && env.TAILSCALE_OWNER) {
+        // Always on, Tailscale says who the owner is (auth/tailscale.ts): nothing pairs.
+        console.log(
+          `Open ${env.WEB_ORIGIN} on a device signed in to your Tailscale account.\n` +
+            "To sign a device out, remove it from your Tailscale network.",
+        );
+        if (flags.has("--sign-out-everywhere")) process.exitCode = 1;
+        return;
+      }
+      const { pendingMigrations } = await import("./db/migrations.ts");
+      if (await pendingMigrations(env.DATABASE_URL)) {
+        const { auniCommand } = await import("./setup.ts");
+        console.error(`Start Auni first: run ${auniCommand()}`);
+        process.exitCode = 1;
+        return;
+      }
       if (typeof channel === "string") {
         const { mintChannelPairing } = await import("./channels/hub.ts");
         const pairing = await mintChannelPairing(channel);
@@ -105,16 +122,6 @@ switch (command) {
               `Or send /start ${pairing.code} to Auni in a direct chat from your account.\n` +
               "This code works once and expires after 15 minutes.",
           );
-        return;
-      }
-      const { env } = await import("./env.ts");
-      if (env.TAILSCALE_OWNER) {
-        // Always on, Tailscale says who the owner is (auth/tailscale.ts): nothing pairs.
-        console.log(
-          `Open ${env.WEB_ORIGIN} on a device signed in to your Tailscale account.\n` +
-            "To sign a device out, remove it from your Tailscale network.",
-        );
-        if (flags.has("--sign-out-everywhere")) process.exitCode = 1;
         return;
       }
       const owner = await import("./auth/owner.ts");

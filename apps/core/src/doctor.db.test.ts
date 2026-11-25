@@ -4,6 +4,7 @@ import { InvalidParamsRpcError } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { brainRows } from "./agent/brain.ts";
+import * as database from "./db/client.ts";
 import { db } from "./db/client.ts";
 import { appTroubles, jobs } from "./db/schema.ts";
 import { doctor, doctorSummary, line, type Finding } from "./doctor.ts";
@@ -108,7 +109,10 @@ beforeEach(async () => {
   ]);
   vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 describe("auni doctor", () => {
   it("says what works and what to fix, naming the setting that fixes a chain", async () => {
@@ -144,6 +148,7 @@ describe("auni doctor", () => {
   });
 
   it("leads with startup when updates are pending, while keeping independent network checks", async () => {
+    vi.stubEnv("AUNI_HOME", "/custom/auni");
     vi.spyOn(migrations, "pendingMigrations").mockResolvedValue(1);
     vi.mocked(fetch).mockRejectedValue(new Error("fetch failed"));
 
@@ -157,7 +162,10 @@ describe("auni doctor", () => {
       "Networks: 7 chains ready, 1 with limits\n" +
         "Monad didn't answer the deposit history check.\n" +
         "Polygon didn't answer the past balance check.\n" +
-        "Set a working network URL in Auni's settings file.",
+        "Set a working network URL in /custom/auni/.env.",
+    );
+    expect(of(findings, "rpc").join("\n")).toContain(
+      "In /custom/auni/.env, set RPC_URL_MONAD=<url>",
     );
     expect(summary).toContain("Passed: Version");
     expect(summary).not.toMatch(/needs the database first|migrations to apply|Run: .*--verbose/u);
@@ -228,6 +236,30 @@ describe("auni doctor", () => {
     );
     expect(summary).not.toContain("Background work");
     expect(summary).not.toContain("Web app");
+  });
+
+  it("explains a refused database connection and shows where to set its URL", async () => {
+    vi.stubEnv("AUNI_HOME", "/custom/auni");
+    const message = "connect ECONNREFUSED 127.0.0.1:9";
+    vi.spyOn(database, "pingDatabase").mockRejectedValue(
+      Object.assign(new Error(message), { code: "ECONNREFUSED" }),
+    );
+
+    const findings = await doctor();
+    const summary = doctorSummary(findings, "auni");
+    expect(summary).toMatch(
+      /^Auni can't reach its database\.\nDatabase: Connection refused\. Check the database address in \/custom\/auni\/\.env/u,
+    );
+    expect(summary).not.toContain("DATABASE_URL");
+    expect(summary).not.toContain(message);
+    expect(of(findings, "database").join("\n")).toContain(
+      "In /custom/auni/.env, set DATABASE_URL=<url>",
+    );
+    expect(JSON.parse(JSON.stringify(findings))).toContainEqual({
+      check: "database",
+      status: "fix",
+      says: `can't connect (${message}): check DATABASE_URL, or unset it for Auni's own Postgres`,
+    });
   });
 
   it("names a held move and points to its card in the default summary", async () => {

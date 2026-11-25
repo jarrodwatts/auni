@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { platform } from "node:os";
+import { isIP } from "node:net";
+import { platform, userInfo } from "node:os";
 import { delimiter, join } from "node:path";
 
 import type { PrivateFieldWire, SpareKeyWire } from "@auni/shared";
@@ -358,25 +359,41 @@ function pairSay(browser: NonNullable<RunningFact["browser"]>, auni: string): st
     return `The link Auni opened in your browser as it started has run out: ${pair}`;
   if (browser === "not-opened") return `Auni couldn't open your browser. To sign in, ${pair}`;
   // No screen here: the browser is on another computer, which reaches this one's web app through ssh.
-  const command = tunnelCommand();
-  const tunnel = command
-    ? ` If you reach this computer over ssh, connect with \`${command}\` first, then open the link in the browser on yours.`
+  // Keep the setup JSON wording stable. The terminal prints the ready-to-use command.
+  const ports = tunnelPorts();
+  const tunnel = ports
+    ? ` If you reach this computer over ssh, connect with \`ssh -L ${ports} <this computer>\` first, then open the link in the browser on yours.`
     : "";
   return `Auni found no screen on this computer to open a browser on. To sign in, ${pair}${tunnel}`;
 }
 
-function tunnelCommand(): string | null {
+function tunnelPorts(): string | null {
   const { hostname, port } = new URL(env.WEB_ORIGIN);
   if (hostname !== "localhost" && hostname !== "127.0.0.1") return null;
-  return `ssh -L ${port || 80}:127.0.0.1:${env.WEB_PORT} <this computer>`;
+  return `${port || 80}:127.0.0.1:${env.WEB_PORT}`;
 }
 
 /** What to print before a local link when the browser is on a different computer. */
 export function tunnelHint(): string {
-  const tunnel = tunnelCommand();
-  return tunnel
-    ? `If your browser is on another computer, forward the port from there first:\n  ${tunnel}\n\n`
-    : "";
+  const ports = tunnelPorts();
+  if (!ports) return "";
+  // OpenSSH gives the server's address and port in the last two fields.
+  const [, , host = "", port = ""] = process.env.SSH_CONNECTION?.trim().split(/\s+/u) ?? [];
+  const knownHost = isIP(host) !== 0 && /^[\w.:%-]+$/u.test(host);
+  const user = knownHost ? userInfo().username : "";
+  const login = /^[\w.][\w.-]*$/u.test(user) ? `${user}@${host}` : host;
+  const sshPort =
+    knownHost && /^\d{1,5}$/u.test(port) && +port > 0 && +port <= 65535 && +port !== 22
+      ? ` -p ${port}`
+      : "";
+  return (
+    "If your browser is on another computer, run this there first:\n" +
+    `  ssh -L ${ports}${sshPort} ${knownHost ? login : "ssh-host"}\n` +
+    (knownHost
+      ? ""
+      : "Replace ssh-host with the address or user@host you use to reach this computer.\n") +
+    "Leave that SSH session open while you use Auni.\n\n"
+  );
 }
 
 /** One answer as a person reads it, for `auni setup` without --json. */

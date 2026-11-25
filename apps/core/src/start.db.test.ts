@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { userInfo } from "node:os";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,7 +27,10 @@ beforeEach(async () => {
     said += `${line.join(" ")}\n`;
   });
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 const opened = () => vi.mocked(openBrowser).mock.calls.map(([url]) => url);
 const codes = () => db.select().from(ownerSessions);
@@ -92,12 +96,13 @@ describe("openOwner", () => {
       expect.stringMatching(new RegExp(`^${env.WEB_ORIGIN}/app/new#pair=.+`, "u")),
     ]);
     // A demo, with nothing to open a browser in, prints the same link.
+    vi.stubEnv("SSH_CONNECTION", "192.0.2.1 43210 192.0.2.2 22");
     vi.mocked(canOpenBrowser).mockReturnValue(false);
     said = "";
     await openOwner({ web: true, open: true, printsLink: true, landsOn: "/app/new" });
     expect(said).toMatch(new RegExp(`Open ${env.WEB_ORIGIN}/app/new#pair=\\S+`, "u"));
     expect(said).toContain(
-      `ssh -L ${new URL(env.WEB_ORIGIN).port}:127.0.0.1:${env.WEB_PORT} <this computer>`,
+      `ssh -L ${new URL(env.WEB_ORIGIN).port}:127.0.0.1:${env.WEB_PORT} ${userInfo().username}@192.0.2.2`,
     );
     expect(said.indexOf("ssh -L")).toBeLessThan(said.indexOf(env.WEB_ORIGIN));
   });

@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { userInfo } from "node:os";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ON_WINDOWS } from "./agent/brain.ts";
-import { nextStep, said, SETUP_STEPS, spareKey, type SetupFacts } from "./setup.ts";
+import { nextStep, said, SETUP_STEPS, spareKey, tunnelHint, type SetupFacts } from "./setup.ts";
+
+afterEach(() => vi.unstubAllEnvs());
 
 /** A machine where everything the terminal does is done. */
 const ready: SetupFacts = {
@@ -237,14 +240,32 @@ describe("nextStep", () => {
   });
 
   it("shows the tunnel before the pairing command when the other computer needs it", () => {
+    vi.stubEnv("SSH_CONNECTION", "192.0.2.1 43210 192.0.2.2 22");
     const facts: SetupFacts = {
       ...thinking,
       running: { running: true, webAnswers: true, browser: "no-screen" },
     };
-    expect(said(facts)).toMatch(/ssh -L 3000:127.0.0.1:3000 <this computer>[\s\S]+Run auni pair/u);
+    const output = said(facts);
+    expect(output).toContain(`ssh -L 3000:127.0.0.1:3000 ${userInfo().username}@192.0.2.2`);
+    expect(output.indexOf("ssh -L")).toBeLessThan(output.indexOf("Run auni pair"));
     expect(said({ ...facts, running: { ...facts.running, browser: "not-opened" } })).not.toContain(
       "ssh -L",
     );
+  });
+
+  it("uses the SSH server's IPv6 address and custom port when known", () => {
+    vi.stubEnv("SSH_CONNECTION", "2001:db8::1 43210 2001:db8::2 2222");
+    expect(tunnelHint()).toContain(
+      `ssh -L 3000:127.0.0.1:3000 -p 2222 ${userInfo().username}@2001:db8::2\n`,
+    );
+  });
+
+  it("explains the placeholder when the SSH address is unknown", () => {
+    vi.stubEnv("SSH_CONNECTION", undefined);
+    const hint = tunnelHint();
+    expect(hint).toContain("ssh -L 3000:127.0.0.1:3000 ssh-host\n");
+    expect(hint).toContain("Replace ssh-host with the address or user@host");
+    expect(hint).toContain("Leave that SSH session open");
   });
 
   it("reads as plain words, with the command to run", () => {

@@ -105,7 +105,10 @@ export async function doctor(): Promise<Finding[]> {
 /** One line a finding, as `auni doctor` prints it. */
 export function line({ check, status, says, [terminalDetail]: detail }: Finding): string {
   const setting = typeof detail === "object" && "setting" in detail ? detail.setting : undefined;
-  return `${status.padEnd(4)} ${check}: ${says}${setting ? ` (check ${setting})` : ""}`;
+  return (
+    `${status.padEnd(4)} ${check}: ${says}` +
+    (setting ? `\n     In ${settingsFile()}, set ${setting}=<url>` : "")
+  );
 }
 
 /** How long one check may take: a busy RPC can ask to be waited on for minutes. */
@@ -155,6 +158,24 @@ const checkVersion: Check = async () => {
   ];
 };
 
+function databaseReason(error: unknown): string | undefined {
+  switch ((error as { code?: unknown } | null)?.code) {
+    case "ECONNREFUSED":
+      return "Connection refused.";
+    case "CONNECT_TIMEOUT":
+    case "ETIMEDOUT":
+      return "Connection timed out.";
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      return "Couldn't find the database host.";
+    case "28P01":
+    case "28000":
+      return "The database didn't accept the login.";
+    case "3D000":
+      return "The named database doesn't exist.";
+  }
+}
+
 const checkDatabase: Check = async () => {
   try {
     await pingDatabase();
@@ -164,8 +185,13 @@ const checkDatabase: Check = async () => {
         check: "database",
         status: "fix",
         [terminalDetail]: {
-          problem:
-            "Check the database address in Auni's settings file, or remove it to use Auni's own database.",
+          problem: [
+            databaseReason(error),
+            `Check the database address in ${settingsFile()}, or remove it to use Auni's own database.`,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          setting: "DATABASE_URL",
         },
         says: `can't connect (${said(error)}): check DATABASE_URL, or unset it for Auni's own Postgres`,
       },
@@ -331,17 +357,20 @@ const checkRpcs: Check = async () =>
   ).flat();
 
 async function checkNetwork(network: NetworkKey, run: Check): Promise<Finding[]> {
-  return (await guarded("rpc", run)).map((finding) => ({
-    ...finding,
-    ...(finding.status === "fix" && !finding[terminalDetail]
-      ? {
-          [terminalDetail]: {
-            problem: `${NETWORKS[network].name} isn't answering.`,
-            setting: rpcUrlVar(network),
-          },
-        }
-      : {}),
-  }));
+  return (await guarded("rpc", run)).map((finding) => {
+    if (finding.status !== "fix") return finding;
+    const detail = finding[terminalDetail];
+    return {
+      ...finding,
+      [terminalDetail]: {
+        problem:
+          typeof detail === "object" && "problem" in detail
+            ? detail.problem
+            : `${NETWORKS[network].name} isn't answering.`,
+        setting: rpcUrlVar(network),
+      },
+    };
+  });
 }
 
 /** "Monad, through its public RPCs (RPC_URL_MONAD sets your own)". */
@@ -586,7 +615,7 @@ export function doctorSummary(
       typeof detail === "object" && "problem" in detail
         ? detail.problem
         : issue.check === "database"
-          ? "Check the database connection and run doctor with --verbose for details."
+          ? `Check the database connection in ${settingsFile()} and run doctor with --verbose for details.`
           : issue.says;
     lines.push(problem(`${LABELS[issue.check]}: ${text}`));
   }
@@ -637,7 +666,7 @@ export function doctorSummary(
         ),
       );
     }
-    if (count("fix")) lines.push("Set a working network URL in Auni's settings file.");
+    if (count("fix")) lines.push(`Set a working network URL in ${settingsFile()}.`);
   }
 
   const healthy = new Set(

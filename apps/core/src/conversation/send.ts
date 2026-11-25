@@ -16,6 +16,7 @@ interface OwnerMessage {
   readonly supersedesId?: string;
   /** The channel app it came from; unset, the web app. */
   readonly channel?: string;
+  readonly channelRef?: string;
 }
 
 /**
@@ -30,7 +31,7 @@ type Sent = "sent" | "key_kept_out" | "not_theirs";
  * by the agent, and Auni answers in its place.
  */
 export async function sendMessage(thread: ThreadRow, message: OwnerMessage): Promise<Sent> {
-  const { id, text, supersedesId, channel } = message;
+  const { id, text, supersedesId, channel, channelRef } = message;
 
   if (supersedesId) {
     const [replaced] = await db
@@ -61,7 +62,7 @@ export async function sendMessage(thread: ThreadRow, message: OwnerMessage): Pro
         role: "user",
         parts: [{ type: "text", text }],
         supersedesId: supersedesId ?? null,
-        metadata: channel ? { channel } : {},
+        metadata: channel ? { channel, ...(channelRef && { channelRef }) } : {},
       })
       .onConflictDoNothing()
       .returning({ id: messages.id });

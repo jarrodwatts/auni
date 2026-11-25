@@ -1,0 +1,1 @@
+ALTER TABLE "channel_deliveries" ADD COLUMN "deposit" jsonb;

@@ -1,4 +1,5 @@
 import { rmSync } from "node:fs";
+import { hostname } from "node:os";
 
 import { RETRACTED } from "@auni/shared";
 import { and, desc, eq } from "drizzle-orm";
@@ -8,20 +9,25 @@ import { toolsFor } from "../../agent/mcp.ts";
 import { routineBodySchema, routineDescriptionSchema, routinesDir } from "../../agent/routines.ts";
 import { hashOf, legsDigest, syncCards } from "../../channels/cards.ts";
 import { deliver, listenOnChannels, mintChannelPairing, receive } from "../../channels/hub.ts";
+import { publishThreadEvent } from "../../conversation/stream.ts";
 import { mainChat } from "../../conversation/places.ts";
 import { db } from "../../db/client.ts";
 import {
   actions,
   channelDeliveries,
   channelLinks,
+  fills,
   jobs,
   messages,
   ownerSessions,
   threads,
+  valueSnapshots,
   type ActionRow,
   type ThreadRow,
 } from "../../db/schema.ts";
+import { env } from "../../env.ts";
 import { executeAction } from "../../money/actions.ts";
+import { type Holding, portfolioNow } from "../../money/portfolio.ts";
 import { allowAction } from "../../money/decide.ts";
 import { insertAction, insertThread, wipe } from "../../test/db.ts";
 import { queued } from "../../test/jobs.ts";
@@ -50,6 +56,11 @@ vi.mock("../../money/funding.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   proposalFunding: async () =>
     funding.needUsd ? { chain: "base", needUsd: funding.needUsd } : null,
+}));
+
+vi.mock("../../money/portfolio.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  portfolioNow: vi.fn(),
 }));
 
 const buy = stubRecipe({
@@ -206,7 +217,7 @@ describe("pairing", () => {
     expect(fake.sent("sendMessage")).toEqual([
       expect.objectContaining({
         chat_id: String(OWNER),
-        text: expect.stringContaining("now paired"),
+        text: expect.stringContaining("paired with Auni"),
       }),
     ]);
   });
@@ -229,7 +240,7 @@ describe("pairing", () => {
       Array.from({ length: 4 }, () =>
         expect.objectContaining({
           chat_id: String(OWNER),
-          text: "You're paired with your Auni. Ask it anything here.",
+          text: expect.stringContaining("Send a take, or reply to any message"),
         }),
       ),
     );
@@ -260,18 +271,293 @@ describe("pairing", () => {
     fake.message({ from: OWNER }, `/start ${pairing!.code}`);
     await fake.handled();
     expect(await db.select().from(messages)).toEqual([]);
-    expect(fake.sent("sendMessage").at(-1)?.text).toContain("now paired");
+    expect(fake.sent("sendMessage").at(-1)?.text).toContain("paired with Auni");
+  });
+
+  it("resends tap cards and held moves only to the owner, with proof kept in the app", async () => {
+    const first = await waiting({ summary: "Buy Nvidia" });
+    const second = await waiting({ summary: "Buy Tesla" });
+    const held = await waiting({
+      summary: "Existing order",
+      status: "running",
+      phase: "needs_owner",
+    });
+    const proof = await waiting({
+      summary: "Withdrawal",
+      tool: "withdraw_usdc",
+      details: { leavesTo: "0x5b7a3f0e2c9d41a8b6e0f7c2d9a4b1e3f6c8d0a2" },
+    });
+    await waiting({ summary: "Unpublished order", status: "running", phase: "needs_owner" });
+    const unpublished = await waiting({ summary: "A card the turn hasn't shown yet" });
+    await db.insert(messages).values({
+      threadId: thread.id,
+      role: "assistant",
+      parts: [
+        {
+          type: "data-cards",
+          data: {
+            cards: [first, second, held, proof].map((action) => ({
+              kind: "action",
+              actionReference: action.id,
+              title: action.summary,
+            })),
+          },
+        },
+      ],
+    });
+    fake.calls.length = 0;
+    fake.message({ from: STRANGER }, "/pending");
+    fake.message({ from: OWNER, chat: GROUP, chatType: "group" }, "/pending");
+    fake.message({ from: OWNER }, "/pending");
+    await fake.handled();
+    const replies = fake.sent("sendMessage");
+    expect(replies).toHaveLength(5);
+    expect(replies.every(({ chat_id }) => chat_id === String(OWNER))).toBe(true);
+    const firstGrant = (await deliveryOf(first.id)).grantHash;
+    const secondGrant = (await deliveryOf(second.id)).grantHash;
+    expect(firstGrant).toBeTruthy();
+    expect(secondGrant).toBeTruthy();
+    expect(firstGrant).not.toBe(secondGrant);
+    expect(await deliveryOf(held.id)).toMatchObject({ grantHash: null });
+    expect(await deliveryOf(proof.id)).toMatchObject({ grantHash: null });
+    expect(replies.at(-1)).toMatchObject({
+      text: `1 more waiting. Open Auni on ${hostname().split(".")[0]} to see them.`,
+    });
+    expect(replies.at(-1)?.reply_markup).toBeUndefined();
+    expect(replies.some(({ text }) => String(text).includes("Status unknown"))).toBe(true);
+    expect(replies.some(({ text }) => String(text).includes("Confirm it's you first."))).toBe(true);
+    expect(
+      await db
+        .select()
+        .from(channelDeliveries)
+        .where(eq(channelDeliveries.actionId, unpublished.id)),
+    ).toEqual([]);
+    expect(replies.some(({ text }) => String(text).includes("Unpublished order"))).toBe(false);
+    expect(await queued("turn")).toEqual([]);
+    const buyNvidia = replies.find(({ text }) => String(text).includes("Buy Nvidia"));
+    const callback = /allow:[^"]+/u.exec(JSON.stringify(buyNvidia?.reply_markup))?.[0];
+    expect(callback).toBeTruthy();
+    expect(await press({ from: OWNER }, await messageIdOf(first.id), callback!)).toBe("Allowed.");
+    expect(await statusOf(second.id)).toBe("awaiting_permission");
+  });
+
+  it.each([false, true])(
+    "shows where to look for a held move without a saved card (phone link: %s)",
+    async (onPhone) => {
+      const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };
+      const origin = "https://evo-t1.example.ts.net";
+      try {
+        Object.assign(env, {
+          WEB_ORIGIN: onPhone ? origin : "http://localhost:3000",
+          TAILSCALE_OWNER: onPhone ? "owner@example.com" : undefined,
+        });
+        await waiting({ summary: "Existing order", status: "running", phase: "needs_owner" });
+        fake.calls.length = 0;
+        fake.message({ from: OWNER }, "/pending");
+        await fake.handled();
+        const [notice] = fake.sent("sendMessage");
+        expect(notice?.text).toContain("Existing order");
+        expect(notice?.text).toContain("Auni can't confirm whether money moved");
+        if (onPhone) {
+          expect(notice?.reply_markup).toEqual({
+            inline_keyboard: [[{ text: "Open Money", url: `${origin}/app` }]],
+          });
+        } else {
+          expect(notice?.text).toContain(
+            `Open Auni on ${hostname().split(".")[0]} to see what you hold.`,
+          );
+          expect(notice?.reply_markup).toBeUndefined();
+        }
+      } finally {
+        Object.assign(env, saved);
+      }
+    },
+  );
+
+  it("opens the exact plan and held card in Auni and links the queue overflow", async () => {
+    const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };
+    const origin = "https://evo-t1.example.ts.net";
+    try {
+      Object.assign(env, { WEB_ORIGIN: origin, TAILSCALE_OWNER: "owner@example.com" });
+      const proposalId = crypto.randomUUID();
+      await waiting({ proposalId, lines: [{ label: "Terms", value: "x".repeat(3_500) }] });
+      await waiting({ proposalId });
+      const held = await waiting({ status: "running", phase: "needs_owner" });
+      const others = [];
+      for (let i = 0; i < 3; i += 1) others.push(await waiting());
+      await answer(thread.id, [
+        {
+          type: "data-cards",
+          data: {
+            cards: [
+              { kind: "action_plan", proposalId, title: "A plan" },
+              ...[held, ...others].map((row) => ({
+                kind: "action",
+                actionReference: row.id,
+                title: row.summary,
+              })),
+            ],
+          },
+        },
+      ]);
+      await waiting(); // No sealed card for this row yet.
+      fake.calls.length = 0;
+      fake.message({ from: OWNER }, "/pending");
+      await fake.handled();
+      const replies = fake.sent("sendMessage");
+      const chat = `${origin}/app/chat/${thread.id}`;
+      expect(replies).toHaveLength(5);
+      expect(replies[0]?.reply_markup).toEqual({
+        inline_keyboard: [[{ text: "Open in Auni", url: `${chat}?card=${proposalId}` }]],
+      });
+      expect(replies[1]?.reply_markup).toEqual({
+        inline_keyboard: [[{ text: "Check status", url: `${chat}?status=${held.id}` }]],
+      });
+      expect(replies.at(-1)).toMatchObject({
+        text: "1 more waiting in Auni",
+        reply_markup: { inline_keyboard: [[{ text: "Open Money", url: `${origin}/app` }]] },
+      });
+    } finally {
+      Object.assign(env, saved);
+    }
+  });
+
+  it("reads cash and the value of each take for /money without a local-only link", async () => {
+    const position: Holding = {
+      venue: "wallet",
+      chain: "base",
+      instrument: "native",
+      symbol: "ETH",
+      quantity: "2",
+      decimals: 18,
+      usdValue: "200.00",
+      cash: false,
+      priceId: null,
+    };
+    const loose = { ...position, chain: "monad", symbol: "MON", usdValue: "20.00" };
+    vi.mocked(portfolioNow).mockResolvedValue({
+      totalUsd: "255.00",
+      observedAt: new Date().toISOString(),
+      unavailable: [],
+      looking: [],
+      assets: { usdValue: "220.00", holdings: [position, loose] },
+      cash: { usdValue: "25.00", holdings: [] },
+      onTheWay: {
+        usdValue: "10.00",
+        moves: [{ actionId: crypto.randomUUID(), lands: "Base", usdValue: "10.00" }],
+      },
+      holdings: [position, loose],
+    });
+    await db.update(threads).set({ title: "ETH take" }).where(eq(threads.id, thread.id));
+    const other = await insertThread({ title: "Other ETH take" });
+    const now = Date.now();
+    for (const [threadId, quantity] of [
+      [thread.id, "1.5"],
+      [other.id, "1"],
+    ] as const) {
+      const action = await waiting({ threadId, status: "done" });
+      await db.insert(fills).values({
+        actionId: action.id,
+        threadId,
+        chain: "base",
+        instrument: "native",
+        side: "buy",
+        quantity,
+        createdAt: new Date(now - (quantity === "1.5" ? 72 : 71) * 60 * 60_000),
+        usdValue: "100",
+      });
+    }
+    await db.insert(valueSnapshots).values([
+      { usdValue: "243", holdings: [], takenAt: new Date(now - 48 * 60 * 60_000) },
+      { usdValue: "255", holdings: [], takenAt: new Date(now - 10) },
+    ]);
+    fake.calls.length = 0;
+    fake.message({ from: STRANGER }, "/money");
+    fake.message({ from: OWNER }, "/money");
+    await fake.handled();
+    expect(fake.sent("sendMessage")).toMatchObject([
+      {
+        chat_id: String(OWNER),
+        text: "<b>Money</b>\n\n<blockquote>Total: $255 (+$12 today)\nCash: $25\nETH take: $150\nOther ETH take: $50\nOther holdings: $20\nOn the way: $10</blockquote>",
+      },
+    ]);
+    expect(fake.sent("sendMessage")[0]?.reply_markup).toBeUndefined();
+    expect(portfolioNow).toHaveBeenCalledTimes(1);
+    expect(await queued("turn")).toEqual([]);
+
+    const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };
+    try {
+      Object.assign(env, {
+        WEB_ORIGIN: "https://evo-t1.example.ts.net",
+        TAILSCALE_OWNER: "owner@example.com",
+      });
+      fake.message({ from: OWNER }, "/money");
+      await fake.handled();
+      expect(fake.sent("sendMessage").at(-1)?.reply_markup).toEqual({
+        inline_keyboard: [[{ text: "Open Money", url: "https://evo-t1.example.ts.net/app" }]],
+      });
+    } finally {
+      Object.assign(env, saved);
+    }
   });
 });
 
 describe("the owner's messages", () => {
+  it("edits a single long-turn status into the answer", async () => {
+    const incoming = fake.message({ from: OWNER }, "Check Hyperliquid");
+    await fake.handled();
+    const { id: threadId } = await mainChat(db);
+    const [message] = await db.select().from(messages).where(eq(messages.threadId, threadId));
+    const turnId = message!.id;
+    const replyTo = `123456:${OWNER}:${incoming}`;
+    const activity = (toolName: string) =>
+      publishThreadEvent(threadId, {
+        kind: "chunks",
+        turnId,
+        chunks: [{ type: "tool-input-available", toolCallId: toolName, toolName, input: {} }],
+      });
+    fake.calls.length = 0;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      activity("hyperliquid_markets");
+      vi.setSystemTime(Date.now() + 9_000);
+      await expect
+        .poll(() => fake.sent("sendMessage")[0]?.text, { timeout: 6_000 })
+        .toBe("Checking Hyperliquid…");
+      activity("get_portfolio");
+      await expect
+        .poll(() => fake.sent("editMessageText")[0]?.text, { timeout: 6_000 })
+        .toBe("Checking your balances…");
+      publishThreadEvent(threadId, { kind: "turn-end", turnId });
+      const [answer] = await db
+        .insert(messages)
+        .values({
+          threadId,
+          role: "assistant",
+          parts: [{ type: "text", text: "The final answer." }],
+        })
+        .returning({ id: messages.id });
+      await deliver({ channel: "telegram", threadId, replyTo, messageId: answer!.id });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(fake.sent("sendMessage")).toHaveLength(1);
+    expect(fake.sent("sendMessage")[0]?.reply_parameters).toMatchObject({ message_id: incoming });
+    const [update, completed] = fake.sent("editMessageText");
+    expect(completed).toMatchObject({ message_id: update?.message_id, text: "The final answer." });
+  }, 15_000);
+
   it("join their main chat, or the thread of the card they reply to", async () => {
-    fake.message({ from: OWNER }, "What do I hold?");
+    const incoming = fake.message({ from: OWNER }, "What do I hold?");
     await fake.handled();
     const main = await mainChat(db);
     const [first] = await db.select().from(messages).where(eq(messages.threadId, main.id));
     expect(first).toMatchObject({ role: "user", metadata: { channel: "telegram" } });
-    expect(fake.sent("sendChatAction")).toHaveLength(1);
+    expect(first?.metadata.channelRef).toBe(`123456:${OWNER}:${incoming}`);
+    expect(fake.sent("setMessageReaction")).toMatchObject([
+      { chat_id: String(OWNER), message_id: incoming },
+    ]);
+    await expect.poll(() => fake.sent("sendChatAction")).toHaveLength(1);
     // The next one, replying to nothing, joins the same chat: one memory.
     fake.message({ from: OWNER }, "And in cash?");
     await fake.handled();
@@ -368,7 +654,7 @@ describe("questions", () => {
     const [question] = await db.select().from(channelDeliveries);
     const messageId = Number(question!.ref.split(":").at(-1));
     expect(await press({ from: OWNER }, messageId, "reply:1")).toBe("Sent.");
-    expect(await press({ from: OWNER }, messageId, "reply:0")).toBe("That was answered already.");
+    expect(await press({ from: OWNER }, messageId, "reply:0")).toBe("Already answered.");
     const said = await db
       .select()
       .from(messages)
@@ -387,11 +673,34 @@ describe("questions", () => {
     const [asked] = await db.select().from(messages).where(eq(messages.role, "user"));
     // The turn's deliver job, queued with no answer to send.
     await deliver({ channel: "telegram", threadId: asked!.threadId });
-    expect(fake.sent("sendMessage").at(-1)?.text).toContain("Something went wrong");
+    expect(fake.sent("sendMessage").at(-1)?.text).toContain("couldn't finish that reply");
   });
 });
 
 describe("approving a card", () => {
+  it("refreshes a pre-upgrade card after a press and requires a separate tap on the full review", async () => {
+    const action = await waiting();
+    await deliverCard(action);
+    const oldGrant = grantOnCard();
+    await db
+      .update(channelDeliveries)
+      .set({ shown: "old-layout-digest" })
+      .where(eq(channelDeliveries.actionId, action.id));
+    const id = await messageIdOf(action.id);
+    expect(await press({ from: OWNER }, id, `allow:${oldGrant}`)).toBe(
+      "Review the updated card first.",
+    );
+    expect(await statusOf(action.id)).toBe("awaiting_permission");
+    expect(signer.calls).toBe(0);
+
+    const refreshed = JSON.stringify(fake.sent("editMessageText").at(-1)?.reply_markup);
+    const grant = /allow:([^"]+)/u.exec(refreshed)?.[1];
+    expect(grant).toBeTruthy();
+    expect(grant).not.toBe(oldGrant);
+    expect(await press({ from: OWNER }, id, `allow:${grant}`)).toBe("Allowed.");
+    expect(signer.calls).toBe(1);
+  });
+
   it("runs it on the owner's press in their direct chat, once, and shows it allowed here", async () => {
     const action = await waiting();
     await deliverCard(action);
@@ -407,26 +716,56 @@ describe("approving a card", () => {
 
     await syncCards();
     const edits = fake.sent("editMessageText");
-    expect(edits.at(-1)).toMatchObject({ reply_markup: { inline_keyboard: [] } });
-    expect(String(edits.at(-1)!.text)).toMatch(/Done\nAllowed here\.$/u);
+    expect(edits.at(-1)).toMatchObject({
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "View transaction", url: expect.stringContaining("/tx/0xabc") }],
+        ],
+      },
+    });
+    expect(String(edits.at(-1)!.text)).toMatch(/Done\n\nAllowed here\.$/u);
   });
 
-  // A card recorded before cards said every permission, still waiting as Auni updated.
-  it("refuses a card drawn before cards said all they say now, and sends nothing", async () => {
+  it("redraws an out-of-date waiting card with its reason and no buttons", async () => {
     const action = await waiting({ cardFormat: 1 });
     await deliverCard(action);
+    const sent = fake.sent("sendMessage").at(-1)!;
+    expect(sent.text).toContain(RETRACTED.outOfDate);
+    expect(sent.reply_markup).toBeUndefined();
+    const [delivery] = await db
+      .select()
+      .from(channelDeliveries)
+      .where(eq(channelDeliveries.actionId, action.id));
+    expect(delivery?.grantHash).toBeNull();
+  });
+
+  // Recreate a message already carrying a grant when the app updated.
+  it("refuses a card drawn before cards said all they say now, and sends nothing", async () => {
+    const action = await waiting();
+    await deliverCard(action);
+    await db.update(actions).set({ cardFormat: 1 }).where(eq(actions.id, action.id));
+    await db
+      .update(channelDeliveries)
+      .set({ shown: "pre-upgrade-telegram-layout" })
+      .where(eq(channelDeliveries.actionId, action.id));
     expect(
       await press({ from: OWNER }, await messageIdOf(action.id), `allow:${grantOnCard()}`),
     ).toBe(RETRACTED.outOfDate);
     // Taken back in the same press, so no surface shows it waiting to be allowed again.
     expect(await statusOf(action.id)).toBe("retracted");
+    expect(fake.sent("editMessageText").at(-1)?.reply_markup).toEqual({ inline_keyboard: [] });
     expect(signer.calls).toBe(0);
   });
 
   // Its Decline is the owner's no, which the thread hears as one, not that it can go up again.
   it("declines a card drawn before cards said all they say now, and tells the thread", async () => {
-    const action = await waiting({ cardFormat: 1 });
+    const action = await waiting();
     await deliverCard(action);
+    await db.update(actions).set({ cardFormat: 1 }).where(eq(actions.id, action.id));
+    await db
+      .update(channelDeliveries)
+      .set({ shown: "pre-upgrade-telegram-layout" })
+      .where(eq(channelDeliveries.actionId, action.id));
     expect(
       await press({ from: OWNER }, await messageIdOf(action.id), `decline:${grantOnCard()}`),
     ).toBe("Declined.");
@@ -447,7 +786,9 @@ describe("approving a card", () => {
     expect(await actModes()).toContain("within_limits");
     expect(signer.calls).toBe(0);
     await syncCards();
-    expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(/Updated\nAllowed here\.$/u);
+    expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(
+      /Updated\n\nAllowed here\.$/u,
+    );
   });
 
   it("keeps a routine of the largest size one message, allowed in the app, and shows it saved", async () => {
@@ -469,7 +810,7 @@ describe("approving a card", () => {
     });
     await deliverCard(ask);
     const card = fake.sent("sendMessage").at(-1)!;
-    expect(String(card.text)).toMatch(/^<b>Save a routine: check-rates<\/b>\nWaiting for you\n/u);
+    expect(String(card.text)).toMatch(/<b>Save a routine: check-rates<\/b>\nWaiting on you\n/u);
     expect(JSON.stringify(fake.sent("sendMessage"))).not.toContain("allow:");
     expect(await deliveryOf(ask.id)).toMatchObject({ grantHash: null });
 
@@ -477,8 +818,8 @@ describe("approving a card", () => {
     await syncCards();
     const edit = fake.sent("editMessageText").at(-1)!;
     expect(edit.message_id).toBe(await messageIdOf(ask.id));
-    expect(String(edit.text)).toBe(
-      "<b>Save a routine: check-rates</b>\nSaved\nAllowed in the app.",
+    expect(String(edit.text)).toContain(
+      "<b>Save a routine: check-rates</b>\nSaved\n\nAllowed in the app.",
     );
   });
 
@@ -496,8 +837,9 @@ describe("approving a card", () => {
     });
     await deliverCard(ask);
     const sent = fake.sent("sendMessage").at(-1)!;
-    expect(String(sent.text)).toContain("Paste it in the app");
-    expect(JSON.stringify(sent)).toContain(`?card=${ask.id}`);
+    expect(String(sent.text)).toContain("Saved only on this computer. Never paste it in chat.");
+    expect(String(sent.text)).toContain("to enter it in a private field.");
+    expect(sent.reply_markup).toBeUndefined();
     expect(JSON.stringify(fake.sent("sendMessage"))).not.toContain("allow:");
     expect(await deliveryOf(ask.id)).toMatchObject({ grantHash: null });
 
@@ -553,7 +895,7 @@ describe("approving a card", () => {
     expect((await allowAction(action.id)).kind).toBe("allowed");
     await runQueued();
     expect(await press({ from: OWNER }, await messageIdOf(action.id), `allow:${grant}`)).toBe(
-      "That was decided already.",
+      "Already decided.",
     );
     await syncCards();
     expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(/Allowed in the app\.$/u);
@@ -672,7 +1014,7 @@ describe.each([
     expect(await press({ from: OWNER }, messageId, "allow:AAAAAAAAAAAAAAAAAAAAAA")).toMatch(
       /expired/u,
     );
-    expect(await press({ from: OWNER }, messageId, "approve")).toBe("That button does nothing.");
+    expect(await press({ from: OWNER }, messageId, "approve")).toBe("That button isn't active.");
   });
 
   it("a grant past its day is pressed", async () => {
@@ -745,7 +1087,7 @@ describe.each([
       })
       .where(eq(channelDeliveries.actionId, leaving.id));
     expect(await press({ from: OWNER }, leavingId, "allow:forged-grant")).toBe(
-      "This one checks it's you, so allow it in the app.",
+      "Confirm it's you in Auni to allow this.",
     );
     expect(await statusOf(leaving.id)).toBe("awaiting_permission");
   });
@@ -773,8 +1115,13 @@ describe("approving a plan", () => {
 
   // An old plan's message, sent without each leg's permissions, pressed before it is redrawn.
   it("refuses a plan with a leg drawn before cards said all they say now", async () => {
-    const legs = await planLegs({ cardFormat: 1 });
+    const legs = await planLegs();
     await deliverPlan(PLAN);
+    await db.update(actions).set({ cardFormat: 1 }).where(eq(actions.id, legs[1].id));
+    await db
+      .update(channelDeliveries)
+      .set({ shown: "pre-upgrade-telegram-layout" })
+      .where(eq(channelDeliveries.proposalId, PLAN));
     // Short of cash, it still says it can never run, not to add money first.
     funding.needUsd = "5.00";
     expect(await press({ from: OWNER }, await planMessage(), `allow:${grantOnCard()}`)).toBe(
@@ -789,8 +1136,13 @@ describe("approving a plan", () => {
   });
 
   it("declines a plan with a leg drawn before cards said all they say now, and tells the thread", async () => {
-    const legs = await planLegs({ cardFormat: 1 });
+    const legs = await planLegs();
     await deliverPlan(PLAN);
+    await db.update(actions).set({ cardFormat: 1 }).where(eq(actions.id, legs[1].id));
+    await db
+      .update(channelDeliveries)
+      .set({ shown: "pre-upgrade-telegram-layout" })
+      .where(eq(channelDeliveries.proposalId, PLAN));
     expect(await press({ from: OWNER }, await planMessage(), `decline:${grantOnCard()}`)).toBe(
       "Declined.",
     );
@@ -843,7 +1195,7 @@ describe("approving a plan", () => {
       })
       .where(eq(channelDeliveries.proposalId, PLAN));
     expect(await press({ from: OWNER }, await planMessage(), "allow:forged-grant")).toMatch(
-      /checks it's you/u,
+      /Confirm it's you/u,
     );
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
       "awaiting_permission",

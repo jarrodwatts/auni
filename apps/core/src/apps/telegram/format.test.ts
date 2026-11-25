@@ -28,8 +28,35 @@ describe("toHtml", () => {
     expect(toHtml("a \\`code\\` b \\\\ c")).toBe("a `code` b \\ c");
   });
 
-  it("leaves a lone star, a snake_case name and a list alone", () => {
-    expect(toHtml("- 2 * 3 is six\n- my_wallet_name")).toBe("- 2 * 3 is six\n- my_wallet_name");
+  it("uses bullets and leaves a lone star and a snake_case name alone", () => {
+    expect(toHtml("- 2 * 3 is six\n- my_wallet_name")).toBe("• 2 * 3 is six\n• my_wallet_name");
+  });
+  it("shows quotes as one block and leaves fenced data alone", () => {
+    expect(toHtml("Intro\n> **Buy**\n> 50 USDC\n\nEnd")).toBe(
+      "Intro\n<blockquote><b>Buy</b>\n50 USDC</blockquote>\n\nEnd",
+    );
+    expect(toHtml("```\n> Quote\n| A | B |\n```")).toBe("<pre>&gt; Quote\n| A | B |</pre>");
+  });
+
+  it("lays out table rows one at a time on a phone", () => {
+    expect(toHtml("| Asset | Fee |\n| :--- | ---: |\n| ETH | $5 |\n| SOL | $1 |")).toBe(
+      "Asset: ETH\nFee: $5\n\nAsset: SOL\nFee: $1",
+    );
+  });
+
+  it("keeps a table compact when repeating its headings would exceed the message budget", () => {
+    const table = [
+      `| ${"Header".repeat(50)} | Fee |`,
+      "| --- | --- |",
+      ...Array(20).fill("| ETH | $5 |"),
+    ].join("\n");
+    expect(toHtml(table)).toBe(table);
+  });
+
+  it("leaves links to localhost and loopback addresses as labels alone", () => {
+    expect(toHtml("[Open Auni](http://localhost:3000) or [open](https://127.0.0.1)")).toBe(
+      "Open Auni or open",
+    );
   });
 });
 

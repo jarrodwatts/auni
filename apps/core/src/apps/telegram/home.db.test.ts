@@ -17,9 +17,11 @@ import {
   type ThreadRow,
 } from "../../db/schema.ts";
 import type { BrainEvent } from "../contract.ts";
+import { deliverKind } from "../../jobs/kinds.ts";
 import { FAKE_TOKEN, FakeBotApi } from "./fake-bot-api.ts";
 import { insertAction, insertThread, wipe } from "../../test/db.ts";
 import { queued } from "../../test/jobs.ts";
+import { syncCards } from "../../channels/cards.ts";
 import { homeChannel } from "../../channels/home.ts";
 import { deliver } from "../../channels/hub.ts";
 
@@ -27,6 +29,8 @@ import { deliver } from "../../channels/hub.ts";
 // they last talked to it from, and only while it is set up and paired.
 
 const replay = vi.hoisted(() => ({ events: [] as unknown[] }));
+const address = "0x0123456789abcdef0123456789abcdef01234567";
+const wallet = vi.hoisted(() => ({ evm: null as string | null, solana: null }));
 vi.mock("../../agent/brain.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../agent/brain.ts")>()),
   pickBrain: async () => ({
@@ -46,7 +50,7 @@ vi.mock("../../agent/prompt.ts", async (importOriginal) => ({
 }));
 vi.mock("../../money/wallets.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../money/wallets.ts")>()),
-  walletAddresses: async () => null,
+  walletAddresses: async () => ({ ...wallet }),
 }));
 
 const OWNER = "4242";
@@ -66,6 +70,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await wipe(threads, messages, actions, channelDeliveries, jobs);
   fake.calls.length = 0;
+  wallet.evm = address;
   fake.useBot(FAKE_TOKEN);
   vi.spyOn(console, "info").mockImplementation(() => undefined);
   chat = await insertThread();
@@ -177,14 +182,28 @@ describe("a turn's answer", () => {
     await paired();
     await setSettings({ homeChannel: "web" });
     const id = crypto.randomUUID();
-    await sendMessage(chat, { id, text: "How am I doing?", channel: "telegram" });
+    await sendMessage(chat, {
+      id,
+      text: "How am I doing?",
+      channel: "telegram",
+      channelRef: `123456:${OWNER}:55`,
+    });
     replay.events = answers("Up 3% today.");
     await runConversationTurn({
       threadId: chat.id,
       turnId: id,
       trigger: { kind: "message", messageId: id },
     });
-    expect((await queued("deliver")).map(({ data }) => data.channel)).toEqual(["telegram"]);
+    const [queuedAnswer] = await queued("deliver");
+    expect(queuedAnswer?.data).toMatchObject({
+      channel: "telegram",
+      replyTo: `123456:${OWNER}:55`,
+    });
+    await deliver(deliverKind.data.parse(queuedAnswer?.data));
+    expect(fake.sent("sendMessage")[0]?.reply_parameters).toEqual({
+      message_id: 55,
+      allow_sending_without_reply: true,
+    });
   });
 });
 
@@ -229,5 +248,90 @@ describe("deliver", () => {
       .returning();
     await deliver({ channel: "telegram", threadId: chat.id, messageId: answer!.id });
     expect(fake.sent("sendMessage")).toEqual([]);
+  });
+
+  it("clears the copy button on expiry and still edits in a deposit recorded late", async () => {
+    await paired();
+    const deposit = {
+      kind: "deposit",
+      id: "deposit-card",
+      title: "Deposit USDC",
+      network: "base",
+      tokens: [],
+      landed: null,
+      updatedAt: new Date().toISOString(),
+    };
+    const parts = (card: object) => [{ type: "data-cards", data: { cards: [card] } }];
+    const [answer] = await db
+      .insert(messages)
+      .values({
+        threadId: chat.id,
+        role: "assistant",
+        parts: parts(deposit),
+      })
+      .returning();
+    await deliver({ channel: "telegram", threadId: chat.id, messageId: answer!.id });
+    expect(fake.sent("sendMessage")).toMatchObject([
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: "Copy Base wallet address", copy_text: { text: address } }]],
+        },
+      },
+    ]);
+    await syncCards();
+    expect(fake.sent("editMessageText")).toEqual([]);
+    wallet.evm = "0x2345678901234567890123456789012345678901";
+    await syncCards();
+    await syncCards();
+    expect(fake.sent("editMessageText")).toMatchObject([
+      {
+        reply_markup: {
+          inline_keyboard: [[{ copy_text: { text: wallet.evm } }]],
+        },
+      },
+    ]);
+    fake.calls.length = 0;
+    await db
+      .update(messages)
+      .set({
+        parts: parts({
+          ...deposit,
+          updatedAt: new Date(Date.now() - 25 * 60 * 60_000).toISOString(),
+        }),
+      })
+      .where(eq(messages.id, answer!.id));
+    await syncCards();
+    await syncCards();
+    expect(fake.sent("editMessageText")).toMatchObject([
+      {
+        text: expect.stringContaining("Stopped watching"),
+        reply_markup: { inline_keyboard: [] },
+      },
+    ]);
+    fake.calls.length = 0;
+    await db
+      .update(messages)
+      .set({
+        parts: parts({
+          ...deposit,
+          landed: {
+            usdValue: "250.00",
+            network: "Base",
+            moved: [{ amount: "250", symbol: "USDC", to: null }],
+          },
+        }),
+      })
+      .where(eq(messages.id, answer!.id));
+    const [delivery] = await db.select().from(channelDeliveries);
+    await syncCards();
+    await syncCards();
+    expect(fake.sent("editMessageText")).toMatchObject([
+      {
+        message_id: Number(delivery!.ref.split(":").at(-1)),
+        text: "<b>$250 arrived</b>\n<blockquote>Base\n250 USDC</blockquote>",
+        reply_markup: { inline_keyboard: [] },
+      },
+    ]);
+    expect((await db.select().from(channelDeliveries))[0]?.open).toBe(false);
   });
 });

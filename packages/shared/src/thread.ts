@@ -150,7 +150,12 @@ export type ThreadStreamEvent<Chunk> =
   | { readonly kind: "progress"; readonly turnId: string; readonly stage: TurnProgressStage }
   | { readonly kind: "chunks"; readonly turnId: string; readonly chunks: readonly Chunk[] }
   /** Sent after the answer is persisted, so a refetch from here on sees it. */
-  | { readonly kind: "turn-end"; readonly turnId: string; readonly failed?: true }
+  | {
+      readonly kind: "turn-end";
+      readonly turnId: string;
+      readonly failed?: true;
+      readonly stopped?: true;
+    }
   /**
    * A message core left outside any turn, such as money arriving, persisted: a
    * refetch sees it. A turn may be running meanwhile, and is no business of it.

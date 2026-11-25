@@ -31,7 +31,7 @@ function heldMoveWords({ summary, why }: Held, dismissing: boolean): string {
     return `${why} Auni won't send it again, and Money shows what you hold either way.`;
   // Every card's summary starts with its verb ("Withdraw $20 to ..."), so it reads on from "to".
   const move = summary.charAt(0).toLowerCase() + summary.slice(1);
-  return `Dismiss the card to ${move}? Auni stops checking it. Dismissing can't undo or cancel the move, and Money shows whether it went.`;
+  return `Dismiss the card to ${move}? Auni stops checking it. This can't undo or cancel the move, and Auni may never learn whether it went, so check the wallet or exchange it was sent to.`;
 }
 
 /** Never run: a held move offers no Try again (see failedStep). */

@@ -84,7 +84,7 @@ it("names each move in its own dismiss confirmation, and dismisses only on a sec
   await tap(second!, "Dismiss card");
   expect(heldTap).not.toHaveBeenCalled();
   expect(first!.textContent).toContain(
-    "Dismiss the card to withdraw $20 to JAVqaE…6X8n on Solana? Auni stops checking it. Dismissing can't undo or cancel the move",
+    "Dismiss the card to withdraw $20 to JAVqaE…6X8n on Solana? Auni stops checking it. This can't undo or cancel the move, and Auni may never learn whether it went, so check the wallet or exchange it was sent to.",
   );
   expect(second!.textContent).toContain(
     "Dismiss the card to withdraw $70 to your exchange on Base?",

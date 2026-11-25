@@ -583,9 +583,7 @@ async function wakeWaiting(tx: Tx, deposits: readonly ArrivalRow[]): Promise<Pla
     fenced("deposits", deposits.map(forClaude), 1_800),
   ].join("\n");
   for (const thread of woken) await wakeThread(thread.id, reason, { tx });
-  return woken
-    .toSorted((a, b) => b.at.getTime() - a.at.getTime())
-    .map(({ id }) => ({ id }));
+  return woken.toSorted((a, b) => b.at.getTime() - a.at.getTime()).map(({ id }) => ({ id }));
 }
 
 /** A message holding a deposit card still waiting, as jsonb containment finds it. */
@@ -601,10 +599,8 @@ function waiting(card: CardWire): card is DepositCardWire {
 }
 
 /**
- * Lands, in place, every deposit card still waiting in these threads with
- * these deposits: each waited on the thread's next deposit, so the card that
- * said where to send it says what came in, and none is left watching for
- * money that came.
+ * Lands the cards whose own watch window covers the deposit. A later watch
+ * in the same thread doesn't reopen its older deposit cards.
  */
 async function landCards(
   tx: Tx,
@@ -621,23 +617,45 @@ async function landCards(
         sql`${messages.parts} @> ${WAITING_CARD}::jsonb`,
       ),
     );
-  const landed: NonNullable<DepositCardWire["landed"]> = {
-    usdValue: centsToUsd(deposits.reduce((sum, row) => sum + absCents(row.usdValue!), 0n)),
-    network: chainName(deposits[0]!.chain as NetworkKey),
-    moved: moved(deposits),
-  };
   const updatedAt = new Date().toISOString();
-  const land = (card: CardWire): CardWire =>
-    waiting(card) ? { ...card, landed, updatedAt } : card;
+  const posted: Posted[] = [];
   for (const message of waitingIn) {
+    let changed = false;
+    const land = (card: CardWire): CardWire => {
+      if (!waiting(card)) return card;
+      const began = Date.parse(card.updatedAt);
+      const onTime = deposits.filter(
+        ({ at }) => began - SETTLING_MS < at.getTime() && at.getTime() < began + DEPOSIT_WAIT_MS,
+      );
+      const [first] = onTime;
+      if (!first) return card;
+      const byChain = Map.groupBy(onTime, ({ chain }) => chain);
+      const mixed = byChain.size > 1;
+      changed = true;
+      return {
+        ...card,
+        updatedAt,
+        landed: {
+          usdValue: centsToUsd(onTime.reduce((sum, row) => sum + absCents(row.usdValue!), 0n)),
+          network: mixed ? "Multiple networks" : chainName(first.chain as NetworkKey),
+          moved: mixed
+            ? [...byChain].flatMap(([chain, rows]) =>
+                moved(rows).map((item) => ({ ...item, network: chainName(chain as NetworkKey) })),
+              )
+            : moved(onTime),
+        },
+      };
+    };
     const parts = (message.parts as { readonly type: string }[]).map((part) =>
       part.type === "data-cards"
         ? { ...part, data: { cards: (part as CardsPart).data.cards.map(land) } }
         : part,
     );
+    if (!changed) continue;
     await tx.update(messages).set({ parts }).where(eq(messages.id, message.id));
+    posted.push({ threadId: message.threadId, messageId: message.id });
   }
-  return waitingIn.map(({ id, threadId }) => ({ threadId, messageId: id }));
+  return posted;
 }
 
 /**

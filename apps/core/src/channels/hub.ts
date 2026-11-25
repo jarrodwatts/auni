@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { and, eq, gt, isNotNull, sql } from "drizzle-orm";
+import { RETRACTED } from "@auni/shared";
+import { and, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { mainChat } from "../conversation/places.ts";
@@ -9,9 +10,11 @@ import { sendMessage } from "../conversation/send.ts";
 import { threadById } from "../conversation/threads.ts";
 import { db } from "../db/client.ts";
 import {
+  actions,
   channelDeliveries,
   channelLinks,
   messages,
+  threads,
   type ChannelDeliveryRow,
   type ChannelLinkRow,
 } from "../db/schema.ts";
@@ -31,18 +34,26 @@ import {
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
+import { centsToUsd, parseUnits, signedUsdToCents, usdToCents } from "../money/usd.ts";
+import { allFills, holdersOf, threadBooks } from "../money/books.ts";
+import { fillIdentity, QUANTITY_DECIMALS } from "../money/fill-key.ts";
+import { portfolioNow } from "../money/portfolio.ts";
+import { valueHistory } from "../money/value-history.ts";
 import {
+  appDestination,
   hashOf,
   legsDigest,
   legsOf,
   recordSent,
   sendCard,
+  pendingCard,
   spendGrant,
   syncCards,
   syncDelivery,
 } from "./cards.ts";
-import { drawQuestion, replySegments, waitingOn } from "./draw.ts";
+import { drawQuestion, literal, replySegments, showsFullReview, waitingOn } from "./draw.ts";
 import { usedChannel } from "./home.ts";
+import { showTurn, takeTurnStatus } from "./progress.ts";
 
 // The owner talks to Auni from channel apps (Telegram) as well as the web app, in one shared
 // conversation. The hub is where a channel's words become the owner's, and so it alone decides:
@@ -154,7 +165,10 @@ async function linkOf(channelId: string): Promise<ChannelLinkRow | undefined> {
 }
 
 /** Whether an event came from the paired owner, in their direct chat with Auni. */
-function fromOwner(link: ChannelLinkRow | undefined, event: ChannelEvent): boolean {
+function fromOwner(
+  link: ChannelLinkRow | undefined,
+  event: Pick<ChannelEvent, "chat" | "direct" | "from">,
+): boolean {
   return Boolean(
     link?.owner && event.direct && event.from === link.owner && event.chat === link.chat,
   );
@@ -169,7 +183,8 @@ export async function receive(channelId: string, event: ChannelEvent): Promise<s
   if (!found) return;
   const link = await linkOf(channelId);
   if (event.kind === "press") {
-    if (!fromOwner(link, event)) return "Only Auni's owner can do that, in their own chat with it.";
+    if (!fromOwner(link, event))
+      return "Only Auni's owner can tap this, in their direct chat with Auni.";
     await usedChannel(db, channelId);
     return pressed(found, event);
   }
@@ -185,12 +200,131 @@ export async function receive(channelId: string, event: ChannelEvent): Promise<s
   if (event.kind === "message") return ownerSaid(found, event);
   // The app's own start or help, answered here: it was never words for the agent.
   await usedChannel(db, channelId);
+  if (event.command === "pending") return pending(found, event.chat);
+  if (event.command === "money") return money(found, event.chat);
   await found.channel.send(event.chat, { text: STILL_PAIRED });
 }
 
 const PAIRED =
-  "This chat is now paired with your Auni. Talk to it here, and allow its moves with a tap.";
-const STILL_PAIRED = "You're paired with your Auni. Ask it anything here.";
+  "**You're paired with Auni.**\n\nTell me a take, like “AI power demand keeps climbing.” Use /pending to see cards waiting on you.";
+const STILL_PAIRED =
+  "**Talk to Auni here**\n\nSend a take, or reply to any message to continue that chat.\n\n/pending lists cards waiting on you. /money shows your cash and takes.";
+
+async function pending(found: Found, chat: string): Promise<void> {
+  const rows = await db
+    .select()
+    .from(actions)
+    .where(or(eq(actions.status, "awaiting_permission"), eq(actions.phase, "needs_owner")))
+    .orderBy(actions.createdAt, actions.id);
+  let ready = 0;
+  for (const group of Map.groupBy(rows, (row) => row.proposalId ?? row.id).values()) {
+    const row = group.find(({ phase }) => phase === "needs_owner") ?? group[0]!;
+    const send = await pendingCard(found, chat, row);
+    if (!send) continue;
+    ready += 1;
+    if (ready <= 4) await send();
+  }
+  if (ready > 4) {
+    const { link, machine } = appDestination("/app");
+    const more = ready - 4;
+    await found.channel.send(chat, {
+      text: link
+        ? `${more} more waiting in Auni`
+        : `${more} more waiting. Open Auni on ${literal(machine)} to see them.`,
+      ...(link && { buttons: [[{ label: "Open Money", url: link }]] }),
+    });
+  }
+  if (ready === 0)
+    await found.channel.send(chat, {
+      text: rows.length
+        ? "No cards are ready to review yet."
+        : "You're caught up. No cards are waiting on you.",
+    });
+}
+
+async function money(found: Found, chat: string): Promise<void> {
+  const link = appDestination("/app").link;
+  const buttons = link ? [[{ label: "Open Money", url: link }]] : undefined;
+  const summary = await readMoney().catch(
+    () => "I couldn't read your balances just now. Try /money again.",
+  );
+  await found.channel.send(chat, { text: `**Money**\n\n${summary}`, buttons });
+}
+
+function moneyChange(points: Awaited<ReturnType<typeof valueHistory>>["points"]): string {
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last || first === last) return "";
+  const change = signedUsdToCents(last.madeUsd) - signedUsdToCents(first.madeUsd);
+  const amount = dollars(centsToUsd(change < 0n ? -change : change));
+  const sign = change < 0n ? "-" : change > 0n ? "+" : "";
+  return ` (${sign}${amount} today)`;
+}
+
+async function readMoney(): Promise<string> {
+  const [portfolio, fills] = await Promise.all([portfolioNow(), allFills(db)]);
+  const books = threadBooks(fills);
+  const ids = [...books.keys()];
+  const [takes, history] = await Promise.all([
+    ids.length
+      ? db
+          .select({ id: threads.id, title: threads.title })
+          .from(threads)
+          .where(inArray(threads.id, ids))
+          .orderBy(threads.title, threads.id)
+      : [],
+    valueHistory("Today").catch(() => null),
+  ]);
+  const values = new Map<string, { cents: bigint; priced: boolean }>();
+  let looseHoldings = false;
+  let loosePriced = false;
+  // Allocate each holding once, even if several takes bought more than the wallet now holds.
+  for (const holding of portfolio.assets.holdings) {
+    const units = parseUnits(holding.quantity, QUANTITY_DECIMALS);
+    if (units === 0n) continue;
+    const { threads: owners, other: loose } = holdersOf(
+      holding.short ? -units : units,
+      books,
+      fillIdentity(holding),
+    );
+    if (loose > 0n) {
+      looseHoldings = true;
+      if (holding.usdValue !== null) loosePriced = true;
+    }
+    for (const [id, share] of owners) {
+      const value = values.get(id) ?? { cents: 0n, priced: false };
+      if (holding.usdValue !== null) {
+        value.cents += (usdToCents(holding.usdValue) * share) / units;
+        value.priced = true;
+      }
+      values.set(id, value);
+    }
+  }
+  // Unassigned holdings and cents left from splitting a holding belong on their own line.
+  let other = usdToCents(portfolio.assets.usdValue);
+  const lines = takes.flatMap(({ id, title }) => {
+    const value = values.get(id);
+    if (!value) return [];
+    other -= value.cents;
+    const amount = value.priced ? dollars(centsToUsd(value.cents)) : "Value unavailable";
+    return [`> ${literal(title || "Untitled take")}: ${amount}`];
+  });
+  const missing = [...new Set([...portfolio.unavailable, ...portfolio.looking])];
+  return [
+    `> Total: ${dollars(portfolio.totalUsd)}${moneyChange(history?.points ?? [])}`,
+    `> Cash: ${dollars(portfolio.cash.usdValue)}`,
+    ...lines,
+    ...(other || looseHoldings
+      ? [
+          `> Other holdings: ${other || loosePriced ? dollars(centsToUsd(other)) : "Value unavailable"}`,
+        ]
+      : []),
+    ...(portfolio.onTheWay.moves.length
+      ? [`> On the way: ${dollars(portfolio.onTheWay.usdValue)}`]
+      : []),
+    ...(missing.length ? [`\nStill missing balances from ${literal(missing.join(", "))}.`] : []),
+  ].join("\n");
+}
 
 /** Spends a pairing code sent in a direct chat, making its sender the owner here. */
 async function pair(
@@ -236,31 +370,35 @@ async function ownerSaid(found: Found, event: ChannelEvent & { kind: "message" }
     (repliedTo && (await threadById(repliedTo.threadId))) ??
     (await threadById((await mainChat(db)).id));
   if (!thread) throw new Error("The owner's main chat is gone.");
-  await sendMessage(thread, {
-    id: messageIdFrom(`${found.id}:${event.id}`),
+  const turnId = messageIdFrom(`${found.id}:${event.id}`);
+  const sent = await sendMessage(thread, {
+    id: turnId,
     text: event.text,
     channel: found.id,
+    channelRef: event.id,
   });
-  void typingWhileAnswering(found, event.chat, thread.id);
+  if (sent === "sent") {
+    void found.channel.acknowledge?.(event.id).catch(() => undefined);
+    showAnswerProgress(found, event, thread.id, turnId, event.id);
+  }
 }
 
-/** How long a chat app shows "typing…" from one call (Telegram's: about five seconds). */
-const TYPING_SHOWS_MS = 4_000;
-/** The longest "typing…" is kept up, so a turn stuck on a tool never types for ever. */
-const TYPING_MOST_MS = 3 * 60_000;
-
-/**
- * Keeps the chat showing "typing…" while the thread's turn runs, as a person writing back would:
- * one call shows it for a few seconds, and an answer can take a minute. Not waited for, so the
- * next message from the chat app is read meanwhile.
- */
-async function typingWhileAnswering(found: Found, chat: string, threadId: string): Promise<void> {
-  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until;) {
-    await found.channel.typing(chat).catch(() => undefined);
-    await sleep(TYPING_SHOWS_MS);
-    const thread = await threadById(threadId).catch(() => undefined);
-    if (!thread?.turnStartedAt) return;
-  }
+function showAnswerProgress(
+  found: Found,
+  event: Pick<ChannelEvent, "chat" | "direct" | "from">,
+  threadId: string,
+  turnId: string,
+  replyTo: string,
+): void {
+  showTurn({
+    channelId: found.id,
+    channel: found.channel,
+    chat: event.chat,
+    replyTo,
+    threadId,
+    turnId,
+    stillPaired: async () => fromOwner(await linkOf(found.id), event),
+  });
 }
 
 async function deliveryAt(channelId: string, ref: string): Promise<ChannelDeliveryRow | undefined> {
@@ -277,7 +415,7 @@ async function pressed(found: Found, event: ChannelEvent & { kind: "press" }): P
   if (verb === "reply") return answered(found, event, Number(token));
   if (verb === "allow" || verb === "decline")
     return oneAtATime(() => decide(found, event, verb, token));
-  return "That button does nothing.";
+  return "That button isn't active.";
 }
 
 async function answered(
@@ -285,7 +423,7 @@ async function answered(
   event: ChannelEvent & { kind: "press" },
   index: number,
 ): Promise<string> {
-  if (!Number.isInteger(index) || index < 0) return "That button does nothing.";
+  if (!Number.isInteger(index) || index < 0) return "That button isn't active.";
   // Closed as it is answered, so a second press sends nothing more.
   const [delivery] = await db
     .update(channelDeliveries)
@@ -300,16 +438,19 @@ async function answered(
     )
     .returning();
   const label = delivery?.question?.options[index];
-  if (!delivery?.question || label === undefined) return "That was answered already.";
+  if (!delivery?.question || label === undefined) return "Already answered.";
   const thread = await threadById(delivery.threadId);
-  if (!thread) return "That conversation is gone.";
-  await sendMessage(thread, {
-    id: messageIdFrom(`${found.id}:answer:${delivery.id}`),
+  if (!thread) return "That chat is gone.";
+  const turnId = messageIdFrom(`${found.id}:answer:${delivery.id}`);
+  const sent = await sendMessage(thread, {
+    id: turnId,
     text: label,
     channel: found.id,
+    channelRef: event.message,
   });
+  event.answer?.("Sent.");
   await found.channel.edit(delivery.ref, drawQuestion(delivery.question, label));
-  void typingWhileAnswering(found, event.chat, thread.id);
+  if (sent === "sent") showAnswerProgress(found, event, thread.id, turnId, event.message);
   return "Sent.";
 }
 
@@ -325,7 +466,7 @@ async function decide(
   grant: string,
 ): Promise<string> {
   const delivery = await spendGrant(found.id, event.message, grant);
-  if (!delivery) return "This button has expired. Open the card in the app to decide it.";
+  if (!delivery) return "This button expired. Nothing moved. Open Auni to decide this card.";
   const target = delivery.actionId
     ? { actionId: delivery.actionId }
     : delivery.proposalId
@@ -333,10 +474,19 @@ async function decide(
       : null;
   const legs = target ? await legsOf(target) : [];
   let answer: string;
-  if (!target || legs.length === 0) answer = "That card is gone.";
+  if (!target || legs.length === 0) answer = "That card is gone. Nothing moved.";
   else if (legsDigest(legs) !== delivery.cardDigest)
-    answer = "This card changed since it was sent, so nothing was done. Look again before you tap.";
-  else if (!waitingOn(legs)) answer = "That was decided already.";
+    answer = "This card changed, so nothing moved. Review the updated card first.";
+  else if (!waitingOn(legs))
+    answer =
+      verb === "allow" &&
+      legs.every(({ status, error }) => status === "retracted" && error === RETRACTED.outOfDate)
+        ? RETRACTED.outOfDate
+        : "Already decided.";
+  // A newer layout needs a fresh Allow. An out-of-date card can only be taken back, and
+  // Decline still records the owner's no on a card they were already shown.
+  else if (!outOfDate(legs) && !showsFullReview(delivery.shown))
+    answer = "Review the updated card first.";
   else {
     const decided = verb === "allow" ? await allowed(target, legs) : await declined(target);
     if (decided.won)
@@ -346,6 +496,7 @@ async function decide(
         .where(eq(channelDeliveries.id, delivery.id));
     answer = decided.answer;
   }
+  event.answer?.(answer);
   const [now] = await db
     .select()
     .from(channelDeliveries)
@@ -355,10 +506,10 @@ async function decide(
 }
 
 type Decided = { readonly won: boolean; readonly answer: string };
-const NOT_WAITING: Decided = { won: false, answer: "That was decided already." };
+const NOT_WAITING: Decided = { won: false, answer: "Already decided." };
 const TAKES_PROOF: Decided = {
   won: false,
-  answer: "This one checks it's you, so allow it in the app.",
+  answer: "Confirm it's you in Auni to allow this.",
 };
 
 async function allowed(
@@ -371,7 +522,7 @@ async function allowed(
     if (outcome.kind === "refused") return TAKES_PROOF;
     if (outcome.kind === "not_waiting") return NOT_WAITING;
     if (outcome.kind === "in_its_field")
-      return { won: false, answer: "Paste it in the app, never in a chat." };
+      return { won: false, answer: "Enter this in Auni's private field, never in chat." };
     if (outcome.kind === "out_of_date") return { won: false, answer: outcome.said };
     return { won: true, answer: "Allowed." };
   }
@@ -387,7 +538,7 @@ async function allowed(
   if (funding)
     return {
       won: false,
-      answer: `Add ${dollars(funding.needUsd)} to your wallet first, then tap Allow again.`,
+      answer: `Add ${dollars(funding.needUsd)} to your wallet first, then try again.`,
     };
   const rows = await allowProposal(target.proposalId);
   if (!Array.isArray(rows)) return { won: false, answer: rows.said };
@@ -423,6 +574,7 @@ export async function deliver(input: {
   readonly threadId: string;
   /** The answer as stored; unset, a turn that failed before it had one. */
   readonly messageId?: string;
+  readonly replyTo?: string;
 }): Promise<void> {
   const found = channelById(input.channel);
   const link = found && (await linkOf(found.id));
@@ -437,23 +589,41 @@ export async function deliver(input: {
   // Its chat was deleted before it went out: there is nothing left to send.
   if (input.messageId && !answer) return;
   const segments = replySegments(answer?.parts ?? []);
-  if (segments.length === 0 && (!answer || answer.metadata.failed))
-    segments.push({ kind: "text", text: "Something went wrong before I could answer. Try again." });
-  for (const segment of segments) {
+  if (
+    !segments.some((segment) => segment.kind !== "text" || segment.text) &&
+    (!answer || answer.metadata.failed)
+  )
+    segments.push({ kind: "text", text: "I couldn't finish that reply. Try asking again." });
+  const status = await takeTurnStatus(found.id, link.chat, input.replyTo);
+  for (const [index, segment] of segments.entries()) {
+    const replace = index === 0 ? status : undefined;
     if (segment.kind === "text")
       await recordSent(
         found,
         input.threadId,
-        await found.channel.send(link.chat, { text: segment.text }),
+        await found.channel.send(link.chat, segment, input.replyTo, replace),
         {},
       );
     else if (segment.kind === "card")
-      await sendCard(found, link.chat, input.threadId, segment.card);
+      await sendCard(
+        found,
+        link.chat,
+        input.threadId,
+        segment.card,
+        input.messageId,
+        input.replyTo,
+        replace,
+      );
     else
       await recordSent(
         found,
         input.threadId,
-        await found.channel.send(link.chat, drawQuestion(segment.question)),
+        await found.channel.send(
+          link.chat,
+          { ...drawQuestion(segment.question), detail: segment.detail },
+          input.replyTo,
+          replace,
+        ),
         { question: segment.question, open: true },
       );
   }

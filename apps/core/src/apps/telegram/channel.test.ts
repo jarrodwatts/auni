@@ -79,6 +79,7 @@ describe("the Telegram channel", () => {
         direct: true,
         message: "123456:7:120",
         data: "allow:abc",
+        answer: expect.any(Function),
       },
     ]);
     expect(fake.sent("answerCallbackQuery")).toEqual([
@@ -86,7 +87,7 @@ describe("the Telegram channel", () => {
     ]);
   });
 
-  it("sends formatting and buttons, with a link to this machine in the words", async () => {
+  it("sends formatting and buttons, with directions in place of a local-only link", async () => {
     const refs = await channel.send("7", {
       text: "**Buy about $10 of Nvidia**",
       buttons: [
@@ -102,7 +103,7 @@ describe("the Telegram channel", () => {
       expect.objectContaining({
         chat_id: "7",
         parse_mode: "HTML",
-        text: "<b>Buy about $10 of Nvidia</b>\n\nOpen in the app: http://localhost:3000/app/chat/t",
+        text: "<b>Buy about $10 of Nvidia</b>\n\nOpen Auni on your computer.",
         reply_markup: {
           inline_keyboard: [
             [
@@ -113,6 +114,92 @@ describe("the Telegram channel", () => {
         },
       }),
     ]);
+  });
+
+  it("registers a private command menu and hands commands to the hub", async () => {
+    const fresh = telegramChannel({ token: () => FAKE_TOKEN, apiUrl: () => apiUrl });
+    const stop = new AbortController();
+    const seen: ChannelEvent[] = [];
+    fake.message({ from: 7 }, "/pending@auni_test_bot");
+    fake.message({ from: 7 }, "/money");
+    const listening = fresh.listen(async (event) => {
+      seen.push(event);
+    }, stop.signal);
+    await fake.handled();
+    stop.abort();
+    await listening;
+    expect(fake.sent("setMyCommands")).toEqual([
+      {
+        scope: { type: "all_private_chats" },
+        commands: expect.arrayContaining([
+          expect.objectContaining({ command: "pending" }),
+          expect.objectContaining({ command: "money" }),
+        ]),
+      },
+    ]);
+    expect(seen).toMatchObject([
+      { kind: "hello", command: "pending" },
+      { kind: "hello", command: "money" },
+    ]);
+  });
+
+  it("acknowledges the press before doing the redraw", async () => {
+    const callback = fake.press({ from: 7 }, 120, "allow:abc");
+    const stop = new AbortController();
+    const listening = channel.listen(async (event) => {
+      if (event.kind === "press") {
+        event.answer?.("Allowed.");
+        await channel.edit(event.message, { text: "Sending" });
+      }
+      return "Allowed.";
+    }, stop.signal);
+    await fake.handled();
+    stop.abort();
+    await listening;
+    const calls = fake.calls.filter(({ method }) =>
+      ["answerCallbackQuery", "editMessageText"].includes(method),
+    );
+    expect(calls.map(({ method }) => method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+    expect(calls[0]?.params).toMatchObject({ callback_query_id: callback, text: "Allowed." });
+  });
+
+  it("sends an expandable block, a native copy button and a same-chat reply", async () => {
+    await channel.send(
+      "7",
+      {
+        text: "**Deposit on Base**",
+        detail: "**Thinking**\nUse this address.",
+        buttons: [[{ label: "Copy address", copy: "0x123" }]],
+      },
+      "123456:7:55",
+    );
+    expect(fake.sent("sendMessage")[0]).toMatchObject({
+      text: "<blockquote expandable><b>Thinking</b>\n\nUse this address.</blockquote>\n\n<b>Deposit on Base</b>",
+      reply_parameters: { message_id: 55, allow_sending_without_reply: true },
+      reply_markup: { inline_keyboard: [[{ text: "Copy address", copy_text: { text: "0x123" } }]] },
+    });
+    await channel.send("7", { text: "another bot" }, "123457:7:55");
+    await channel.send("7", { text: "another chat" }, "123456:8:55");
+    expect(
+      fake
+        .sent("sendMessage")
+        .slice(1)
+        .every((message) => !message.reply_parameters),
+    ).toBe(true);
+  });
+
+  it("folds long thinking once above the answer, with code, bullets and mobile table rows", async () => {
+    await channel.send("7", {
+      text: "**The answer**",
+      detail:
+        `**Thinking**\n\n${"Earlier research. ".repeat(1_000)}\n\n- Checked Base\n\n` +
+        '```json\n{"fee": 0.03}\n```\n\n| Venue | Fee |\n| --- | --- |\n| Base | $0.03 |',
+    });
+    const sent = fake.sent("sendMessage");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.text).toBe(
+      "<blockquote expandable><b>Thinking</b>\n\n• Checked Base\n\n<pre>{&quot;fee&quot;: 0.03}</pre>\n\nVenue: Base\nFee: $0.03\n\nFull thinking in Auni.</blockquote>\n\n<b>The answer</b>",
+    );
   });
 
   it("sends plain text when Telegram can't parse the tags", async () => {

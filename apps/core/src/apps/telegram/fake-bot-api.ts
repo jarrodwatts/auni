@@ -165,6 +165,8 @@ export class FakeBotApi {
           };
         return { ok: true, result: true };
       case "answerCallbackQuery":
+      case "setMyCommands":
+      case "setMessageReaction":
       case "sendChatAction":
         return { ok: true, result: true };
       default:

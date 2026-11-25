@@ -373,6 +373,7 @@ export function FailedActions({
           disabled={busy !== null}
           onClick={() => onAct(action)}
           data-testid={`step-${action}`}
+          data-check-status={action === "check" ? "" : undefined}
           className={cn(
             onlyWhileNewest(action) && styles.whileNewest,
             "h-8 flex-none rounded-full bg-foreground/[0.06] px-3.5 text-[13px] font-semibold text-ink transition-[background-color,transform,opacity] hover:bg-foreground/[0.09] active:scale-[.98] disabled:opacity-60",

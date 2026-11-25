@@ -216,11 +216,16 @@ async function answersOn(input: {
   readonly visible: readonly Pick<MessageRow, "id" | "metadata">[];
   /** A background answer kept that didn't settle quietly. */
   readonly tells: boolean;
-}): Promise<string | null> {
+}): Promise<{ channel: string; replyTo?: string } | null> {
   const { trigger } = input;
-  if (trigger.kind === "message")
-    return input.visible.find(({ id }) => id === trigger.messageId)?.metadata.channel ?? null;
-  return input.tells ? homeChannel() : null;
+  if (trigger.kind === "message") {
+    const message = input.visible.find(({ id }) => id === trigger.messageId);
+    const channel = message?.metadata.channel;
+    const replyTo = message?.metadata.channelRef;
+    return channel ? { channel, ...(replyTo && { replyTo }) } : null;
+  }
+  const channel = input.tells ? await homeChannel() : null;
+  return channel ? { channel } : null;
 }
 
 function withNotice(message: UIMessage, notice: string): UIMessage {
@@ -459,8 +464,8 @@ async function runBegunTurn(
   // Kept for the agent's own history, but nothing to tell: no unread mark, no notice.
   const quiet = trigger.kind === "background" ? settledQuietly(result.message.parts) : undefined;
   // One the owner stopped, in the web app, ends there.
-  const channel = stopped ? null : await answersOn({ trigger, visible, tells: keep && !quiet });
-  const deliver = channel ? { channel, threadId, ...(keep ? { messageId } : {}) } : null;
+  const destination = stopped ? null : await answersOn({ trigger, visible, tells: keep && !quiet });
+  const deliver = destination ? { ...destination, threadId, ...(keep ? { messageId } : {}) } : null;
   // The answer, the job that sends it and the turn's end are one write: a stored answer is always
   // sent, only a stored one is, and a turn whose answer is kept has ended, so if Auni dies the
   // next instant it is never run again, nor said to be cut off.
@@ -509,7 +514,12 @@ async function runBegunTurn(
   await publishThread(threadId);
   // An answer that only asks for an AI is that answer, not a failure for the browser to show.
   const showsFailed = failed && !noBrain;
-  publishThreadEvent(threadId, { kind: "turn-end", turnId, ...(showsFailed ? { failed } : {}) });
+  publishThreadEvent(threadId, {
+    kind: "turn-end",
+    turnId,
+    ...(showsFailed ? { failed } : {}),
+    ...(stopped ? { stopped: true } : {}),
+  });
   return undefined;
 }
 
@@ -573,7 +583,7 @@ export async function keepCutTurn(input: {
   }
 
   const visible = visibleMessages(await threadMessages(threadId));
-  const channel = await answersOn({ trigger, visible, tells: true });
+  const destination = await answersOn({ trigger, visible, tells: true });
   const messageId = randomUUID();
   const shown = [...cardsShown(seen.parts)];
   const words = await cutOffWords(threadId, began, seen);
@@ -608,7 +618,7 @@ export async function keepCutTurn(input: {
           },
           createdAt: began,
         });
-        if (channel) await deliverKind.enqueue(tx, { channel, threadId, messageId });
+        if (destination) await deliverKind.enqueue(tx, { ...destination, threadId, messageId });
       },
     },
   );

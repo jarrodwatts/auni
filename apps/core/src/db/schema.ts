@@ -164,6 +164,8 @@ export interface MessageMetadata {
   readonly quiet?: string;
   /** The channel app the owner sent this message from; unset, the web app. */
   readonly channel?: string;
+  /** Message to reply to on the originating channel. */
+  readonly channelRef?: string;
   /** Core left it outside any turn (money arriving, a pasted key kept out): no AI worked on it. */
   readonly posted?: true;
 }
@@ -657,6 +659,8 @@ export const channelDeliveries = pgTable(
     actionId: uuid("action_id").references(() => actions.id, { onDelete: "cascade" }),
     proposalId: uuid("proposal_id"),
     question: jsonb("question").$type<ChannelQuestion>(),
+    /** A deposit card edits in place when this answer records what landed. */
+    deposit: jsonb("deposit").$type<{ readonly messageId: string; readonly cardId: string }>(),
     grantHash: text("grant_hash").unique(),
     grantExpiresAt: timestamp("grant_expires_at", TIMESTAMPTZ),
     /** The card as it waited for the owner, which a press must still match; null if it never waited. */

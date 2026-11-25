@@ -163,6 +163,13 @@ describe("retryRefusal", () => {
     const exactly = { ...shortly, grantsExactly: "spend:0x1:0x2" };
     expect(retryRefusal({ ...two, details: exactly })).toBe("needs_proof");
     expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT })).toBe("needs_proof");
+    // Found in review: a format-1 card pinned no more, whether core drew its line whole or its
+    // own words warned of it, so it is never tried again either.
+    const one = { ...two, cardFormat: 1 };
+    expect(retryRefusal({ ...one, card: null })).toBe("not_retryable");
+    const warned = { ...FACE, warning: `It lets ${lets.value} afterwards.` };
+    expect(retryRefusal({ ...one, card: warned })).toBe("not_retryable");
+    expect(retryRefusal({ ...one, card: warned, details: exactly })).toBe("needs_proof");
   });
 
   // Its run may grant what that card never showed, such as a first sale's lasting permission.

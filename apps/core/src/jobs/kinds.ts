@@ -71,7 +71,12 @@ export const triageKind = jobKind("triage", z.object({ threadId: z.uuid() }), ({
  */
 export const deliverKind = jobKind(
   "deliver",
-  z.object({ channel: z.string().min(1), threadId: z.uuid(), messageId: z.uuid().optional() }),
+  z.object({
+    channel: z.string().min(1),
+    threadId: z.uuid(),
+    messageId: z.uuid().optional(),
+    replyTo: z.string().optional(),
+  }),
   ({ channel }) => [`channel:${channel}`],
 );
 

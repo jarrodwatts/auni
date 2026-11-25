@@ -416,7 +416,7 @@ export function withPermissions(face: CardFace, effect: Pick<Effect, "grants">):
  * Why a move gets no card, or null. It measures exactly what a card draws of what the move
  * leaves, each where a card would cut it: the Lets line (every permission and order, which a
  * plain face and a plan show), and the start of the warning, where money it sends for good
- * (`lost`) comes before its permissions (see withLoss in action-card.ts). A card says all a move
+ * (`lost`) comes before its permissions (see lossWarning in action-card.ts). A card says all a move
  * grants, or there is no card.
  */
 export function tooMuchToWarn(effect: Pick<Effect, "grants">, lost: string | null): string | null {
@@ -433,21 +433,23 @@ type OldCard = Pick<ActionRow, "lines" | "card" | "cardFormat" | "tool" | "propo
 
 /**
  * Whether a card drawn before cards said all they say now (CARD_FORMAT) left out a lasting
- * permission one of its moves leaves, so the owner allowed it unseen. A card from format 2 on
- * said every permission, but until format 3 named one over the main wallet by its short words
- * alone, which another can share (see unpinnedGrant). One before format 2 is judged by its
- * recorded Lets line: a plan's card drew no move's Lets line, and a lone move's card showed it
- * whole only when core drew its face from its lines and the line fit (LINE_MOST, where a figure
- * was cut), or the move's own words warned of it whole, as the card drew them: after what it
- * sends for good, and cut where a warning was (withLoss in action-card.ts). Such an old row
- * doesn't mark which of what it lets is an order its face showed among its terms (Grant.order),
- * so each counts as a permission.
+ * permission one of its moves leaves, so the owner allowed it unseen. Until format 3 a card named
+ * a permission over the main wallet by its short words alone, which another can share, and its
+ * row pinned no exact one, so any such move from an older card is taken back, whatever it showed
+ * (see unpinnedGrant). A card from format 2 on said every other permission. One before format 2
+ * is judged by its recorded Lets line: a plan's card drew no move's Lets line, and a lone move's
+ * card showed it whole only when core drew its face from its lines and the line fit (LINE_MOST,
+ * where a figure was cut), or the move's own words warned of it whole, as the card drew them:
+ * after what it sends for good, and cut where a warning was (lossWarning in action-card.ts). Such
+ * an old row doesn't mark which of what it lets is an order its face showed among its terms
+ * (Grant.order), so each counts as a permission.
  */
 export function leftOutPermission(legs: readonly OldCard[]): boolean {
   return legs.some((leg) => {
+    if (leg.cardFormat >= CARD_FORMAT || isAsk(leg.tool)) return false;
+    if (unpinnedGrant(leg.details)) return true;
     const lets = leg.lines.find(({ label }) => label === LETS_LINE)?.value;
-    if (!lets || leg.cardFormat >= CARD_FORMAT || isAsk(leg.tool)) return false;
-    if (leg.cardFormat >= 2) return unpinnedGrant(leg.details);
+    if (!lets || leg.cardFormat >= 2) return false;
     if (leg.proposalId !== null) return true;
     if (leg.card === null) return lets.length > LINE_MOST;
     return !warnedFirst(lostSaid(leg), leg.card.warning)?.includes(lets);

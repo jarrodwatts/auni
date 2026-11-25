@@ -221,7 +221,8 @@ describe("telling them money arrived", () => {
 
   // A deposit days after a plan had run was drawn inside that plan's old card, its day lost; and
   // one while a sell waited only on a tap was drawn inside the sell (2026-11-25 reviews). Only a
-  // plan still waiting, that spends cash where cash came in, is named.
+  // plan still waiting, that spends cash where cash came in, is named, and only when cash is all
+  // that came.
   it("names only the waiting plan this cash funds, never one that settled, sells or spends elsewhere", async () => {
     const thread = await chat();
     const buy = { chain: "base", sellToken: BASE_USDC, buyToken: "ETH" };
@@ -258,7 +259,10 @@ describe("telling them money arrived", () => {
     await hint("0xelsewhere", [usdc({ position: "log:3" })]);
     await plan("00000000-0000-4000-8000-00000000000b", "awaiting_permission", buy);
     await hint("0xcoin", [ETH]);
-    expect(await told()).toEqual([undefined, undefined, undefined, undefined]);
+    // Cash and a coin in one transaction are one card: drawn inside the plan, the coin would
+    // read as money for it, so the whole deposit keeps its own place.
+    await hint("0xmixed", [usdc({ position: "log:5" }), { ...ETH, position: "call:1" }]);
+    expect(await told()).toEqual([undefined, undefined, undefined, undefined, undefined]);
 
     await hint("0xwhile", [usdc({ position: "log:4" })]);
     expect((await told()).at(-1)).toBe("00000000-0000-4000-8000-00000000000b");

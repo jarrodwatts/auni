@@ -111,8 +111,8 @@ const SCENES: readonly Scene[] = [
     name: "no-app",
     shows: null,
     hears: /finished as done[^]*No app for Kintsu yet/u,
-    async *play({ say, call }) {
-      yield* say("If you'd like Kintsu to work first time here, this asks for an app for it.");
+    // The card says why an app helps; a line above it would only say it again.
+    async *play({ call }) {
       yield* call("send_feedback", {
         kind: "app",
         about: "Kintsu",

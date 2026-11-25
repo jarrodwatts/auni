@@ -149,17 +149,18 @@ export async function tellArrivals(tx: Tx, recorded: readonly ArrivalRow[]): Pro
  * more cash on a chain where cash just came in than its own moves bring there. Its card tells
  * the money above the step it makes possible. Any other deposit (a coin, cash on another chain,
  * or money while a plan only sells) is no part of a plan and keeps its own place in the chat, as
- * does money after a plan settled, however near. The newest such plan, when several are.
+ * does money after a plan settled, however near. So does cash that came with a coin: the
+ * transaction is one card, which drawn inside the plan would show the coin as money for it too.
+ * The newest such plan, when several are.
  */
 async function fundedPlan(
   tx: Tx,
   threadId: string,
   deposits: readonly ArrivalRow[],
 ): Promise<string | undefined> {
-  const chains = new Set(
-    deposits.flatMap((row) => (isPlainCash(row.chain, row.instrument) ? [row.chain] : [])),
-  );
-  if (chains.size === 0) return undefined;
+  if (deposits.length === 0) return undefined;
+  if (!deposits.every((row) => isPlainCash(row.chain, row.instrument))) return undefined;
+  const chains = new Set(deposits.map((row) => row.chain));
   const waiting = await tx
     .select()
     .from(actions)

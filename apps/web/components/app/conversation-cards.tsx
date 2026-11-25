@@ -102,7 +102,7 @@ function RetriedAttempt({ card }: { readonly card: CardWire }) {
         aria-expanded={open}
         aria-controls={cardId}
         onClick={() => setOpen(!open)}
-        className="flex min-h-9 items-center gap-2 rounded-md text-[14px] text-muted-foreground transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="flex min-h-9 items-center gap-2 rounded-control text-ui text-muted-foreground transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         <RotateCw aria-hidden className="size-3.5" strokeWidth={1.75} />
         First try didn&apos;t go through

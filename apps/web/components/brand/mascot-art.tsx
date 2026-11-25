@@ -1,3 +1,5 @@
+import "./mascot.css";
+
 import { useId } from "react";
 
 /** The fold over Auni's head, which can swing, and fly off, on its own. */

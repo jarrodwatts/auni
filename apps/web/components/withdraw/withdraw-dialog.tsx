@@ -42,8 +42,8 @@ import { cn } from "@/lib/utils";
 import { WithdrawReview } from "./withdraw-review";
 
 const FIELD =
-  "h-11 w-full rounded-[12px] border border-foreground/[0.12] bg-background px-3.5 text-[15px] text-ink outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-foreground/25 focus-visible:ring-[3px] focus-visible:ring-ring/25";
-const LABEL = "flex flex-col gap-1.5 text-[12.5px] font-medium text-muted-foreground";
+  "h-11 w-full rounded-control border border-foreground/[0.12] bg-background px-3.5 text-body text-ink outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-foreground/25 focus-visible:ring-[3px] focus-visible:ring-ring/25";
+const LABEL = "flex flex-col gap-1.5 text-meta font-medium text-muted-foreground";
 
 type Step =
   | { readonly kind: "form" }
@@ -181,7 +181,7 @@ export function WithdrawDialog({
             <label className={LABEL}>
               Amount
               <span className="relative">
-                <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[15px] text-muted-foreground">
+                <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-body text-muted-foreground">
                   $
                 </span>
                 <input
@@ -190,13 +190,13 @@ export function WithdrawDialog({
                   placeholder="0.00"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
-                  className={cn(FIELD, "pr-16 pl-7 tabular-nums")}
+                  className={cn(FIELD, "pr-16 pl-7")}
                 />
                 <button
                   type="button"
                   disabled={!max || Number(max) <= 0}
                   onClick={() => max && setAmount(max)}
-                  className="absolute top-1/2 right-1.5 h-8 -translate-y-1/2 rounded-full px-3 text-[13px] font-semibold text-primary hover:bg-foreground/[0.04] disabled:opacity-40"
+                  className="absolute top-1/2 right-1.5 h-8 -translate-y-1/2 rounded-full px-3 text-meta font-semibold text-primary hover:bg-foreground/[0.04] disabled:opacity-40"
                 >
                   Max
                 </button>
@@ -224,14 +224,14 @@ export function WithdrawDialog({
                   aria-checked={destination === id}
                   onClick={() => setDestination(id)}
                   className={cn(
-                    "rounded-[12px] border px-3.5 py-2.5 text-left transition-colors",
+                    "rounded-control border px-3.5 py-2.5 text-left transition-colors",
                     destination === id
                       ? "border-foreground/40 bg-foreground/[0.03]"
                       : "border-foreground/[0.1] hover:bg-foreground/[0.02]",
                   )}
                 >
-                  <span className="block text-[14px] font-medium text-ink">{label}</span>
-                  <span className="block text-[12.5px] text-muted-foreground">{detail}</span>
+                  <span className="block text-ui font-medium text-ink">{label}</span>
+                  <span className="block text-meta text-muted-foreground">{detail}</span>
                 </button>
               ))}
             </div>
@@ -264,12 +264,12 @@ export function WithdrawDialog({
                 placeholder={network === "solana" ? "Solana address" : "0x…"}
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
-                className={cn(FIELD, "font-mono text-[13.5px]")}
+                className={cn(FIELD, "font-mono text-ui")}
               />
             </label>
 
             {error ? (
-              <p role="alert" className="text-[12.5px] text-destructive">
+              <p role="alert" className="text-meta text-destructive">
                 {error}
               </p>
             ) : null}

@@ -52,7 +52,7 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
           <CopyLine value={pairing.data.code} label="Your code" />
           {link ? (
             <a
-              className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-foreground px-5 text-[14.5px] font-semibold text-background transition-colors duration-200 ease-settle hover:bg-foreground/85"
+              className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-foreground px-5 text-body font-semibold text-background transition-colors duration-200 ease-settle hover:bg-foreground/85"
               href={link}
               rel="noreferrer"
               target="_blank"
@@ -80,7 +80,7 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
             tone={paired ? "quiet" : "primary"}
             busy={pairing.isPending}
             busyLabel="Making a code"
-            className="h-10 flex-none px-4 text-[14px]"
+            className="h-10 flex-none px-4 text-ui"
             onClick={() => pairing.mutate()}
           >
             {paired ? "Pair again" : "Pair"}
@@ -88,7 +88,7 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
         </div>
       )}
       {pairing.isError ? (
-        <p role="alert" className="mt-2 text-[12.5px] text-destructive">
+        <p role="alert" className="mt-2 text-meta text-destructive">
           Couldn&apos;t make a pairing code. Try again.
         </p>
       ) : null}

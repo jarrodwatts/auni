@@ -29,7 +29,7 @@ export function BrainsPane({ highlightedTarget }: { readonly highlightedTarget: 
       {brains.data?.blocked ? (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-[14px] border border-warning/30 bg-warning-surface px-4 py-3 text-[13px] leading-[1.5] text-warning"
+          className="flex items-start gap-2.5 rounded-card border border-waiting/30 bg-waiting-surface px-4 py-3 text-meta leading-[1.5] text-waiting"
         >
           <AlertTriangle className="mt-0.5 size-4 flex-none" />
           <span>{brains.data.blocked}</span>
@@ -56,7 +56,7 @@ export function BrainsPane({ highlightedTarget }: { readonly highlightedTarget: 
             />
           </SettingsRow>
           {setPreferred.isError ? (
-            <div className="px-4 py-2.5 text-[12.5px] text-destructive sm:px-5">
+            <div className="px-4 py-2.5 text-meta text-destructive sm:px-5">
               {setPreferred.error instanceof CoreApiError && setPreferred.error.detail
                 ? setPreferred.error.detail
                 : "Could not save preferred brain. Check if BRAIN is set in your shell environment."}
@@ -71,7 +71,7 @@ export function BrainsPane({ highlightedTarget }: { readonly highlightedTarget: 
       >
         <div className="p-4 sm:p-5">
           {brains.isPending && rows.length === 0 ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 py-8 text-meta text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" />
               Checking local AI CLIs…
             </div>

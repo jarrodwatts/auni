@@ -1,0 +1,472 @@
+/*
+ * The Portal: money in from another wallet or exchange. Auni waits front and
+ * centre, in the orbit of every network it takes (NetworkOrbit); it shrinks
+ * into the middle of an address's QR code as the code grows around it, and
+ * hops when the money lands, once the landed network's mark has glided into
+ * it. The states are set on the root as data attributes: data-qr, data-copied,
+ * data-arriving, data-landed. Where motion is reduced, everything still shows,
+ * by fading alone.
+ */
+.auni-portal {
+  --auni-portal-hero: 116px;
+  --auni-portal-qr: 232px;
+
+  /* Lets the addresses fold from their own height; where it isn't known, they fold at once. */
+  interpolate-size: allow-keywords;
+}
+
+.auni-portal-hero {
+  --auni-eye-x: 0px;
+  --auni-eye-y: 0px;
+
+  position: relative;
+  z-index: 3;
+  width: var(--auni-portal-hero);
+  height: var(--auni-portal-hero);
+  flex: none;
+}
+
+.auni-portal .auni-mascot-face {
+  transition-duration: 350ms;
+}
+
+.auni-portal .auni-mascot-art {
+  filter: drop-shadow(0 14px 22px color-mix(in oklab, var(--primary) 22%, transparent));
+}
+
+.auni-portal .auni-mascot-attention,
+.auni-portal .auni-mascot-joy {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.auni-portal .auni-mascot-eyes,
+.auni-portal .auni-mascot-brow {
+  transition: opacity 150ms ease;
+}
+
+.auni-portal[data-copied] .auni-mascot-attention {
+  opacity: 1;
+}
+
+.auni-portal[data-landed] .auni-mascot-joy {
+  opacity: 1;
+  transition-delay: 220ms;
+}
+
+.auni-portal[data-landed] :is(.auni-mascot-eyes, .auni-mascot-brow) {
+  opacity: 0;
+  transition-delay: 220ms;
+}
+
+.auni-portal-shadow {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 82px;
+  height: 11px;
+  margin-left: -41px;
+  border-radius: 50%;
+  background: radial-gradient(
+    color-mix(in oklab, var(--color-shade) 16%, transparent),
+    transparent 70%
+  );
+  animation: auni-portal-shadow 4.2s ease-in-out infinite;
+  transition: opacity 400ms ease;
+}
+
+/* Where Auni stands: in the middle of the code while one shows. */
+.auni-portal-pos {
+  position: absolute;
+  inset: 0;
+  transition:
+    transform 750ms var(--motion-settle),
+    opacity 400ms ease;
+}
+
+.auni-portal-float {
+  --auni-float: 7px;
+  position: absolute;
+  inset: 6px;
+  animation: auni-float 4.2s ease-in-out infinite;
+}
+
+/* Squashes from its feet. */
+.auni-portal-squash {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 88%;
+}
+
+.auni-portal-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    transparent 40%,
+    color-mix(in oklab, var(--color-primary) 35%, transparent) 62%,
+    transparent 72%
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auni-portal[data-landed] .auni-portal-ring {
+  animation: auni-portal-ring 1.3s 350ms var(--motion-settle) both;
+}
+
+/* The code, centred where Auni goes; it grows out from Auni as Auni shrinks into it. */
+.auni-portal-qr {
+  position: absolute;
+  top: var(--auni-portal-qr-top);
+  left: 50%;
+  width: var(--auni-portal-qr);
+  height: var(--auni-portal-qr);
+  margin-left: calc(var(--auni-portal-qr) / -2);
+  border-radius: var(--radius-sheet);
+  background: var(--color-plate);
+  box-shadow: 0 0 0 1px var(--border);
+  opacity: 0;
+  transform: scale(0.86);
+  pointer-events: none;
+  transition:
+    opacity 400ms ease,
+    transform 650ms var(--motion-settle);
+}
+
+.auni-portal-code {
+  position: absolute;
+  inset: 20px;
+  /* The library sizes its canvas inline, at the size it draws; this is the size it shows. */
+  width: calc(100% - 40px) !important;
+  height: calc(100% - 40px) !important;
+  clip-path: circle(0% at 50% 50%);
+  opacity: 0;
+  transition:
+    clip-path 800ms var(--motion-settle) 100ms,
+    opacity 300ms ease;
+}
+
+.auni-portal-code[data-on] {
+  clip-path: circle(75% at 50% 50%);
+  opacity: 1;
+}
+
+/* The quiet middle Auni sits in, which the code's error correction reads past. */
+.auni-portal-qr-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 60px;
+  height: 60px;
+  margin: -30px;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--color-plate);
+}
+
+/* Auni already in place: shown only where motion is reduced, so Auni can't travel there. */
+.auni-portal-qr-mascot {
+  width: 46px;
+  height: 46px;
+  opacity: 0;
+}
+
+.auni-portal[data-qr] .auni-portal-qr {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.auni-portal[data-qr] .auni-portal-pos {
+  transform: translateY(
+      calc(var(--auni-portal-qr-top) + var(--auni-portal-qr) / 2 - var(--auni-portal-hero) / 2)
+    )
+    scale(0.43);
+}
+
+.auni-portal[data-qr] .auni-portal-float {
+  animation-play-state: paused;
+}
+
+.auni-portal[data-qr] :is(.auni-portal-shadow, .auni-portal-texts) {
+  opacity: 0;
+}
+
+/*
+ * What to do, then what landed, in one place, so nothing below moves when the money lands. The
+ * one column is the dialog's width, never the width of the longest line in it.
+ */
+.auni-portal-texts,
+.auni-portal-acts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.auni-portal-texts {
+  align-items: center;
+  transition: opacity 300ms ease;
+}
+
+.auni-portal-texts > *,
+.auni-portal-acts > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity 400ms ease,
+    transform 550ms var(--motion-settle);
+}
+
+.auni-portal-landing,
+.auni-portal-done {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/*
+ * The amount takes the heading's place as it starts counting, never a $0 waiting on it: the
+ * heading stays until then, so the place is never empty.
+ */
+.auni-portal[data-counting] .auni-portal-waiting {
+  opacity: 0;
+  transform: translateY(-8px);
+  /* Gone quickly, so the heading and the amount barely cross. */
+  transition-duration: 160ms, 300ms;
+}
+
+.auni-portal[data-counting] .auni-portal-landing {
+  opacity: 1;
+  transform: none;
+}
+
+/*
+ * Landed, the addresses fade where they are and Done comes up at their foot, so the dialog keeps
+ * its height and place from Send me to the amount, and nothing moves while Auni gulps.
+ */
+.auni-portal-done {
+  align-self: end;
+}
+
+.auni-portal[data-landed] .auni-portal-addresses {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.auni-portal[data-landed] .auni-portal-done {
+  opacity: 1;
+  transform: none;
+  transition-delay: 550ms;
+}
+
+/* Until then Done isn't there at all, so a keyboard's Tab from the last address wraps to the top. */
+.auni-portal:not([data-landed]) .auni-portal-done {
+  visibility: hidden;
+}
+
+/*
+ * The networks round Auni (NetworkHalo): each one's mark on a tilted orbit round Auni's middle,
+ * at the angle --a plus the orbit's turn, --auni-orbit-spin (set each frame by useOrbit), at its
+ * size --mark. Fainter at the back, it passes behind Auni, which hides it.
+ */
+.auni-portal-stage {
+  /* The code centred on Auni, which only shrinks into it. */
+  --auni-portal-qr-top: calc((var(--auni-portal-hero) - var(--auni-portal-qr)) / 2);
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  width: 312px;
+  height: 218px;
+  flex: none;
+  place-items: center;
+}
+
+.auni-portal-stage .auni-portal-hero {
+  z-index: 3;
+}
+
+/* With no ring, only as tall as Auni. */
+.auni-portal-stage:not([data-ringed]) {
+  height: var(--auni-portal-hero);
+}
+
+/* A code opening: the orbit steps back out of its way, and comes back when it folds. */
+.auni-portal[data-qr] :is(.auni-orbit-at, .auni-orbit-line) {
+  opacity: 0;
+}
+
+.auni-portal[data-qr] .auni-orbit-line {
+  transform: scale(1.08);
+}
+
+.auni-portal[data-arriving] :is(.auni-mascot-joy, .auni-mascot-eyes, .auni-mascot-brow) {
+  transition-delay: 1000ms;
+}
+
+/* The addresses stay until Done comes up in their place, so the dialog is never half empty. */
+.auni-portal[data-arriving] .auni-portal-addresses {
+  transition-delay: 1250ms;
+}
+
+.auni-portal[data-arriving] .auni-portal-done {
+  transition-delay: 1400ms;
+}
+
+.auni-portal[data-arriving] .auni-portal-ring {
+  animation-delay: 1300ms;
+}
+
+.auni-portal[data-arriving] .auni-mascot-mouth {
+  animation: auni-portal-gulp 1000ms both;
+}
+
+/* The coin, at Auni's mouth, where its flight ends; its trail is copies of it, each fainter. */
+.auni-portal-coin {
+  position: absolute;
+  z-index: 4;
+  top: 60%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.auni-portal-coin-step {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.auni-portal-coin-step > * {
+  flex: none;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.auni-portal-coin-step[data-step="1"] > * {
+  filter: opacity(0.55) blur(0.5px);
+}
+
+.auni-portal-coin-step[data-step="2"] > * {
+  filter: opacity(0.32) blur(1px);
+}
+
+.auni-portal-coin-step[data-step="3"] > * {
+  filter: opacity(0.16) blur(1.5px);
+}
+
+.auni-portal-burst {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.auni-portal-burst i {
+  --turn: calc(var(--i) * 30deg + 8deg);
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  opacity: 0;
+}
+
+.auni-portal[data-arriving] .auni-portal-burst i {
+  animation: auni-portal-burst 900ms 1000ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes auni-portal-gulp {
+  0%,
+  12% {
+    transform: scale(0);
+  }
+  34% {
+    transform: scale(0.95, 1);
+  }
+  84% {
+    transform: scale(1.2, 1.28);
+  }
+  95%,
+  100% {
+    transform: scale(0);
+  }
+}
+
+@keyframes auni-portal-burst {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--turn)) translateY(-18px) scale(0.4);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--turn)) translateY(calc(var(--reach) * -1)) rotate(140deg) scale(1);
+  }
+}
+
+@keyframes auni-portal-shadow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes auni-portal-ring {
+  from {
+    opacity: 1;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-portal .auni-mascot-eye,
+  .auni-portal-float,
+  .auni-portal-shadow,
+  .auni-portal[data-landed] .auni-portal-ring,
+  .auni-portal[data-arriving] :is(.auni-mascot-mouth, .auni-portal-burst i) {
+    animation: none;
+  }
+  .auni-portal-qr,
+  .auni-portal[data-qr] .auni-portal-pos,
+  .auni-portal-landing,
+  .auni-portal-done,
+  .auni-portal[data-landed] :is(.auni-portal-waiting, .auni-portal-addresses) {
+    transform: none;
+  }
+  .auni-portal-addresses {
+    transition: opacity 400ms ease;
+  }
+  /* Auni can't travel into the code, so it fades away as the code fades in with Auni in it. */
+  .auni-portal[data-qr] .auni-portal-pos {
+    opacity: 0;
+  }
+  .auni-portal-code {
+    clip-path: none;
+    transition: opacity 300ms ease;
+  }
+  .auni-portal-qr-mascot {
+    opacity: 1;
+  }
+}

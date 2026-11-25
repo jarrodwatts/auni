@@ -1,5 +1,9 @@
 "use client";
 
+import "./deposit-card.css";
+
+import "../money/portal/portal.css";
+
 import { DEPOSIT_WAIT_MS, type DepositCardWire, type NetworkKey } from "@auni/shared";
 import { useEffect, useRef, useState } from "react";
 
@@ -107,10 +111,8 @@ export function DepositCard({ card }: { readonly card: DepositCardWire }) {
 
         <div className="auni-portal-texts mt-3 w-full">
           <div aria-hidden={isLanded} className="auni-portal-waiting">
-            <p className="text-[21px] leading-[27px] font-bold tracking-[-0.03em] text-ink">
-              {card.title}
-            </p>
-            <p className="mt-1.5 text-[14.5px] leading-[28px] text-muted-foreground">
+            <p className="text-section text-ink">{card.title}</p>
+            <p className="mt-1.5 text-body leading-[28px] text-muted-foreground">
               {network && promised[0] ? (
                 <>
                   {watching ? "Send it on" : "Your address on"}
@@ -123,18 +125,18 @@ export function DepositCard({ card }: { readonly card: DepositCardWire }) {
               )}
             </p>
             {watchedTokens(card.tokens).map((token) => (
-              <p key={token} className="mt-1 text-[12.5px] leading-[18px] text-muted-foreground">
+              <p key={token} className="mt-1 text-meta leading-[18px] text-muted-foreground">
                 {token}
               </p>
             ))}
           </div>
           <div aria-hidden={!isLanded} className="auni-portal-landing">
-            <p className="text-[44px] leading-[48px] font-bold tracking-[-0.035em] text-ink tabular-nums">
+            <p className="text-hero-money text-ink">
               {total !== null && (drawnLanded || counted !== null)
                 ? formatUsdcBalance(drawnLanded ? total : (counted ?? total))
                 : null}
             </p>
-            <p className="mt-1 text-[15px] leading-[22px] text-balance text-muted-foreground">
+            <p className="mt-1 text-body leading-[22px] text-balance text-muted-foreground">
               {what}
             </p>
           </div>
@@ -163,14 +165,14 @@ export function DepositCard({ card }: { readonly card: DepositCardWire }) {
                   ))
                 : addresses.map((entry) => <RowSkeleton key={entry.address} />)}
             </div>
-            <p className="mt-3 text-[12.5px] leading-[18px] text-muted-foreground">
+            <p className="mt-3 text-meta leading-[18px] text-muted-foreground">
               {/* The orbit above shows every network; a few are named too. */}
               {/* One network is named above, where a tap says what it means; more show on the orbit. */}
               {promised.length > 1 ? "Only send on the networks above. " : null}
               {watching ? "I'll reply here when it lands." : null}
             </p>
             {clipboard.blocked ? (
-              <p role="alert" className="mt-2 text-[12.5px] text-muted-foreground">
+              <p role="alert" className="mt-2 text-meta text-muted-foreground">
                 Copying was blocked. Select the address to copy it.
               </p>
             ) : null}

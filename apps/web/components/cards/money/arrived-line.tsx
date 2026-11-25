@@ -29,10 +29,8 @@ export function ArrivedLine() {
             <ArrowDownLeft className="size-4" strokeWidth={2.4} />
           </span>
           <span className="min-w-0">
-            <span className="block text-[14.5px] leading-5 font-medium text-ink">
-              {arrival.title}
-            </span>
-            <span className="block truncate text-[13px] leading-5 text-muted-foreground">
+            <span className="block text-body leading-5 font-medium text-ink">{arrival.title}</span>
+            <span className="block truncate text-meta leading-5 text-muted-foreground">
               {movedLine(arrival)}
             </span>
           </span>

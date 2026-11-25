@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import type { ChatMark, PlaceAttention } from "./attention";
 
 const ATTENTION_COLOR: Record<NonNullable<PlaceAttention>, string> = {
-  waiting: "bg-waiting",
+  waiting: "bg-waiting-mark",
   unread: "bg-primary",
 };
 
@@ -126,32 +126,29 @@ export function PortfolioMark({
 }
 
 const TAG_CLASS_NAME =
-  "flex h-5 min-w-5 flex-none items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums";
+  "flex h-5 min-w-5 flex-none items-center justify-center rounded-full px-1.5 text-caption font-semibold";
 
 /** Something waits on the person: "Your turn" on a thread, "1 needs your OK" on a card. */
 export function TurnTag({ children }: { readonly children: ReactNode }) {
-  return <span className={cn(TAG_CLASS_NAME, "bg-primary/[0.1] text-primary")}>{children}</span>;
+  return <span className={cn(TAG_CLASS_NAME, "bg-waiting-surface text-waiting")}>{children}</span>;
 }
 
-/** How many threads wait on the person: a count points, so it wears the app's blue. */
+/** How many threads wait on the person: amber, which means that and only that. */
 export function WaitingCount({ count }: { readonly count: number }) {
   return (
     <span
       aria-label={`${count} waiting on you`}
-      className={cn(TAG_CLASS_NAME, "bg-primary/[0.1] text-primary")}
+      className={cn(TAG_CLASS_NAME, "bg-waiting-surface text-waiting")}
     >
       {count}
     </span>
   );
 }
 
-/** How many things happened to their money that they haven't looked at: each was done to them, so red. */
+/** How many things happened to their money that they haven't looked at: ink, as red means a loss. */
 export function UnreadCount({ count }: { readonly count: number }) {
   return (
-    <span
-      aria-label={`${count} unread`}
-      className={cn(TAG_CLASS_NAME, "bg-negative text-background")}
-    >
+    <span aria-label={`${count} unread`} className={cn(TAG_CLASS_NAME, "bg-ink text-paper")}>
       {count}
     </span>
   );

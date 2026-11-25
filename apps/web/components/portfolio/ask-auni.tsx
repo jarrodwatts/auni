@@ -17,7 +17,7 @@ export function AskAuni() {
       <Link
         href="/app/new"
         onClick={startNew}
-        className="pointer-events-auto flex h-12 items-center gap-2 rounded-full bg-popover pr-6 pl-2.5 shadow-[0_8px_24px_-6px_--alpha(var(--color-shade)/16%),0_1px_3px_--alpha(var(--color-shade)/5%),0_0_0_1px_--alpha(var(--foreground)/6%)] transition-transform duration-200 ease-settle outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.96] motion-reduce:transition-none"
+        className="pointer-events-auto flex h-12 items-center gap-2 rounded-full bg-popover pr-6 pl-2.5 border border-border shadow-float transition-transform duration-200 ease-settle outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.96] motion-reduce:transition-none"
       >
         <Mascot alt="" size={30} state="color" className="flex-none" />
         <span className="text-reading font-semibold tracking-[-0.01em] text-ink">Ask Auni</span>

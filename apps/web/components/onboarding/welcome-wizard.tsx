@@ -164,7 +164,7 @@ function WizardSurface({
           type="button"
           disabled={finishing}
           onClick={() => void complete(false)}
-          className="rounded-full px-3 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink disabled:opacity-50"
+          className="rounded-full px-3 py-1.5 text-meta font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink disabled:opacity-50"
         >
           Skip for now
         </button>
@@ -188,9 +188,9 @@ function WizardSurface({
                   type="button"
                   onClick={() => setStep(entry.id)}
                   className={cn(
-                    "flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                    "flex items-center gap-2 rounded-full border px-3 py-1.5 text-meta font-medium transition-colors",
                     active
-                      ? "border-foreground/20 bg-card text-ink shadow-xs"
+                      ? "border-foreground/20 bg-card text-ink"
                       : done
                         ? "border-positive/25 bg-positive/[0.08] text-positive"
                         : "border-transparent bg-transparent text-muted-foreground hover:bg-foreground/[0.04] hover:text-ink",
@@ -199,7 +199,7 @@ function WizardSurface({
                   {done ? (
                     <Check className="size-3.5" strokeWidth={2.6} />
                   ) : (
-                    <span className="font-mono text-[11px] opacity-75">{entry.id + 1}</span>
+                    <span className="font-mono text-caption opacity-75">{entry.id + 1}</span>
                   )}
                   <span>{entry.label}</span>
                 </button>
@@ -208,7 +208,7 @@ function WizardSurface({
           })}
         </ol>
 
-        <section className="overflow-hidden rounded-[22px] border border-foreground/[0.08] bg-card shadow-sm">
+        <section className="overflow-hidden rounded-sheet border border-foreground/[0.08] bg-card">
           <div className="p-6 sm:p-8">
             {step === 0 ? (
               <BrainStep
@@ -237,7 +237,7 @@ function WizardSurface({
             )}
 
             {finishError ? (
-              <p role="alert" className="mt-4 text-[13px] text-destructive">
+              <p role="alert" className="mt-4 text-meta text-destructive">
                 {finishError}
               </p>
             ) : null}
@@ -250,21 +250,19 @@ function WizardSurface({
                 type="button"
                 disabled={finishing}
                 onClick={() => setStep((s) => (s - 1) as StepIndex)}
-                className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-[13.5px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-ui font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink"
               >
                 <ArrowLeft className="size-4" />
                 Back
               </button>
             ) : (
-              <span className="text-[12.5px] text-faint">
-                Everything runs locally on your machine
-              </span>
+              <span className="text-meta text-faint">Everything runs locally on your machine</span>
             )}
 
             {step < 2 ? (
               <MoneyButton
                 tone="primary"
-                className="h-10 px-5 text-[14px]"
+                className="h-10 px-5 text-ui"
                 onClick={() => setStep((s) => (s + 1) as StepIndex)}
               >
                 <span className="inline-flex items-center gap-1.5">
@@ -279,7 +277,7 @@ function WizardSurface({
             ) : (
               <MoneyButton
                 tone="primary"
-                className="h-10 px-6 text-[14px]"
+                className="h-10 px-6 text-ui"
                 busy={finishing}
                 busyLabel="Opening Auni…"
                 onClick={() => void complete(true)}
@@ -318,10 +316,8 @@ function BrainStep({
       <div className="flex items-start gap-3.5">
         <Mascot alt="" size={44} state="listening" />
         <div>
-          <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.025em] text-ink">
-            Connect your AI brain
-          </h1>
-          <p className="mt-1 text-[14px] leading-[1.5] text-muted-foreground">
+          <h1 className="text-title text-ink">Connect your AI brain</h1>
+          <p className="mt-1 text-ui leading-[1.5] text-muted-foreground">
             Auni thinks using your own local AI CLI subscription, with no hosted accounts or API
             markup.
           </p>
@@ -331,14 +327,14 @@ function BrainStep({
       {brains.data?.blocked ? (
         <p
           role="alert"
-          className="rounded-[12px] bg-warning-surface px-4 py-3 text-[13px] leading-[1.5] text-warning"
+          className="rounded-control bg-waiting-surface px-4 py-3 text-meta leading-[1.5] text-waiting"
         >
           {brains.data.blocked}
         </p>
       ) : null}
 
       {brains.isPending && rows.length === 0 ? (
-        <div className="flex items-center justify-center gap-2 py-10 text-[13px] text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 py-10 text-meta text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" />
           Checking installed AI CLIs…
         </div>
@@ -351,10 +347,10 @@ function BrainStep({
       )}
 
       {readyCount > 1 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-foreground/[0.07] bg-surface/60 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-foreground/[0.07] bg-surface/60 px-4 py-3">
           <div>
-            <span className="block text-[13px] font-medium text-ink">Preferred brain</span>
-            <span className="block text-[12px] text-muted-foreground">
+            <span className="block text-meta font-medium text-ink">Preferred brain</span>
+            <span className="block text-caption text-muted-foreground">
               Falls back automatically if one hits a usage limit
             </span>
           </div>
@@ -416,35 +412,31 @@ function WalletStep() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.025em] text-ink">
-          Set up your local wallet
-        </h1>
-        <p className="mt-1 text-[14px] leading-[1.5] text-muted-foreground">
+        <h1 className="text-title text-ink">Set up your local wallet</h1>
+        <p className="mt-1 text-ui leading-[1.5] text-muted-foreground">
           Your private keys stay on this machine (OS keychain or a 0600 file). Every move waits for
           your tap.
         </p>
       </div>
 
       {addresses?.evm || addresses?.solana ? (
-        <div className="flex flex-col gap-3 rounded-[16px] border border-positive/25 bg-positive/[0.06] p-4">
-          <div className="flex items-center gap-2 text-[14px] font-semibold text-positive">
+        <div className="flex flex-col gap-3 rounded-card border border-positive/25 bg-positive/[0.06] p-4">
+          <div className="flex items-center gap-2 text-ui font-semibold text-positive">
             <ShieldCheck className="size-4.5" />
             <span>Your local wallet is ready</span>
           </div>
           {addresses.evm ? (
-            <div className="flex items-center justify-between gap-2 rounded-[10px] bg-card px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-control bg-card px-3 py-2">
               <div className="min-w-0">
-                <span className="block text-[11.5px] font-medium text-muted-foreground">
+                <span className="block text-caption font-medium text-muted-foreground">
                   EVM (Monad, Base, Arbitrum, Polygon, Ethereum)
                 </span>
-                <code className="block truncate font-mono text-[12.5px] text-ink">
-                  {addresses.evm}
-                </code>
+                <code className="block truncate font-mono text-meta text-ink">{addresses.evm}</code>
               </div>
               <button
                 type="button"
                 onClick={() => copy("evm", addresses.evm!)}
-                className="flex h-8 flex-none items-center gap-1 rounded-[8px] border border-foreground/[0.08] px-2.5 text-[12px] text-ink hover:bg-foreground/[0.04]"
+                className="flex h-8 flex-none items-center gap-1 rounded-control border border-foreground/[0.08] px-2.5 text-caption text-ink hover:bg-foreground/[0.04]"
               >
                 {copied === "evm" ? (
                   <Check className="size-3.5 text-positive" />
@@ -456,19 +448,17 @@ function WalletStep() {
             </div>
           ) : null}
           {addresses.solana ? (
-            <div className="flex items-center justify-between gap-2 rounded-[10px] bg-card px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-control bg-card px-3 py-2">
               <div className="min-w-0">
-                <span className="block text-[11.5px] font-medium text-muted-foreground">
-                  Solana
-                </span>
-                <code className="block truncate font-mono text-[12.5px] text-ink">
+                <span className="block text-caption font-medium text-muted-foreground">Solana</span>
+                <code className="block truncate font-mono text-meta text-ink">
                   {addresses.solana}
                 </code>
               </div>
               <button
                 type="button"
                 onClick={() => copy("sol", addresses.solana!)}
-                className="flex h-8 flex-none items-center gap-1 rounded-[8px] border border-foreground/[0.08] px-2.5 text-[12px] text-ink hover:bg-foreground/[0.04]"
+                className="flex h-8 flex-none items-center gap-1 rounded-control border border-foreground/[0.08] px-2.5 text-caption text-ink hover:bg-foreground/[0.04]"
               >
                 {copied === "sol" ? (
                   <Check className="size-3.5 text-positive" />
@@ -480,16 +470,16 @@ function WalletStep() {
             </div>
           ) : null}
           <WalletBalanceNotice />
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             You can deposit funds or back up your keys anytime from Settings → Wallet &amp; Keys.
           </p>
         </div>
       ) : mode === "import" && bringField ? (
-        <div className="flex flex-col gap-4 rounded-[16px] border border-foreground/[0.08] bg-background p-4">
+        <div className="flex flex-col gap-4 rounded-card border border-foreground/[0.08] bg-background p-4">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-[15px] font-semibold text-ink">Import existing keys</h2>
-              <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+              <h2 className="text-body font-semibold text-ink">Import existing keys</h2>
+              <p className="mt-0.5 text-meta text-muted-foreground">
                 Paste an EVM hex private key, a Solana Base58 key, or keys exported from another
                 wallet. Sent straight to core&apos;s private field, never seen by the AI.
               </p>
@@ -497,7 +487,7 @@ function WalletStep() {
             <button
               type="button"
               onClick={() => setMode("choose")}
-              className="flex-none text-[12.5px] font-medium text-muted-foreground hover:text-ink"
+              className="flex-none text-meta font-medium text-muted-foreground hover:text-ink"
             >
               Back
             </button>
@@ -513,21 +503,21 @@ function WalletStep() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex flex-col justify-between gap-4 rounded-[16px] border border-foreground/[0.1] bg-background p-4">
+          <div className="flex flex-col justify-between gap-4 rounded-card border border-foreground/[0.1] bg-background p-4">
             <div>
               <div className="flex items-center justify-between gap-2">
                 <WalletMinimal className="size-5 text-primary" />
                 <SettingsBadge tone="accent">Recommended</SettingsBadge>
               </div>
-              <h2 className="mt-3 text-[15px] font-semibold text-ink">Create a new local wallet</h2>
-              <p className="mt-1 text-[13px] leading-[1.45] text-muted-foreground">
+              <h2 className="mt-3 text-body font-semibold text-ink">Create a new local wallet</h2>
+              <p className="mt-1 text-meta leading-[1.45] text-muted-foreground">
                 Generates fresh EVM and Solana keys on this computer. Start with $0 and fund only
                 when you&apos;re ready.
               </p>
             </div>
             <MoneyButton
               tone="primary"
-              className="h-10 w-full text-[13.5px]"
+              className="h-10 w-full text-ui"
               busy={creating}
               busyLabel="Creating wallet…"
               onClick={() => void createFresh()}
@@ -536,11 +526,11 @@ function WalletStep() {
             </MoneyButton>
           </div>
 
-          <div className="flex flex-col justify-between gap-4 rounded-[16px] border border-foreground/[0.08] bg-background p-4">
+          <div className="flex flex-col justify-between gap-4 rounded-card border border-foreground/[0.08] bg-background p-4">
             <div>
               <KeyRound className="size-5 text-muted-foreground" />
-              <h2 className="mt-3 text-[15px] font-semibold text-ink">Import existing keys</h2>
-              <p className="mt-1 text-[13px] leading-[1.45] text-muted-foreground">
+              <h2 className="mt-3 text-body font-semibold text-ink">Import existing keys</h2>
+              <p className="mt-1 text-meta leading-[1.45] text-muted-foreground">
                 Bring an existing EVM or Solana private key (or exported auni.io keys) directly into
                 local storage.
               </p>
@@ -549,7 +539,7 @@ function WalletStep() {
               type="button"
               disabled={!bringField}
               onClick={() => setMode("import")}
-              className="inline-flex h-10 w-full items-center justify-center rounded-full border border-foreground/[0.12] bg-card px-4 text-[13.5px] font-medium text-ink transition-colors hover:bg-foreground/[0.04] disabled:opacity-50"
+              className="inline-flex h-10 w-full items-center justify-center rounded-full border border-foreground/[0.12] bg-card px-4 text-ui font-medium text-ink transition-colors hover:bg-foreground/[0.04] disabled:opacity-50"
             >
               {bringField ? "Import keys" : "External wallet managed"}
             </button>
@@ -558,7 +548,7 @@ function WalletStep() {
       )}
 
       {createError ? (
-        <p role="alert" className="text-[13px] text-destructive">
+        <p role="alert" className="text-meta text-destructive">
           {createError}
         </p>
       ) : null}
@@ -573,7 +563,7 @@ function WalletBalanceNotice() {
   if (!data) return null;
   if (data.looking && data.empty) {
     return (
-      <p className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+      <p className="flex items-center gap-2 text-meta text-muted-foreground">
         <LoaderCircle className="size-3.5 animate-spin" />
         Checking balances across supported chains…
       </p>
@@ -583,7 +573,7 @@ function WalletBalanceNotice() {
   const total = formatUsdcBalance(BigInt(data.totalUsd.baseUnits));
   const latest = data.deposits[0];
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-positive/25 bg-card px-3 py-2 text-[12.5px]">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-positive/25 bg-card px-3 py-2 text-meta">
       <span className="font-medium text-ink">Detected balance: {total}</span>
       {latest ? (
         <span className="text-positive">
@@ -678,14 +668,14 @@ function ImportKeysForm({
         />
       ) : null}
       {error ? (
-        <p role="alert" className="text-[12.5px] text-destructive">
+        <p role="alert" className="text-meta text-destructive">
           {error}
         </p>
       ) : checked ? (
-        <div aria-live="polite" className="text-[12.5px] leading-5">
+        <div aria-live="polite" className="text-meta leading-5">
           <p className="text-ink-soft">
             Signs for{" "}
-            <span className="font-mono text-[12px] break-all text-ink">{checked.preview}</span>
+            <span className="font-mono text-caption break-all text-ink">{checked.preview}</span>
           </p>
           {checked.notes.map((note) => (
             <p key={note} className="mt-1 text-muted-foreground">
@@ -707,7 +697,7 @@ function ImportKeysForm({
       )}
       <MoneyButton
         tone="primary"
-        className="h-10 w-full text-[13.5px]"
+        className="h-10 w-full text-ui"
         busy={importing}
         busyLabel="Importing…"
         disabled={!checked}
@@ -764,21 +754,19 @@ function PersonalizeStep({
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-[22px] leading-7 font-semibold tracking-[-0.025em] text-ink">
-          Make it yours
-        </h1>
-        <p className="mt-1 text-[14px] leading-[1.5] text-muted-foreground">
+        <h1 className="text-title text-ink">Make it yours</h1>
+        <p className="mt-1 text-ui leading-[1.5] text-muted-foreground">
           Optional: drop in read-only signals so your New Chat starts with tailored, live ideas
           instead of a blank page. No forms, no keys needed.
         </p>
       </div>
 
       {/* Signal 1: Public X handle */}
-      <div className="rounded-[14px] border border-foreground/[0.08] bg-background p-4">
-        <label htmlFor="wizard-x-handle" className="block text-[13.5px] font-medium text-ink">
+      <div className="rounded-card border border-foreground/[0.08] bg-background p-4">
+        <label htmlFor="wizard-x-handle" className="block text-ui font-medium text-ink">
           Public X / Twitter handle
         </label>
-        <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+        <p className="mt-0.5 text-meta text-muted-foreground">
           Auni reads your public bio to infer themes you care about (no login or API key).
         </p>
         <input
@@ -791,16 +779,13 @@ function PersonalizeStep({
       </div>
 
       {/* Signal 2: Watch-only wallet */}
-      <div className="rounded-[14px] border border-foreground/[0.08] bg-background p-4">
+      <div className="rounded-card border border-foreground/[0.08] bg-background p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <label
-              htmlFor="wizard-watch-wallet"
-              className="block text-[13.5px] font-medium text-ink"
-            >
+            <label htmlFor="wizard-watch-wallet" className="block text-ui font-medium text-ink">
               Watch-only wallet address
             </label>
-            <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+            <p className="mt-0.5 text-meta text-muted-foreground">
               Public address only (zero signing) so Auni tailors market ideas to what you hold.
             </p>
           </div>
@@ -809,7 +794,7 @@ function PersonalizeStep({
               type="button"
               disabled={connecting}
               onClick={() => void connectBrowser()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-foreground/[0.1] bg-card px-3 text-[12.5px] font-medium text-ink hover:bg-foreground/[0.04]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-control border border-foreground/[0.1] bg-card px-3 text-meta font-medium text-ink hover:bg-foreground/[0.04]"
             >
               {connecting ? (
                 <LoaderCircle className="size-3.5 animate-spin" />
@@ -828,17 +813,17 @@ function PersonalizeStep({
             onWatchedWalletChange(event.target.value);
             setConnectError(null);
           }}
-          className={cn(SETTINGS_INPUT, "mt-2.5 w-full font-mono text-[12.5px]")}
+          className={cn(SETTINGS_INPUT, "mt-2.5 w-full font-mono text-meta")}
         />
         {connectError ? (
-          <p className="mt-1.5 text-[12px] text-destructive">{connectError}</p>
+          <p className="mt-1.5 text-caption text-destructive">{connectError}</p>
         ) : null}
       </div>
 
       {/* Optional expandable extras: Remote access & Chat channels */}
       <div className="flex flex-col gap-2">
-        <details className="group rounded-[14px] border border-foreground/[0.07] bg-surface/50">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[13px] font-medium text-ink select-none">
+        <details className="group rounded-card border border-foreground/[0.07] bg-surface/50">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-meta font-medium text-ink select-none">
             <span className="flex items-center gap-2">
               <GlobeLock className="size-4 text-muted-foreground" />
               <span>Remote access (Tailscale &amp; always-on)</span>
@@ -850,7 +835,7 @@ function PersonalizeStep({
             </span>
             <ChevronDown className="size-4 text-faint transition-transform group-open:rotate-180" />
           </summary>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-foreground/[0.06] px-4 py-3 text-[12.5px] text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-foreground/[0.06] px-4 py-3 text-meta text-muted-foreground">
             <span>
               {ts?.state === "ready"
                 ? `Detected ${ts.dnsName} on your tailnet. Enable HTTPS or background service anytime.`
@@ -859,7 +844,7 @@ function PersonalizeStep({
             <button
               type="button"
               onClick={() => openSettings("remote")}
-              className="rounded-[8px] border border-foreground/[0.1] bg-card px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-foreground/[0.04]"
+              className="rounded-control border border-foreground/[0.1] bg-card px-3 py-1.5 text-caption font-medium text-ink hover:bg-foreground/[0.04]"
             >
               Configure in Settings
             </button>
@@ -867,8 +852,8 @@ function PersonalizeStep({
         </details>
 
         {channelApps.length > 0 ? (
-          <details className="group rounded-[14px] border border-foreground/[0.07] bg-surface/50">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-[13px] font-medium text-ink select-none">
+          <details className="group rounded-card border border-foreground/[0.07] bg-surface/50">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-meta font-medium text-ink select-none">
               <span className="flex items-center gap-2">
                 <MessageSquare className="size-4 text-muted-foreground" />
                 <span>Chat on your phone ({channelApps.map((a) => a.name).join(", ")})</span>
@@ -880,7 +865,7 @@ function PersonalizeStep({
                 <div key={app.id} className="flex flex-col gap-3">
                   <div className="flex items-center gap-2">
                     <AppMark id={app.id} name={app.name} size={24} />
-                    <span className="text-[13.5px] font-medium text-ink">{app.name}</span>
+                    <span className="text-ui font-medium text-ink">{app.name}</span>
                   </div>
                   <AppKeysNeeded app={app} />
                   <AppPairing app={app} name={app.name} />

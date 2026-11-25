@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { cn, SCALE } from "@/lib/utils";
+
 // Every colour a person sees comes from a token (tokens.css), so a look, light or dark or one an
 // app brings, changes them all at once. A colour written into a component is one the look can't
 // reach: light words on a card that stayed white. This fails the next one that is written in.
@@ -16,17 +18,25 @@ const APPS = join(WEB, "../core/src/apps");
  * no longer in its file fails the test too, so this list never outlives what it allows.
  */
 const WRITTEN_IN: Readonly<Record<string, { readonly why: string; readonly colours: string[] }>> = {
-  "components/brand/marks.tsx": {
-    why: "the deep colours initials sit on when a holding has no logo: a mark's own, as a logo's",
-    colours: ["#0b5cab", "#5a2d8c", "#1b1f27", "#1f6f5c", "#9c3d24", "#34405a"],
-  },
-  "components/portfolio/dawn-chart.tsx": {
-    why: "white inside an SVG mask says where the chart shows; nobody sees it as a colour",
-    colours: ["white"],
-  },
-  "app/globals.css": {
-    why: "black inside a CSS mask says where a list or a row shows; nobody sees it as a colour",
+  "components/places/sidebar.css": {
+    why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
     colours: ["#000", "rgb(0 0 0 / 0.82)", "rgb(0 0 0 / 0.5)", "rgb(0 0 0 / 0.2)"],
+  },
+  "components/places/chat-row.css": {
+    why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
+    colours: ["#000"],
+  },
+  "components/motion/rolling-number.css": {
+    why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
+    colours: ["#000"],
+  },
+  "components/ai-elements/conversation.css": {
+    why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
+    colours: ["#000"],
+  },
+  "components/motion/spotlight-shimmer.css": {
+    why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
+    colours: ["#000", "rgb(0 0 0 / 0.5)", "rgb(0 0 0 / 0.2)"],
   },
   "components/motion/status-mark.module.css": {
     why: "black inside a CSS mask cuts the arc to a ring; nobody sees it as a colour",
@@ -151,5 +161,83 @@ describe("colours", () => {
         "bg-card text-ink whitespace-nowrap hsl(${hue} 78% 95%) hsl(var(--orb-h)_95%_97%) href='#main-content'",
       ),
     ).toEqual([]);
+  });
+});
+
+// Type and shape come from the same file: a font size is one of the scale's steps (`text-meta`,
+// `text-card-money`) and a corner one of three radii or a pill (`rounded-control`,
+// `rounded-card`, `rounded-sheet`, `rounded-full`). A size or a radius written in is the next
+// screen that looks a little different from the rest, so this fails one.
+
+/** Each way a size or a corner gets written in instead of read from a token. */
+const OFF_SCALE: readonly RegExp[] = [
+  // An arbitrary size or radius: text-[13.5px], rounded-[14px], rounded-t-[22px].
+  /(?<![\w-])text-\[(?:length:)?[\d.]+(?:px|rem|em)\]/gu,
+  /(?<![\w-])rounded(?:-[a-z]{1,2})?-\[[^\]]+\]/gu,
+  // Tailwind's own steps, which say a size, not what it's for.
+  /(?<![\w-])text-(?:xs|sm|base|lg|[2-9]?xl)(?![\w-])/gu,
+  /(?<![\w-])rounded(?:-[a-z]{1,2})?-(?:xs|sm|md|lg|[2-4]?xl)(?![\w-])/gu,
+  // In a stylesheet: a size or a corner that isn't a token (a pill, 999px or 50%, is a shape).
+  /font-size:(?!\s*(?:var\(--text-|inherit|calc\(var\())[^;]+/gu,
+  /border-radius:(?!\s*(?:var\(--radius-|999px|9999px|50%|0[;\s]|inherit))[^;]+/gu,
+];
+
+function offScale(source: string): string[] {
+  const bare = code(source);
+  return OFF_SCALE.flatMap((pattern) => bare.match(pattern) ?? []);
+}
+
+describe("type and shape", () => {
+  it("come from the scale, never written into a component", () => {
+    const stray = SEEN.flatMap((path) =>
+      offScale(readFileSync(path, "utf8")).map((found) => `${relative(WEB, path)}: ${found}`),
+    );
+    expect(stray, "use a text-* step or a radius from app/tokens.css").toEqual([]);
+  });
+
+  it("are found however they are written", () => {
+    expect(
+      offScale(
+        'className="text-[12.5px] sm:text-[40px] rounded-[14px] rounded-t-[22px] text-sm rounded-md rounded-tl-xl"',
+      ),
+    ).toEqual([
+      "text-[12.5px]",
+      "text-[40px]",
+      "rounded-[14px]",
+      "rounded-t-[22px]",
+      "text-sm",
+      "rounded-md",
+      "rounded-tl-xl",
+    ]);
+    expect(offScale("a { font-size: 13px; border-radius: 18px; }")).toEqual([
+      "font-size: 13px",
+      "border-radius: 18px",
+    ]);
+    expect(
+      offScale(
+        'className="text-meta text-card-money rounded-control rounded-full text-ink text-[color:var(--x)]" a { font-size: var(--text-ui); border-radius: 999px; }',
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("the scale cn knows", () => {
+  const tokens = readFileSync(join(WEB, "app/tokens.css"), "utf8");
+  const declared = (prefix: string) =>
+    [...tokens.matchAll(new RegExp(`^\\s*--${prefix}-([a-z-]+):`, "gmu"))]
+      .map(([, name]) => name!)
+      .filter((name) => !name.includes("--") && !/^(?:xs|sm|md|lg|base|[2-9]?xl)$/u.test(name));
+
+  it("is every step tokens.css declares", () => {
+    expect(SCALE.text).toEqual(declared("text").filter((name) => !name.includes("-line")));
+    expect([...SCALE.radius]).toEqual(declared("radius"));
+    expect([...SCALE.shadow]).toEqual(declared("shadow"));
+  });
+
+  it("keeps a size beside a colour", () => {
+    expect(cn("text-hero-money text-foreground", "mt-1")).toBe(
+      "text-hero-money text-foreground mt-1",
+    );
+    expect(cn("rounded-card", "rounded-sheet")).toBe("rounded-sheet");
   });
 });

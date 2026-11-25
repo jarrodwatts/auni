@@ -95,24 +95,19 @@ function Story({ story, now }: { readonly story: TapeStory; readonly now: number
   const more = story.sourceCount - story.sources.length;
   return (
     <>
-      <p className="text-[13.5px] leading-[18px] font-semibold tracking-[-0.01em] text-pretty">
+      <p className="text-ui leading-[18px] font-semibold tracking-[-0.01em] text-pretty">
         {story.title}
       </p>
       {story.summary ? (
-        <p className="mt-1 line-clamp-6 text-[13px] leading-[1.45] text-pretty text-muted-foreground">
+        <p className="mt-1 line-clamp-6 text-meta leading-[1.45] text-pretty text-muted-foreground">
           {story.summary}
         </p>
       ) : null}
-      <p
-        className={cn(
-          "mt-2 text-[12px] leading-4 font-medium tabular-nums",
-          NOTE_LINE_TONE[lineTone],
-        )}
-      >
+      <p className={cn("mt-2 text-caption leading-4 font-medium", NOTE_LINE_TONE[lineTone])}>
         {line}
       </p>
       {story.sources.length ? (
-        <p className="mt-1.5 text-[12px] leading-4 text-muted-foreground">
+        <p className="mt-1.5 text-caption leading-4 text-muted-foreground">
           From{" "}
           {story.sources.map((source, index) => {
             const href = webLink(source.link);
@@ -180,27 +175,27 @@ export default function TapeCard({ data: card }: { readonly data: Tape }) {
   return (
     <section
       aria-label={`${asset.name}, past week`}
-      className="relative my-2 w-full min-w-0 overflow-hidden rounded-[24px] border border-foreground/[0.07] bg-card pb-6 text-ink shadow-card"
+      className="relative my-2 w-full min-w-0 overflow-hidden rounded-card border border-border bg-card pb-6 text-ink"
       data-testid="market-pulse"
     >
       <div className="flex items-start justify-between gap-4 px-6 pt-[22px]">
         <div className="min-w-0">
-          <p className="truncate text-[13px] leading-[18px] text-muted-foreground">
+          <p className="truncate text-meta leading-[18px] text-muted-foreground">
             {asset.name}, past week
           </p>
           {price ? (
             <p className="mt-0.5 flex items-baseline gap-2">
-              <span className="text-[30px] leading-9 font-semibold tracking-[-0.035em] text-ink tabular-nums">
+              <span className="text-card-money text-ink">
                 <RollingNumber value={formatAssetPrice(scrubbed?.value ?? price.now)} />
               </span>
               {scrubbed ? (
-                <span className="text-[14px] leading-5 text-muted-foreground tabular-nums">
+                <span className="text-ui leading-5 text-muted-foreground">
                   {SCRUBBED.format(new Date(scrubbed.at))}
                 </span>
               ) : (
                 <span
                   className={cn(
-                    "text-[14px] leading-5 font-medium tabular-nums",
+                    "text-ui leading-5 font-medium",
                     // Toned by what it rounds to, so a week that ends level reads as no move.
                     Math.round(price.weekChangePct * 10) > 0
                       ? "text-positive"
@@ -267,7 +262,7 @@ function Stories({
             <MomentTrigger
               moment={moment}
               cards={cards}
-              className="flex w-full items-start gap-3 rounded-[12px] px-2.5 py-2 text-left outline-none transition-colors hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-ring/50 data-[open]:bg-foreground/[0.03]"
+              className="flex w-full items-start gap-3 rounded-control px-2.5 py-2 text-left outline-none transition-colors hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-ring/50 data-[open]:bg-foreground/[0.03]"
             >
               <span
                 aria-hidden
@@ -275,15 +270,10 @@ function Stories({
                 style={{ background: MOMENT_COLOR[moment.tone] }}
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] leading-5 font-medium text-ink">
+                <span className="block truncate text-ui leading-5 font-medium text-ink">
                   {story.title}
                 </span>
-                <span
-                  className={cn(
-                    "block text-[12.5px] leading-[18px] tabular-nums",
-                    NOTE_LINE_TONE[lineTone],
-                  )}
-                >
+                <span className={cn("block text-meta leading-[18px]", NOTE_LINE_TONE[lineTone])}>
                   {line}
                 </span>
               </span>

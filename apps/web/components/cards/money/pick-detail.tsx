@@ -1,5 +1,9 @@
 "use client";
 
+import "../auni-note.css";
+
+import "./pick-detail.css";
+
 import type { ActionRecordId, PickDetailWire } from "@auni/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -53,16 +57,16 @@ function PickDetailBody({ leg }: { readonly leg: Leg }) {
     <div className="flex flex-col">
       {isPending ? (
         <div className="flex flex-col gap-2 px-4 pt-1">
-          <Skeleton className="h-7 w-32 rounded-lg" />
-          <Skeleton className="h-[96px] w-full rounded-[14px]" />
+          <Skeleton className="h-7 w-32 rounded-card" />
+          <Skeleton className="h-[96px] w-full rounded-card" />
         </div>
       ) : detail ? (
         <div className="auni-pick-settle">
           <div className="flex items-baseline gap-2 px-4">
-            <span className="text-[24px] leading-8 font-semibold tracking-[-0.03em] text-ink tabular-nums">
+            <span className="text-card-money text-ink">
               <RollingNumber value={valueLabel(detail.kind, scrubbed?.value ?? detail.now)} />
             </span>
-            <span className="text-[13px] text-muted-foreground tabular-nums">
+            <span className="text-meta text-muted-foreground">
               {scrubbed ? (
                 DATE.format(new Date(scrubbed.at))
               ) : detail.today === null ? (
@@ -97,10 +101,8 @@ function PickDetailBody({ leg }: { readonly leg: Leg }) {
                 className="auni-pick-fact min-w-0"
                 style={{ "--fact": index } as CSSProperties}
               >
-                <dt className="text-[11.5px] leading-4 text-muted-foreground">{fact.label}</dt>
-                <dd className="truncate text-[13.5px] leading-5 font-semibold text-ink tabular-nums">
-                  {fact.value}
-                </dd>
+                <dt className="text-caption leading-4 text-muted-foreground">{fact.label}</dt>
+                <dd className="truncate text-ui leading-5 font-semibold text-ink">{fact.value}</dd>
               </div>
             ))}
           </dl>
@@ -209,7 +211,7 @@ export function PickHoverCard({
       onAnimationEnd={(event) => {
         if (event.target === event.currentTarget) setSettled(true);
       }}
-      className="auni-pick-card auni-scrollbar-none fixed top-0 left-0 z-50 max-h-[calc(100dvh-24px)] w-[344px] overflow-x-hidden overflow-y-auto rounded-[22px] bg-popover pt-4 pb-3.5 shadow-[inset_0_0_0_1px_--alpha(var(--color-shade-blue)/7%),0_2px_6px_--alpha(var(--color-shade-blue)/5%),0_28px_60px_-18px_--alpha(var(--color-shade-blue)/35%)]"
+      className="auni-pick-card auni-scrollbar-none fixed top-0 left-0 z-50 max-h-[calc(100dvh-24px)] w-[344px] overflow-x-hidden overflow-y-auto rounded-sheet bg-popover pt-4 pb-3.5 border border-border shadow-float"
       style={{
         transform: `translate3d(${spot.x}px, ${spot.y}px, 0)`,
         transformOrigin: spot.origin,
@@ -218,7 +220,7 @@ export function PickHoverCard({
       <div key={leg.actionReference} className="auni-pick-swap">
         <div className="flex items-center gap-2.5 px-4 pb-2.5">
           {leg.logoUrl ? <LogoImage fallback={null} size={28} src={leg.logoUrl} /> : null}
-          <p className="min-w-0 flex-1 truncate text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink">
+          <p className="min-w-0 flex-1 truncate text-body leading-5 font-semibold tracking-[-0.01em] text-ink">
             {leg.name}
           </p>
         </div>

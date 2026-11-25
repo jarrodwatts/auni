@@ -36,7 +36,6 @@ export function NotLooking({
       data-pose={pose}
       style={{ width: size, height: size }}
     >
-      <span className={styles.lookerGlow} />
       {pose === "key" ? (
         <span className={styles.lookerKey}>
           <KeyRound strokeWidth={2.4} />

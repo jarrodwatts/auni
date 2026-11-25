@@ -127,14 +127,13 @@ function Overview({ reveal }: { readonly reveal: boolean }) {
                       <PlaceLink
                         href={chatHref(thread.id)}
                         thread={thread.id}
-                        className="flex min-w-0 items-center gap-3 rounded-[16px] bg-surface px-3.5 py-3 transition-colors duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                        className="flex min-w-0 items-center gap-3 rounded-card bg-surface px-3.5 py-3 transition-colors duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                       >
                         <span
                           className={cn(
                             "flex size-8 flex-none items-center justify-center rounded-full",
-                            auto
-                              ? "bg-primary/[0.1] text-primary"
-                              : "bg-foreground/[0.06] text-muted-foreground",
+                            "bg-glyph-plate",
+                            auto ? "text-primary" : "text-muted-foreground",
                           )}
                         >
                           {auto ? (
@@ -144,10 +143,8 @@ function Overview({ reveal }: { readonly reveal: boolean }) {
                           )}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14.5px] font-medium text-ink">
-                            {thread.title}
-                          </p>
-                          <p className="mt-0.5 truncate text-caption text-muted-foreground">
+                          <p className="truncate text-body font-medium text-ink">{thread.title}</p>
+                          <p className="mt-0.5 truncate text-caption font-medium text-muted-foreground">
                             {auto
                               ? `Auto ${budgetLabel} budget`
                               : thread.watchCount === 1
@@ -189,9 +186,7 @@ function NothingYet({ reveal }: { readonly reveal: boolean }) {
       )}
     >
       <Mascot alt="" size={72} state="color" />
-      <h2 className="mt-5 text-amount tracking-[-0.02em] text-ink">
-        Your portfolio starts with a belief
-      </h2>
+      <h2 className="mt-5 text-title text-ink">Your portfolio starts with a belief</h2>
       <p className="mt-2 max-w-[380px] text-ui leading-[1.5] font-normal text-muted-foreground">
         Tell Auni something you believe about the world, and the positions you open will live here.
       </p>
@@ -213,14 +208,14 @@ function NothingYet({ reveal }: { readonly reveal: boolean }) {
 function PortfolioLoading() {
   return (
     <div className="auni-appear-late mx-auto w-full max-w-[960px] px-4 pt-6 sm:px-8">
-      <Skeleton className="h-4 w-24 rounded-md" />
-      <Skeleton className="mt-2 h-14 w-64 rounded-lg" />
+      <Skeleton className="h-4 w-24 rounded-control" />
+      <Skeleton className="mt-2 h-14 w-64 rounded-card" />
       <Skeleton className="mt-6 h-[140px] w-full rounded-card" />
-      <Skeleton className="mt-10 h-[192px] rounded-[20px] sm:hidden" />
+      <Skeleton className="mt-10 h-[192px] rounded-card sm:hidden" />
       <div className={`mt-10 ${GRID} max-sm:hidden`}>
-        <Skeleton className="h-[74px] rounded-[16px]" />
-        <Skeleton className="h-[74px] rounded-[16px]" />
-        <Skeleton className="h-[74px] rounded-[16px]" />
+        <Skeleton className="h-[74px] rounded-card" />
+        <Skeleton className="h-[74px] rounded-card" />
+        <Skeleton className="h-[74px] rounded-card" />
       </div>
     </div>
   );

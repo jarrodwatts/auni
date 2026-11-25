@@ -1,0 +1,96 @@
+/* One continuous handoff from the welcome composer into a live conversation. */
+@keyframes auni-conversation-launch-header {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes auni-conversation-launch-message {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes auni-conversation-launch-detail {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Solid canvas from frame 0 so the welcome screen never bleeds through underneath. */
+.auni-conversation-launch {
+  transition: opacity 140ms ease-out;
+}
+
+.auni-conversation-launch-header {
+  animation: auni-conversation-launch-header 180ms ease-out both;
+}
+
+.auni-conversation-launch-message {
+  transform-origin: right bottom;
+  animation: auni-conversation-launch-message 300ms var(--motion-settle) both;
+}
+
+/* The owner's first take is carried in by the landing's dive (components/landing), which moves
+   every part of this first frame itself. */
+.auni-conversation-launch[data-carried],
+.auni-conversation-launch[data-carried]
+  :is(
+    .auni-conversation-launch-header,
+    .auni-conversation-launch-message,
+    .auni-conversation-launch-thinking,
+    .auni-conversation-launch-composer
+  ) {
+  animation: none;
+}
+
+.auni-conversation-launch-thinking {
+  animation: auni-conversation-launch-detail 220ms 90ms var(--motion-drift) both;
+}
+
+.auni-conversation-launch-composer {
+  animation: none;
+}
+
+/* Settled reveals identical content beneath, so the exit stays a pure opacity crossfade. */
+.auni-conversation-launch[data-phase="settled"],
+.auni-conversation-launch[data-phase="cancelled"] {
+  pointer-events: none;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-conversation-launch,
+  .auni-conversation-launch-header,
+  .auni-conversation-launch-message,
+  .auni-conversation-launch-thinking,
+  .auni-conversation-launch-composer,
+  .auni-loading-row,
+  .auni-skeleton-breath,
+  .auni-loading-sheen,
+  .auni-loading-mascot,
+  .auni-settings-value-resolve,
+  .auni-segment-reveal,
+  .auni-account-balance-update,
+  .auni-stagger-in,
+  .auni-watch-signal [data-wave],
+  .auni-new-conversation-enter {
+    animation: none;
+    filter: none;
+    transform: none;
+    transition: opacity 140ms linear;
+  }
+}

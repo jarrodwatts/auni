@@ -2,6 +2,10 @@
 
 import type { ReactNode } from "react";
 
+import { badgeClass } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
+import { inputClass } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,17 +32,16 @@ export function SettingsSection({
       id={id}
       data-highlighted={highlighted ? "true" : undefined}
       className={cn(
-        "scroll-mt-4 rounded-[16px] border bg-card transition-[border-color,box-shadow] duration-300",
-        highlighted ? "border-primary/50 ring-[3px] ring-ring/25" : "border-foreground/[0.08]",
+        cardClass,
+        "scroll-mt-4 transition-[border-color,box-shadow] duration-300",
+        highlighted && "border-ring/50 ring-[3px] ring-ring/20",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-foreground/[0.06] px-4 py-3.5 sm:px-5">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3.5 sm:px-5">
         <div className="min-w-0 flex-1">
-          <h4 className="text-[14.5px] leading-5 font-semibold tracking-[-0.015em] text-ink">
-            {title}
-          </h4>
+          <h4 className="text-body font-semibold text-ink">{title}</h4>
           {description ? (
-            <p className="mt-0.5 text-[12.5px] leading-[1.45] text-pretty text-muted-foreground">
+            <p className="mt-0.5 text-meta leading-[1.45] text-pretty text-muted-foreground">
               {description}
             </p>
           ) : null}
@@ -82,11 +85,9 @@ export function SettingsRow({
     >
       {label || description ? (
         <div className="min-w-0 flex-1">
-          {label ? (
-            <div className="text-[13.5px] leading-5 font-medium text-ink">{label}</div>
-          ) : null}
+          {label ? <div className="text-ui leading-5 font-medium text-ink">{label}</div> : null}
           {description ? (
-            <div className="mt-0.5 text-[12.5px] leading-[1.45] text-pretty text-muted-foreground">
+            <div className="mt-0.5 text-meta leading-[1.45] text-pretty text-muted-foreground">
               {description}
             </div>
           ) : null}
@@ -99,12 +100,13 @@ export function SettingsRow({
 
 export type BadgeTone = "ok" | "warn" | "error" | "accent" | "neutral";
 
-const BADGE_STYLES: Record<BadgeTone, string> = {
-  ok: "bg-positive/[0.12] text-positive",
-  warn: "bg-warning-surface text-warning",
-  error: "bg-destructive/[0.12] text-destructive",
-  accent: "bg-primary/[0.12] text-primary",
-  neutral: "bg-surface text-muted-foreground",
+/** Each tone as the Badge primitive's: amber only for what waits on the owner. */
+const BADGE_TONES: Record<BadgeTone, Parameters<typeof badgeClass>[0]> = {
+  ok: "positive",
+  warn: "waiting",
+  error: "negative",
+  accent: "neutral",
+  neutral: "neutral",
 };
 
 /** Compact semantic status pill, always derived from Auni's design tokens. */
@@ -117,27 +119,14 @@ export function SettingsBadge({
   readonly children: ReactNode;
   readonly className?: string;
 }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11.5px] leading-4 font-medium whitespace-nowrap",
-        BADGE_STYLES[tone],
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
+  return <span className={cn(badgeClass(BADGE_TONES[tone]), className)}>{children}</span>;
 }
 
-/** Shared input class matching Auni's calm rounded control style. */
-export const SETTINGS_INPUT =
-  "h-9 rounded-[10px] border border-foreground/[0.1] bg-background px-3 text-[13.5px] text-ink outline-none transition-[border-color,box-shadow] placeholder:text-faint focus-visible:border-foreground/25 focus-visible:ring-[3px] focus-visible:ring-ring/25 disabled:opacity-60";
+/** A field in Settings: the Input primitive's, a row's height. */
+export const SETTINGS_INPUT = cn(inputClass, "h-9 w-auto");
 
-/** Shared secondary pill button for Settings actions. */
-export const SETTINGS_BUTTON =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] border border-foreground/[0.1] bg-background px-3 text-[12.5px] font-medium text-ink transition-colors hover:bg-foreground/[0.04] focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
+/** A lesser action in Settings. */
+export const SETTINGS_BUTTON = buttonVariants({ variant: "outline", size: "sm" });
 
-/** Shared primary pill button for Settings actions. */
-export const SETTINGS_PRIMARY_BUTTON =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-medium text-background transition-colors hover:bg-foreground/85 focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
+/** The one strong action in a Settings section. */
+export const SETTINGS_PRIMARY_BUTTON = buttonVariants({ variant: "primary", size: "sm" });

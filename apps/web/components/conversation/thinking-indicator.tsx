@@ -1,5 +1,7 @@
 "use client";
 
+import "./thinking-indicator.css";
+
 import { SpotlightShimmer } from "@/components/motion/spotlight-shimmer";
 import { TextSwap } from "@/components/motion/text-swap";
 import { ThinkingGlyph } from "@/components/motion/thinking-glyph";
@@ -31,7 +33,7 @@ export function ThinkingIndicator({
     <div
       aria-live={active ? "polite" : undefined}
       className={cn(
-        "flex min-h-8 w-fit max-w-full min-w-0 items-center gap-2 py-1 text-[13.5px] font-[450] leading-5 tracking-[-0.005em] text-muted-foreground select-none",
+        "flex min-h-8 w-fit max-w-full min-w-0 items-center gap-2 py-1 text-ui font-[450] leading-5 tracking-[-0.005em] text-muted-foreground select-none",
         animateEnter && "auni-thinking-enter",
       )}
       data-slot={primary ? "work-history-trigger" : "thinking-indicator"}
@@ -43,10 +45,7 @@ export function ThinkingIndicator({
         </span>
       </SpotlightShimmer>
       {active ? (
-        <LiveElapsed
-          className="flex-none text-[12.5px] font-normal text-faint"
-          startedAt={startedAt}
-        />
+        <LiveElapsed className="flex-none text-meta font-normal text-faint" startedAt={startedAt} />
       ) : null}
     </div>
   );

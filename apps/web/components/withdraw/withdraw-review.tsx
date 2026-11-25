@@ -81,36 +81,34 @@ export function WithdrawReview({
   return (
     <div className="flex flex-col">
       <div className="text-center">
-        <p className="text-[34px] leading-[1.1] font-semibold tracking-[-0.035em] text-ink tabular-nums">
-          {amount}
-        </p>
-        <p className="mt-1 text-[14px] text-muted-foreground">
+        <p className="text-card-money text-ink">{amount}</p>
+        <p className="mt-1 text-ui text-muted-foreground">
           {review.destination ? `to your ${review.destination}` : "to this address"} on {network}
         </p>
       </div>
 
       {/* Two even lines, so a phone never wraps it mid-way; the start and end people check stand out. */}
-      <p className="mt-5 rounded-[12px] border border-foreground/[0.1] bg-surface px-3 py-3 text-center text-[14px] leading-[1.6]">
+      <p className="mt-5 rounded-control border border-foreground/[0.1] bg-surface px-3 py-3 text-center text-ui leading-[1.6]">
         <FullAddress address={review.address} />
       </p>
 
       {review.lookalike ? (
         <p
           role="alert"
-          className="mt-3 rounded-[12px] bg-destructive/[0.07] px-3.5 py-3 text-[13px] leading-[1.5] text-destructive"
+          className="mt-3 rounded-control bg-destructive/[0.07] px-3.5 py-3 text-meta leading-[1.5] text-destructive"
         >
           This looks like {review.lookalike.slice(0, 6)}…{review.lookalike.slice(-4)}, an address
           you sent to before, but the middle is different. Scammers plant addresses like this. Check
           every character before you send.
         </p>
       ) : review.destination === "exchange" ? (
-        <p className="mt-3 text-[13px] leading-[1.5] text-muted-foreground">
+        <p className="mt-3 text-meta leading-[1.5] text-muted-foreground">
           Check that your exchange takes USDC on {network}. Money sent on a network it doesn’t
           support can be lost.
         </p>
       ) : null}
 
-      <dl className="mt-4 divide-y divide-foreground/[0.06] text-[14px]">
+      <dl className="mt-4 divide-y divide-foreground/[0.06] text-ui">
         {[
           ["Network", network],
           ["Arrives", pinned.arrives],
@@ -120,7 +118,7 @@ export function WithdrawReview({
           value ? (
             <div key={label} className="flex items-center justify-between py-2">
               <dt className="text-muted-foreground">{label}</dt>
-              <dd className="font-medium text-ink tabular-nums">{value}</dd>
+              <dd className="font-medium text-ink">{value}</dd>
             </div>
           ) : null,
         )}
@@ -135,7 +133,7 @@ export function WithdrawReview({
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 text-[12.5px] text-destructive">
+        <p role="alert" className="mt-3 text-meta text-destructive">
           {error}
         </p>
       ) : null}

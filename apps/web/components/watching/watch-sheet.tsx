@@ -73,20 +73,14 @@ export function WatchSheet({
       onOpenChange={onOpenChange}
       side={wide ? "right" : "bottom"}
       title="What Auni watches"
-      // The wash sits in pixels from the top, so a phone's drag strip, which inherits it, lines up.
-      className="bg-surface bg-[image:radial-gradient(360px_260px_at_15%_0,--alpha(var(--color-primary)/13%),transparent_70%),radial-gradient(280px_200px_at_100%_40px,--alpha(var(--color-blush-wash)/50%),transparent_70%)] bg-no-repeat"
+      className="bg-surface"
     >
       <div className="auni-scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
-        <Mascot
-          alt=""
-          size={56}
-          state={on > 0 ? "listening" : "color"}
-          className="drop-shadow-[0_8px_14px_--alpha(var(--color-primary)/22%)]"
-        />
-        <h2 className="mt-3 text-[25px] leading-[1.2] font-semibold tracking-[-0.03em] text-ink lg:pr-8 px-1">
+        <Mascot alt="" size={56} state={on > 0 ? "listening" : "color"} />
+        <h2 className="mt-3 text-title text-ink lg:pr-8 px-1">
           {on > 0 ? `Watching ${things(on)}` : "Not watching right now"}
         </h2>
-        <p className="mt-1 px-1 text-[14.5px] text-muted-foreground">
+        <p className="mt-1 px-1 text-body text-muted-foreground">
           {thread ? <span className="block font-medium text-ink">{thread.title}</span> : null}
           {spokeThisMonth(fires)}
         </p>
@@ -103,14 +97,14 @@ export function WatchSheet({
                   )}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[12.5px] text-muted-foreground">
+                  <span className="block text-meta text-muted-foreground">
                     {spokeAt(fire.firedAt)}
                     {fire.late ? ", about something that happened while I was asleep" : null}
                   </span>
-                  <span className="mt-0.5 block text-[14.5px] leading-[1.45] text-ink">
+                  <span className="mt-0.5 block text-body leading-[1.45] text-ink">
                     {fire.outcome ?? fire.description}
                   </span>
-                  <span className="mt-0.5 block text-[12.5px] leading-[1.4] text-muted-foreground">
+                  <span className="mt-0.5 block text-meta leading-[1.4] text-muted-foreground">
                     {verdictLine(fire)}
                   </span>
                 </span>
@@ -120,7 +114,7 @@ export function WatchSheet({
         ) : null}
 
         {shown.length > 0 ? (
-          <ul className="mt-6 rounded-card bg-card shadow-[0_1px_2px_--alpha(var(--color-shade)/5%),0_0_0_1px_--alpha(var(--color-shade)/4%)]">
+          <ul className="mt-6 rounded-card bg-card border border-border">
             {shown.map((watch) => (
               <li key={watch.id} className="group flex items-center gap-3 pl-3.5">
                 <WatchIcon watch={watch} />
@@ -129,14 +123,14 @@ export function WatchSheet({
                   <div className="min-w-0 flex-1">
                     <p
                       className={cn(
-                        "text-[15px] leading-5",
+                        "text-body leading-5",
                         watch.status === "active" ? "text-ink" : "text-muted-foreground",
                       )}
                     >
                       {watch.description}
                     </p>
                     {watch.note && watch.note !== watch.description ? (
-                      <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.4] text-muted-foreground">
+                      <p className="mt-0.5 line-clamp-2 text-meta leading-[1.4] text-muted-foreground">
                         {watch.note}
                       </p>
                     ) : null}
@@ -150,7 +144,7 @@ export function WatchSheet({
           </ul>
         ) : null}
 
-        <p className="mt-4 px-1 text-[13.5px] leading-5 text-muted-foreground">
+        <p className="mt-4 px-1 text-ui leading-5 text-muted-foreground">
           Want something else watched? Ask in the chat.
         </p>
       </div>
@@ -163,16 +157,16 @@ export function WatchState({ watch }: { readonly watch: AutomationWire }) {
   const by = watchSource(watch)?.name ?? watch.source;
   if (watch.status === "failed")
     return (
-      <p className="mt-0.5 text-[13px] text-destructive">
+      <p className="mt-0.5 text-meta text-destructive">
         {by} stopped taking it. Ask me to set it up again.
       </p>
     );
   if (watch.status === "paused")
-    return <p className="mt-0.5 text-[13px] text-muted-foreground">{by}, paused</p>;
+    return <p className="mt-0.5 text-meta text-muted-foreground">{by}, paused</p>;
   if (watch.lastFiredAt && isToday(watch.lastFiredAt))
-    return <p className="mt-0.5 text-[13px] font-medium text-ink">{by}, spoke up today</p>;
+    return <p className="mt-0.5 text-meta font-medium text-ink">{by}, spoke up today</p>;
   return (
-    <p className="mt-0.5 text-[13px] text-muted-foreground">
+    <p className="mt-0.5 text-meta text-muted-foreground">
       {watch.lastFiredAt
         ? `${by}, last spoke up ${spokeAt(watch.lastFiredAt)}`
         : `Watched by ${by}`}

@@ -33,7 +33,7 @@ export function FooterMorph({
 export function StepError({ children }: { readonly children: string | null }) {
   if (!children) return null;
   return (
-    <p className="mb-3 flex items-start gap-2 text-[13px] leading-5 text-destructive" role="alert">
+    <p className="mb-3 flex items-start gap-2 text-meta leading-5 text-destructive" role="alert">
       <CircleAlert aria-hidden className="mt-0.5 size-3.5 flex-none" />
       {children}
     </p>
@@ -61,7 +61,7 @@ export function FundStep({
     <>
       <StepError>{error}</StepError>
       {watching && !error ? (
-        <p className="mb-3 text-[13px] leading-5 text-muted-foreground">
+        <p className="mb-3 text-meta leading-5 text-muted-foreground">
           Sent it already? It can take a few minutes to show up here.
         </p>
       ) : null}
@@ -138,7 +138,7 @@ export function ReadyStep({
 export function PaysWith({ lines }: { readonly lines: readonly string[] }) {
   if (lines.length === 0) return null;
   return (
-    <ul className="mt-3 flex flex-col gap-1 text-[13px] leading-[1.4] text-muted-foreground">
+    <ul className="mt-3 flex flex-col gap-1 text-meta leading-[1.4] text-muted-foreground">
       {lines.map((line) => (
         <li key={line}>
           <span className="font-medium text-ink">Pays with</span> {line}
@@ -152,7 +152,7 @@ export function PaysWith({ lines }: { readonly lines: readonly string[] }) {
 export function Costs({ costs }: { readonly costs: string | undefined }) {
   if (!costs) return null;
   return (
-    <p className="mt-3 text-[13px] leading-[1.4] text-muted-foreground">
+    <p className="mt-3 text-meta leading-[1.4] text-muted-foreground">
       <span className="font-medium text-ink">Costs</span> {costs}
     </p>
   );
@@ -165,7 +165,7 @@ export function Costs({ costs }: { readonly costs: string | undefined }) {
  */
 export function CardNote({ says }: { readonly says: string | undefined }) {
   if (!says) return null;
-  return <p className="mt-3 text-[13px] leading-[1.4] text-muted-foreground">{says}</p>;
+  return <p className="mt-3 text-meta leading-[1.4] text-muted-foreground">{says}</p>;
 }
 
 /** Money counting up as it goes in, each digit rolling to its new value. */
@@ -210,8 +210,8 @@ export function ProposalReceipt({
     <div className="flex items-center gap-3.5">
       <span className="flex flex-none opacity-55 grayscale">{mark}</span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink">{name}</p>
-        <p className="truncate text-[13px] text-muted-foreground">{status}</p>
+        <p className="truncate text-body font-semibold tracking-[-0.01em] text-ink">{name}</p>
+        <p className="truncate text-meta text-muted-foreground">{status}</p>
       </div>
     </div>
   );

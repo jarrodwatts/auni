@@ -10,37 +10,41 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const auniDialogOverlayClass = "bg-veil backdrop-blur-[2px]";
 
 export const auniDialogCardClass =
-  "gap-0 rounded-[20px] border-foreground/[0.12] bg-popover p-6 shadow-[0_18px_60px_--alpha(var(--color-shade)/16%)] sm:max-w-[400px] sm:p-6";
+  "gap-0 rounded-sheet border-border bg-popover p-6 shadow-float sm:max-w-[400px] sm:p-6";
 
-export const auniDialogTitleClass =
-  "text-[20px] leading-7 font-semibold tracking-[-0.025em] text-ink";
+export const auniDialogTitleClass = "text-section text-ink";
 
-export const auniDialogDescriptionClass = "mt-2.5 text-[15px] leading-[1.5] text-muted-foreground";
+export const auniDialogDescriptionClass = "mt-2.5 text-body leading-[1.5] text-muted-foreground";
 
-export const auniDialogPrimaryButtonClass =
-  "h-11 w-full rounded-full bg-foreground text-[14px] font-semibold text-background hover:bg-foreground/85";
+export const auniDialogPrimaryButtonClass = buttonVariants({
+  variant: "primary",
+  size: "lg",
+  className: "w-full",
+});
 
-/** Refined rose destructive, the same as the logout row: --destructive. */
-export const auniDialogDestructiveButtonClass =
-  "h-11 w-full rounded-full bg-destructive text-[14px] font-semibold text-background hover:bg-destructive/90";
+export const auniDialogDestructiveButtonClass = buttonVariants({
+  variant: "destructive",
+  size: "lg",
+  className: "w-full",
+});
 
-export const auniDialogOutlineButtonClass =
-  "h-11 w-full rounded-full border-foreground/[0.14] text-[14px] font-medium";
+export const auniDialogOutlineButtonClass = buttonVariants({
+  variant: "secondary",
+  size: "lg",
+  className: "w-full",
+});
 
-/** The mascot leads every popup, glowing and popping in like onboarding. */
+/** The mascot leads a popup that waits on the owner. */
 export function AuniDialogMascot({ state }: { readonly state: MascotState }) {
   return (
-    <div className="relative mx-auto mt-1 w-fit">
-      <span
-        aria-hidden
-        className="absolute -inset-3 -z-10 rounded-[32px] bg-[radial-gradient(circle,--alpha(var(--color-halo)/18%),transparent_70%)]"
-      />
-      <Mascot className="auni-onb-mascot" size={64} state={state} />
+    <div className="mx-auto mt-1 w-fit">
+      <Mascot className="auni-onb-mascot" size={56} state={state} />
     </div>
   );
 }

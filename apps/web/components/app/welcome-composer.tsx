@@ -71,7 +71,7 @@ export function WelcomeComposer({
         placeholder="Peptides go mainstream by 2028"
       />
       {error && (
-        <p role="alert" className="mt-2 text-center text-xs text-destructive">
+        <p role="alert" className="mt-2 text-center text-caption text-destructive">
           {error}
         </p>
       )}

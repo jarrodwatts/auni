@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
  * from the bottom edge as a sheet, and rides above the keyboard while typing.
  */
 const manageDialogCardClass =
-  "flex flex-col overflow-hidden p-0 sm:max-w-[440px] sm:p-0 max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[calc(100dvh-24px)] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-[22px] max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:zoom-in-100 max-sm:data-[state=open]:slide-in-from-bottom motion-reduce:animate-none";
+  "flex flex-col overflow-hidden p-0 sm:max-w-[440px] sm:p-0 max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[calc(100dvh-24px)] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-sheet max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:zoom-in-100 max-sm:data-[state=open]:slide-in-from-bottom motion-reduce:animate-none";
 
 export function ManageDialogContent({
   className,
@@ -68,7 +68,7 @@ export function ManageFooter({
       className={cn("px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-6", className)}
     >
       {failed ? (
-        <p role="alert" className="mb-3 text-center text-[13.5px] text-destructive">
+        <p role="alert" className="mb-3 text-center text-ui text-destructive">
           Couldn’t save. Try again.
         </p>
       ) : null}
@@ -95,4 +95,4 @@ export function ManageFooter({
 }
 
 export const manageFieldClass =
-  "block w-full rounded-[12px] border border-foreground/[0.09] bg-background px-3.5 py-2.5 text-[15px] leading-6 text-ink outline-none transition-colors placeholder:text-faint focus:border-foreground/[0.28]";
+  "block w-full rounded-control border border-foreground/[0.09] bg-background px-3.5 py-2.5 text-body leading-6 text-ink outline-none transition-colors placeholder:text-faint focus:border-foreground/[0.28]";

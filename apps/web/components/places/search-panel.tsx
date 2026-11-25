@@ -128,7 +128,7 @@ export function SearchPanel({
           className={cn(
             "h-full min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-faint",
             // 16px on a phone, so focusing never zooms the page.
-            sheet ? "text-[16px]" : "text-[16px] tracking-[-0.01em]",
+            sheet ? "text-reading" : "text-reading tracking-[-0.01em]",
           )}
         />
         {query ? (
@@ -145,7 +145,7 @@ export function SearchPanel({
             <X aria-hidden className="size-4" strokeWidth={2} />
           </button>
         ) : sheet ? null : (
-          <kbd className="flex-none rounded-[6px] border border-foreground/[0.08] px-1.5 py-0.5 font-sans text-[11px] text-faint">
+          <kbd className="flex-none rounded-control border border-foreground/[0.08] px-1.5 py-0.5 font-sans text-caption text-faint">
             esc
           </kbd>
         )}
@@ -205,7 +205,7 @@ function Group({ group, children }: { readonly group: SearchGroup; readonly chil
     <div role="group" aria-label={group.label} className="pb-1 first:pt-0">
       <p
         aria-hidden
-        className="px-3 pt-2.5 pb-1 text-[12px] font-medium text-faint group-data-mobile/sidebar:pt-3"
+        className="px-3 pt-2.5 pb-1 text-caption font-medium text-faint group-data-mobile/sidebar:pt-3"
       >
         {group.label}
       </p>
@@ -219,7 +219,7 @@ const ROW_CLASS_NAME =
   "relative isolate flex w-full items-center gap-3 rounded-control px-3 text-left outline-none before:absolute before:inset-0 before:-z-10 before:rounded-control before:transition-colors before:duration-100 aria-selected:before:bg-foreground/[0.05] motion-reduce:before:transition-none";
 
 function rowSize(sheet: boolean) {
-  return sheet ? "h-12 text-[16px]" : "h-10 text-[14px]";
+  return sheet ? "h-12 text-reading" : "h-10 text-ui";
 }
 
 function Row({
@@ -245,13 +245,11 @@ function Row({
       <span className="flex min-w-0 flex-1 items-baseline gap-2">
         <span className="min-w-0 flex-none truncate text-ink [max-width:70%]">{item.title}</span>
         {item.detail ? (
-          <span className="min-w-0 flex-1 truncate text-[13px] text-faint">{item.detail}</span>
+          <span className="min-w-0 flex-1 truncate text-meta text-faint">{item.detail}</span>
         ) : null}
       </span>
       {item.trailing ? (
-        <span className="flex-none text-[13px] text-muted-foreground tabular-nums">
-          {item.trailing}
-        </span>
+        <span className="flex-none text-meta text-muted-foreground">{item.trailing}</span>
       ) : null}
     </>
   );

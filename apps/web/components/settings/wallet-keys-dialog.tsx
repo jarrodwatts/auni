@@ -101,12 +101,12 @@ function ShowKeys() {
       {pairAgain ? (
         <PairAgain className="mt-4" then="Then show your keys here again." />
       ) : (
-        <p className="mt-3 text-left text-[13px] leading-[1.5] text-muted-foreground">
+        <p className="mt-3 text-left text-meta leading-[1.5] text-muted-foreground">
           Auni checks it’s you before they show.
         </p>
       )}
       {error ? (
-        <p role="alert" className="mt-3 text-[12.5px] text-destructive">
+        <p role="alert" className="mt-3 text-meta text-destructive">
           {error}
         </p>
       ) : null}
@@ -165,13 +165,13 @@ export function WalletKeyList({
   return (
     <div className={cn("space-y-3", className)}>
       {shown.map(({ label, value }) => (
-        <div key={label} className="rounded-[14px] border border-foreground/[0.1] p-3 text-left">
+        <div key={label} className="rounded-card border border-foreground/[0.1] p-3 text-left">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[12.5px] font-semibold text-ink">{label}</span>
+            <span className="text-meta font-semibold text-ink">{label}</span>
             <button
               type="button"
               onClick={() => clipboard.copy(value)}
-              className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[12.5px] text-muted-foreground transition-colors hover:bg-foreground/[0.05]"
+              className="flex items-center gap-1.5 rounded-full px-2 py-1 text-meta text-muted-foreground transition-colors hover:bg-foreground/[0.05]"
             >
               {clipboard.copiedValue === value ? (
                 <Check aria-hidden className="size-3.5" />
@@ -181,11 +181,11 @@ export function WalletKeyList({
               {clipboard.copiedValue === value ? "Copied" : "Copy"}
             </button>
           </div>
-          <p className="mt-2 font-mono text-[12px] break-all text-ink select-all">{value}</p>
+          <p className="mt-2 font-mono text-caption break-all text-ink select-all">{value}</p>
         </div>
       ))}
       {clipboard.blocked ? (
-        <p className="text-[12.5px] text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           This browser blocked copying: select a key to copy it by hand.
         </p>
       ) : null}

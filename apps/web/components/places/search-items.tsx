@@ -45,7 +45,7 @@ interface Scored {
 }
 
 const LIMIT = { threads: 6, holdings: 4, pages: 4 } as const;
-const ARCHIVED = <span className="text-[12.5px] text-faint">Archived</span>;
+const ARCHIVED = <span className="text-meta text-faint">Archived</span>;
 const ICON = { className: ICON_CLASS_NAME, strokeWidth: ICON_STROKE, "aria-hidden": true };
 
 /**
@@ -146,17 +146,15 @@ export function useSearchGroups(query: string, withdraw: () => void): readonly S
       .map(({ item, names }) => score(item, item.title, ...names))
       .filter(({ score }) => score > 0);
 
-    return (
-      [
-        group("Threads", threadMatches, LIMIT.threads),
-        group("Holdings", holdings, LIMIT.holdings),
-        group("Go to", pageMatches, LIMIT.pages),
-      ]
-        .filter((found) => found.items.length > 0)
-        .map((found, index) => ({ found, index }))
-        .sort((a, b) => b.found.best - a.found.best || a.index - b.index)
-        .map(({ found: { label, items } }) => ({ label, items }))
-    );
+    return [
+      group("Threads", threadMatches, LIMIT.threads),
+      group("Holdings", holdings, LIMIT.holdings),
+      group("Go to", pageMatches, LIMIT.pages),
+    ]
+      .filter((found) => found.items.length > 0)
+      .map((found, index) => ({ found, index }))
+      .sort((a, b) => b.found.best - a.found.best || a.index - b.index)
+      .map(({ found: { label, items } }) => ({ label, items }));
   }, [needle, now, pages, pathname, places, portfolio, recent, said]);
 }
 

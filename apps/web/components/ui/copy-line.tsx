@@ -29,10 +29,12 @@ export function CopyLine({
   const copied = clipboard.copiedValue === value;
   return (
     <div className={cn("min-w-0", className)}>
-      <div className="flex items-center gap-2 rounded-[12px] bg-surface py-1.5 pr-1.5 pl-3.5 text-left">
+      <div className="flex items-center gap-2 rounded-control bg-surface py-1.5 pr-1.5 pl-3.5 text-left">
         <span className="min-w-0 flex-1 py-1">
-          {label ? <span className="block text-caption text-muted-foreground">{label}</span> : null}
-          <span className="flex gap-2 font-mono text-[13px] leading-[20px]">
+          {label ? (
+            <span className="block text-caption font-medium text-muted-foreground">{label}</span>
+          ) : null}
+          <span className="flex gap-2 font-mono text-meta leading-[20px]">
             {command ? (
               <span aria-hidden className="text-faint select-none">
                 $
@@ -48,7 +50,7 @@ export function CopyLine({
           autoFocus={focused}
           onClick={() => clipboard.copy(value)}
           aria-label={copied ? "Copied" : `Copy ${label ?? value}`}
-          className="flex h-8 flex-none items-center gap-1.5 self-center rounded-[9px] px-2.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-card hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
+          className="flex h-8 flex-none items-center gap-1.5 self-center rounded-control px-2.5 text-meta font-medium text-muted-foreground transition-colors hover:bg-card hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
         >
           {copied ? (
             <Check aria-hidden className="size-3.5 text-positive" />
@@ -59,7 +61,7 @@ export function CopyLine({
         </button>
       </div>
       {clipboard.blocked ? (
-        <p role="alert" className="mt-1.5 text-[12.5px] text-muted-foreground">
+        <p role="alert" className="mt-1.5 text-meta text-muted-foreground">
           Copying was blocked. Select it to copy it.
         </p>
       ) : null}

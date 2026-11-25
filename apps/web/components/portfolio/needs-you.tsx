@@ -62,7 +62,7 @@ function NeedsYouRow({
           <MessageCircle aria-hidden className="size-4 text-muted-foreground" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-ui text-ink">{name}</span>
+          <span className="block truncate text-ui font-medium text-ink">{name}</span>
           <span className="mt-0.5 block truncate text-meta text-muted-foreground">
             {ask ?? "Waiting for your OK"}
           </span>

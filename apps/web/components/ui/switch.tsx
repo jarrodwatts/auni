@@ -18,7 +18,7 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         // Off, the knob is the lighter part in every look; on, it is the page's colour on the filled track.
-        className="pointer-events-none block size-5 rounded-full shadow-sm ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=checked]:bg-background data-[state=unchecked]:translate-x-0 data-[state=unchecked]:bg-knob"
+        className="pointer-events-none block size-5 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-3.5 data-[state=checked]:bg-background data-[state=unchecked]:translate-x-0 data-[state=unchecked]:bg-knob"
       />
     </SwitchPrimitive.Root>
   );

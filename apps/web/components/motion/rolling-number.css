@@ -1,0 +1,38 @@
+.auni-digit-window {
+  position: relative;
+  display: inline-flex;
+  height: 1.3em;
+  min-width: 1ch;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  line-height: 1.3em;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 16%,
+    #000 84%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+}
+
+.auni-digit-in {
+  animation: auni-digit-in 260ms var(--motion-settle) both;
+}
+
+.auni-digit-out {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: auni-digit-out 260ms var(--motion-settle) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-digit-out {
+    display: none;
+  }
+}

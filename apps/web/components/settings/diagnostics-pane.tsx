@@ -112,7 +112,7 @@ export function DiagnosticsPane({
           {diag.data ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <SettingsBadge tone="ok">{okCount} ok</SettingsBadge>
-              {noteCount > 0 ? <SettingsBadge tone="warn">{noteCount} notes</SettingsBadge> : null}
+              {noteCount > 0 ? <SettingsBadge>{noteCount} notes</SettingsBadge> : null}
               {fixCount > 0 ? <SettingsBadge tone="error">{fixCount} to fix</SettingsBadge> : null}
             </div>
           ) : (
@@ -123,10 +123,8 @@ export function DiagnosticsPane({
         {repairNotice ? (
           <div
             className={cn(
-              "flex flex-col gap-2 px-4 py-3 text-[12.5px] leading-[1.45] sm:px-5",
-              repairNotice.ok
-                ? "bg-positive/[0.08] text-positive"
-                : "bg-warning-surface text-warning",
+              "flex flex-col gap-2 px-4 py-3 text-meta leading-[1.45] sm:px-5",
+              repairNotice.ok ? "bg-positive/[0.08] text-positive" : "bg-surface text-ink-soft",
             )}
           >
             <span>{repairNotice.text}</span>
@@ -141,7 +139,7 @@ export function DiagnosticsPane({
         ) : null}
 
         {diag.isError ? (
-          <div className="px-4 py-4 text-[13px] text-destructive sm:px-5">
+          <div className="px-4 py-4 text-meta text-destructive sm:px-5">
             Could not run diagnostics. Try again or run <code>auni doctor</code> in your terminal.
           </div>
         ) : (
@@ -155,15 +153,15 @@ export function DiagnosticsPane({
                   {finding.status === "ok" ? (
                     <CheckCircle2 className="mt-0.5 size-4 flex-none text-positive" />
                   ) : finding.status === "note" ? (
-                    <Info className="mt-0.5 size-4 flex-none text-warning" />
+                    <Info className="mt-0.5 size-4 flex-none text-faint" />
                   ) : (
                     <Wrench className="mt-0.5 size-4 flex-none text-destructive" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <span className="mr-2 font-mono text-[11px] font-medium tracking-wide text-faint uppercase">
+                    <span className="mr-2 font-mono text-caption font-medium tracking-wide text-faint uppercase">
                       {finding.check}
                     </span>
-                    <span className="text-[13px] leading-[1.45] text-ink-soft">{finding.says}</span>
+                    <span className="text-meta leading-[1.45] text-ink-soft">{finding.says}</span>
                   </div>
                 </div>
                 {finding.repair ? (
@@ -197,7 +195,7 @@ export function DiagnosticsPane({
         open={logsOpen}
         onToggle={(event) => setLogsOpen((event.currentTarget as HTMLDetailsElement).open)}
         className={cn(
-          "group scroll-mt-4 rounded-[16px] border bg-card",
+          "group scroll-mt-4 rounded-card border bg-card",
           highlightedTarget === "setting-logs"
             ? "border-primary/50 ring-[3px] ring-ring/25"
             : "border-foreground/[0.08]",
@@ -207,10 +205,10 @@ export function DiagnosticsPane({
           <div className="flex items-center gap-2.5">
             <FileText className="size-4 text-muted-foreground" />
             <div>
-              <span className="block text-[14.5px] font-semibold tracking-[-0.015em] text-ink">
+              <span className="block text-body font-semibold tracking-[-0.015em] text-ink">
                 Recent logs
               </span>
-              <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+              <span className="mt-0.5 block text-meta text-muted-foreground">
                 Last 200 lines of Auni&apos;s log file, redacted of tokens and keys.
               </span>
             </div>
@@ -219,7 +217,7 @@ export function DiagnosticsPane({
         </summary>
         <div className="border-t border-foreground/[0.06] p-4 sm:p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <code className="truncate font-mono text-[11.5px] text-faint">
+            <code className="truncate font-mono text-caption text-faint">
               {logs.data?.path ?? "~/.auni/auni.log"}
             </code>
             <div className="flex items-center gap-1.5">
@@ -258,16 +256,16 @@ export function DiagnosticsPane({
             </div>
           </div>
           {logs.isPending ? (
-            <div className="flex items-center gap-2 py-6 text-[12.5px] text-muted-foreground">
+            <div className="flex items-center gap-2 py-6 text-meta text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" />
               Loading logs…
             </div>
           ) : !logs.data || logs.data.lines.length === 0 ? (
-            <p className="rounded-[12px] bg-surface px-3.5 py-4 text-[12.5px] text-muted-foreground">
+            <p className="rounded-control bg-surface px-3.5 py-4 text-meta text-muted-foreground">
               No log entries yet at this path.
             </p>
           ) : (
-            <pre className="max-h-[260px] overflow-auto rounded-[12px] bg-surface p-3 font-mono text-[11.5px] leading-[1.55] whitespace-pre-wrap break-all text-ink-soft">
+            <pre className="max-h-[260px] overflow-auto rounded-control bg-surface p-3 font-mono text-caption leading-[1.55] whitespace-pre-wrap break-all text-ink-soft">
               {logs.data.lines.join("\n")}
             </pre>
           )}

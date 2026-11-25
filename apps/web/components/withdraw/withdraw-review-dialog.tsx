@@ -65,7 +65,7 @@ export function WithdrawReviewDialog({
               }}
             />
           ) : withdrawal.isError ? (
-            <p role="alert" className="text-center text-[13px] text-destructive">
+            <p role="alert" className="text-center text-meta text-destructive">
               This withdrawal couldn’t load. Nothing was sent.
             </p>
           ) : (

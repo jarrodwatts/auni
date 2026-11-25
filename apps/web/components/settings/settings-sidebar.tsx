@@ -84,7 +84,7 @@ export function SettingsSidebar({
     <aside className="flex flex-none flex-col border-b border-foreground/[0.06] bg-sidebar md:h-full md:w-[236px] md:border-r md:border-b-0">
       <div className="flex items-center gap-2.5 px-4 pt-4 pb-2.5 md:px-4 md:pt-5">
         <Mascot alt="" size={26} state="listening" />
-        <DialogTitle className="text-[16px] font-semibold tracking-[-0.02em] text-ink">
+        <DialogTitle className="text-reading font-semibold tracking-[-0.02em] text-ink">
           Settings
         </DialogTitle>
       </div>
@@ -126,7 +126,7 @@ export function SettingsSidebar({
                 if (picked) pickResult(picked);
               }
             }}
-            className="h-8 w-full rounded-[9px] border border-foreground/[0.08] bg-background pr-7 pl-8 text-[12.5px] text-ink outline-none transition-[border-color,box-shadow] placeholder:text-faint focus-visible:border-foreground/20 focus-visible:ring-[2px] focus-visible:ring-ring/25"
+            className="h-8 w-full rounded-control border border-foreground/[0.08] bg-background pr-7 pl-8 text-meta text-ink outline-none transition-[border-color,box-shadow] placeholder:text-faint focus-visible:border-foreground/20 focus-visible:ring-[2px] focus-visible:ring-ring/25"
           />
           {searching ? (
             <button
@@ -136,12 +136,12 @@ export function SettingsSidebar({
                 setQuery("");
                 inputRef.current?.focus();
               }}
-              className="absolute right-1.5 rounded-md p-1 text-faint hover:bg-foreground/[0.05] hover:text-ink"
+              className="absolute right-1.5 rounded-control p-1 text-faint hover:bg-foreground/[0.05] hover:text-ink"
             >
               <X className="size-3.5" />
             </button>
           ) : (
-            <kbd className="pointer-events-none absolute right-2 hidden rounded bg-surface px-1.5 py-0.5 font-mono text-[10px] text-faint md:inline-block">
+            <kbd className="pointer-events-none absolute right-2 hidden rounded-control bg-surface px-1.5 py-0.5 font-mono text-caption text-faint md:inline-block">
               /
             </kbd>
           )}
@@ -152,7 +152,7 @@ export function SettingsSidebar({
       {searching ? (
         <div className="max-h-[240px] flex-1 overflow-y-auto px-2.5 pb-3 md:max-h-none">
           {results.length === 0 ? (
-            <p className="px-2 py-6 text-center text-[12.5px] text-muted-foreground">
+            <p className="px-2 py-6 text-center text-meta text-muted-foreground">
               No settings match &ldquo;{query.trim()}&rdquo;.
             </p>
           ) : (
@@ -167,19 +167,19 @@ export function SettingsSidebar({
                       onClick={() => pickResult(item)}
                       onMouseEnter={() => setCursor(idx)}
                       className={cn(
-                        "flex w-full flex-col rounded-[9px] px-2.5 py-2 text-left transition-colors",
+                        "flex w-full flex-col rounded-control px-2.5 py-2 text-left transition-colors",
                         selected
                           ? "bg-foreground/[0.07] text-ink"
                           : "text-ink-soft hover:bg-foreground/[0.04]",
                       )}
                     >
                       <span className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[13px] font-medium text-ink">
+                        <span className="truncate text-meta font-medium text-ink">
                           {item.title}
                         </span>
-                        <span className="flex-none text-[11px] text-faint">{meta.label}</span>
+                        <span className="flex-none text-caption text-faint">{meta.label}</span>
                       </span>
-                      <span className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                      <span className="mt-0.5 truncate text-caption text-muted-foreground">
                         {item.description}
                       </span>
                     </button>
@@ -197,7 +197,7 @@ export function SettingsSidebar({
           {groups.map((group) => (
             <div key={group.label ?? "primary"} className="flex gap-1 md:flex-col md:gap-0.5">
               {group.label ? (
-                <div className="hidden px-2.5 pt-1 pb-1 text-[11px] font-semibold tracking-[0.04em] text-faint uppercase md:block">
+                <div className="hidden px-2.5 pt-1 pb-1 text-caption font-semibold tracking-[0.04em] text-faint uppercase md:block">
                   {group.label}
                 </div>
               ) : null}
@@ -210,7 +210,7 @@ export function SettingsSidebar({
                     aria-current={isCurrent ? "page" : undefined}
                     onClick={() => onSelect(entry.id)}
                     className={cn(
-                      "flex flex-none items-center gap-2.5 rounded-[9px] px-2.5 py-1.5 text-left text-[13.5px] whitespace-nowrap transition-colors duration-150 md:w-full md:py-[7px]",
+                      "flex flex-none items-center gap-2.5 rounded-control px-2.5 py-1.5 text-left text-ui whitespace-nowrap transition-colors duration-150 md:w-full md:py-[7px]",
                       isCurrent
                         ? "bg-foreground/[0.07] font-medium text-ink"
                         : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-ink",

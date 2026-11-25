@@ -200,19 +200,19 @@ function themeCss(n: Names): string {
  */
 :root[data-theme="${n.id}"] {
   --background: #ffffff;
-  --foreground: #141414;
-  --sidebar: #fafbfd;
+  --foreground: #101623;
+  --sidebar: #f8f9fb;
   --card: #ffffff;
   --popover: #ffffff;
   --primary: #3d63e0;
-  --muted: #eef1f7;
-  --muted-foreground: #5c6472;
-  --accent: #f0f0f0;
-  --border: #e3e8f2;
-  --ring: #5b7fe8;
-  --color-ink: #101623;
-  --color-faint: #9aa2ae;
-  --color-surface: #f5f7fb;
+  --muted: #f1f3f6;
+  --muted-foreground: #535c6b;
+  --accent: #f1f3f6;
+  --border: #e4e7ec;
+  --ring: #3d63e0;
+  --ink: #101623;
+  --faint: #6b7484;
+  --surface: #f5f6f8;
 }
 `;
 }

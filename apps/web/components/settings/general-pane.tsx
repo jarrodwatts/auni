@@ -142,7 +142,7 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
                 {updateMe.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : "Save"}
               </button>
             ) : savedField === "name" ? (
-              <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+              <span className="inline-flex items-center gap-1 text-caption text-positive">
                 <Check className="size-3.5" />
                 Saved
               </span>
@@ -157,7 +157,7 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
           description="Used for watches, routines on the clock, and your daily brief."
         >
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-[9px] bg-surface px-3 py-1.5 font-mono text-[12.5px] text-ink">
+            <span className="rounded-control bg-surface px-3 py-1.5 font-mono text-meta text-ink">
               {me.timeZone}
             </span>
             {tzDiffers && localTz ? (
@@ -175,7 +175,7 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
               </button>
             ) : null}
             {savedField === "tz" ? (
-              <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+              <span className="inline-flex items-center gap-1 text-caption text-positive">
                 <Check className="size-3.5" />
                 Updated
               </span>
@@ -210,7 +210,7 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
               onChange={(picked) => void updateBrief(picked as BriefMode, briefAt)}
             />
             {briefMode !== "off" ? (
-              <label className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+              <label className="flex items-center gap-2 text-meta text-muted-foreground">
                 <span>at</span>
                 <input
                   type="time"
@@ -221,12 +221,12 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
                       void updateBrief(briefMode, event.target.value);
                     }
                   }}
-                  className={cn(SETTINGS_INPUT, "h-8 w-auto px-2.5 font-mono text-[12.5px]")}
+                  className={cn(SETTINGS_INPUT, "h-8 w-auto px-2.5 font-mono text-meta")}
                 />
               </label>
             ) : null}
             {savedField === "brief" ? (
-              <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+              <span className="inline-flex items-center gap-1 text-caption text-positive">
                 <Check className="size-3.5" />
                 Saved
               </span>
@@ -266,7 +266,7 @@ export function GeneralPane({ highlightedTarget }: { readonly highlightedTarget:
       </SettingsSection>
 
       {updateMe.isError ? (
-        <p role="alert" className="text-[12.5px] text-destructive">
+        <p role="alert" className="text-meta text-destructive">
           Your change could not be saved. Try again.
         </p>
       ) : null}

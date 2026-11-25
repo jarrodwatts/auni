@@ -22,7 +22,7 @@ export function Card({
   readonly children?: ReactNode;
 }) {
   return (
-    <section className="rounded-[24px] bg-card px-5 pt-6 pb-5 shadow-[0_24px_70px_--alpha(var(--color-shade)/8%)] sm:px-7 sm:pt-7 sm:pb-6">
+    <section className="rounded-sheet bg-card px-5 pt-6 pb-5 border border-border sm:px-7 sm:pt-7 sm:pb-6">
       {pose ? (
         <Mascot
           alt=""
@@ -32,13 +32,11 @@ export function Card({
           state={pose}
         />
       ) : null}
-      <h1 className="text-center text-[24px] leading-[30px] font-semibold tracking-[-0.03em] text-ink">
-        {title}
-      </h1>
+      <h1 className="text-center text-title text-ink">{title}</h1>
       {body ? (
         <p
           role={pose ? "status" : undefined}
-          className="mx-auto mt-2 max-w-[380px] text-center text-[15px] leading-[1.5] text-muted-foreground"
+          className="mx-auto mt-2 max-w-[380px] text-center text-body leading-[1.5] text-muted-foreground"
         >
           {body}
         </p>

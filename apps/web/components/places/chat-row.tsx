@@ -1,5 +1,7 @@
 "use client";
 
+import "./chat-row.css";
+
 import { Eye, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

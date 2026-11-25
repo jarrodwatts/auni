@@ -1,0 +1,83 @@
+.auni-account-balance-update {
+  animation: auni-account-balance-update 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.auni-account-avatar,
+.auni-account-mark {
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 200ms ease;
+}
+
+.auni-account-settings-link:hover .auni-account-avatar,
+.auni-account-settings-link:focus-visible .auni-account-avatar {
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+/* Pointed at, the vault leans in, as if to open. */
+.auni-account-settings-link:hover .auni-account-mark,
+.auni-account-settings-link:focus-visible .auni-account-mark {
+  transform: translateY(-1px) rotate(-6deg) scale(1.06);
+}
+
+/*
+ * The app arriving around the owner's first take (PlaceShell): the sidebar docks beside the chat
+ * as it starts (the landing's dive), then their wallet's vault drops into the foot of it, lands with a squash,
+ * turns its dial shut, and stays as their account, with a quiet word on what it holds.
+ */
+[data-arriving] .auni-account-mark {
+  transform-origin: 50% 100%;
+  animation: auni-vault-drop 1000ms 650ms backwards;
+}
+
+/* Falls in from above, lands at 60% squashed, springs up a touch, and settles. */
+@keyframes auni-vault-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-160px) scale(0.9, 1.1);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.45);
+  }
+  12% {
+    opacity: 1;
+  }
+  60% {
+    transform: translateY(0) scale(1.18, 0.8);
+    animation-timing-function: ease-out;
+  }
+  78% {
+    transform: translateY(-3px) scale(0.96, 1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-arriving] .auni-account-mark,
+  [data-arriving] .auni-vault-dial {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-account-settings-link,
+  .auni-account-avatar,
+  .auni-account-mark {
+    transition:
+      background-color 100ms linear,
+      border-color 100ms linear,
+      color 100ms linear,
+      box-shadow 100ms linear;
+  }
+  .auni-account-settings-link,
+  .auni-account-settings-link:hover,
+  .auni-account-settings-link:focus-visible,
+  .auni-account-settings-link:active,
+  .auni-account-settings-link:hover .auni-account-avatar,
+  .auni-account-settings-link:focus-visible .auni-account-avatar,
+  .auni-account-settings-link:hover .auni-account-mark,
+  .auni-account-settings-link:focus-visible .auni-account-mark {
+    transform: none;
+  }
+}

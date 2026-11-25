@@ -1,5 +1,7 @@
 "use client";
 
+import "./rolling-number.css";
+
 import { useState } from "react";
 
 import { reducedMotion } from "@/lib/motion";
@@ -53,7 +55,7 @@ export function RollingNumber({
   const text = String(value);
   const slots = rollingSlots(text);
   return (
-    <span aria-label={text} className={cn("inline-flex items-center tabular-nums", className)}>
+    <span aria-label={text} className={cn("inline-flex items-center", className)}>
       {slots.map((slot) =>
         slot.isDigit ? (
           <RollingDigit char={slot.char} key={slot.key} />
@@ -89,10 +91,7 @@ function RollingDigit({ char }: { readonly char: string }) {
           {state.prev}
         </span>
       ) : null}
-      <span
-        className={state.prev !== null ? "auni-digit-in" : undefined}
-        key={`in-${state.tick}`}
-      >
+      <span className={state.prev !== null ? "auni-digit-in" : undefined} key={`in-${state.tick}`}>
         {state.current}
       </span>
     </span>

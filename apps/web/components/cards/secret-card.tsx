@@ -91,10 +91,10 @@ export function SecretCard({
         <div className="flex items-center gap-3.5" data-testid="secret-card" data-standing="ended">
           <span className={done ? undefined : "opacity-55 grayscale"}>{mark}</span>
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink">
+            <p className="text-body leading-5 font-semibold tracking-[-0.01em] text-ink">
               {card.summary}
             </p>
-            <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.4] text-muted-foreground">
+            <p className="mt-0.5 line-clamp-2 text-meta leading-[1.4] text-muted-foreground">
               {done && backsUp
                 ? "Saved. Back up your keys again, as your last backup doesn't have it"
                 : standing.label}
@@ -119,7 +119,7 @@ export function SecretCard({
       <div ref={frame} data-testid="secret-card" data-standing="waiting">
         <div className="flex items-center gap-3">
           {mark}
-          <p className="min-w-0 flex-1 text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
+          <p className="min-w-0 flex-1 text-reading leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
             {card.summary}
           </p>
           {link ? (
@@ -128,7 +128,7 @@ export function SecretCard({
             </a>
           ) : null}
         </div>
-        {why ? <p className="mt-4 text-[15px] leading-[1.5] text-pretty text-ink">{why}</p> : null}
+        {why ? <p className="mt-4 text-body leading-[1.5] text-pretty text-ink">{why}</p> : null}
         <div className="mt-5">
           {loaded.kind === "ready" ? (
             <PrivateInput
@@ -153,7 +153,7 @@ export function SecretCard({
               {loaded.kind === "pair_again" ? (
                 <PairAgain then="Then paste it here." />
               ) : (
-                <p className="text-[13px] leading-[18px] text-muted-foreground">
+                <p className="text-meta leading-[18px] text-muted-foreground">
                   {loaded.kind === "gone"
                     ? "There's nothing to paste here any more."
                     : "That didn't reach Auni. Try again."}
@@ -171,7 +171,7 @@ export function SecretCard({
           )}
         </div>
         {failed ? (
-          <p role="alert" className="mt-3 text-[13px] text-destructive">
+          <p role="alert" className="mt-3 text-meta text-destructive">
             That didn&apos;t reach Auni, so nothing changed. Try again.
           </p>
         ) : null}

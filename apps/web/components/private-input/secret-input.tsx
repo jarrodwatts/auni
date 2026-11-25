@@ -50,7 +50,7 @@ export function SecretInput({
     >
       <span
         className={cn(
-          "text-[13px] font-medium text-ink",
+          "text-meta font-medium text-ink",
           inline && "w-[124px] flex-none truncate",
           labelHidden && "sr-only",
         )}
@@ -76,10 +76,10 @@ export function SecretInput({
             if (event.key === "Enter") onEnter?.();
           }}
           className={cn(
-            "h-12 w-full pr-12 font-mono text-[14px] text-ink outline-none placeholder:font-sans placeholder:text-faint disabled:text-muted-foreground",
+            "h-12 w-full pr-12 font-mono text-ui text-ink outline-none placeholder:font-sans placeholder:text-faint disabled:text-muted-foreground",
             inline
               ? "bg-transparent"
-              : "rounded-[14px] border border-foreground/[0.12] bg-background pl-4 transition-[border-color,box-shadow] focus-visible:border-foreground/25 focus-visible:ring-[3px] focus-visible:ring-ring/25 disabled:bg-surface",
+              : "rounded-card border border-foreground/[0.12] bg-background pl-4 transition-[border-color,box-shadow] focus-visible:border-foreground/25 focus-visible:ring-[3px] focus-visible:ring-ring/25 disabled:bg-surface",
           )}
         />
         <button
@@ -87,7 +87,7 @@ export function SecretInput({
           aria-label={visible ? `Hide ${label}` : `Show ${label}`}
           aria-controls={id}
           onClick={() => setVisible((shown) => !shown)}
-          className="absolute inset-y-0 right-1.5 my-auto grid size-9 place-items-center rounded-[10px] text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink"
+          className="absolute inset-y-0 right-1.5 my-auto grid size-9 place-items-center rounded-control text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink"
         >
           {visible ? (
             <EyeOff aria-hidden className="size-4" />
@@ -103,7 +103,7 @@ export function SecretInput({
 /** Where what is typed goes, said under every secret's field: in core's words where it says. */
 export function SecretNote({ says }: { readonly says?: string }) {
   return (
-    <p className="flex items-start gap-2 text-left text-[12.5px] leading-[18px] text-muted-foreground">
+    <p className="flex items-start gap-2 text-left text-meta leading-[18px] text-muted-foreground">
       <LockKeyhole aria-hidden className="mt-px size-3.5 flex-none text-positive" />
       {says ??
         "What you paste goes straight to Auni on this computer, and from there only to the service it is for. Its AI never sees it."}

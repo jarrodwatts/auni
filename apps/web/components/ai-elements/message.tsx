@@ -25,8 +25,7 @@ const STREAM_ANIMATE = {
 /** Whether a link in Auni's words goes to a place in this app: a path under /app, on this origin. */
 function inApp(link: string): boolean {
   return (
-    link.startsWith("/app") &&
-    new URL(link, window.location.href).origin === window.location.origin
+    link.startsWith("/app") && new URL(link, window.location.href).origin === window.location.origin
   );
 }
 
@@ -63,7 +62,7 @@ export const MessageResponse = memo(
           "[&_[data-streamdown=unordered-list]]:ml-1 [&_[data-streamdown=unordered-list]]:list-outside [&_[data-streamdown=unordered-list]]:pl-5",
           "[&_[data-streamdown=ordered-list]]:ml-1 [&_[data-streamdown=ordered-list]]:list-outside [&_[data-streamdown=ordered-list]]:pl-5",
           "[&_[data-streamdown=list-item]]:py-0.5 [&_[data-streamdown=list-item]]:pl-0.5 [&_[data-streamdown=list-item]::marker]:text-muted-foreground/70",
-          "[&_[data-streamdown=blockquote]]:rounded-r-xl [&_[data-streamdown=blockquote]]:bg-muted/35 [&_[data-streamdown=blockquote]]:py-2.5 [&_[data-streamdown=blockquote]]:pr-4",
+          "[&_[data-streamdown=blockquote]]:rounded-r-card [&_[data-streamdown=blockquote]]:bg-muted/35 [&_[data-streamdown=blockquote]]:py-2.5 [&_[data-streamdown=blockquote]]:pr-4",
           // A quote's paragraphs stand apart, as they do outside one.
           "[&_[data-streamdown=blockquote]_p+p]:mt-2",
           className,

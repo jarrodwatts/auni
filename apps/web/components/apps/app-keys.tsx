@@ -97,7 +97,7 @@ function KeyFields({
   readonly focusRef?: Ref<HTMLInputElement> | undefined;
 }) {
   const refusal = refused ? (
-    <p role="alert" className="text-[13px] leading-[18px] text-destructive">
+    <p role="alert" className="text-meta leading-[18px] text-destructive">
       {refused}
     </p>
   ) : null;
@@ -121,7 +121,7 @@ function KeyFields({
         {field(setting!, 0, false)}
         {refusal ??
           (setting!.help ? (
-            <p className="text-[13px] leading-[18px] text-muted-foreground">{setting!.help}</p>
+            <p className="text-meta leading-[18px] text-muted-foreground">{setting!.help}</p>
           ) : null)}
       </div>
     );
@@ -130,11 +130,11 @@ function KeyFields({
   return (
     <div className="flex flex-col gap-2">
       {help.map((line) => (
-        <p key={line} className="text-[13px] leading-[18px] text-muted-foreground">
+        <p key={line} className="text-meta leading-[18px] text-muted-foreground">
           {line}
         </p>
       ))}
-      <div className="divide-y divide-foreground/[0.07] overflow-hidden rounded-[16px] border border-foreground/[0.12] bg-background transition-[border-color,box-shadow] focus-within:border-foreground/25 focus-within:ring-[3px] focus-within:ring-ring/25">
+      <div className="divide-y divide-foreground/[0.07] overflow-hidden rounded-card border border-foreground/[0.12] bg-background transition-[border-color,box-shadow] focus-within:border-foreground/25 focus-within:ring-[3px] focus-within:ring-ring/25">
         {settings.map((setting, index) => field(setting, index, true))}
       </div>
       {refusal}
@@ -325,8 +325,8 @@ function FileRow({
       {where ? (
         <p className="mt-1.5 text-meta leading-[1.55] text-muted-foreground">
           It changes whom Auni trusts, so only your settings file sets it:{" "}
-          <code className="font-mono text-[12px] text-ink wrap-anywhere">{setting.env}</code> in{" "}
-          <code className="font-mono text-[12px] text-ink wrap-anywhere">{settingsFile}</code>.
+          <code className="font-mono text-caption text-ink wrap-anywhere">{setting.env}</code> in{" "}
+          <code className="font-mono text-caption text-ink wrap-anywhere">{settingsFile}</code>.
         </p>
       ) : null}
     </AutoHeight>
@@ -335,4 +335,4 @@ function FileRow({
 
 /** A small quiet action beside a row: "Replace", "Where?". */
 export const quietPillClass =
-  "flex h-9 flex-none items-center rounded-full bg-foreground/[0.05] px-4 text-[13.5px] font-semibold text-ink transition-colors duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-55";
+  "flex h-9 flex-none items-center rounded-full bg-foreground/[0.05] px-4 text-ui font-semibold text-ink transition-colors duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-55";

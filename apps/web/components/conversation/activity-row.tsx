@@ -1,5 +1,7 @@
 "use client";
 
+import "./activity-row.css";
+
 import { ChevronDown } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -110,7 +112,7 @@ export function ActivityRow({
       {result === undefined && duration === undefined ? null : (
         <span
           className={cn(
-            "flex max-w-[52%] min-w-0 flex-none items-center text-[12.5px] tabular-nums",
+            "flex max-w-[52%] min-w-0 flex-none items-center text-meta",
             result && duration && "gap-2",
           )}
         >

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { OtherTokensDialog, OtherTokensMark } from "./other-tokens";
 import { otherTokensLabel } from "./other-tokens-text";
 
-const LIST = "overflow-hidden rounded-[20px] bg-surface";
+const LIST = "overflow-hidden rounded-card bg-surface";
 const ROW =
   "flex items-center pl-4 outline-none transition-colors duration-150 active:bg-foreground/[0.04] focus-visible:bg-foreground/[0.04]";
 const RULE = "group-[:not(:first-child)]/row:border-t border-foreground/[0.06]";
@@ -102,14 +102,14 @@ function Row({
             {name}
           </span>
           {value ? (
-            <span className="flex-none text-reading leading-[22px] font-semibold tracking-[-0.01em] text-ink tabular-nums">
+            <span className="flex-none text-reading leading-[22px] font-semibold tracking-[-0.01em] text-ink">
               {value}
             </span>
           ) : null}
         </span>
         <span className="flex items-baseline gap-3 text-meta">
           <span className="min-w-0 flex-1 truncate text-muted-foreground">{note}</span>
-          {move ? <span className="flex-none tabular-nums">{move}</span> : null}
+          {move ? <span className="flex-none">{move}</span> : null}
         </span>
       </span>
     </>

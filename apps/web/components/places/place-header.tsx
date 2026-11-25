@@ -108,7 +108,7 @@ export function PlaceHeader({
             aria-haspopup="dialog"
             onClick={showPane}
             className={cn(
-              "flex h-8 items-center gap-2 rounded-full px-3 text-[13.5px] tabular-nums transition-colors duration-200 hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none max-xl:bg-foreground/[0.04] max-sm:gap-1.5 max-sm:px-2.5",
+              "flex h-8 items-center gap-2 rounded-full px-3 text-ui transition-colors duration-200 hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none max-xl:bg-foreground/[0.04] max-sm:gap-1.5 max-sm:px-2.5",
               // Each time the pane closes, the value eases in to stand for it.
               "duration-300 ease-settle motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-2",
               paneOpen && "xl:hidden",
@@ -118,7 +118,7 @@ export function PlaceHeader({
             {money}
           </button>
         ) : money ? (
-          <span className="mr-1 flex items-baseline gap-2 text-[13.5px] tabular-nums">{money}</span>
+          <span className="mr-1 flex items-baseline gap-2 text-ui">{money}</span>
         ) : null}
         {actions}
         {pane && !preview ? (
@@ -130,7 +130,7 @@ export function PlaceHeader({
                 aria-label="Show details"
                 aria-haspopup="dialog"
                 onClick={showPane}
-                className="flex size-8 items-center justify-center rounded-lg text-faint transition-colors duration-200 hover:bg-foreground/[0.05] hover:text-ink xl:hidden"
+                className="flex size-8 items-center justify-center rounded-card text-faint transition-colors duration-200 hover:bg-foreground/[0.05] hover:text-ink xl:hidden"
               >
                 <PanelRight aria-hidden className="size-[17px]" />
               </button>
@@ -141,7 +141,7 @@ export function PlaceHeader({
               aria-pressed={paneOpen}
               onClick={() => setPaneOpen(!paneOpen)}
               className={cn(
-                "hidden size-8 items-center justify-center rounded-lg transition-colors duration-200 xl:flex",
+                "hidden size-8 items-center justify-center rounded-card transition-colors duration-200 xl:flex",
                 paneOpen
                   ? "bg-foreground/[0.05] text-ink"
                   : "text-faint hover:bg-foreground/[0.05] hover:text-ink",

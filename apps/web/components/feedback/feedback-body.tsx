@@ -46,9 +46,9 @@ export function FeedbackBody({
   return (
     <div className="@container" data-testid="feedback" data-kind={feedback.kind}>
       {/* The note itself, as it would read on GitHub: its title, then each thing it says. */}
-      <div className="rounded-[16px] bg-foreground/[0.035] px-4 pt-3.5 pb-4">
-        <p className="text-[12px] leading-4 font-medium text-faint">What will be posted</p>
-        <p className="mt-1.5 text-[16px] leading-[22px] font-semibold tracking-[-0.015em] text-pretty text-ink">
+      <div className="rounded-card bg-foreground/[0.035] px-4 pt-3.5 pb-4">
+        <p className="text-caption leading-4 font-medium text-faint">What will be posted</p>
+        <p className="mt-1.5 text-reading leading-[22px] font-semibold tracking-[-0.015em] text-pretty text-ink">
           {feedback.title}
         </p>
         {rows.length > 0 ? (
@@ -58,12 +58,12 @@ export function FeedbackBody({
                 key={part.field}
                 className="grid grid-cols-[minmax(0,5fr)_minmax(0,8fr)] gap-x-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,5fr)]"
               >
-                <dt className="pt-px text-[13px] leading-5 text-muted-foreground">{part.label}</dt>
-                <dd className="min-w-0 text-[14.5px] leading-5 text-pretty text-ink wrap-anywhere">
+                <dt className="pt-px text-meta leading-5 text-muted-foreground">{part.label}</dt>
+                <dd className="min-w-0 text-body leading-5 text-pretty text-ink wrap-anywhere">
                   {part.reads ?? part.value}
                   {/* The owner's words first; what is posted is the maintainers' name for it. */}
                   {part.reads ? (
-                    <span className="block text-[12.5px] leading-[18px] text-muted-foreground">
+                    <span className="block text-meta leading-[18px] text-muted-foreground">
                       Posted as {part.value}
                     </span>
                   ) : null}
@@ -82,7 +82,7 @@ export function FeedbackBody({
               <li
                 key={part.field}
                 className={cn(
-                  "rounded-[14px] border transition-[background-color,border-color] duration-200 ease-settle",
+                  "rounded-card border transition-[background-color,border-color] duration-200 ease-settle",
                   on
                     ? "border-foreground/[0.14] bg-card"
                     : "border-transparent bg-foreground/[0.035]",
@@ -94,12 +94,12 @@ export function FeedbackBody({
                     role="checkbox"
                     aria-checked={on}
                     onClick={() => tick(part.field)}
-                    className="flex w-full items-start gap-3 rounded-[14px] px-3.5 pt-3 pb-1.5 text-left focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
+                    className="flex w-full items-start gap-3 rounded-card px-3.5 pt-3 pb-1.5 text-left focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
                   >
                     <span
                       aria-hidden
                       className={cn(
-                        "mt-px flex size-5 flex-none items-center justify-center rounded-[7px] border transition-colors duration-200 ease-settle",
+                        "mt-px flex size-5 flex-none items-center justify-center rounded-control border transition-colors duration-200 ease-settle",
                         on
                           ? "border-foreground bg-foreground text-background"
                           : "border-foreground/[0.22] bg-background",
@@ -108,10 +108,10 @@ export function FeedbackBody({
                       {on ? <Check className="size-3" strokeWidth={3.2} /> : null}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] leading-5 font-medium text-ink">
+                      <span className="block text-body leading-5 font-medium text-ink">
                         Also post {lowerFirst(part.label)}
                       </span>
-                      <span className="mt-0.5 block text-[13px] leading-[18px] text-muted-foreground">
+                      <span className="mt-0.5 block text-meta leading-[18px] text-muted-foreground">
                         {part.warning}
                       </span>
                     </span>
@@ -120,7 +120,7 @@ export function FeedbackBody({
                     type="button"
                     aria-expanded={seen}
                     onClick={() => show(part.field)}
-                    className="mb-2 ml-[46px] flex h-7 items-center gap-1 rounded-full text-[13px] font-medium text-muted-foreground transition-colors hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
+                    className="mb-2 ml-[46px] flex h-7 items-center gap-1 rounded-full text-meta font-medium text-muted-foreground transition-colors hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
                   >
                     {seen ? "Hide it" : "See exactly what it posts"}
                     <ChevronDown
@@ -133,7 +133,7 @@ export function FeedbackBody({
                     />
                   </button>
                   {seen ? (
-                    <p className="mr-3.5 mb-3 ml-[46px] rounded-[10px] bg-foreground/[0.04] px-3 py-2.5 text-[12.5px] leading-[19px] whitespace-pre-wrap text-ink wrap-anywhere">
+                    <p className="mr-3.5 mb-3 ml-[46px] rounded-control bg-foreground/[0.04] px-3 py-2.5 text-meta leading-[19px] whitespace-pre-wrap text-ink wrap-anywhere">
                       {part.value}
                     </p>
                   ) : null}
@@ -143,7 +143,7 @@ export function FeedbackBody({
           })}
         </ul>
       ) : null}
-      <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">
+      <p className="mt-4 text-meta leading-[1.45] text-muted-foreground">
         {opened
           ? "GitHub's form is open in your browser with this filled in. Press Submit there to post it."
           : "This opens GitHub's form in your browser with this filled in, under your own account. Auni sends nothing, and you can change it there before you post."}
@@ -162,7 +162,7 @@ export function FeedbackBody({
           {opened ? "Open it again" : "Open on GitHub"}
           <ArrowUpRight aria-hidden className="size-4" strokeWidth={2.4} />
         </MoneyButton>
-        <p className="flex min-w-0 flex-1 flex-wrap justify-center gap-x-5 gap-y-1 text-[13px] leading-5 @xl:justify-start">
+        <p className="flex min-w-0 flex-1 flex-wrap justify-center gap-x-5 gap-y-1 text-meta leading-5 @xl:justify-start">
           <button
             type="button"
             className={QUIET_LINK}
@@ -178,7 +178,7 @@ export function FeedbackBody({
       {clipboard.blocked ? (
         <p
           role="alert"
-          className="mt-1.5 text-center text-[12.5px] text-muted-foreground @xl:text-left"
+          className="mt-1.5 text-center text-meta text-muted-foreground @xl:text-left"
         >
           Copying was blocked, so GitHub&apos;s form is the way to post it.
         </p>

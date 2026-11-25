@@ -39,7 +39,7 @@ const WAITING_WIDTHS = [212, 176, 238, 194].slice(0, STARTING_POINTS);
 // words start a fixed GAP after it. Rows are 52 tall with nothing between them, so the evenness
 // comes from the rhythm. A row lightens under a pointer. On a phone the words may run to the
 // row's edge, which keeps no padding there.
-const ROW = "flex h-[52px] w-full items-center rounded-[14px] pr-0 text-left sm:pr-3";
+const ROW = "flex h-[52px] w-full items-center rounded-card pr-0 text-left sm:pr-3";
 const ROW_SPACING = { paddingLeft: INSET, gap: GAP } as const;
 
 /**
@@ -84,7 +84,7 @@ export function StartingPoints() {
                 onClick={() => void start(point.prompt)}
                 title={point.sources.map(cited).join("\n")}
                 style={ROW_SPACING}
-                className={`${ROW} text-[15px] tracking-[-0.01em] transition-colors sm:text-[16px] duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60`}
+                className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60`}
               >
                 {/* 15px on a phone, PHONE_TEXT_PX, which core measures each line at (lineFits). */}
                 <PointImage image={point.image} />
@@ -103,7 +103,7 @@ export function StartingPoints() {
       {/* Always one line tall: their money is read after the page draws, and a line arriving
           then would push the page, which is centred, up by half of it. */}
       <div
-        className="mt-2 flex h-5 items-center justify-between gap-3 pr-2 text-[13px] leading-5 text-muted-foreground"
+        className="mt-2 flex h-5 items-center justify-between gap-3 pr-2 text-meta leading-5 text-muted-foreground"
         style={{ paddingLeft: WORDS_START }}
       >
         <span className="min-w-0 truncate">
@@ -145,7 +145,7 @@ export function StartingPoints() {
             type="button"
             disabled={refresh.isPending || pending}
             onClick={() => refresh.mutate()}
-            className="inline-flex flex-none items-center gap-1 text-[12px] text-faint transition-colors hover:text-ink disabled:opacity-50"
+            className="inline-flex flex-none items-center gap-1 text-caption text-faint transition-colors hover:text-ink disabled:opacity-50"
           >
             <RefreshCw
               aria-hidden
@@ -156,7 +156,7 @@ export function StartingPoints() {
         ) : null}
       </div>
       {error && (
-        <p role="alert" className="mt-2 text-center text-xs text-destructive">
+        <p role="alert" className="mt-2 text-center text-caption text-destructive">
           {error}
         </p>
       )}

@@ -1,0 +1,4 @@
+.auni-message-enter {
+  transform-origin: right bottom;
+  animation: auni-message-enter 240ms var(--motion-settle) both;
+}

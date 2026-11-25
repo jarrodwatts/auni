@@ -62,12 +62,12 @@ export function ChannelsPane({ highlightedTarget }: { readonly highlightedTarget
 
       <div id="setting-channel-apps" className="scroll-mt-4 flex flex-col gap-4">
         {apps.isPending && channelApps.length === 0 ? (
-          <div className="flex items-center justify-center gap-2 rounded-[16px] border border-foreground/[0.08] bg-card py-10 text-[13px] text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 rounded-card border border-foreground/[0.08] bg-card py-10 text-meta text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin" />
             Loading chat apps…
           </div>
         ) : channelApps.length === 0 ? (
-          <div className="rounded-[16px] border border-foreground/[0.08] bg-card px-5 py-6 text-[13px] text-muted-foreground">
+          <div className="rounded-card border border-foreground/[0.08] bg-card px-5 py-6 text-meta text-muted-foreground">
             No chat channel apps are installed in this build.
           </div>
         ) : (

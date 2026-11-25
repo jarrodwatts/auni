@@ -1,12 +1,16 @@
 "use client";
 
+import { AUNI_REPO_URL } from "@auni/shared";
 import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 
 import { Mascot } from "@/components/brand/mascot";
 import { Button } from "@/components/ui/button";
 
-/** A screen that threw stays inside the app's frame, with a way back, rather than blanking it. */
+/**
+ * A screen that threw stays inside the app's frame, with the ways out there are: try it again,
+ * or tell Auni's makers (with only the error's digest, which names nothing of the owner's).
+ */
 export default function AppError({
   error,
   retry,
@@ -18,17 +22,28 @@ export default function AppError({
     console.error(error);
   }, [error]);
 
+  const report = new URL(`${AUNI_REPO_URL}/issues/new`);
+  report.searchParams.set("title", "A screen in the web app hit an error");
+  report.searchParams.set("body", `What I was doing:\n\n\nError digest: ${error.digest ?? "none"}`);
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center px-6 pb-16 text-center">
-      <Mascot alt="" size={72} state="sad" />
-      <h2 className="mt-5 text-amount tracking-[-0.02em] text-ink">Something went wrong</h2>
-      <p className="mt-2 max-w-[380px] text-ui leading-[1.5] font-normal text-muted-foreground">
-        Your money stays in your own wallet.
+      <Mascot alt="" size={64} state="sad" />
+      <h2 className="mt-5 text-section text-ink">This view hit an error</h2>
+      <p className="mt-2 max-w-[380px] text-body text-muted-foreground">
+        Your money is untouched. Trying again usually clears it.
       </p>
-      <Button onClick={() => retry()} type="button" variant="outline" className="mt-6">
-        <RefreshCw aria-hidden />
-        Try again
-      </Button>
+      <div className="mt-6 flex gap-2">
+        <Button onClick={() => retry()} type="button">
+          <RefreshCw aria-hidden />
+          Try again
+        </Button>
+        <Button asChild variant="outline">
+          <a href={report.href} target="_blank" rel="noreferrer">
+            Report it
+          </a>
+        </Button>
+      </div>
     </div>
   );
 }

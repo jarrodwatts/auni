@@ -16,10 +16,8 @@ function share(holding: Holding, total: bigint): number {
 function useHoldingTint(holding: Holding): string {
   const colors = useBrandColors(holding.logoUrl);
   if (!colors) return "var(--border)";
-  const soft = (color: string) => `color-mix(in oklab, ${color} 62%, var(--background))`;
-  return colors.from === colors.to
-    ? soft(colors.from)
-    : `linear-gradient(90deg, ${soft(colors.from)}, ${soft(colors.to)})`;
+  // The logo's own colour, solid: a holding's colour comes from its mark, never a gradient.
+  return `color-mix(in oklab, ${colors.from} 62%, var(--background))`;
 }
 
 function Segment({
@@ -52,7 +50,7 @@ function Segment({
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={2}>
         {holding.name}
-        <span className="ml-2 text-background/60 tabular-nums">{width.toFixed(0)}%</span>
+        <span className="ml-2 text-background/60">{width.toFixed(0)}%</span>
       </TooltipContent>
     </Tooltip>
   );
@@ -103,8 +101,8 @@ function HoldingRow({ holding, total }: { readonly holding: Holding; readonly to
     <li className="flex h-16 items-center gap-3">
       <AssetLogo holding={holding} size={40} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-medium text-ink">{holding.name}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted-foreground tabular-nums">
+        <p className="truncate text-body font-medium text-ink">{holding.name}</p>
+        <p className="mt-0.5 flex items-center gap-1.5 text-meta text-muted-foreground">
           <span
             aria-hidden
             className="size-1.5 flex-none rounded-full"
@@ -114,14 +112,12 @@ function HoldingRow({ holding, total }: { readonly holding: Holding; readonly to
         </p>
       </div>
       <div className="flex-none text-right">
-        <p className="text-[15px] font-semibold text-ink tabular-nums">
-          {formatUsdcBalance(value)}
-        </p>
+        <p className="text-body font-semibold text-ink">{formatUsdcBalance(value)}</p>
         {change === null ? null : (
           <Change
             pct={changePercent(change, value)}
             period="today"
-            className="mt-0.5 block text-[13px] font-medium"
+            className="mt-0.5 block text-meta font-medium"
           />
         )}
       </div>

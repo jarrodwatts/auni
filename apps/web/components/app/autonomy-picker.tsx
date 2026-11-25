@@ -65,7 +65,8 @@ export function AutonomyPicker({
   const auto = actMode === "within_limits";
   const label = auto ? `Auto ${formatBudget(budgetUsd)}` : "Ask first";
   const parsedBudget = Number(draftBudget);
-  const validBudget = Number.isFinite(parsedBudget) && parsedBudget > 0 && parsedBudget <= 1_000_000;
+  const validBudget =
+    Number.isFinite(parsedBudget) && parsedBudget > 0 && parsedBudget <= 1_000_000;
   const alwaysOn = me.reach.staysOn.stays;
 
   const chooseAskFirst = () => {
@@ -94,7 +95,7 @@ export function AutonomyPicker({
           data-mode={auto ? "auto" : "ask"}
           aria-label={`${label}. Change thread spending permissions.`}
           className={cn(
-            "flex h-7 items-center gap-1.5 rounded-[8px] px-2 text-[12.5px] whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-7 items-center gap-1.5 rounded-control px-2 text-meta whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
             auto
               ? "bg-primary/[0.08] font-medium text-primary hover:bg-primary/[0.13] data-[state=open]:bg-primary/[0.13]"
               : "text-muted-foreground hover:bg-foreground/[0.045] hover:text-ink data-[state=open]:bg-foreground/[0.05] data-[state=open]:text-ink",
@@ -115,13 +116,11 @@ export function AutonomyPicker({
         side="top"
         sideOffset={8}
         onCloseAutoFocus={(event) => event.preventDefault()}
-        className="w-[332px] rounded-[16px] border-foreground/[0.08] p-2 shadow-menu"
+        className="w-[332px] rounded-card border-foreground/[0.08] p-2 shadow-float"
       >
         <div className="px-2 pt-1 pb-2">
-          <p className="text-[13.5px] font-semibold tracking-[-0.01em] text-ink">
-            Thread permissions
-          </p>
-          <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+          <p className="text-ui font-semibold tracking-[-0.01em] text-ink">Thread permissions</p>
+          <p className="mt-0.5 truncate text-caption text-muted-foreground">
             {threadTitle ?? "Applies when this thread starts"}
           </p>
         </div>
@@ -131,7 +130,7 @@ export function AutonomyPicker({
             type="button"
             onClick={chooseAskFirst}
             className={cn(
-              "flex w-full items-start gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left transition-colors outline-none hover:bg-foreground/[0.045]",
+              "flex w-full items-start gap-2.5 rounded-control px-2.5 py-2.5 text-left transition-colors outline-none hover:bg-foreground/[0.045]",
               draftMode === "ask_first" && "bg-foreground/[0.045]",
             )}
           >
@@ -139,8 +138,8 @@ export function AutonomyPicker({
               <Hand aria-hidden className="size-3.5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-medium text-ink">Ask first</span>
-              <span className="mt-0.5 block text-[12px] leading-[1.4] text-muted-foreground">
+              <span className="block text-ui font-medium text-ink">Ask first</span>
+              <span className="mt-0.5 block text-caption leading-[1.4] text-muted-foreground">
                 Every move waits for your tap on a card. Nothing spends without you.
               </span>
             </span>
@@ -153,16 +152,16 @@ export function AutonomyPicker({
             type="button"
             onClick={() => setDraftMode("within_limits")}
             className={cn(
-              "flex w-full items-start gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left transition-colors outline-none hover:bg-foreground/[0.045]",
+              "flex w-full items-start gap-2.5 rounded-control px-2.5 py-2.5 text-left transition-colors outline-none hover:bg-foreground/[0.045]",
               draftMode === "within_limits" && "bg-primary/[0.06]",
             )}
           >
-            <span className="mt-0.5 flex size-7 flex-none items-center justify-center rounded-full bg-primary/[0.1] text-primary">
+            <span className="mt-0.5 flex size-7 flex-none items-center justify-center rounded-full bg-glyph-plate text-primary">
               <Zap aria-hidden className="size-3.5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-medium text-ink">Auto within budget</span>
-              <span className="mt-0.5 block text-[12px] leading-[1.4] text-muted-foreground">
+              <span className="block text-ui font-medium text-ink">Auto within budget</span>
+              <span className="mt-0.5 block text-caption leading-[1.4] text-muted-foreground">
                 Buys and sells stocks, tokens, savings, and market bets inside a dollar cap. Perps,
                 bridges, and withdrawals still ask.
               </span>
@@ -174,16 +173,13 @@ export function AutonomyPicker({
         </div>
 
         {draftMode === "within_limits" ? (
-          <div className="mt-2 rounded-[12px] bg-surface p-2.5">
+          <div className="mt-2 rounded-control bg-surface p-2.5">
             <div className="flex items-center justify-between gap-2">
-              <label
-                htmlFor="auni-auto-budget"
-                className="text-[12px] font-medium text-ink-soft"
-              >
+              <label htmlFor="auni-auto-budget" className="text-caption font-medium text-ink-soft">
                 Spending budget
               </label>
               {auto && freeBudgetUsd != null ? (
-                <span className="text-[11.5px] text-muted-foreground tabular-nums">
+                <span className="text-caption text-muted-foreground">
                   {formatBudget(freeBudgetUsd)} left of {formatBudget(budgetUsd)}
                 </span>
               ) : null}
@@ -198,7 +194,7 @@ export function AutonomyPicker({
                     type="button"
                     onClick={() => setDraftBudget(String(preset))}
                     className={cn(
-                      "h-7 rounded-[8px] text-[12px] font-medium tabular-nums transition-colors outline-none",
+                      "h-7 rounded-control text-caption font-medium transition-colors outline-none",
                       activePreset
                         ? "bg-foreground text-background"
                         : "bg-background text-ink-soft ring-1 ring-foreground/[0.08] hover:text-ink",
@@ -220,7 +216,7 @@ export function AutonomyPicker({
               <div className="relative flex-1">
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[13px] text-muted-foreground"
+                  className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-meta text-muted-foreground"
                 >
                   $
                 </span>
@@ -233,20 +229,20 @@ export function AutonomyPicker({
                   step="any"
                   value={draftBudget}
                   onChange={(event) => setDraftBudget(event.target.value)}
-                  className="h-8 w-full rounded-[8px] bg-background pr-2.5 pl-6 text-[13px] text-ink ring-1 ring-foreground/[0.1] outline-none tabular-nums focus:ring-ring"
+                  className="h-8 w-full rounded-control bg-background pr-2.5 pl-6 text-meta text-ink ring-1 ring-foreground/[0.1] outline-none focus:ring-ring"
                 />
               </div>
               <button
                 type="submit"
                 disabled={!validBudget}
-                className="h-8 flex-none rounded-[8px] bg-foreground px-3 text-[12.5px] font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="h-8 flex-none rounded-control bg-foreground px-3 text-meta font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
               >
                 {auto ? "Update" : "Turn on"}
               </button>
             </form>
 
             {!alwaysOn ? (
-              <div className="mt-2.5 flex items-start gap-2 rounded-[9px] bg-warning-surface px-2.5 py-2 text-[11.5px] leading-[1.4] text-warning">
+              <div className="mt-2.5 flex items-start gap-2 rounded-control bg-surface px-2.5 py-2 text-caption leading-[1.4] text-ink-soft">
                 <Laptop aria-hidden className="mt-0.5 size-3.5 flex-none" />
                 <span>
                   Running locally on {me.reach.machine}. Auto actions pause when this computer

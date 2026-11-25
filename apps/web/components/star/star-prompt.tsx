@@ -1,5 +1,7 @@
 "use client";
 
+import "./star-prompt.css";
+
 import { AUNI_REPO_URL } from "@auni/shared";
 import { StarIcon } from "lucide-react";
 import { useEffect } from "react";

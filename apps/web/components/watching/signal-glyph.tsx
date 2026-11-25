@@ -1,3 +1,5 @@
+import "./signal-glyph.css";
+
 import { cn } from "@/lib/utils";
 
 /** Auni watching: a dot with waves that breathe out while it's on. */

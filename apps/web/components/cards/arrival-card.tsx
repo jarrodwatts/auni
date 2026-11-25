@@ -18,7 +18,7 @@ export function ArrivalCard({ card }: { readonly card: ArrivalCardWire }) {
   const Arrow = out ? ArrowUpRight : ArrowDownLeft;
   return (
     <div
-      className="my-2 flex w-full min-w-0 items-start gap-3 rounded-[18px] border border-foreground/[0.08] bg-card px-3.5 py-3"
+      className="my-2 flex w-full min-w-0 items-start gap-3 rounded-card border border-foreground/[0.08] bg-card px-3.5 py-3"
       data-direction={card.direction}
       data-testid="arrival"
     >
@@ -26,18 +26,18 @@ export function ArrivalCard({ card }: { readonly card: ArrivalCardWire }) {
         aria-hidden
         className={cn(
           "flex size-9 flex-none items-center justify-center rounded-full",
-          out ? "bg-warning-surface text-warning" : "bg-positive/10 text-positive",
+          out ? "bg-surface text-ink-soft" : "bg-positive/10 text-positive",
         )}
       >
         <Arrow className="size-4" strokeWidth={2.4} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[14.5px] leading-5 font-medium text-ink">{card.title}</p>
-        <p className="mt-0.5 text-[13.5px] leading-5 break-words text-muted-foreground">
+        <p className="text-body leading-5 font-medium text-ink">{card.title}</p>
+        <p className="mt-0.5 text-ui leading-5 break-words text-muted-foreground">
           {movedLine(card)}
         </p>
         {out ? (
-          <p className="mt-1.5 text-[13px] leading-[1.45] text-muted-foreground">
+          <p className="mt-1.5 text-meta leading-[1.45] text-muted-foreground">
             If this was you, there&apos;s nothing to do. If it wasn&apos;t, withdraw what&apos;s
             left to an address you trust.
           </p>
@@ -47,7 +47,7 @@ export function ArrivalCard({ card }: { readonly card: ArrivalCardWire }) {
         <Link
           href={settingsHref("wallet")}
           scroll={false}
-          className="flex h-9 flex-none items-center rounded-full bg-foreground px-4 text-[13.5px] font-semibold text-background"
+          className="flex h-9 flex-none items-center rounded-full bg-foreground px-4 text-ui font-semibold text-background"
         >
           Wallet
         </Link>

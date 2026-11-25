@@ -1,5 +1,7 @@
 "use client";
 
+import "./sidebar.css";
+
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
@@ -60,7 +62,7 @@ export function Sidebar({
     <PlaceLink
       href="/app"
       aria-label="Portfolio"
-      className="auni-touch-target flex items-center rounded-lg px-3 py-1 transition-opacity hover:opacity-75"
+      className="auni-touch-target flex items-center rounded-card px-3 py-1 transition-opacity hover:opacity-75"
     >
       <Lockup height={18} priority />
     </PlaceLink>

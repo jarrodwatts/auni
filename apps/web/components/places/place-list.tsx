@@ -82,7 +82,7 @@ export function PlaceList({ folded = false }: { readonly folded?: boolean }) {
               <span
                 aria-hidden
                 className={cn(
-                  "absolute -top-0.5 -right-0.5 size-2 rounded-full bg-negative ring-2 ring-sidebar",
+                  "absolute -top-0.5 -right-0.5 size-2 rounded-full bg-ink ring-2 ring-sidebar",
                   RAIL_FADE,
                 )}
               />

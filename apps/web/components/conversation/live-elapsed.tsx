@@ -33,7 +33,7 @@ export function LiveElapsed({
     <span
       aria-hidden
       className={cn(
-        "inline-flex items-baseline tabular-nums opacity-0 transition-opacity duration-300 ease-settle data-[shown=true]:opacity-100 motion-reduce:transition-none",
+        "inline-flex items-baseline opacity-0 transition-opacity duration-300 ease-settle data-[shown=true]:opacity-100 motion-reduce:transition-none",
         className,
       )}
       data-shown={shown ? "true" : "false"}

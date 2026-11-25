@@ -6,9 +6,17 @@
 // looks, light and dark, are the two values each token holds there; an app's look starts from
 // the light ones.
 
-/** Every design token the web declares: the custom properties of its tokens.css, by name. */
+/**
+ * Every design token the web declares: the custom properties of its tokens.css, by name. Not a
+ * `--color-*` one: each is Tailwind's name for a plain token (`--color-ink` is `--ink`), read in
+ * place of it, so a theme gives the plain one its value.
+ */
 export function designTokens(tokensCss: string): ReadonlySet<string> {
-  return new Set([...tokensCss.matchAll(/^\s*(--[a-z][\w-]*)\s*:/gmu)].map(([, name]) => name!));
+  return new Set(
+    [...tokensCss.matchAll(/^\s*(--[a-z][\w-]*)\s*:/gmu)]
+      .map(([, name]) => name!)
+      .filter((name) => !name.startsWith("--color-")),
+  );
 }
 
 /** What a theme may give a token: a colour, a length, a font: plain values, nothing fetched. */

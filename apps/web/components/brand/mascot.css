@@ -1,0 +1,159 @@
+/* The welcome mascot follows the cursor without scheduling React renders. */
+@keyframes auni-mascot-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1) rotate(0);
+  }
+  50% {
+    transform: translateY(-7px) scale(1.018, 0.992) rotate(-0.5deg);
+  }
+}
+
+/* Eyes travel in the artwork's viewBox, so gaze scales with the mascot. */
+.auni-mascot-face {
+  transform: translate(var(--auni-eye-x), var(--auni-eye-y));
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.auni-mascot-art {
+  overflow: visible;
+  filter: drop-shadow(0 12px 16px color-mix(in oklab, var(--ring) 14%, transparent));
+}
+
+.auni-mascot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auni-mascot-blink 6.8s ease-in-out infinite;
+}
+
+.auni-mascot-brow {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.auni-mascot-notice {
+  transform-origin: 50% 78%;
+}
+
+.auni-mascot-attention {
+  opacity: 0.45;
+  transition: opacity 280ms ease;
+}
+
+/* Faces Auni pulls only now and then, out of sight until a mood shows one. */
+.auni-mascot-mood {
+  display: none;
+}
+
+@keyframes auni-mascot-blink {
+  0%,
+  42%,
+  46%,
+  100% {
+    transform: scaleY(1);
+  }
+  44% {
+    transform: scaleY(0.08);
+  }
+}
+
+.auni-mascot-tracker {
+  transform: translate3d(var(--auni-track-x), var(--auni-track-y), 0)
+    rotate(var(--auni-track-rotate));
+  transform-origin: 50% 72%;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.auni-mascot-press {
+  transform: scale(1);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.auni-mascot-body {
+  animation: auni-mascot-breathe 4.6s ease-in-out infinite;
+  transform-origin: 50% 75%;
+  will-change: transform;
+}
+
+.auni-mascot-spark {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  opacity: 0;
+}
+
+.auni-mascot-zzz {
+  pointer-events: none;
+}
+
+.auni-mascot-zzz span {
+  position: absolute;
+  top: 6%;
+  left: 74%;
+  color: var(--color-primary);
+  font-size: calc(var(--auni-mascot-size) * 0.13);
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  animation: auni-mascot-z 3.6s ease-out infinite;
+}
+
+.auni-mascot-zzz span:nth-child(2) {
+  animation-delay: 1.2s;
+}
+
+.auni-mascot-zzz span:nth-child(3) {
+  animation-delay: 2.4s;
+}
+
+@keyframes auni-mascot-z {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6) rotate(-8deg);
+  }
+  20% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(var(--auni-mascot-size) * 0.22),
+        calc(var(--auni-mascot-size) * -0.34)
+      )
+      scale(1.25) rotate(12deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-mascot-tracker,
+  .auni-mascot-press,
+  .auni-mascot-face,
+  .auni-mascot-brow,
+  .auni-mascot-attention {
+    transition: none;
+  }
+  /* Asleep, its z's stay put. */
+  .auni-mascot-zzz span {
+    animation: none;
+    opacity: 0.7;
+  }
+  .auni-mascot-zzz span:nth-child(2) {
+    transform: translate(10px, -14px);
+  }
+  .auni-mascot-zzz span:nth-child(3) {
+    transform: translate(20px, -28px);
+  }
+}
+
+/*
+ * The gulp: Auni opens wide as the money comes in (its mark off the orbit, or dropped in from
+ * above where there is no orbit), shuts on it as it arrives, and a burst comes off it as it hops.
+ */
+.auni-mascot-mouth {
+  transform-box: fill-box;
+  transform-origin: 50% 40%;
+  transform: scale(0);
+}

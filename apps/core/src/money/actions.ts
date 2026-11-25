@@ -1,5 +1,5 @@
 import { CARD_FORMAT, RAW_TRANSACTION_TOOLS, RETRACTED, type actionWireSchema } from "@auni/shared";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { toolInput } from "../agent/tool.ts";
@@ -436,13 +436,10 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
     .from(actions)
     .where(eq(actions.id, actionId));
   if (!row) return null;
-  // Every leg in one lock, in one order, so two legs starting at once never wait on each other.
-  const card = await tx
-    .select()
-    .from(actions)
-    .where(row.proposalId ? eq(actions.proposalId, row.proposalId) : eq(actions.id, actionId))
-    .orderBy(actions.id)
-    .for("update");
+  const card = await lockLegs(
+    tx,
+    row.proposalId ? eq(actions.proposalId, row.proposalId) : eq(actions.id, actionId),
+  );
   const leg = card.find(({ id }) => id === actionId);
   let stopped: ActionRow[] = [];
   if (card.every(unstarted) && leftOutPermission(card)) {
@@ -468,6 +465,15 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
   if (first?.threadId && told)
     await wakeThread(first.threadId, told.reason, { key: told.id, tx });
   return null;
+}
+
+/**
+ * Locks these legs, in one order (by id), for the rest of the transaction. Every write to several
+ * legs of one plan that may run as one of them starts takes this first: two that each lock rows
+ * in their own order can each hold what the other waits for, and Postgres aborts one.
+ */
+export function lockLegs(tx: Tx, which: SQL): Promise<ActionRow[]> {
+  return tx.select().from(actions).where(which).orderBy(actions.id).for("update");
 }
 
 /**

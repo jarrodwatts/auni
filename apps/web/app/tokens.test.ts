@@ -26,10 +26,6 @@ const WRITTEN_IN: Readonly<Record<string, { readonly why: string; readonly colou
     why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
     colours: ["#000"],
   },
-  "components/motion/rolling-number.css": {
-    why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
-    colours: ["#000"],
-  },
   "components/ai-elements/conversation.css": {
     why: "black inside a CSS mask says where it shows; nobody sees it as a colour",
     colours: ["#000"],
@@ -334,8 +330,7 @@ describe("figures", () => {
   // timer changed width each second, and amounts stopped lining up (2026-11-25 council).
   it("stay tabular where they tick or stand in a column", () => {
     for (const file of [
-      "components/conversation/live-elapsed.tsx",
-      "components/conversation/work-panel.tsx",
+      "components/conversation/activity-row.tsx",
       "components/places/pane-holdings.tsx",
       "components/withdraw/withdraw-review.tsx",
       "components/cards/money/pick-detail.tsx",

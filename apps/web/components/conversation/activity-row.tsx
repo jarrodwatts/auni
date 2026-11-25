@@ -12,43 +12,33 @@ import { cn } from "@/lib/utils";
 
 /**
  * One step of the work on one line: what it did, what it found on the right,
- * and how it went at the end. A step too long for the line unfolds in place when tapped;
- * a thought shows its first sentence whole, wrapping rather than cut short, and unfolds the rest.
+ * and how it went at the end. A step too long for the line unfolds in place when tapped.
  */
 export function ActivityRow({
   detail,
-  duration,
   icon,
   result,
   status,
   swap = false,
   text,
-  whole,
 }: {
   readonly detail?: string | null;
-  /** How long a live step took once finished ("420ms", "1.2s"), shown quietly on the right. */
-  readonly duration?: string | null;
   readonly icon: ReactNode;
   /**
    * What the step found, a few quiet words: "$412 in cash". Given on any step
    * that may find something, null until it has, so the words blur in when it does.
    */
   readonly result?: string | null;
-  /** Where the step is, as a mark at the end of the line; a thought has none. */
+  /** Where the step is, as a mark at the end of the line. */
   readonly status?: Status | null;
-  /**
-   * Hand the words over in place as they change, as a tool step's do when it finishes.
-   * A thought only grows at its end, past what the line shows, so it stays put.
-   */
+  /** Hand the words over in place as they change, as a step's do when it finishes. */
   readonly swap?: boolean;
   readonly text: string;
-  /** All of a thought, of which `text` is the start: the line is never cut, and opens to this. */
-  readonly whole?: string;
 }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [cut, setCut] = useState(false);
   const [open, setOpen] = useState(false);
-  const clipped = cut || (whole !== undefined && whole.trim() !== text);
+  const clipped = cut;
 
   // `clipped` swaps the row's element, so the new text node is measured too.
   useLayoutEffect(() => {
@@ -81,11 +71,7 @@ export function ActivityRow({
       <span
         className={cn(
           "min-w-0 flex-1",
-          open
-            ? "break-words whitespace-pre-wrap"
-            : whole !== undefined
-              ? "text-pretty"
-              : !swap && "truncate",
+          open ? "break-words whitespace-pre-wrap" : !swap && "truncate",
         )}
         ref={textRef}
       >
@@ -101,7 +87,7 @@ export function ActivityRow({
         ) : (
           <SpotlightShimmer active={active} className="max-w-full">
             <span className="min-w-0 break-words">
-              <span className={tone}>{open && whole !== undefined ? whole : text}</span>
+              <span className={tone}>{text}</span>
               {detail ? (
                 <span className={active ? undefined : "auni-activity-detail"}> {detail}</span>
               ) : null}
@@ -109,26 +95,13 @@ export function ActivityRow({
           </SpotlightShimmer>
         )}
       </span>
-      {result === undefined && duration === undefined ? null : (
-        <span
-          className={cn(
-            "flex max-w-[52%] min-w-0 flex-none items-center text-meta tabular-nums",
-            result && duration && "gap-2",
-          )}
-        >
-          {result !== undefined ? (
-            <span className="flex min-w-0 text-muted-foreground/80">
-              <TextSwap align="end" text={result ?? ""} />
-            </span>
-          ) : null}
-          {duration !== undefined ? (
-            <span className="flex-none text-faint">
-              <TextSwap align="end" text={duration ?? ""} />
-            </span>
-          ) : null}
+      {result === undefined ? null : (
+        <span className="flex max-w-[52%] min-w-0 flex-none items-center text-meta text-muted-foreground/80 tabular-nums">
+          <TextSwap align="end" text={result ?? ""} />
         </span>
       )}
-      {status ? (
+      {/* A finished step's words already say it's done; only one under way or failed is marked. */}
+      {status && status !== "done" ? (
         <span className="flex h-5 flex-none items-center">
           <StatusMark size={14} status={status} variant="bare" />
         </span>

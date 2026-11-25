@@ -17,6 +17,8 @@ interface MessageTranscriptActivity {
   readonly cards: readonly CardWire[];
   /** Character offset into the message's joined text where this activity sat. */
   readonly offset: number;
+  /** A step that put up a card, here or at the end of the answer: once done, its card says it. */
+  readonly madeCards?: true;
 }
 
 /**
@@ -79,6 +81,11 @@ export function messageTranscript(message: AuniUiMessage): {
         : [],
     ),
   );
+  const madeCards = new Set(
+    message.parts.flatMap((part) =>
+      part.type === "data-cards" && part.id && part.data.cards.length > 0 ? [part.id] : [],
+    ),
+  );
   let offset = 0;
   let sawText = false;
   message.parts.forEach((part, index) => {
@@ -117,6 +124,7 @@ export function messageTranscript(message: AuniUiMessage): {
         part: part as AuniConversationActivityPart,
         offset,
         cards,
+        ...(madeCards.has(part.toolCallId) ? { madeCards: true as const } : {}),
       });
     }
   });

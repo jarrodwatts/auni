@@ -757,7 +757,7 @@ export async function settledOutcome(
   if (!SETTLED.includes(action.status)) return null;
   if (!action.proposalId)
     return {
-      reason: actionOutcome(action).slice(0, SETTLED_SAID),
+      reason: withCardShows(actionOutcome(action).replace(/[^.!?]$/u, "$&."), " "),
       id: `action-settled-${action.id}-a${action.attempts}`,
     };
   const legs = await proposalActions(action.proposalId, executor);
@@ -774,20 +774,29 @@ export async function settledOutcome(
   });
   const heading = `Every leg of proposal ${action.proposalId} has settled`;
   return {
-    reason: [
-      notDone.length === 0
-        ? `${heading}:`
-        : `${heading}; ${String(notDone.length)} of ${String(legs.length)} didn't go through:`,
-      ...list,
-      // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
-      ...[...notDone, ...legs.filter((leg) => leg.status === "done")].map(
-        (leg) => `- ${actionOutcome({ ...leg, error: said.has(leg.id) ? null : cut(leg) })}`,
-      ),
-    ]
-      .join("\n")
-      .slice(0, SETTLED_SAID),
+    reason: withCardShows(
+      [
+        notDone.length === 0
+          ? `${heading}:`
+          : `${heading}; ${String(notDone.length)} of ${String(legs.length)} didn't go through:`,
+        ...list,
+        // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
+        ...[...notDone, ...legs.filter((leg) => leg.status === "done")].map(
+          (leg) => `- ${actionOutcome({ ...leg, error: said.has(leg.id) ? null : cut(leg) })}`,
+        ),
+      ].join("\n"),
+      "\n",
+    ),
     id: `proposal-settled-${action.proposalId}-a${cardRuns(legs)}`,
   };
+}
+
+/** What the owner already sees of a settled move: its card, changed in place to how it ended. */
+const CARD_SHOWS = "Its card already shows the owner how it ended.";
+
+/** A settled wake's words cut to fit SETTLED_SAID, with CARD_SHOWS whole after them. */
+function withCardShows(said: string, between: string): string {
+  return `${said.slice(0, SETTLED_SAID - between.length - CARD_SHOWS.length)}${between}${CARD_SHOWS}`;
 }
 
 /**

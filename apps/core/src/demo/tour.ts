@@ -74,7 +74,7 @@ const STOPS: readonly Stop[] = [
     title: "The plan card",
     follows: true,
     does:
-      "I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money. Before answering I looked both stocks up and read your cash. Scroll up and tap **3 steps** to see it.\n\n" +
+      "I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money. Before answering I looked both stocks up and read your cash. Scroll up and tap the line that says so to see each step.\n\n" +
       "Tap a row to see why it is there. Then tap **Buy both for $1,350** and watch each buy land.",
     beats: [
       {
@@ -124,7 +124,7 @@ const STOPS: readonly Stop[] = [
       {
         hears: event("finished as failed"),
         notice:
-          "I ran that buy first, saw it would fail, and never sent it, so your money stayed where it was. Nothing is sent a second time by itself: **Try again** is yours to tap.",
+          "Nothing is sent a second time by itself: **Try again** on the card is yours to tap.",
         on: true,
       },
     ],

@@ -30,7 +30,6 @@ import { QuestionPicker } from "@/components/conversation/question-picker";
 import { useTrailingTextFlow } from "@/components/conversation/use-text-flow";
 import { moneyProgress } from "@/components/places/attention";
 import {
-  answerStartedAt,
   answeredQuestion,
   createOptimisticUserMessage,
   editableExchange,
@@ -292,11 +291,6 @@ export function ThreadPane({
                         }
                         message={message}
                         pending={live}
-                        workStartedAt={
-                          standIn || message.id === trailingMessage?.id
-                            ? answerStartedAt(turns, index)
-                            : undefined
-                        }
                         onAskAgent={askAgent}
                         onEditMessage={
                           regenerable && !failure && message.id === regenerable.userMessageId

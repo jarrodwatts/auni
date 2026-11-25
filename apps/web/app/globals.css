@@ -251,66 +251,6 @@ button:not(:disabled),
   }
 }
 
-/* Odometer-style vertical rolling digits with soft top/bottom mask fade. */
-@keyframes auni-digit-in {
-  from {
-    opacity: 0;
-    filter: blur(1.5px);
-    transform: translateY(105%);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
-  }
-}
-
-@keyframes auni-digit-out {
-  from {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    filter: blur(1.5px);
-    transform: translateY(-105%);
-  }
-}
-
-@keyframes auni-work-panel-enter {
-  from {
-    opacity: 0.45;
-    transform: translateY(2px) scale(0.996);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes auni-work-icon-enter {
-  from {
-    width: 0;
-    opacity: 0;
-    filter: blur(2px);
-    transform: scale(0.45);
-  }
-}
-
-@keyframes auni-work-row-enter {
-  from {
-    opacity: 0;
-    filter: blur(3px);
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: none;
-  }
-}
-
 /* Tactile arrival for live action/proposal cards landing inside a conversation. */
 @keyframes auni-card-enter {
   from {

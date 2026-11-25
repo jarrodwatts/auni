@@ -4,9 +4,8 @@ import "./conversation-message.css";
 
 import type { ThreadId } from "@auni/shared";
 import { getToolName } from "ai";
-import { Brain, OctagonPause, Pencil, RefreshCw } from "lucide-react";
+import { OctagonPause, Pencil, RefreshCw } from "lucide-react";
 
-import { AssistantMessageAvatar } from "@/components/app/assistant-message-avatar";
 import { ConversationCards } from "@/components/app/conversation-cards";
 import {
   CopyMessageAction,
@@ -16,19 +15,16 @@ import {
   useLongPressReveal,
 } from "@/components/app/message-action-row";
 import type { AskAgentHandler } from "@/components/cards/ask-agent";
-import { ActivityRow } from "@/components/conversation/activity-row";
 import { toolAppId, toolStepStatus } from "@/components/conversation/generic-activity-copy";
 import { GenericActivityTool, ToolStepIcon } from "@/components/conversation/generic-activity-tool";
-import { SegmentedBubbles } from "@/components/conversation/segmented-bubbles";
-import { answerWorkingLabel, firstSentence } from "@/components/conversation/tool-working-status";
+import { answerWorkingLabel } from "@/components/conversation/tool-working-status";
+import { TurnBody } from "@/components/conversation/turn-body";
 import type { TextFlowView } from "@/components/conversation/use-text-flow";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Message, MessageContent } from "@/components/ui/message";
-import { auniActivityMood } from "@/lib/auni-activity";
 import {
   messageCards,
   messageText,
-  messageToolParts,
   type AuniQuestion,
   type AuniUiMessage,
 } from "@/lib/conversation";
@@ -36,6 +32,7 @@ import { useShowThinking } from "@/components/places/stored-state";
 import { FiredRule } from "@/components/watching/fired-rule";
 import { WatchingLine } from "@/components/watching/watching-line";
 import { messageTranscript } from "@/lib/message-transcript";
+import { toolActivityTitle } from "@/lib/tool-copy";
 import { cn } from "@/lib/utils";
 
 interface ConversationMessageProps {
@@ -49,8 +46,6 @@ interface ConversationMessageProps {
   readonly isStreaming: boolean;
   /** The turn behind this answer is still running; live work stays open until it ends. */
   readonly pending?: boolean;
-  /** When the request was sent; the live work clock counts up from it. */
-  readonly workStartedAt?: string | undefined;
   /** Present only on the user message whose exchange may still be edited. */
   readonly onEditMessage?: () => void;
   /** Present only on the answer that may still be regenerated. */
@@ -72,7 +67,6 @@ export function ConversationMessage({
   onRegenerate,
   pending = false,
   threadId,
-  workStartedAt,
 }: ConversationMessageProps) {
   const text = messageText(message);
   const reveal = useLongPressReveal();
@@ -95,7 +89,7 @@ export function ConversationMessage({
           ) : null}
           <Bubble align="end" variant="muted">
             {text.length > 0 && (
-              <BubbleContent className="rounded-sheet rounded-br-control px-[18px] py-3 text-body leading-normal">
+              <BubbleContent className="rounded-sheet rounded-br-control px-4 py-2.5 text-reading">
                 <p className="whitespace-pre-wrap" dir="auto">
                   {text}
                 </p>
@@ -140,11 +134,6 @@ export function ConversationMessage({
   // The ask under an answer lands once its words have, so nothing below them ever moves.
   const settled =
     !working && (flow === undefined || (flow.visibleLength >= text.length && !flow.animating));
-  const activityMood = auniActivityMood({
-    activities: messageToolParts(message),
-    streaming: isStreaming,
-    text,
-  });
 
   const { fires } = message.metadata ?? {};
 
@@ -154,57 +143,46 @@ export function ConversationMessage({
       {/* Its actions show on hover in the space under the answer, as the owner's do under their
           words, rather than holding a row of their own open between one answer and the next. */}
       <Message align="start" className="pb-4" {...reveal}>
-        <AssistantMessageAvatar state={activityMood} />
         <MessageContent className="relative">
-          <SegmentedBubbles
-            workDurationMs={message.metadata?.workDurationMs}
-            workStartedAt={workStartedAt}
+          <TurnBody
             liveLabel={liveLabel}
-            activities={timeline.map(({ cards, key, offset, part }) => {
-              const isReasoning = part.type === "data-reasoning";
-              const toolName = isReasoning ? null : getToolName(part);
-              const appId = toolName ? toolAppId(toolName) : null;
+            activities={timeline.map(({ cards, key, madeCards, offset, part }) => {
+              const placed =
+                cards.length > 0 ? (
+                  <ConversationCards
+                    cards={cards}
+                    retried={transcript.retried}
+                    // A card something later followed up on offers no follow-up of its own.
+                    onAskAgent={cards.some(({ id }) => id === lastCardId) ? onAskAgent : undefined}
+                  />
+                ) : undefined;
+              if (part.type === "data-reasoning")
+                return { key, offset, thought: part.data.text, cards: placed };
+              // A step that put up a card says nothing once done: the card is what it did.
+              if (madeCards && part.state === "output-available")
+                return { key, offset, cards: placed };
+              const toolName = getToolName(part);
+              const appId = toolAppId(toolName);
               return {
                 key,
                 offset,
-                iconKey: isReasoning
-                  ? "thought"
-                  : appId
-                    ? `app:${appId}`
-                    : `tool:${toolName ?? "step"}`,
-                icon: isReasoning ? (
-                  <Brain className="size-3" aria-hidden />
-                ) : (
-                  <ToolStepIcon size={20} toolName={toolName ?? ""} />
-                ),
-                isTool: !isReasoning,
-                status: isReasoning ? null : toolStepStatus(part.state, working),
-                node: isReasoning ? (
-                  <ActivityRow
-                    icon={<Brain className="size-3.5" aria-hidden />}
-                    text={firstSentence(part.data.text)}
-                    whole={part.data.text}
-                  />
-                ) : (
-                  <GenericActivityTool
-                    input={part.input}
-                    live={working}
-                    output={part.state === "output-available" ? part.output : undefined}
-                    state={part.state}
-                    toolName={toolName ?? ""}
-                  />
-                ),
-                cards:
-                  cards.length > 0 ? (
-                    <ConversationCards
-                      cards={cards}
-                      retried={transcript.retried}
-                      // A card something later followed up on offers no follow-up of its own.
-                      onAskAgent={
-                        cards.some(({ id }) => id === lastCardId) ? onAskAgent : undefined
-                      }
+                cards: placed,
+                step: {
+                  key,
+                  iconKey: appId ? `app:${appId}` : `tool:${toolName}`,
+                  icon: <ToolStepIcon size={20} toolName={toolName} />,
+                  status: toolStepStatus(part.state, working),
+                  title: toolActivityTitle(toolName, part.state),
+                  node: (
+                    <GenericActivityTool
+                      input={part.input}
+                      live={working}
+                      output={part.state === "output-available" ? part.output : undefined}
+                      state={part.state}
+                      toolName={toolName}
                     />
-                  ) : undefined,
+                  ),
+                },
               };
             })}
             finalized={!working}

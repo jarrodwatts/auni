@@ -108,3 +108,31 @@ describe("where a card sits in an answer", () => {
     expect(asked.trailingCards).toEqual([feedback]);
   });
 });
+
+describe("a step that put up a card", () => {
+  const step = (toolCallId: string, toolName: string) => ({
+    type: `tool-${toolName}`,
+    toolCallId,
+    state: "output-available",
+    input: {},
+    output: "ok",
+  });
+
+  it("is marked, wherever its card sits, so once done the card alone says what it did", () => {
+    const buy = card("stock_trade", "awaiting_permission", face("Buy $250 of Nvidia"));
+    const message = {
+      id: "m2",
+      role: "assistant",
+      parts: [
+        step("look", "get_portfolio"),
+        step("buy", "stock_trade"),
+        { type: "data-cards", id: "buy", data: { cards: [buy] } },
+      ],
+    } as unknown as AuniUiMessage;
+    const { activities } = messageTranscript(message);
+    expect(activities.map(({ key, madeCards }) => [key, madeCards ?? false])).toEqual([
+      ["look", false],
+      ["buy", true],
+    ]);
+  });
+});

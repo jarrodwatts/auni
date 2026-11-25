@@ -112,7 +112,6 @@ const SCENES: readonly Scene[] = [
     shows: null,
     hears: /finished as done[^]*No app for Kintsu yet/u,
     async *play({ say, call }) {
-      yield* say("That's done. Your sMON shows in your portfolio now.");
       yield* call("send_feedback", {
         kind: "app",
         about: "Kintsu",
@@ -120,7 +119,7 @@ const SCENES: readonly Scene[] = [
         says: "Stake MON with Kintsu and see what it earns.",
       });
       yield* say(
-        "It worked, but I had to build that by hand. If you'd like Kintsu to work first time here, this asks for an app for it.",
+        "That worked, but I had to build it by hand. If you'd like Kintsu to work first time here, this asks for an app for it.",
       );
     },
   },
@@ -134,10 +133,7 @@ const SCENES: readonly Scene[] = [
       );
       yield* call("get_portfolio", {});
       yield* say(
-        "I sent that order to Polymarket and never got an answer, so I can't tell you whether it went through. I won't send it again, and nothing else of yours is affected.",
-      );
-      yield* say(
-        "Your portfolio reads your shares from Polymarket itself, so it is right either way. It still shows all of your Yes shares, which suggests the order never went in. I'll keep checking. The card lets you check again now, or close it once you're sure.",
+        "Your portfolio reads your shares from Polymarket itself, and it still shows all of your Yes shares, so that order most likely never went in. If you still want to sell, close that card and I'll put the sale up again.",
       );
     },
   },
@@ -152,19 +148,16 @@ const SCENES: readonly Scene[] = [
     },
   },
   {
+    // A card shows how its move ended, in place, so a move that went as asked needs no words:
+    // a real agent calls settle_quietly, and the demo's says nothing, which leaves the same, no
+    // answer at all. One that failed gets Auni's read of why, and what would work.
     name: "settled",
     shows: null,
     hears: /finished as (done|failed|cancelled)|has settled|The owner declined/u,
     async *play({ heard, say }) {
+      if (!/finished as failed/u.test(heard)) return;
       yield* say(
-        /finished as failed/u.test(heard)
-          ? "That one didn't go through, and nothing left your wallet. Say the word and I'll put it up again."
-          : /finished as cancelled|The owner declined/u.test(heard)
-            ? "No problem, I've left that as it was."
-            : // A cancelled order leaves nothing in the portfolio to point at.
-              /\(Cancel your order\b/u.test(heard)
-              ? "That's done. The order is off the book."
-              : "That's done. It shows in your portfolio now.",
+        "The market for it turned the trade down when I ran it first, which usually passes quickly. Try again in a minute, or say the word and I'll look for another route.",
       );
     },
   },
@@ -247,7 +240,7 @@ const SCENES: readonly Scene[] = [
         ],
       });
       yield* say(
-        "Here is where I'd start: $1,800 in Nvidia as the core and $900 in Tesla for the robotics upside, both on one card.",
+        "Chips are the surest part of the buildout, so Nvidia carries most of it. Tesla is the long shot: if robots take off it pays most, and if they don't, it's the smaller loss.",
       );
     },
   },
@@ -291,7 +284,7 @@ const SCENES: readonly Scene[] = [
         ],
       });
       yield* say(
-        "Eli Lilly and Novo Nordisk make nearly all of these drugs, and both trade as stocks on Monad where your cash sits. Here are both picks on one card.",
+        "Between them, Lilly and Novo make nearly all of these drugs, so owning both covers whichever wins. Lilly gets more because its pipeline leads.",
       );
     },
   },
@@ -305,7 +298,7 @@ const SCENES: readonly Scene[] = [
       );
       yield* call("aave_supply", { chain: "monad", amount_usd: "4000" });
       yield* say(
-        "I'll keep it simple: $4,000 into Aave on Monad, where it earns and stays one tap from cash.",
+        "Aave is the simplest home for cash you aren't using: it earns while it waits and comes back out whenever a buy needs it.",
       );
     },
   },
@@ -350,7 +343,9 @@ const SCENES: readonly Scene[] = [
           },
         ],
       });
-      yield* say("Here it is on one card: your cash moves into Hyperliquid, then the long opens.");
+      yield* say(
+        "I kept it to $2,000 of your cash, so a bad week for bitcoin can't reach the rest of your money.",
+      );
     },
   },
   {
@@ -365,9 +360,7 @@ const SCENES: readonly Scene[] = [
         leverage: 2,
         stopLoss: 3_600,
       });
-      yield* say(
-        "A small short with a stop above, so the most it can cost you is set before it opens.",
-      );
+      yield* say("Small on purpose: it's there to soften a fall, not to be a bet of its own.");
     },
   },
   {
@@ -385,7 +378,7 @@ const SCENES: readonly Scene[] = [
         stopLoss: 88_000,
       });
       yield* say(
-        "This waits on Hyperliquid's book and adds to your long only if bitcoin trades down there. Its stop goes on your position the moment the order is placed, and Hyperliquid holds it, so you are covered even while I'm switched off.",
+        "If bitcoin dips there you get a better price, and if it doesn't you've lost nothing. Hyperliquid holds the stop, so you're covered even while I'm switched off.",
       );
     },
   },
@@ -438,8 +431,8 @@ const SCENES: readonly Scene[] = [
       yield* call("hyperliquid_close", { market: "BTC", percent: part });
       yield* say(
         half
-          ? "This sells half of the long at the market and leaves the rest running."
-          : "This closes the whole long at the market, and what it is worth goes back to your Hyperliquid cash.",
+          ? "Taking half off banks some of the gain and leaves the rest running if bitcoin keeps going."
+          : "Closing it all takes the leverage off the table entirely. Say so if you'd rather keep a little running.",
       );
     },
   },
@@ -458,7 +451,7 @@ const SCENES: readonly Scene[] = [
           },
         ],
       });
-      yield* say("It comes out to Arbitrum first, then moves on to Monad, on one tap.");
+      yield* say("On Monad it sits with the rest of your cash, ready for your next buy.");
     },
   },
   {
@@ -481,9 +474,7 @@ const SCENES: readonly Scene[] = [
           },
         ],
       });
-      yield* say(
-        "Your savings come out and your Arbitrum cash comes home first, then the Nvidia sale goes, all on one tap.",
-      );
+      yield* say("Everything ends up as cash on Monad, in one place, ready for whatever's next.");
     },
   },
   {
@@ -492,7 +483,7 @@ const SCENES: readonly Scene[] = [
     hears: /back from hyperliquid|money out of hyperliquid/iu,
     async *play({ say, call }) {
       yield* call("hyperliquid_withdraw", { amountUsd: 500 });
-      yield* say("Hyperliquid keeps $1 of it, and the rest is in your wallet in a few minutes.");
+      yield* say("Say a different amount if you'd rather leave more there for your long.");
     },
   },
   {
@@ -599,7 +590,7 @@ const SCENES: readonly Scene[] = [
         amountUsd: Number(/\$(\d+)/u.exec(heard)?.[1] ?? 30),
       });
       yield* say(
-        "Tether Gold is backed by real gold, one token to an ounce. KyberSwap finds the best price for it when you tap.",
+        "Tether Gold is backed by real gold, one token to an ounce, so it's the closest thing here to holding the metal.",
       );
     },
   },
@@ -653,7 +644,7 @@ const SCENES: readonly Scene[] = [
         },
       });
       yield* say(
-        "I have no app for Kintsu yet, so I built this one myself. The card shows what it did when I ran it first.",
+        "I have no app for Kintsu yet, so I built this one myself. Stake only MON you mean to hold for a while.",
       );
     },
   },
@@ -744,7 +735,7 @@ const SCENES: readonly Scene[] = [
         side: "sell",
         shares: 40,
       });
-      yield* say("This sells 40 of your Yes shares at the best price on Polymarket's book.");
+      yield* say("A small trim: most of your bet stays on until December.");
     },
   },
   {
@@ -774,7 +765,7 @@ const SCENES: readonly Scene[] = [
         shares: 310,
       });
       yield* say(
-        "This sells half of your Yes shares at the best price on Polymarket's book. The cash waits in your Polymarket wallet, and I can bring it back to your own wallet whenever you like.",
+        "Selling half takes some risk off and leaves the rest riding until the Fed's December meeting.",
       );
     },
   },
@@ -908,7 +899,9 @@ const SCENES: readonly Scene[] = [
       yield* call("stock_trade", { stock: "COIN", side: "buy", amountUsd: 400 });
       // The demo's market refuses the next trade once, so the tap on this card shows a failure.
       failNextSwap();
-      yield* say("Here is a small buy of Coinbase stock for you to allow.");
+      yield* say(
+        "Coinbase earns when crypto trading picks up, so it tends to move with the coins you already follow.",
+      );
     },
   },
   {
@@ -917,7 +910,9 @@ const SCENES: readonly Scene[] = [
     hears: /buy.*nvidia/iu,
     async *play({ say, call }) {
       yield* call("stock_trade", { stock: "NVDA", side: "buy", amountUsd: 250 });
-      yield* say("A $250 buy of Nvidia stock on Monad. Allow it and it fills in a moment.");
+      yield* say(
+        "Nvidia is still the cleanest way to own the chip buildout, and $250 keeps it a small bet.",
+      );
     },
   },
   {
@@ -996,9 +991,7 @@ const SCENES: readonly Scene[] = [
         field: "keys:elfa",
         why: "I could show you the week's stories pinned to the price, and who is saying what.",
       });
-      yield* say(
-        "For the story behind it I'd want Elfa, which reads what people are posting. It needs a key of your own, and the card has a place to paste it.",
-      );
+      yield* say("For the story behind it I'd want Elfa, which reads what people are posting.");
     },
   },
   {
@@ -1014,7 +1007,7 @@ const SCENES: readonly Scene[] = [
         why: "With it I can make this sale, and any other trade on Solana.",
       });
       yield* say(
-        "I can't make that sale yet. Trades on Solana go through Jupiter, which needs a free key of your own, and the card has a place to paste it.",
+        "I can't make that sale yet: trades on Solana go through Jupiter, which needs a free key of your own.",
       );
     },
   },

@@ -93,12 +93,7 @@ export function ConversationLaunchStage() {
             {brainless ? (
               <BrainNeeded latest={false} onReady={() => undefined} />
             ) : (
-              <ConversationMessage
-                isStreaming={false}
-                message={pendingAnswer(message)}
-                pending
-                workStartedAt={message.metadata?.createdAt}
-              />
+              <ConversationMessage isStreaming={false} message={pendingAnswer(message)} pending />
             )}
           </div>
         </ConversationHistoryPreview>

@@ -1,0 +1,146 @@
+/*
+ * A thought: Auni's own words to itself, quieter than its answer, on a hairline rail. The rail
+ * is Auni's blue while it is still thinking and settles to a hairline once it moves on.
+ */
+.auni-thought {
+  min-width: 0;
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 12px;
+  color: var(--muted-foreground);
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+  transition: border-color 360ms var(--motion-settle);
+}
+
+.auni-thought[data-live] {
+  border-inline-start-color: color-mix(in oklab, var(--primary) 55%, transparent);
+}
+
+.auni-thought-more {
+  margin-top: 2px;
+  color: var(--faint);
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  font-weight: 500;
+  outline: none;
+  transition: color 120ms var(--motion-settle);
+}
+
+.auni-thought-more:hover {
+  color: var(--foreground);
+}
+
+.auni-thought-more:focus-visible {
+  border-radius: var(--radius-control);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 55%, transparent);
+}
+
+/* A run of steps: quiet lines, flush with the answer's words. */
+.auni-steps {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.auni-steps-rows {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding-top: 2px;
+}
+
+/* A run folded: one line saying what it did, led by the marks of what it used. */
+.auni-steps-line {
+  display: flex;
+  max-width: 100%;
+  width: fit-content;
+  min-width: 0;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+  text-align: start;
+  outline: none;
+  transition: color 120ms var(--motion-settle);
+}
+
+.auni-steps-line:hover {
+  color: var(--foreground);
+}
+
+.auni-steps-line:focus-visible {
+  border-radius: var(--radius-control);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 55%, transparent);
+}
+
+.auni-steps-marks {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.auni-steps-mark {
+  position: relative;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--color-ink-soft);
+  box-shadow: 0 0 0 1.5px var(--background);
+}
+
+.auni-steps-mark + .auni-steps-mark {
+  margin-inline-start: -4px;
+}
+
+.auni-steps-mark > svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.75;
+}
+
+.auni-steps-mark > [data-slot="integration-mark"] {
+  border-radius: 999px !important;
+}
+
+/* What folds under the words after it closes to nothing instead of vanishing. */
+.auni-fold {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 280ms var(--motion-settle),
+    opacity 150ms ease;
+}
+
+.auni-fold[data-folded="true"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.auni-fold > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.auni-card-enter {
+  animation: auni-card-enter 420ms var(--motion-settle) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-thought,
+  .auni-steps-line,
+  .auni-fold {
+    transition: none;
+  }
+  .auni-card-enter {
+    animation: none;
+  }
+}

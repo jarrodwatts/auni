@@ -97,10 +97,10 @@ withdrawalsRouter.post("/", async (req, res) => {
       error: "withdrawal_refused",
       message:
         error instanceof z.ZodError
-          ? "Check the amount and the address."
+          ? "Check the amount and address. Nothing was sent."
           : error instanceof Error
             ? error.message
-            : "That withdrawal can't go ahead.",
+            : "Couldn't prepare this withdrawal. Nothing was sent.",
     });
   }
 });

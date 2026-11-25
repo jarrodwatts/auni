@@ -72,7 +72,7 @@ function ShowKeys() {
       setKeys(await revealWalletKeys());
     } catch (caught) {
       if (mustPairAgain(caught)) setPairAgain(true);
-      else setError("That didn't reach Auni. Nothing was shown, so try again.");
+      else setError("Couldn't reach Auni. Nothing was shown. Try again.");
     } finally {
       setChecking(false);
     }
@@ -83,8 +83,8 @@ function ShowKeys() {
       <>
         <DialogTitle className="pr-10 text-title text-ink">Your keys</DialogTitle>
         <DialogDescription className="mt-1.5 text-body text-muted-foreground">
-          Save them somewhere only you can reach, like a password manager. They leave this screen
-          when you close it.
+          Save them somewhere only you can reach, like a password manager. Revealed keys hide after
+          60s.
         </DialogDescription>
         <WalletKeyList className="mt-6" keys={keys} />
         <DialogClose asChild>
@@ -109,7 +109,7 @@ function ShowKeys() {
         ))}
       </ul>
       {pairAgain ? (
-        <PairAgain className="mt-5" then="Then show your keys here again." />
+        <PairAgain className="mt-5" then="Then tap Show keys again." />
       ) : (
         <p className="mt-5 text-meta text-muted-foreground">Auni checks it&apos;s you first.</p>
       )}
@@ -210,12 +210,11 @@ export function WalletKeyList({
       })}
       {clipboard.blocked ? (
         <p className="text-meta text-muted-foreground">
-          This browser blocked copying. Show a key and select it to copy it by hand.
+          Your browser blocked copying. Show a key, then select it to copy.
         </p>
       ) : copiedOnce ? (
         <p className="text-meta text-muted-foreground">
-          Paste it into your password manager, then copy something else so it isn&apos;t left on
-          your clipboard.
+          Paste it into your password manager, then copy something else to clear your clipboard.
         </p>
       ) : null}
     </div>

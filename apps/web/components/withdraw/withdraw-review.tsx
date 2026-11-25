@@ -28,7 +28,7 @@ const SENT: ReadonlySet<ActionStatus> = new Set(["running", "done", "failed"]);
 function refusal(error: unknown): string {
   return error instanceof CoreApiError && error.detail
     ? error.detail
-    : "That didn't reach Auni. Nothing was sent, so try again.";
+    : "Couldn't reach Auni. Nothing was sent. Try again.";
 }
 
 /**
@@ -70,7 +70,7 @@ export function WithdrawReview({
       // A tap after one that went through comes back as the withdrawal now stands.
       const now = await decideAction(action.id, "allow");
       if (SENT.has(now.status)) onSent(now);
-      else setError("This withdrawal already moved on. Nothing new was sent.");
+      else setError("This withdrawal is no longer waiting. Nothing new was sent.");
     } catch (caught) {
       // This browser has no proof to give that the owner is here: nothing was sent.
       if (mustPairAgain(caught)) return void setPairAgain(true);
@@ -92,7 +92,7 @@ export function WithdrawReview({
           <span className="grid size-10 place-items-center rounded-full bg-foreground/[0.06] text-ink">
             <WalletMinimal aria-hidden className="size-[18px]" />
           </span>
-          <span className="text-meta text-muted-foreground">Your wallet</span>
+          <span className="text-meta text-muted-foreground">Auni wallet</span>
         </span>
         <span className="relative flex min-w-0 flex-1 flex-col items-center pb-6">
           <span className="text-card-money text-ink tabular-nums">{amount}</span>

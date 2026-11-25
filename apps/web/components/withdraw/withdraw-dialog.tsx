@@ -115,12 +115,14 @@ export function WithdrawDialog({
     if (!/^\d+(\.\d{1,2})?$/u.test(dollars) || Number(dollars) <= 0)
       return setError("Enter an amount in dollars, like 50 or 12.50.");
     if (max !== undefined && Number(dollars) > Number(max))
-      return setError(`You can send up to ${formatUsd(max)} to ${networkName(goesTo.network)}.`);
+      return setError(
+        `You can withdraw up to ${formatUsd(max)} on ${networkName(goesTo.network)}.`,
+      );
     if (!addressFits(goesTo.network, goesTo.address))
       return setError(
         goesTo.network === "solana"
-          ? "That isn't a Solana address. Copy it again."
-          : `That isn't an address on ${networkName(goesTo.network)}. It starts with 0x and has 42 characters.`,
+          ? "That isn't a valid Solana address. Copy it again."
+          : `That isn't a valid ${networkName(goesTo.network)} address. It starts with 0x and has 42 characters.`,
       );
     setBusy(true);
     setError(null);
@@ -136,7 +138,7 @@ export function WithdrawDialog({
       setError(
         caught instanceof CoreApiError && caught.detail
           ? caught.detail
-          : "That didn't reach Auni. Nothing was sent, so try again.",
+          : "Couldn't reach Auni. Nothing was sent. Try again.",
       );
     } finally {
       setBusy(false);
@@ -147,8 +149,11 @@ export function WithdrawDialog({
     sent && sentNow
       ? sentWords(sent, sentNow)
       : step.kind === "review"
-        ? { title: "Check before it goes", lede: "Money sent to a wrong address can't come back." }
-        : { title: "Withdraw", lede: "Send cash to an exchange or another wallet." };
+        ? {
+            title: "Check before you send",
+            lede: "Money sent to the wrong address can't come back.",
+          }
+        : { title: "Withdraw", lede: "Send USDC to an exchange or another wallet." };
 
   return (
     <MoneySheet open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
@@ -222,8 +227,8 @@ export function WithdrawDialog({
             {cash.data
               ? cashWords(cash.data)
               : cash.isError
-                ? "Your cash couldn't load right now."
-                : "Reading your cash"}
+                ? "Couldn't load your balance. You can still enter an amount."
+                : "Checking your cash"}
           </p>
 
           <p className="mt-6 text-meta font-semibold text-muted-foreground">To</p>
@@ -247,7 +252,7 @@ export function WithdrawDialog({
                       <Plus aria-hidden className="size-4" />
                     </span>
                   }
-                  title="A new address"
+                  title="New address"
                 />
               </li>
             </Rows>
@@ -269,7 +274,7 @@ export function WithdrawDialog({
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder={`Paste the address on ${networkName(network)}`}
+                  placeholder={`Paste ${networkName(network)} address`}
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
                   className="h-12 px-3.5 font-mono placeholder:font-sans"

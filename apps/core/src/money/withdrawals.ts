@@ -55,7 +55,7 @@ const SOLANA_PROGRAMS = new Set([
 
 /** Why a withdrawal to a burn address is refused: the owner reads it, and so does the agent. */
 const BURNS =
-  "That's a burn address: nobody can ever spend from it, so money sent there is gone for good. Use a real one.";
+  "That's a burn address: nobody can ever spend from it, so money sent there is gone for good. Use a wallet or exchange address instead.";
 
 /**
  * The destination as it will be sent to, or a plain sentence saying why not:
@@ -103,7 +103,9 @@ export async function refuseTokenDestination(
   try {
     token = await isToken(network, destination);
   } catch {
-    throw new Error("That address couldn't be checked right now. Try again in a moment.");
+    throw new Error(
+      "That address couldn't be checked right now. Nothing was sent. Try again in a moment.",
+    );
   }
   if (token)
     throw new Error("That's a token's own address, not a wallet. Money sent there is lost.");

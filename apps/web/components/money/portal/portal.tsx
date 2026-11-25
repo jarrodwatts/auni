@@ -148,8 +148,8 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
             {need && landed.length > 0
               ? `${formatUsdcBalance(total)} arrived. ${formatUsdcBalance(left)} more to go.`
               : need
-                ? "Send it from an exchange or another wallet, then go back to your card."
-                : "Send it from an exchange or another wallet."}
+                ? "Send from an exchange or another wallet, then go back to your card."
+                : "Send from an exchange or another wallet."}
           </DialogDescription>
           <NetworkPicker
             className="mt-5"
@@ -188,8 +188,8 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
             </p>
             {/* The one thing that loses money: sending on a network this address isn't for. */}
             <p className="mt-3 text-center text-ui text-ink">
-              Pick <span className="font-semibold">{network.networkName}</span> when your exchange
-              or wallet asks for the network.
+              Choose <span className="font-semibold">{network.networkName}</span> as the network
+              when you send.
             </p>
             <Button
               className={cn(auniDialogPrimaryButtonClass, "mt-4")}
@@ -206,15 +206,19 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
             </Button>
             {clipboard.blocked ? (
               <p role="alert" className="mt-2 text-center text-meta text-muted-foreground">
-                Copying was blocked. Select the address to copy it.
+                Your browser blocked copying. Select the address above to copy it.
               </p>
             ) : null}
             <p className="mt-3 text-center text-meta text-muted-foreground">
-              {usdc ? "Send USDC or any other coin" : "Send any coin"} on {network.networkName}. A
-              little {coin.asset.symbol} with it pays network fees.
+              {usdc ? "Send USDC or any coin" : "Send any coin"} on {network.networkName}. A little{" "}
+              {coin.asset.symbol} pays network fees.
             </p>
             <p className="mt-5 text-center text-meta text-muted-foreground">
-              <SpotlightShimmer active={ready}>Watching for your transfer</SpotlightShimmer>
+              <SpotlightShimmer active={ready}>
+                {ready
+                  ? `Watching for your transfer on ${network.networkName}`
+                  : "Preparing your wallet address"}
+              </SpotlightShimmer>
             </p>
           </div>
         </div>
@@ -244,7 +248,7 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
 
       {/* Copies and landings are said apart, so neither cuts the other off. */}
       <span aria-live="polite" className="sr-only">
-        {copied ? `Copied. Pick ${network.networkName} when you send.` : ""}
+        {copied ? `Copied. Choose ${network.networkName} as the network when you send.` : ""}
       </span>
       <span aria-live="polite" className="sr-only">
         {newest ? `${formatUsdcBalance(total)} arrived: ${what}.` : ""}

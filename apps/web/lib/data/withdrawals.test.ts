@@ -18,15 +18,15 @@ describe("cashWords", () => {
         recent: [],
       }),
     ).toBe(
-      "$8.70 cash in your wallet. $0.49 at Aave and $0.10 at Polymarket: ask Auni to bring it " +
-        "home first.",
+      "$8.70 USDC in your wallet. $0.49 on Aave and $0.10 on Polymarket: ask Auni to move it " +
+        "back first.",
     );
   });
 
   it("says just the cash when all of it is in the wallet", () => {
     expect(
       cashWords({ cashUsd: "8.70", walletUsd: "8.70", elsewhere: [], maxUsd, recent: [] }),
-    ).toBe("$8.70 cash in your wallet. To send holdings, ask Auni to sell them first.");
+    ).toBe("$8.70 USDC in your wallet. To withdraw other holdings, ask Auni to sell them first.");
   });
 });
 
@@ -52,11 +52,11 @@ describe("sentWords", () => {
   it("says it is on its way while it runs, then that it arrived, where and when", () => {
     expect(sentWords(sent, now("running"))).toEqual({
       title: "$0.50 on its way",
-      lede: "In seconds.",
+      lede: "Arrives in seconds.",
     });
     const done = sentWords(sent, now("done"));
     expect(done.title).toBe("$0.50 arrived");
-    expect(done.lede).toMatch(/^It reached your wallet on Base at \d{1,2}:04[ap]m\.$/u);
+    expect(done.lede).toMatch(/^Reached your wallet on Base at \d{1,2}:04[ap]m\.$/u);
   });
 
   it("says it didn't go through, and why, once it failed", () => {

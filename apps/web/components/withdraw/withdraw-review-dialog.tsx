@@ -29,9 +29,9 @@ export function WithdrawReviewDialog({
 
   return (
     <MoneySheet open={open} onOpenChange={onOpenChange}>
-      <DialogTitle className="text-title text-ink">Check before it goes</DialogTitle>
+      <DialogTitle className="text-title text-ink">Check before you send</DialogTitle>
       <DialogDescription className="mt-1.5 text-body text-muted-foreground">
-        Money sent to a wrong address can&apos;t come back.
+        Money sent to the wrong address can&apos;t come back.
       </DialogDescription>
       {withdrawal.data ? (
         <WithdrawReview
@@ -47,7 +47,7 @@ export function WithdrawReviewDialog({
         />
       ) : withdrawal.isError ? (
         <p role="alert" className="mt-6 text-meta text-negative">
-          This withdrawal couldn&apos;t load. Nothing was sent.
+          Couldn&apos;t load this withdrawal. Nothing was sent. Close and try again.
         </p>
       ) : (
         <LoaderCircle aria-hidden className="mx-auto mt-6 animate-spin text-muted-foreground" />

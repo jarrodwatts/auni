@@ -58,11 +58,12 @@ export function addressFits(network: WithdrawNetwork, value: string): boolean {
  * where an app keeps some, how much and where, which comes home by asking Auni first.
  */
 export function cashWords({ walletUsd, elsewhere }: WithdrawCash): string {
-  const inWallet = `${formatUsd(walletUsd)} cash in your wallet.`;
-  if (elsewhere.length === 0) return `${inWallet} To send holdings, ask Auni to sell them first.`;
-  const at = elsewhere.map(({ name, usdValue }) => `${formatUsd(usdValue)} at ${name}`);
+  const inWallet = `${formatUsd(walletUsd)} USDC in your wallet.`;
+  if (elsewhere.length === 0)
+    return `${inWallet} To withdraw other holdings, ask Auni to sell them first.`;
+  const at = elsewhere.map(({ name, usdValue }) => `${formatUsd(usdValue)} on ${name}`);
   const rest = at.length === 1 ? at[0] : `${at.slice(0, -1).join(", ")} and ${at.at(-1)}`;
-  return `${inWallet} ${rest}: ask Auni to bring it home first.`;
+  return `${inWallet} ${rest}: ask Auni to move it back first.`;
 }
 
 const TIME = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
@@ -82,11 +83,13 @@ export function sentWords(
       title: "Withdrawal didn't go through",
       lede: now.error ?? "Your money stayed in your wallet. Try again in a moment.",
     };
-  if (now.status !== "done")
+  if (now.status !== "done") {
+    const arrives = withdrawalDetails(now).arrives;
     return {
       title: `${amount} on its way`,
-      lede: `${withdrawalDetails(now).arrives ?? "Soon"}.`,
+      lede: arrives ? `Arrives ${arrives.toLowerCase()}.` : "Should arrive soon.",
     };
+  }
   const network = WITHDRAW_NETWORKS.find((entry) => entry.id === review.network)?.name;
   const to = review.destination ? `your ${review.destination}` : "that address";
   // "4:04pm", as Activity says a time.
@@ -96,7 +99,7 @@ export function sentWords(
   );
   return {
     title: `${amount} arrived`,
-    lede: `It reached ${to}${network ? ` on ${network}` : ""} at ${at}.`,
+    lede: `Reached ${to}${network ? ` on ${network}` : ""} at ${at}.`,
   };
 }
 

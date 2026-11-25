@@ -189,11 +189,19 @@ export type Parsed =
 /** Reads `auni`'s arguments: bare flags are the start's, else the first word is the command. */
 export function parseArgs(argv: readonly string[]): Parsed {
   const [first, ...after] = argv;
-  if (first === "--help" || first === "-h" || (first === "help" && !after.length))
+  const wantsHelp = first === "help";
+  if (wantsHelp && after.length > 1) return { refused: "Usage: auni help [command]" };
+  if (
+    first === "--help" ||
+    first === "-h" ||
+    (wantsHelp && (after[0] === undefined || after[0] === "--help" || after[0] === "-h"))
+  )
     return { help: USAGE };
-  const name = first === "help" ? after[0] : first;
-  const starts = name === undefined || (name.startsWith("-") && name !== "--version");
-  const command = name === "start" && first === "help" ? "" : starts ? "" : name!;
+  const name = wantsHelp ? after[0] : first;
+  const starts =
+    !wantsHelp && (name === undefined || (name.startsWith("-") && name !== "--version"));
+  const namedStart = name === "start";
+  const command = namedStart || starts ? "" : name!;
   if (!Object.hasOwn(COMMANDS, command) || name === "")
     return { refused: `auni has no command "${name}".\n\nRun auni --help for commands.` };
   const spec = COMMANDS[command]!;
@@ -201,7 +209,7 @@ export function parseArgs(argv: readonly string[]): Parsed {
   const own = [`Usage: ${invocation}`, `${spec.summary}.`, spec.details]
     .filter(Boolean)
     .join("\n\n");
-  if (first === "help") return { help: own };
+  if (wantsHelp) return { help: own };
   const rest = starts ? argv : after;
   const flags = new Map<string, string | true>();
   let word: string | undefined;

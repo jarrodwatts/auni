@@ -119,7 +119,7 @@ export async function start(
     stopping = true;
     told.abandon();
     console.error(
-      `Auni's database stopped, so Auni is stopping too. Your wallet is untouched. See ${postgresLog()}. ${runsAs() === "service" ? "Its background service will restart it." : `Run ${auniCommand()} to start it again.`}`,
+      `Auni's database stopped, so Auni is stopping too. A move in progress may still have gone through. Check its card after Auni restarts. See ${postgresLog()}. ${runsAs() === "service" ? "Its background service will restart it." : `Run ${auniCommand()} to start it again.`}`,
     );
     webApp?.kill();
     process.exit(1);
@@ -172,9 +172,9 @@ export async function start(
       });
     } else told.say("Background work is off.");
     servers = await listen();
-    if (!web) told.log(`API ready at http://${env.HOST}:${env.PORT}`);
     if (env.TAILSCALE_OWNER) told.log("Tailscale access is ready.");
     await onceUp?.();
+    if (!web) told.log(`API ready at http://${env.HOST}:${env.PORT}`);
     if (web) {
       // Its banner and chatter never reach the terminal, scene or plain: only Auni's own lines do.
       webApp = await startWebApp({ quiet: true, onBuild: () => told.pageBuilding() });
@@ -193,7 +193,7 @@ export async function start(
       console.log(
         holder ? `Auni is already running ${where(holder)}.` : "Auni is already running.",
       );
-      await openOwner({ open, printsLink, landsOn });
+      await openOwner({ web, open, printsLink, landsOn });
       await stop(0);
       return;
     }
@@ -207,7 +207,8 @@ export async function start(
   }
 
   const opened = await openOwner({
-    open: open && web,
+    web,
+    open,
     printsLink,
     landsOn,
     say: told.say,
@@ -268,12 +269,14 @@ async function coreServing(): Promise<boolean> {
  * made up, prints its link instead (`printsLink`). Either way the browser lands on `landsOn`.
  */
 export async function openOwner({
+  web,
   open,
   printsLink = false,
   landsOn = "/app",
   say = (line) => console.log(line),
   opening = () => {},
 }: {
+  readonly web: boolean;
   readonly open: boolean;
   readonly printsLink?: boolean;
   readonly landsOn?: string | undefined;
@@ -282,6 +285,7 @@ export async function openOwner({
   /** Told as the browser opens: the terminal's Auni leaps into it. */
   readonly opening?: () => void;
 }): Promise<boolean> {
+  if (!web) return false;
   // Through Tailscale there is nothing to pair, and this machine's own browser is never let in.
   if (env.TAILSCALE_OWNER) {
     say(`\nOpen Auni from a device signed in to Tailscale.\n${env.WEB_ORIGIN}`);
@@ -332,5 +336,10 @@ async function brainFound(): Promise<BrainFound> {
         name: picked.about.name,
         line: `Your AI: ${picked.about.name} ready.`,
       }
-    : { name: null, line: `Your AI needs attention. Run ${auniCommand()} doctor --verbose` };
+    : {
+        name: null,
+        line: picked.fixes.length
+          ? picked.fixes.join("\n")
+          : "Couldn't check your AI. Open Settings to check your sign-in.",
+      };
 }

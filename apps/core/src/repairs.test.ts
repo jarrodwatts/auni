@@ -113,7 +113,7 @@ describe("auni doctor's repairs", () => {
     expect(await doctorCommand({ ...run, dryRun: true, fix: true })).toBe(1);
     expect(said.out.at(-1)).toBe("Dry run: nothing changed.");
     expect(await doctorCommand(run)).toBe(1);
-    expect(said.out.at(-1)).toMatch(/^Auni is stopped\.\nRun: pnpm auni doctor --fix/u);
+    expect(said.out.at(-1)).toMatch(/^Auni isn't running\.\nRun: pnpm auni doctor --fix/u);
     expect(startService).not.toHaveBeenCalled();
     expect(enableLinger).not.toHaveBeenCalled();
   });
@@ -175,7 +175,7 @@ describe("auni doctor's repairs", () => {
 
     expect(await doctorCommand(run)).toBe(1);
     expect(said.out[0]).toMatch(/^Auni is running, with checks to review\./u);
-    expect(said.out[0]).toContain("Needs attention: Remote access");
+    expect(said.out[0]).toContain("Remote access:");
     expect(said.out[0]).toContain("Passed: Background work, Web app");
   });
 
@@ -193,12 +193,11 @@ describe("auni doctor's repairs", () => {
     const ask = vi.fn(async () => false);
 
     expect(await doctorCommand({ ...run, ask })).toBe(1);
-    expect(said.out[0]).toMatch(/^Auni is stopped\.\nRun: pnpm auni\n/u);
+    expect(said.out[0]).toMatch(/^Auni isn't running\.\nRun: pnpm auni\n/u);
     expect(ask).not.toHaveBeenCalled();
     await doctorCommand({ ...run, verbose: true });
-    expect(said.out.at(-1)).toBe(
-      "To choose an optional repair, run pnpm auni doctor --verbose in a terminal.",
-    );
+    expect(said.out.at(-1)).toContain("Repairs:");
+    expect(said.out.at(-1)).not.toContain("--verbose");
     await doctorCommand({ ...run, ask, verbose: true });
     expect(ask).toHaveBeenCalledWith(expect.objectContaining({ id: "install-service" }));
   });

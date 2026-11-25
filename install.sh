@@ -69,6 +69,28 @@ logged() {
   fi
 }
 
+# Keep the build output in the log while showing how long this step has been running.
+building() (
+  label="$1"
+  shift
+  done_ "$label"
+  if [ ! -t 1 ] || [ "${TERM:-}" = dumb ]; then
+    logged "$@"
+    exit
+  fi
+  started=$(date +%s)
+  (
+    while sleep 1; do
+      printf '\r      %s (%ss)' "$label" "$(($(date +%s) - started))"
+    done
+  ) &
+  timer=$!
+  trap 'kill "$timer" 2>/dev/null || :; wait "$timer" 2>/dev/null || :; printf "\r      %s (%ss)\n" "$label" "$(($(date +%s) - started))"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  logged "$@"
+)
+
 # Stops, saying how to install it, when the command $1 (from the package $2) is missing.
 need() {
   command -v "$1" >/dev/null 2>&1 && return
@@ -286,11 +308,10 @@ main() {
       cd "$dir"
       PATH="$dir/.node/bin:$PATH"
       export PATH COREPACK_HOME="$APP/corepack" COREPACK_ENABLE_DOWNLOAD_PROMPT=0 AUNI_HOME
-      done_ "Installing packages"
-      logged "$dir/.node/bin/corepack" pnpm install --frozen-lockfile --store-dir "$APP/pnpm-store"
+      done_ "Allow about 5 minutes for a fresh build. Slower machines may take longer."
+      building "Installing packages" "$dir/.node/bin/corepack" pnpm install --frozen-lockfile --store-dir "$APP/pnpm-store"
       # The version's own build, so how a version builds can change without a new install.sh.
-      done_ "Building the web app"
-      logged "$dir/.node/bin/node" apps/core/bin/auni.mjs build
+      building "Building the web app" "$dir/.node/bin/node" apps/core/bin/auni.mjs build
     )
     touch "$dir/.auni-built"
     done_ "Build complete"
@@ -321,24 +342,23 @@ EOF
   fi
   done_ "Command ready"
   case ":$PATH:" in
-    *":$HOME/.local/bin:"*) command=auni ;;
-    *) command='"$HOME/.local/bin/auni"' ;;
+    *":$HOME/.local/bin:"*) ;;
+    *)
+      say ""
+      say "Add Auni to your PATH now and in your shell profile:"
+      say '  export PATH="$HOME/.local/bin:$PATH"'
+      ;;
   esac
 
   printf '\n'
   if [ "$current" != "$tag" ]; then
     say "Auni $tag is built. $current is still the active version."
-    say "Switch to it with: $command update --version $tag"
+    say "Switch to it with: auni update --version $tag"
     return
   fi
   say "Done. Auni $tag is installed."
-  say "Run $command to start Auni and open it in your browser."
-  say "Run $command demo to try it with fake money."
-  if [ "$command" != auni ]; then
-    say ""
-    say "To run auni from anywhere, add it to your PATH now and in your shell profile:"
-    say '  export PATH="$HOME/.local/bin:$PATH"'
-  fi
+  say "Run auni to start Auni and open it in your browser."
+  say "Run auni demo to try it with fake money."
 }
 
 main "$@"

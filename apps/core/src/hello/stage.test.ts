@@ -110,7 +110,7 @@ describe("the terminal's Auni", () => {
     scene.run(300);
     scene.hear({ kind: "brain", found: FOUND });
     // The page comes up, and the browser starts to open on it, as Auni hops onto the brain's stone.
-    scene.until(() => scene.stage.view.said === "Your AI is ready");
+    scene.until(() => scene.stage.view.said === "There it is!");
     scene.run(300);
     scene.hear({ kind: "page" });
     const asked = scene.now;
@@ -124,7 +124,7 @@ describe("the terminal's Auni", () => {
     // Whole within the second a browser takes to come up, and with no "page is ready" before it.
     expect(whole).not.toBeNull();
     expect(whole! - asked).toBeLessThan(1_000);
-    expect(scene.views.some((view) => view.said === "Web app ready")).toBe(false);
+    expect(scene.views.some((view) => view.said === "Your page is ready")).toBe(false);
   });
 
   it("leaps off the terminal's own right edge, not the stones'", () => {
@@ -164,7 +164,7 @@ describe("the terminal's Auni", () => {
     scene.hear({ kind: "leave" });
     scene.leapt();
     expect(scene.views.some((view) => view.auni?.face === "worry")).toBe(true);
-    expect(scene.views.some((view) => view.said === "Your AI needs attention")).toBe(true);
+    expect(scene.views.some((view) => view.said === "I need an AI to think with")).toBe(true);
     expect(scene.views.some((view) => view.said === "Let's set up your AI in the browser!")).toBe(
       true,
     );
@@ -225,7 +225,7 @@ describe("the terminal's Auni", () => {
     scene.until(() => scene.signals.some(({ signal }) => signal === "ended"));
     expect(scene.signals.map(({ signal }) => signal)).toEqual(["ended"]);
     expect(scene.stage.view.auni).not.toBeNull();
-    expect(scene.stage.view.said).toBe("Open Auni at the address below");
+    expect(scene.stage.view.said).toBe("Come find me at the address below");
     expect(scene.stage.view.notes).toEqual(["Auni is at http://localhost:3000", MISSING.line]);
   });
 

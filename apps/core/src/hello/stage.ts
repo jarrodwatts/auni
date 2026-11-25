@@ -265,13 +265,13 @@ export class Stage {
         if (!this.memory) return;
         this.step = "memory";
         this.cheer();
-        this.say("Checking your AI");
+        this.say("Let me see who's here");
         this.face("open", 1);
         return;
       }
       case "memory": {
         if (this.brain?.name) {
-          this.say("Your AI is ready");
+          this.say("There it is!");
           this.face("open", 0);
           this.hop(standingX(STONE.brain));
           // Behind a page already waiting, it doesn't stop to cheer.
@@ -280,7 +280,7 @@ export class Stage {
           // To the edge of the empty stone, to frown at it.
           this.hop(EDGE);
           this.face("worry", 1);
-          this.say("Your AI needs attention");
+          this.say("I need an AI to think with");
           // Long enough to read, and shorter with the browser already opening on its page.
           this.then(this.quick || this.leaveAsked ? 700 : 1_400);
         } else if (!this.gaveUpOnBrain(now)) return;
@@ -294,7 +294,7 @@ export class Stage {
           this.page && this.leaveAsked
             ? this.goodbye
             : this.page
-              ? "Web app ready"
+              ? "Your page is ready"
               : this.building
                 ? "Building the web app"
                 : "Starting the web app",
@@ -312,7 +312,7 @@ export class Stage {
           this.leap();
           this.step = "leaving";
         } else if (this.up && !this.up.opened && (this.brain || this.gaveUpOnBrain(now))) {
-          const words = "Open Auni at the address below";
+          const words = "Come find me at the address below";
           this.say(words);
           this.face("open", 0);
           // Typed in full before the scene ends.
@@ -364,7 +364,7 @@ export class Stage {
       ...this.kept,
       ...(this.brain?.name ? [this.brain.line] : []),
       // What fixes the brain is said here only where no browser opened to do it in.
-      ...(fix ? [this.up?.opened ? SIGN_IN_THERE : fix] : []),
+      ...(fix ? (this.up?.opened ? [SIGN_IN_THERE] : fix.split("\n")) : []),
     ];
   }
 

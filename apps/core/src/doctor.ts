@@ -49,7 +49,7 @@ export interface Finding {
   readonly status: "ok" | "note" | "fix";
   readonly says: string;
   readonly [terminalDetail]?:
-    | { readonly network: NetworkKey }
+    | { readonly problem: string }
     | { readonly failedJobs: number }
     | "migrates-on-start"
     | "restart-to-update";
@@ -154,6 +154,10 @@ const checkDatabase: Check = async () => {
       {
         check: "database",
         status: "fix",
+        [terminalDetail]: {
+          problem:
+            "Check your database connection in DATABASE_URL, or unset it to use Auni's own database.",
+        },
         says: `can't connect (${said(error)}): check DATABASE_URL, or unset it for Auni's own Postgres`,
       },
     ];
@@ -225,6 +229,12 @@ const checkRunner: Check = async () => {
     findings.push({
       check: "runner",
       status: "fix",
+      [terminalDetail]: {
+        problem:
+          held.length === 1
+            ? "1 move needs checking. Open its card in Auni to check its status."
+            : `${held.length} moves need checking. Open their cards in Auni to check their status.`,
+      },
       says: `${held.length} moves are held, waiting on you (${held.join(", ")}): each card says why, with Check again and Close`,
     });
   for (const { kind, jobs: many, error } of failed)
@@ -286,6 +296,10 @@ const checkService: Check = async () => {
     findings.push({
       check: "service",
       status: "fix",
+      [terminalDetail]: {
+        problem:
+          "Auni stops when you log out. Let its background service keep running after logout.",
+      },
       says: "Auni stops when you log out, and starts again only when you log in",
       repair: by("linger"),
     });
@@ -310,7 +324,13 @@ const checkRpcs: Check = async () =>
 async function checkNetwork(network: NetworkKey, run: Check): Promise<Finding[]> {
   return (await guarded("rpc", run)).map((finding) => ({
     ...finding,
-    [terminalDetail]: { network },
+    ...(finding.status === "fix" && !finding[terminalDetail]
+      ? {
+          [terminalDetail]: {
+            problem: `${NETWORKS[network].name} didn't answer. Check ${rpcUrlVar(network)} or set it to a working network URL.`,
+          },
+        }
+      : {}),
   }));
 }
 
@@ -331,6 +351,9 @@ async function checkEvmRpc(chain: (typeof EVM_CHAIN_KEYS)[number]): Promise<Find
   const fix = (what: string, error: unknown): Finding => ({
     check: "rpc",
     status: "fix",
+    [terminalDetail]: {
+      problem: `${NETWORKS[chain].name} ${what}. Set ${rpcUrlVar(chain)} to a network URL that supports this check.`,
+    },
     says: `${NETWORKS[chain].name} ${what} (${said(error)}): set ${rpcUrlVar(chain)} to an RPC that does`,
   });
   let head: number;
@@ -457,6 +480,10 @@ const checkWeb: Check = async () => {
     {
       check: "web",
       status: "fix",
+      [terminalDetail]: {
+        problem:
+          "The web app isn't answering. Check auni.log and make sure WEB_ORIGIN matches the address you open.",
+      },
       says: `nothing answers at ${env.WEB_ORIGIN}/core/health (${why}): is Auni running, and is WEB_ORIGIN where the browser opens it?`,
     },
   ];
@@ -480,7 +507,13 @@ const LABELS: Record<Finding["check"], string> = {
 };
 
 /** Summarizes the same findings that --json and web diagnostics read. */
-export function doctorSummary(findings: readonly Finding[], auni: string): string {
+export function doctorSummary(
+  findings: readonly Finding[],
+  auni: string,
+  { styled = false, prompting = false }: { styled?: boolean; prompting?: boolean } = {},
+): string {
+  const paint = (code: number, text: string) => (styled ? `\u001B[${code}m${text}\u001B[0m` : text);
+  const problem = (text: string) => (styled ? `${paint(33, "!")} ${text}` : text);
   const fixes = findings.filter(({ status }) => status === "fix");
   const stopped = fixes.find(
     ({ check, repair }) =>
@@ -500,17 +533,10 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
   const repair = needsStart
     ? stopped.repair?.recommended
     : fixes.some(({ repair }) => repair?.recommended);
-  const next = databaseDown
-    ? details
-    : needsStart && !repair
-      ? auni
-      : repair
-        ? `${auni} doctor --fix`
-        : details;
   const state = databaseDown
     ? "Auni can't reach its database."
     : needsStart
-      ? "Auni is stopped."
+      ? "Auni isn't running."
       : stopped
         ? "Web app is running, but background work is stopped."
         : followUp
@@ -518,22 +544,21 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
             ? "Auni is running, with checks to review."
             : "Auni needs attention."
           : "Auni is running.";
-  const lines = [state];
-  if (followUp) lines.push(`Run: ${next}`);
+  const lines = [paint(1, state)];
+  if (needsStart && !repair) lines.push(`Run: ${auni}`);
+  if (repair && !prompting) lines.push(`Run: ${auni} doctor --fix`);
 
-  const issues = new Set(
-    fixes
-      .filter(
-        ({ check }) =>
-          check !== "rpc" &&
-          !(database && (check === "wallet" || check === "apps")) &&
-          !(databaseDown && (check === "runner" || check === "database" || check === "web")) &&
-          !(needsStart && check === "web") &&
-          !(needsStart && (check === "runner" || check === "database")),
-      )
-      .map(({ check }) => LABELS[check]),
+  const issues = fixes.filter(
+    ({ check }) =>
+      !(database && (check === "wallet" || check === "apps")) &&
+      !(databaseDown && (check === "runner" || check === "web")) &&
+      !(needsStart && (check === "runner" || check === "database" || check === "web")),
   );
-  if (issues.size) lines.push(`Needs attention: ${[...issues].join(", ")}`);
+  for (const issue of issues) {
+    const detail = issue[terminalDetail];
+    const text = typeof detail === "object" && "problem" in detail ? detail.problem : issue.says;
+    lines.push(problem(`${LABELS[issue.check]}: ${text}`));
+  }
   if (needsStart)
     lines.push(
       database ? "Waiting for startup: Web app, Your wallet, Apps" : "Waiting for startup: Web app",
@@ -541,10 +566,16 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
   else if (database) lines.push("Waiting for the database: Your wallet, Apps");
 
   if (needsRestart)
-    lines.push("Update pending: stop Auni and start it from this folder to run this version");
+    lines.push(
+      problem("Update pending: stop Auni and start it from this folder to run this version"),
+    );
   if (failedJobs) {
     const tasks = failedJobs === 1 ? "task" : "tasks";
-    lines.push(`Background work: ${failedJobs} ${tasks} failed in the last 24 hours`);
+    lines.push(
+      problem(
+        `Background work: ${failedJobs} ${tasks} failed in the last 24 hours. Check auni.log for details.`,
+      ),
+    );
   }
   const localOnly =
     !env.TAILSCALE_OWNER &&
@@ -556,19 +587,9 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
     const count = (status: Finding["status"]) =>
       networks.filter((row) => row.status === status).length;
     const ready = count("ok");
-    const problems = networks.flatMap((row) => {
-      const detail = row[terminalDetail];
-      return row.status === "fix" && typeof detail === "object" && "network" in detail
-        ? [NETWORKS[detail.network].name]
-        : [];
-    });
     const parts = [`${ready} ${ready === 1 ? "chain" : "chains"} ready`];
     if (count("note")) parts.push(`${count("note")} with limits`);
-    if (count("fix"))
-      parts.push(
-        `check ${problems.length === count("fix") ? problems.join(", ") : `${count("fix")} networks`}`,
-      );
-    lines.push(`Networks: ${parts.join(", ")}`);
+    lines.push(paint(2, `Networks: ${parts.join(", ")}`));
   }
 
   const healthy = new Set(
@@ -578,11 +599,11 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
           check !== "rpc" &&
           !(localOnly && check === "always-on") &&
           status === "ok" &&
-          !issues.has(LABELS[check]),
+          !issues.some((issue) => issue.check === check),
       )
       .map(({ check }) => LABELS[check]),
   );
-  if (healthy.size) lines.push(`Passed: ${[...healthy].join(", ")}`);
-  if (next !== details || !followUp) lines.push(`All checks: ${details}`);
+  if (healthy.size) lines.push(paint(2, `Passed: ${[...healthy].join(", ")}`));
+  lines.push(`All checks: ${details}`);
   return lines.join("\n");
 }

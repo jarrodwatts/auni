@@ -9,6 +9,7 @@ import { appTroubles, jobs } from "./db/schema.ts";
 import { doctor, doctorSummary, line, type Finding } from "./doctor.ts";
 import { env } from "./env.ts";
 import * as migrations from "./db/migrations.ts";
+import { heldMoves } from "./money/reconcile.ts";
 import { checkRelease } from "./release/check.ts";
 import { runningVersion, versionLine } from "./release/layout.ts";
 import { holderName } from "./running.ts";
@@ -18,6 +19,10 @@ import { wipe } from "./test/db.ts";
 vi.mock("./agent/brain.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   brainRows: vi.fn(),
+}));
+vi.mock("./money/reconcile.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  heldMoves: vi.fn(),
 }));
 vi.mock("./money/chains.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -93,6 +98,7 @@ const of = (findings: readonly Finding[], check: Finding["check"]) =>
 beforeEach(async () => {
   await wipe(jobs, appTroubles);
   wallet.made = false;
+  vi.mocked(heldMoves).mockResolvedValue([]);
   layout.installed = false;
   service.command = null;
   service.lingers = null;
@@ -142,17 +148,16 @@ describe("auni doctor", () => {
     vi.mocked(fetch).mockRejectedValue(new Error("fetch failed"));
 
     const findings = await doctor();
-    expect(doctorSummary(findings, "pnpm auni")).toBe(
-      [
-        "Auni is stopped.",
-        "Run: pnpm auni",
-        "Needs attention: Your AI",
-        "Waiting for startup: Web app, Your wallet, Apps",
-        "Networks: 7 chains ready, 1 with limits, check Monad, Polygon",
-        "Passed: Version",
-        "All checks: pnpm auni doctor --verbose",
-      ].join("\n"),
-    );
+    const summary = doctorSummary(findings, "pnpm auni");
+    expect(summary).toMatch(/^Auni isn't running\.\nRun: pnpm auni\n/u);
+    expect(summary).toContain("Claude Code: sign it in");
+    expect(summary).toContain("claude auth login");
+    expect(summary).toContain("Set RPC_URL_MONAD");
+    expect(summary).toContain("Set RPC_URL_POLYGON");
+    expect(summary).toContain("Waiting for startup: Web app, Your wallet, Apps");
+    expect(summary).toContain("Networks: 7 chains ready, 1 with limits");
+    expect(summary).toContain("Passed: Version");
+    expect(summary).not.toMatch(/needs the database first|migrations to apply|Run: .*--verbose/u);
     // Machine readers still see the individual findings and no presentation fields.
     expect(JSON.parse(JSON.stringify(findings))).toContainEqual({
       check: "database",
@@ -161,6 +166,20 @@ describe("auni doctor", () => {
     });
     expect(of(findings, "web")).toContainEqual(expect.stringMatching(/fetch failed/u));
     expect(of(findings, "wallet")).toEqual(["fix  wallet: needs the database first"]);
+  });
+
+  it("adds visual weight to the headline, problems and passed checks only when styled", () => {
+    const findings: Finding[] = [
+      { check: "version", status: "ok", says: "current" },
+      { check: "brain", status: "fix", says: "Run claude auth login" },
+      { check: "web", status: "ok", says: "answers" },
+    ];
+    const plain = doctorSummary(findings, "auni");
+    const styled = doctorSummary(findings, "auni", { styled: true });
+    expect(plain).not.toContain("\u001B");
+    expect(styled).toContain("\u001B[1mAuni is running, with checks to review.\u001B[0m");
+    expect(styled).toContain("\u001B[33m!\u001B[0m Your AI: Run claude auth login");
+    expect(styled).toContain("\u001B[2mPassed: Version, Web app\u001B[0m");
   });
 
   it("keeps database failures visible when starting won't resolve them", () => {
@@ -172,9 +191,25 @@ describe("auni doctor", () => {
       ],
       "auni",
     );
-    expect(summary).toMatch(/^Auni can't reach its database\.\nRun: auni doctor --verbose/u);
+    expect(summary).toMatch(/^Auni can't reach its database\.\nDatabase: can't connect/u);
     expect(summary).not.toContain("Background work");
     expect(summary).not.toContain("Web app");
+  });
+
+  it("names a held move and points to its card in the default summary", async () => {
+    vi.mocked(heldMoves).mockResolvedValue(["held-id"]);
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      const findings = await doctor();
+      expect(doctorSummary(findings, "auni")).toContain(
+        "1 move needs checking. Open its card in Auni to check its status.",
+      );
+      expect(doctorSummary(findings, "auni")).not.toContain("held-id");
+      expect(JSON.stringify(findings)).toContain("held-id");
+    } finally {
+      await auni.end();
+    }
   });
 
   it("shows recent failed tasks without the error in the default summary", async () => {

@@ -19,6 +19,7 @@ import type { StartingPoint } from "@auni/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { sceneFor } from "./scenes.ts";
+import { demoPairCode } from "./test-pair.ts";
 
 // The demo, started as `auni demo` starts it, from an environment that names a home, a
 // database, a wallet and a brain of someone's own. It must make its owner by playing every
@@ -72,7 +73,7 @@ describe("auni demo", () => {
     await vi.waitFor(
       () => {
         if (demo.exitCode !== null) throw new Error(`The demo exited:\n${said}`);
-        if (!/Open http:\/\/localhost:\d+\/app\/new#pair=/u.test(said)) throw new Error(said);
+        if (!/API ready at http:\/\/\S+/u.test(said)) throw new Error(said);
       },
       { timeout: 120_000, interval: 200 },
     );
@@ -160,10 +161,11 @@ describe("auni demo", () => {
       .toSatisfy((statuses: string[]) => statuses.every((status) => status === ends));
   };
 
-  it("signs a browser in by the link it prints, which lands on a new chat", async () => {
+  it("pairs against the demo API with the web app turned off", async () => {
     const core = /API ready at (http:\/\/\S+)/u.exec(said)![1]!;
     const origin = `http://localhost:${port}`;
-    const [, code] = /Open http:\/\/localhost:\d+\/app\/new#pair=(\S+)/u.exec(said)!;
+    expect(said).not.toContain("#pair=");
+    const code = await demoPairCode(scratch, port);
     const paired = await fetch(`${core}/owner/pair`, {
       method: "POST",
       headers: { origin, "content-type": "application/json" },

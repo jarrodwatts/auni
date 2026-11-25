@@ -37,6 +37,15 @@ describe("parseArgs", () => {
     expect(parseArgs(["help"])).toEqual({ help: USAGE });
   });
 
+  it("validates help arguments and recognizes the startup command", () => {
+    expect(parseArgs(["help", "--help"])).toEqual({ help: USAGE });
+    expect(parseArgs(["help", "-h"])).toEqual({ help: USAGE });
+    expect(parseArgs(["help", "--bogus"])).toHaveProperty("refused");
+    expect(parseArgs(["help", "doctor", "extra"])).toHaveProperty("refused");
+    expect(parseArgs(["start", "--help"])).toEqual(parseArgs(["help", "start"]));
+    expect(parseArgs(["start", "--no-web"])).toEqual(parseArgs(["--no-web"]));
+  });
+
   it("keeps advanced flags in per-command help", () => {
     expect(USAGE).toContain("Start here\n  auni");
     expect(USAGE).not.toContain("--finish");

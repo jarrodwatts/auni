@@ -375,9 +375,9 @@ function tunnelCommand(): string | null {
 export function said(facts: SetupFacts, answer = nextStep(facts)): string {
   if (answer.run)
     return [
+      "Auni isn't running.",
       `Run ${answer.run.command}`,
-      "",
-      "Auni is stopped. Keep the terminal open while you use it.",
+      "Keep the terminal open while you use it.",
       ...(facts.webBuilt ? [] : ["The web app builds on the first start (about a minute)."]),
     ].join("\n");
   if (answer.step === "start" && answer.next === "wait")

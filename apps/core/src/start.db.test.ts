@@ -38,8 +38,15 @@ const pairBrowser = () =>
   });
 
 describe("openOwner", () => {
+  it("skips the browser and pairing entirely when the web app is off", async () => {
+    expect(await openOwner({ web: false, open: true, printsLink: true })).toBe(false);
+    expect(opened()).toEqual([]);
+    expect(await codes()).toEqual([]);
+    expect(said).toBe("");
+  });
+
   it("opens the pairing link in the browser while none is paired, and never prints it", async () => {
-    await openOwner({ open: true });
+    await openOwner({ web: true, open: true });
     expect(opened()).toEqual([
       expect.stringMatching(new RegExp(`^${env.WEB_ORIGIN}/app#pair=.+`, "u")),
     ]);
@@ -51,13 +58,13 @@ describe("openOwner", () => {
 
   it("opens the app once a browser is paired, minting no code", async () => {
     await pairBrowser();
-    await openOwner({ open: true });
+    await openOwner({ web: true, open: true });
     expect(opened()).toEqual([`${env.WEB_ORIGIN}/app`]);
     expect((await codes()).map(({ kind }) => kind)).toEqual(["session"]);
   });
 
   it("says where Auni is and how to pair, when it isn't to open a browser", async () => {
-    await openOwner({ open: false });
+    await openOwner({ web: true, open: false });
     expect(opened()).toEqual([]);
     expect(await codes()).toEqual([]);
     expect(said).toContain(`Auni is at ${env.WEB_ORIGIN}`);
@@ -66,31 +73,31 @@ describe("openOwner", () => {
 
   it("says the same when there's no screen, or the browser didn't open, and records which", async () => {
     vi.mocked(canOpenBrowser).mockReturnValue(false);
-    await openOwner({ open: true });
+    await openOwner({ web: true, open: true });
     expect(opened()).toEqual([]);
     expect(browserTried()?.how).toBe("no-screen");
     vi.mocked(canOpenBrowser).mockReturnValue(true);
     vi.mocked(openBrowser).mockRejectedValue(new Error("xdg-open exited 3"));
-    await openOwner({ open: true });
+    await openOwner({ web: true, open: true });
     expect(browserTried()?.how).toBe("not-opened");
     expect(said).not.toContain("#pair");
     expect(said.match(/auni pair/gu)).toHaveLength(2);
   });
 
   it("brings the browser to the page a start names, by the link it opens or prints", async () => {
-    await openOwner({ open: true, landsOn: "/app/new" });
+    await openOwner({ web: true, open: true, landsOn: "/app/new" });
     expect(opened()).toEqual([
       expect.stringMatching(new RegExp(`^${env.WEB_ORIGIN}/app/new#pair=.+`, "u")),
     ]);
     // A demo, with nothing to open a browser in, prints the same link.
     vi.mocked(canOpenBrowser).mockReturnValue(false);
-    await openOwner({ open: true, printsLink: true, landsOn: "/app/new" });
+    await openOwner({ web: true, open: true, printsLink: true, landsOn: "/app/new" });
     expect(said).toMatch(new RegExp(`Open ${env.WEB_ORIGIN}/app/new#pair=\\S+`, "u"));
   });
 
   it("asks a paired owner for no pairing link", async () => {
     await pairBrowser();
-    await openOwner({ open: false });
+    await openOwner({ web: true, open: false });
     expect(said).toContain(`Open Auni at ${env.WEB_ORIGIN}`);
     expect(said).not.toContain("auni pair");
   });

@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { demoPairCode } from "./test-pair.ts";
+
 // A demo started `--at` a moment long past, as `pnpm demo:shots` starts it. Whatever day and
 // hour this test runs, everything it shows is laid on that moment and stays there: that is what
 // lets two sets of pictures be compared.
@@ -52,7 +54,7 @@ describe("auni demo --at a moment", () => {
     await vi.waitFor(
       () => {
         if (demo.exitCode !== null) throw new Error(`The demo exited:\n${said}`);
-        if (!/Open http:\/\/localhost:\d+\/app\/new#pair=/u.test(said)) throw new Error(said);
+        if (!/API ready at http:\/\/\S+/u.test(said)) throw new Error(said);
       },
       { timeout: 120_000, interval: 200 },
     );
@@ -62,7 +64,7 @@ describe("auni demo --at a moment", () => {
     const paired = await fetch(`${core}/owner/pair`, {
       method: "POST",
       headers: { origin, "content-type": "application/json" },
-      body: JSON.stringify({ code: /#pair=(\S+)/u.exec(said)![1] }),
+      body: JSON.stringify({ code: await demoPairCode(scratch, port) }),
     });
     const cookie = paired.headers.get("set-cookie")!.split(";")[0]!;
     ask = async <T>(path: string) => {

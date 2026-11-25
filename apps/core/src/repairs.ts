@@ -247,7 +247,12 @@ export async function doctorCommand(run: DoctorRun): Promise<number> {
   const say = (text: string) => (run.json ? console.error(text) : console.log(text));
   let findings = await doctor();
   const print = (rows: readonly Finding[]) =>
-    run.verbose ? rows.map(line).join("\n") : doctorSummary(rows, auniCommand());
+    run.verbose
+      ? rows.map(line).join("\n")
+      : doctorSummary(rows, auniCommand(), {
+          styled: process.stdout.isTTY && !process.env.NO_COLOR && process.env.TERM !== "dumb",
+          prompting: Boolean(run.ask && !run.fix && !run.dryRun),
+        });
   if (!run.json) say(print(findings));
   const offers = offered(findings);
   if (offers.length > 0) {
@@ -263,16 +268,15 @@ export async function doctorCommand(run: DoctorRun): Promise<number> {
       );
     if (run.dryRun) say("Dry run: nothing changed.");
     else if (!run.fix && !run.ask) {
-      if (run.json || run.verbose) {
-        const auni = auniCommand();
-        say(
-          offers.some(({ recommended }) => recommended)
-            ? `Run ${auni} doctor --fix to run the recommended repairs.`
-            : `To choose an optional repair, run ${auni} doctor --verbose in a terminal.`,
-        );
-      }
+      const recommended = offers.some((offer) => offer.recommended);
+      const auni = auniCommand();
+      if (recommended && (run.json || run.verbose))
+        say(`Run ${auni} doctor --fix to run the recommended repairs.`);
+      else if (run.json && !run.verbose)
+        say(`To choose an optional repair, run ${auni} doctor --verbose in a terminal.`);
     } else {
       const eligible = offers.filter(({ recommended }) => recommended || (!run.fix && run.verbose));
+      if (run.ask && !run.fix && !run.verbose && eligible.length) say("\nRepairs:");
       const chosen: Offer[] = [];
       for (const each of eligible) if (run.fix || (await run.ask!(each))) chosen.push(each);
       if (chosen.length === 0) {

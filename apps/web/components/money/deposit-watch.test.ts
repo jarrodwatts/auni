@@ -41,4 +41,15 @@ describe("stillNeeded", () => {
     expect(stillNeeded(base, [mon, eth, onMonad])).toBe(50_000_000n);
     expect(stillNeeded(base, [mon, deposit("usdc", "20")])).toBe(30_000_000n);
   });
+
+  // 24.995 and 25.005 USDC, exactly 50, left a card short "1¢ to go": each one's dollars are cut
+  // to the cent, $24.99 and $25.00 (review of 2026-11-25).
+  it("counts USDC to the last unit, not by its dollars cut to the cent", () => {
+    const landed = [
+      { ...deposit("a", "24.99"), amount: "24.995" },
+      { ...deposit("b", "25.00"), amount: "25.005" },
+    ];
+    expect(landedTotal(landed)).toBe(50_000_000n);
+    expect(stillNeeded(base, landed)).toBe(0n);
+  });
 });

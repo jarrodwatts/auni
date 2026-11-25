@@ -39,8 +39,15 @@ const depositWireSchema = z.object({
 
 export type DepositWire = z.infer<typeof depositWireSchema>;
 
-/** Core's GET /portfolio/deposits: every deposit recorded while a screen waited, newest first. */
-export const depositsWireSchema = z.object({ deposits: z.array(depositWireSchema) });
+/**
+ * Core's GET /portfolio/deposits: every deposit recorded after the mark a screen began waiting
+ * at, newest first, and that mark, to ask after next time.
+ */
+export const depositsWireSchema = z.object({
+  deposits: z.array(depositWireSchema),
+  /** The instant the screen began waiting, on core's clock, exactly as core gave it. */
+  after: z.string(),
+});
 
 /** Core's GET /portfolio: the live total, all non-cash holdings, and cash. */
 export const portfolioWireSchema = z.object({

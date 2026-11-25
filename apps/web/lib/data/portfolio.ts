@@ -98,16 +98,29 @@ export async function getPortfolio(
 }
 
 /**
- * Every deposit core recorded in the `waitedMs` a screen has waited for one, newest first
- * (`GET /portfolio/deposits`); each ask has core look for money that landed.
+ * Where a screen about to wait for a deposit marks its start, on core's clock
+ * (`GET /portfolio/deposits` with no mark).
  */
-export async function getDepositsSince(
-  waitedMs: number,
+export async function markDepositWait(signal?: AbortSignal): Promise<string> {
+  const body = depositsWireSchema.parse(
+    await requestCore("portfolio/deposits", { method: "GET", signal }),
+  );
+  return body.after;
+}
+
+/**
+ * Every deposit core recorded after `mark` (see markDepositWait), newest first; each ask has core
+ * look for money that landed.
+ */
+export async function getDepositsAfter(
+  mark: string,
   signal?: AbortSignal,
 ): Promise<readonly DepositWire[]> {
-  const within = Math.max(0, Math.ceil(waitedMs));
   const body = depositsWireSchema.parse(
-    await requestCore(`portfolio/deposits?within=${within}`, { method: "GET", signal }),
+    await requestCore(`portfolio/deposits?after=${encodeURIComponent(mark)}`, {
+      method: "GET",
+      signal,
+    }),
   );
   return body.deposits;
 }

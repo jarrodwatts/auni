@@ -813,36 +813,47 @@ describe("deposits a waiting screen sees land", () => {
     ...fields,
   });
   const url = serve(express().use("/portfolio", portfolioRouter));
-  const landedFor = async (within: string) =>
-    (await (await fetch(url(`/portfolio/deposits?within=${within}`))).json()) as {
-      deposits: { id: string; usdValue: string }[];
-    };
+  const landedFor = async (after?: string) =>
+    (await (
+      await fetch(url(`/portfolio/deposits${after ? `?after=${encodeURIComponent(after)}` : ""}`))
+    ).json()) as { deposits: { id: string; usdValue: string }[]; after: string };
+  const at = (mark: string, ms: number) => new Date(Date.parse(mark) + ms);
 
-  // Six deposits between two reads counted as five, and one recorded before the sheet's first
-  // read counted as old news (review of 2026-11-25).
-  it("lists every deposit recorded since the screen began waiting, a burst and the first one alike", async () => {
-    const secondsAgo = (seconds: number) => new Date(Date.now() - seconds * 1_000);
+  // A $50 Base USDC deposit recorded two seconds before Add money opened counted as landing
+  // while it watched, so a card short $50 could read Done (review of 2026-11-25).
+  it("lists every deposit recorded after the screen began waiting, and none from before", async () => {
+    const usdc = { instrument: NETWORKS.base.usdc, decimals: 6, symbol: "USDC" };
+    await db.insert(arrivals).values(
+      row("0xbefore", {
+        ...usdc,
+        baseUnits: "50000000",
+        usdValue: "50.00",
+        createdAt: new Date(Date.now() - 2_000),
+      }),
+    );
+
+    // Opening it lands nothing and marks where it began.
+    const { deposits: opened, after } = await landedFor();
+    expect(opened).toEqual([]);
+    expect((await landedFor(after)).deposits).toEqual([]);
+
     await db.insert(arrivals).values([
-      // Before it waited: old news.
-      row("0xbefore", { createdAt: secondsAgo(60) }),
+      // Recorded in the very millisecond it began, as records count them: before it was waiting.
+      row("0xat", { createdAt: at(after, 0) }),
+      // The next millisecond, and a burst of six between two reads: every one of them lands.
+      row("0xjustafter", { usdValue: "5.00", createdAt: at(after, 1) }),
       ...[1, 2, 3, 4, 5, 6].map((n) =>
-        row(`0xburst${n}`, { usdValue: "10.00", createdAt: secondsAgo(20 - n) }),
+        row(`0xburst${n}`, { usdValue: "10.00", createdAt: at(after, 1 + n) }),
       ),
-      // As it opened, before its first read came back.
-      row("0xopening", { usdValue: "5.00", createdAt: secondsAgo(1) }),
     ]);
-
-    const { deposits } = await landedFor("30000");
-    expect(deposits.map(({ usdValue }) => usdValue)).toEqual(["5.00", ...Array(6).fill("10.00")]);
-    // The first read, however soon after it opened, counts what landed as it did.
-    expect((await landedFor("0")).deposits.map(({ usdValue }) => usdValue)).toEqual(["5.00"]);
+    const { deposits } = await landedFor(after);
+    expect(deposits.map(({ usdValue }) => usdValue)).toEqual([...Array(6).fill("10.00"), "5.00"]);
     // The portfolio still lists only the latest few.
     expect(await recentDeposits()).toHaveLength(5);
   });
 
-  it("asks how long the screen waited", async () => {
-    expect((await fetch(url("/portfolio/deposits"))).status).toBe(400);
-    expect((await fetch(url("/portfolio/deposits?within=-1"))).status).toBe(400);
+  it("asks after a mark core gave", async () => {
+    expect((await fetch(url("/portfolio/deposits?after=yesterday"))).status).toBe(400);
   });
 
   it("lists their latest deposits told, a cent or more, recorded in the last hour, named as recorded", async () => {

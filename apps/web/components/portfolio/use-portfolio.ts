@@ -4,7 +4,12 @@ import type { DepositWire, ThreadId, ValueRange } from "@auni/shared";
 import { keepPreviousData, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
-import { getDepositsSince, getPortfolio, getValueHistory } from "@/lib/data/portfolio";
+import {
+  getDepositsAfter,
+  getPortfolio,
+  getValueHistory,
+  markDepositWait,
+} from "@/lib/data/portfolio";
 import { getTakes } from "@/lib/data/takes";
 import { getThreadState } from "@/lib/data/threads";
 
@@ -63,20 +68,27 @@ export function useTakes() {
 const NO_DEPOSITS: readonly DepositWire[] = [];
 
 /**
- * Every deposit core recorded since the screen calling this began waiting, newest first, read
- * every 10 seconds with core looking for money that landed each time; none before the first read.
- * Core counts back by how long it waited, so one landing before that first read counts, and a
- * burst between two reads counts in full.
+ * A screen waiting for a deposit: it first has core mark the instant it began, on the clock core
+ * records deposits by, then reads every deposit recorded after that mark, newest first, every 10
+ * seconds, with core looking for money that landed each time. So one landing just after it opened
+ * counts, a burst between two reads counts in full, and one recorded before it opened never does.
+ * `watching` is false until the mark is in, as nothing that lands can be counted before then.
  */
-export function useDepositsSince() {
-  // How long it waited, on a clock nothing sets back or forward.
-  const [since] = useState(() => performance.now());
+export function useDepositWatch() {
+  // This screen's own wait, so opening it again marks a new start.
+  const [opened] = useState(() => performance.now());
+  const mark = useQuery({
+    queryKey: ["deposit-mark", opened],
+    queryFn: ({ signal }) => markDepositWait(signal),
+    staleTime: Infinity,
+  });
+  const after = mark.data;
   const read = useQuery({
-    queryKey: ["deposits", since],
-    queryFn: ({ signal }) => getDepositsSince(performance.now() - since, signal),
+    queryKey: ["deposits", after],
+    queryFn: after === undefined ? skipToken : ({ signal }) => getDepositsAfter(after, signal),
     refetchInterval: DEPOSIT_POLL_MS,
   });
-  return read.data ?? NO_DEPOSITS;
+  return { watching: after !== undefined, landed: read.data ?? NO_DEPOSITS };
 }
 
 /** Live holdings opened in one thread and its remaining auto-spend budget. */

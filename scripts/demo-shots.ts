@@ -504,80 +504,78 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     if (looked)
       await take(page, out, "work-open", `${origin}/app/chat/${looked.id}`, "end", OPEN_WORK);
     // Money in and out: Add money, for a card and as money lands, Withdraw and its review, and
-    // the wallet's keys, asked for and shown.
+    // the wallet's keys, asked for and shown. Each is opened in the sheet on top, and pictured
+    // once what it opened shows.
     const once = { once: true } as const;
-    await take(page, out, "add-money", `${origin}/app?fund=open`, "top", undefined, once);
-    await take(
-      page,
-      out,
-      "add-money-solana",
-      `${origin}/app?fund=open`,
-      "top",
-      PRESS("Solana"),
-      once,
-    );
-    await take(
-      page,
-      out,
-      "add-money-for-a-card",
-      `${origin}/app?fund=50-base`,
-      "top",
-      undefined,
-      once,
-    );
-    await take(page, out, "add-money-landed", `${origin}/app?fund=open`, "top", LAND, once);
-    await take(page, out, "withdraw", `${origin}/app`, "top", PRESS("Withdraw"), once);
-    await take(
-      page,
-      out,
-      "withdraw-review",
-      `${origin}/app`,
-      "top",
-      `(async () => {
-        ${PRESS("Withdraw")};
-        await ${PAUSE(800)};
-        ${FILL("amount", "120")};
-        ${PRESS("Monad")};
-        ${FILL("address", "0x8ba1f109551bD432803012645Ac136ddd64DBA72")};
-        await ${PAUSE(300)};
-        ${PRESS("Review")};
-        await ${PAUSE(2_500)};
-        return true;
-      })()`,
-      once,
-    );
-    await take(
-      page,
-      out,
-      "withdraw-new-address",
-      `${origin}/app`,
-      "top",
-      `(async () => {
-        ${LATE_PLACES};
-        ${PRESS("Withdraw")};
-        await ${PAUSE(500)};
-        ${FILL("amount", "20")};
-        ${PRESS("Monad")};
-        ${FILL("address", "0x2222222222222222222222222222222222222222")};
-        await ${PAUSE(4_000)};
-        return true;
-      })()`,
-      once,
-    );
-    const KEYS = `(async () => { ${PRESS("Show wallet keys")}; await ${PAUSE(800)}; return true; })()`;
-    await take(page, out, "wallet-keys", `${origin}/app?settings=wallet`, "top", KEYS, once);
-    const SHOWN = `(async () => { await ${KEYS}; ${PRESS("Show keys")}; await ${PAUSE(1_500)}; return true; })()`;
+    const onTop = (words: string) =>
+      `[...document.querySelectorAll('[role="dialog"]')].at(-1)?.textContent.includes(${JSON.stringify(words)})`;
     const wallet = `${origin}/app?settings=wallet`;
-    await take(page, out, "wallet-keys-shown", wallet, "top", SHOWN, once);
-    await take(
-      page,
-      out,
-      "wallet-keys-revealed",
-      wallet,
-      "top",
-      `(async () => { await ${SHOWN}; ${PRESS("Show the Monad")}; return true; })()`,
-      once,
-    );
+    const KEYS = `(async () => { ${PRESS("Show wallet keys")}; await ${PAUSE(800)}; return true; })()`;
+    const SHOWN = `(async () => { await ${KEYS}; ${PRESS("Show keys")}; await ${PAUSE(1_500)}; return true; })()`;
+    const shots: readonly [string, string, Opener | undefined][] = [
+      ["add-money", `${origin}/app?fund=open`, undefined],
+      [
+        "add-money-solana",
+        `${origin}/app?fund=open`,
+        {
+          does: PRESS("Solana"),
+          shows: `document.querySelector('[role="dialog"] [data-networks="solana"][aria-checked="true"]')`,
+        },
+      ],
+      ["add-money-for-a-card", `${origin}/app?fund=50-base`, undefined],
+      [
+        "add-money-landed",
+        `${origin}/app?fund=open`,
+        { does: LAND, shows: `document.querySelector("[data-landed]")` },
+      ],
+      ["withdraw", `${origin}/app`, { does: PRESS("Withdraw"), shows: onTop("Withdraw") }],
+      [
+        "withdraw-review",
+        `${origin}/app`,
+        {
+          does: `(async () => {
+            ${PRESS("Withdraw")};
+            await ${PAUSE(800)};
+            ${FILL("amount", "120")};
+            ${PRESS("Monad")};
+            ${FILL("address", "0x8ba1f109551bD432803012645Ac136ddd64DBA72")};
+            await ${PAUSE(300)};
+            ${PRESS("Review")};
+            await ${PAUSE(2_500)};
+            return true;
+          })()`,
+          shows: onTop("Check before you send"),
+        },
+      ],
+      [
+        "withdraw-new-address",
+        `${origin}/app`,
+        {
+          does: `(async () => {
+            ${LATE_PLACES};
+            ${PRESS("Withdraw")};
+            await ${PAUSE(500)};
+            ${FILL("amount", "20")};
+            ${PRESS("Monad")};
+            ${FILL("address", "0x2222222222222222222222222222222222222222")};
+            await ${PAUSE(4_000)};
+            return true;
+          })()`,
+          shows: onTop("Your exchange on Base"),
+        },
+      ],
+      ["wallet-keys", wallet, { does: KEYS, shows: onTop("Show your keys?") }],
+      ["wallet-keys-shown", wallet, { does: SHOWN, shows: onTop("Your keys") }],
+      [
+        "wallet-keys-revealed",
+        wallet,
+        {
+          does: `(async () => { await ${SHOWN}; ${PRESS("Show the Monad")}; return true; })()`,
+          shows: onTop("Your keys"),
+        },
+      ],
+    ];
+    for (const [name, url, opener] of shots) await take(page, out, name, url, "top", opener, once);
     if (busiest) {
       const chat = `${origin}/app/chat/${busiest.id}`;
       // Last, as the pane stays open once opened (on this device) for every thread after it.

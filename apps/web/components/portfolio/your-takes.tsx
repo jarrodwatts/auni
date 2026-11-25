@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { amountText, TONE_CLASS_NAME } from "@/components/activity/activity-groups";
+import { useActivity } from "@/components/activity/use-activity";
 import { useStartNew } from "@/components/app/use-start-conversation";
 import { AssetLogo } from "@/components/brand/marks";
 import { PlaceLink } from "@/components/places/open-place";
@@ -30,15 +31,12 @@ import { TakeChange } from "./take-change";
 export function YourTakes({
   takes,
   failed,
-  moves,
   openTake,
   onOpenMove,
 }: {
   /** Null until read. */
   readonly takes: readonly Take[] | null;
   readonly failed: boolean;
-  /** Every move, newest first. */
-  readonly moves: readonly ActivityItemWire[];
   /** A take to open as the page loads (a link from its chat). */
   readonly openTake: ThreadId | null;
   readonly onOpenMove: (move: ActivityItemWire) => void;
@@ -75,7 +73,6 @@ export function YourTakes({
             <TakeRow
               key={take.threadId}
               take={take}
-              moves={moves}
               initiallyOpen={take.threadId === openTake}
               onOpenMove={onOpenMove}
             />
@@ -88,16 +85,17 @@ export function YourTakes({
 
 function TakeRow({
   take,
-  moves,
   initiallyOpen,
   onOpenMove,
 }: {
   readonly take: Take;
-  readonly moves: readonly ActivityItemWire[];
   readonly initiallyOpen: boolean;
   readonly onOpenMove: (move: ActivityItemWire) => void;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
+  // A take's moves are read once it is first opened, and kept while it folds away.
+  const [opened, setOpened] = useState(initiallyOpen);
+  if (open && !opened) setOpened(true);
   // A link to this take opens it whenever it's followed, the page already open or not.
   const [asked, setAsked] = useState(initiallyOpen);
   if (asked !== initiallyOpen) {
@@ -159,7 +157,7 @@ function TakeRow({
         )}
       >
         <div className="min-h-0 overflow-hidden" inert={!open}>
-          <TakeInside take={take} moves={moves} onOpenMove={onOpenMove} />
+          {opened ? <TakeInside take={take} onOpenMove={onOpenMove} /> : null}
         </div>
       </div>
     </div>
@@ -184,20 +182,21 @@ function LogoStack({ take }: { readonly take: Take }) {
   );
 }
 
+/**
+ * A take's holdings and its moves: every move it took part in, as core reads them for this take
+ * (not the latest moves of all, which newer moves elsewhere would push its first ones out of).
+ */
 function TakeInside({
   take,
-  moves,
   onOpenMove,
 }: {
   readonly take: Take;
-  readonly moves: readonly ActivityItemWire[];
   readonly onOpenMove: (move: ActivityItemWire) => void;
 }) {
   const [all, setAll] = useState(false);
-  const timeline = takeTimeline(moves, take.threadId);
-  const shown = all
-    ? moves.filter((move) => move.threadId === take.threadId).toReversed()
-    : timeline.moves;
+  const moves = useActivity(take.threadId).data?.items ?? [];
+  const timeline = takeTimeline(moves);
+  const shown = all ? moves.toReversed() : timeline.moves;
   return (
     <div className="px-4 pb-4 sm:px-5">
       <ul className="divide-y divide-border border-t border-border">

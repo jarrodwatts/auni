@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireOwner } from "../auth/middleware.ts";
 import { db } from "../db/client.ts";
-import { arrivals, fills, ownerSessions, threads } from "../db/schema.ts";
+import { arrivals, fills, otherTokens, ownerSessions, threads } from "../db/schema.ts";
 import { env } from "../env.ts";
 import { ownerRouter } from "../routes/owner.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
@@ -94,7 +94,7 @@ const url = serve(express().use("/owner", ownerRouter).use("/takes", requireOwne
 
 let cookie = "";
 beforeEach(async () => {
-  await wipe(ownerSessions, threads, fills, arrivals);
+  await wipe(ownerSessions, threads, fills, arrivals, otherTokens);
   wallet.holdings = [nvidia, btcLong, cash];
   const { mintPairingCode } = await import("../auth/owner.ts");
   const paired = await fetch(url("/owner/pair"), {
@@ -285,5 +285,39 @@ describe("GET /takes", () => {
       }),
       expect.objectContaining({ venue: "aave", name: "Aave", savings: true, usdValue: "90.00" }),
     ]);
+  });
+
+  it("shares savings' interest with what was saved when Auni first looked, from then", async () => {
+    const earning = await insertThread({ title: "Keep my idle cash earning" });
+    const aave = {
+      venue: "aave",
+      chain: "monad",
+      instrument: "0x35a73BAcb179d3740395A3ceCc87FF2e581d6042",
+      symbol: "aUSDC",
+      decimals: 6,
+      cash: true,
+      priceId: null,
+    } as const;
+    const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000);
+    // Auni first looked 40 days ago and found $1,000 already saved; the take saved $4,000 30
+    // days ago. $20.16 grew since: the take's $4,000 for 30 days earned $15.12, the $1,000 for
+    // 40 days $5.04.
+    await db.insert(otherTokens).values({
+      chain: aave.chain,
+      instrument: aave.instrument.toLowerCase(),
+      keptAt: daysAgo(40),
+      keptUsd: "1000.00",
+      keptBlock: 1,
+    });
+    await bought(earning.id, aave, "4000", "4000.00");
+    await db.update(fills).set({ createdAt: daysAgo(30) });
+    wallet.holdings = [{ ...aave, quantity: "5020.16", usdValue: "5020.16" }];
+
+    const { takes, cash: places } = await read();
+
+    expect(takes).toEqual([
+      expect.objectContaining({ valueUsd: "4015.12", changeUsd: "15.12", costUsd: "4000.00" }),
+    ]);
+    expect(places).toContainEqual(expect.objectContaining({ venue: "aave", usdValue: "1005.04" }));
   });
 });

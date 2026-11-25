@@ -410,11 +410,15 @@ function stake(puts: readonly Put[], at: Date): { units: bigint; weight: bigint 
   return { units, weight: weight > 0n ? weight : 0n };
 }
 
-/** Money core recorded coming in from outside as units of `holding`, at its price now. */
+/**
+ * Money core recorded coming in from outside as units of `holding`, at its price now, from when
+ * it was really there (`since`): what Auni found at its first look earns from then, not from 0.
+ */
 function sentInUnits(holding: Holding, flow: Flow, total: bigint): Put[] {
   const worth = holding.usdValue === null ? 0n : usdToCents(holding.usdValue);
   if (worth === 0n) return [];
-  return [{ units: (BigInt(Math.round(flow.usd * 100)) * total) / worth, at: flow.at }];
+  const units = (BigInt(Math.round(flow.usd * 100)) * total) / worth;
+  return [{ units, at: flow.since ?? flow.at }];
 }
 
 /** A thread's own entry price into a perp, in dollars to 12 places, by its fills (see walkPositions). */

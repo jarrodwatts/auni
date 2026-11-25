@@ -93,17 +93,15 @@ export function chartMoves(items: readonly ActivityItemWire[], from: number): Ch
 const TIMELINE_MOVES = 4;
 
 /**
- * The moves that built a take, oldest first, as many as its timeline shows (the latest), and
- * how many earlier ones it leaves out.
+ * The moves that built a take (its own activity, newest first), oldest first, as many as its
+ * timeline shows (the latest), and how many earlier ones it leaves out.
  */
-export function takeTimeline(
-  items: readonly ActivityItemWire[],
-  threadId: string,
-): { readonly moves: readonly ActivityItemWire[]; readonly earlier: number } {
-  // Items come newest first.
-  const mine = items.filter((item) => item.threadId === threadId);
+export function takeTimeline(items: readonly ActivityItemWire[]): {
+  readonly moves: readonly ActivityItemWire[];
+  readonly earlier: number;
+} {
   return {
-    moves: mine.slice(0, TIMELINE_MOVES).toReversed(),
-    earlier: Math.max(0, mine.length - TIMELINE_MOVES),
+    moves: items.slice(0, TIMELINE_MOVES).toReversed(),
+    earlier: Math.max(0, items.length - TIMELINE_MOVES),
   };
 }

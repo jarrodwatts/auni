@@ -64,10 +64,8 @@ describe("recentOf", () => {
 
 describe("takeTimeline", () => {
   it("is the take's latest moves, oldest first, and how many came before", () => {
-    const items = ["6", "5", "x", "4", "3", "2", "1"].map((id) =>
-      item({ id, threadId: (id === "x" ? "other" : "take") as ActivityItemWire["threadId"] }),
-    );
-    const { moves, earlier } = takeTimeline(items, "take");
+    const items = ["6", "5", "4", "3", "2", "1"].map((id) => item({ id }));
+    const { moves, earlier } = takeTimeline(items);
     expect(moves.map(({ id }) => id)).toEqual(["3", "4", "5", "6"]);
     expect(earlier).toBe(2);
   });

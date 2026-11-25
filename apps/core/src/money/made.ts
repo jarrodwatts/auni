@@ -70,7 +70,9 @@ export async function walletFlows(): Promise<Flow[]> {
  * reading held what moved (see countsFrom); and each holding that began to
  * count, what Auni first found already there included, at what it held then,
  * from then (see keptUsd, and first-look.ts), or from the start for what every
- * read of the wallet holds (see readFromStart): a reading before then held it.
+ * read of the wallet holds (see readFromStart): a reading before then held it,
+ * though it has been there only since then (`since`, which savings' interest
+ * is shared by; see withGrowth in books.ts).
  * A wallet token's worth was read at a block, so it holds whatever moved there or
  * before, recorded yet or not: only what moved after counts again, whichever
  * was recorded first. One with no price counts as nothing, as the portfolio
@@ -116,10 +118,14 @@ export async function arrivalFlows(): Promise<Flow[]> {
         ? []
         : [{ at: row.countsFrom.getTime(), usd: Number(row.usdValue), key: fillIdentity(row) }],
     ),
-    ...kept.map((row) => ({
-      at: readFromStart(row.chain, row.instrument) ? 0 : row.keptAt!.getTime(),
-      usd: Number(row.usdValue),
-      key: fillIdentity(row),
-    })),
+    ...kept.map((row) => {
+      const since = row.keptAt!.getTime();
+      return {
+        at: readFromStart(row.chain, row.instrument) ? 0 : since,
+        since,
+        usd: Number(row.usdValue),
+        key: fillIdentity(row),
+      };
+    }),
   ];
 }

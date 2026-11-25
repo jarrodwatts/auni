@@ -36,14 +36,14 @@ const COLUMN = "mx-auto w-full max-w-[760px] px-4 sm:px-8";
  * Money: everything the owner has, in the order they think of it. The total and its line, then
  * each take with what it holds and the moves that built it, then cash, then what no take holds,
  * then every move as a receipt, even at a zero balance: only an owner with no past at all sees
- * the first-use prompt instead. A receipt opens over the page, from the right on a wide screen
- * and from the bottom on a phone.
+ * the first-use prompt instead. Each part answers for its own read, so balances that couldn't
+ * load leave the takes and receipts that could. A receipt opens over the page, from the right on
+ * a wide screen and from the bottom on a phone.
  */
 export function MoneyScreen({ openTake }: { readonly openTake: ThreadId | null }) {
   const money = useMoney();
   const portfolio = usePortfolio();
   const activity = useActivity();
-  const failed = portfolio.isError && !portfolio.data;
   const view = moneyView(
     money.portfolio?.empty === true,
     activity.isError && !activity.data ? null : activity.data?.items,
@@ -53,16 +53,12 @@ export function MoneyScreen({ openTake }: { readonly openTake: ThreadId | null }
   return (
     <section className="relative flex h-full min-h-0 min-w-0 flex-col">
       <PlaceHeader root icon={<PortfolioMark size={20} />} title="Money" />
-      {failed ? (
-        <div className={cn(COLUMN, "pt-6")}>
-          <ThreadFailureNotice failure={READ_FAILURE} onRetry={() => void portfolio.refetch()} />
-        </div>
-      ) : money.loading || view === "waiting" ? (
+      {money.loading || view === "waiting" ? (
         <MoneyLoading />
       ) : view === "first-use" ? (
         <NothingYet reveal={reveal} />
       ) : (
-        <Overview reveal={reveal} openTake={openTake} activity={activity} />
+        <Overview reveal={reveal} openTake={openTake} activity={activity} balances={portfolio} />
       )}
     </section>
   );
@@ -72,10 +68,12 @@ function Overview({
   reveal,
   openTake,
   activity,
+  balances,
 }: {
   readonly reveal: boolean;
   readonly openTake: ThreadId | null;
   readonly activity: ReturnType<typeof useActivity>;
+  readonly balances: ReturnType<typeof usePortfolio>;
 }) {
   const takes = useTakes();
   const { chats, archived } = usePlaces();
@@ -101,11 +99,14 @@ function Overview({
           reveal && "auni-stagger-in",
         )}
       >
-        <TotalHero moves={items} onOpenMove={open} />
+        {balances.isError && !balances.data ? (
+          <ThreadFailureNotice failure={READ_FAILURE} onRetry={() => void balances.refetch()} />
+        ) : (
+          <TotalHero moves={items} onOpenMove={open} />
+        )}
         <YourTakes
           takes={takes.data?.takes ?? null}
           failed={takes.isError && !takes.data}
-          moves={items}
           openTake={openTake}
           onOpenMove={open}
         />

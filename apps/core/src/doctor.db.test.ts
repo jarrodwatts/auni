@@ -414,10 +414,49 @@ describe("auni doctor", () => {
       await insertAction({ phase: "needs_owner", startedAt: new Date() });
       const { id } = await insertThread({ title: "Fed bet" });
       await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
-      const held = (await doctor()).filter(({ says }) => says.includes("need checking"));
+      const held = (await doctor()).filter(({ says }) => says.includes("needs checking"));
       expect(held).toEqual([
         expect.objectContaining({ status: "fix", chats: [{ id, title: "Fed bet" }] }),
+        expect.objectContaining({ status: "fix", heldMove: expect.any(String) }),
       ]);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  // A withdrawal from Settings is in no chat, yet Health told the owner to open its card in
+  // chat, with nowhere to go (2026-11-25).
+  it("gives a held move in no chat its own finding, which Health checks in place", async () => {
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      const withdrawal = await insertAction({
+        tool: "withdraw_usdc",
+        summary: "Withdraw $20 to JAVqaE…6X8n on Solana",
+        phase: "needs_owner",
+        startedAt: new Date(),
+        run: { held: "unanswered" },
+      });
+      const { id } = await insertThread({ title: "Fed bet" });
+      await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
+      const held = (await doctor()).filter(
+        ({ check, status }) => check === "runner" && status === "fix",
+      );
+      expect(held).toEqual([
+        {
+          check: "runner",
+          status: "fix",
+          says: "1 move needs checking. Open its card in chat for details",
+          chats: [{ id, title: "Fed bet" }],
+        },
+        {
+          check: "runner",
+          status: "fix",
+          says: "Withdraw $20 to JAVqaE…6X8n on Solana needs checking. Auni sent it and never heard back, so it can't tell whether it went through.",
+          heldMove: withdrawal.id,
+        },
+      ]);
+      expect(held[1]!.says).not.toMatch(/chat/u);
     } finally {
       await auni.end();
     }

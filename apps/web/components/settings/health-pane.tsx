@@ -11,6 +11,7 @@ import { CoreApiError } from "@/lib/core";
 import { useAbout, useCheckUpdate, useDiagnostics, useLogs, useRunRepair } from "@/lib/data/system";
 import { cn } from "@/lib/utils";
 
+import { HeldMove } from "./held-move";
 import { chatLinks, healthOf, partName } from "./health";
 import { Networks } from "./networks";
 import {
@@ -135,6 +136,7 @@ function Checks() {
       {needs.length > 0 ? (
         <div className="divide-y divide-border overflow-hidden rounded-card border border-border bg-card">
           {needs.map((finding, index) => {
+            if (finding.heldMove) return <HeldMove key={finding.heldMove} finding={finding} />;
             const chats = chatLinks(finding.chats);
             return (
               <Setting

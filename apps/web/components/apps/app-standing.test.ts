@@ -1,7 +1,7 @@
 import type { AppWire } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { appStanding, keysNeeded, needOf, waysToTry } from "./app-standing";
+import { appStanding, keysNeeded, moneyInOut, needOf, waysToTry } from "./app-standing";
 import { turningOff } from "./turning-off";
 
 const KEY = {
@@ -146,6 +146,43 @@ describe("waysToTry", () => {
       now: [],
       waiting: [read.title, bet.title],
     });
+  });
+});
+
+describe("moneyInOut", () => {
+  const polymarket = (fields: Partial<AppWire> = {}) =>
+    app({
+      name: "Polymarket",
+      account: {
+        ...account("408.58"),
+        moneyIn: "A buy spends the cash already in your Polymarket wallet first.",
+      },
+      ...fields,
+    });
+
+  it("says how money moves there, and offers what Auni is asked for, once it can", () => {
+    expect(moneyInOut(polymarket())).toEqual({
+      in: { words: "A buy spends the cash already in your Polymarket wallet first." },
+      out: { waits: false },
+      blocked: null,
+    });
+    expect(moneyInOut(app())).toBeNull();
+  });
+
+  // Polymarket with money and no keys still explained how a buy spends its cash, while buying
+  // waited for those keys (2026-11-25).
+  it("says only what's in the way until money can move there", () => {
+    expect(moneyInOut(polymarket({ needs: ["Needs an API key"], settings: [KEY] }))).toEqual({
+      in: null,
+      out: { waits: true },
+      blocked: "Add your key above to move money here.",
+    });
+    expect(moneyInOut(polymarket({ on: false }))?.blocked).toBe(
+      "Turn Polymarket on to move money here.",
+    );
+    expect(moneyInOut(polymarket({ needs: ["Not paired yet"] }))?.blocked).toBe(
+      "Auni can move money here once Polymarket is set up.",
+    );
   });
 });
 

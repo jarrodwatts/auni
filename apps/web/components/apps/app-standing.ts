@@ -41,6 +41,35 @@ export function waysToTry<Way extends { readonly title: string; readonly moves?:
   return { now: ways.filter(works), waiting: ways.filter((way) => !works(way)) };
 }
 
+/** One way money goes in or out: the app's own words, a tap asking Auni (which may wait), or nothing. */
+export type MoneyWay = { readonly words: string } | { readonly waits: boolean } | null;
+
+/**
+ * Money in and out of an app with an account there, as its sheet says it. The app's words for
+ * how money moves show only while it moves: until then the sheet says what's in the way instead,
+ * and never how a buy spends cash while buying waits for keys. A way Auni is asked for keeps its
+ * button, which waits too.
+ */
+export function moneyInOut(app: AppWire): {
+  readonly in: MoneyWay;
+  readonly out: MoneyWay;
+  readonly blocked: string | null;
+} | null {
+  if (!app.account) return null;
+  const keys = keysNeeded(app).length;
+  const blocked =
+    app.on && app.needs.length === 0
+      ? null
+      : !app.on
+        ? `Turn ${app.name} on to move money here.`
+        : keys > 0
+          ? `Add your ${keys === 1 ? "key" : "keys"} above to move money here.`
+          : `Auni can move money here once ${app.name} is set up.`;
+  const way = (words: string | null): MoneyWay =>
+    words === null ? { waits: blocked !== null } : blocked === null ? { words } : null;
+  return { in: way(app.account.moneyIn), out: way(app.account.moneyOut), blocked };
+}
+
 /**
  * What it waits on, short enough for a tile: "Needs a key", "Needs 3 keys", "Not paired yet", or
  * what keeps going wrong for it now, "Out of credits".

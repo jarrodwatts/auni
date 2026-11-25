@@ -66,21 +66,35 @@ export async function reconcileStuckActions(): Promise<ActionRow[]> {
 }
 
 /**
- * Up to 50 held moves, each waiting on the owner's Check again or Close (see hold), with the
- * chat its card is in (none for one started outside a chat), the oldest first.
+ * Up to 50 held moves, each waiting on the owner's Check again or Close (see hold), with what
+ * its card was for, why it is held, and the chat its card is in (none for one started outside a
+ * chat, or whose chat was deleted), the oldest first.
  */
 export async function heldMoves(): Promise<
-  { id: string; chat: { id: string; title: string | null } | null }[]
+  {
+    id: string;
+    summary: string;
+    why: HeldWhy | undefined;
+    chat: { id: string; title: string | null } | null;
+  }[]
 > {
   const rows = await db
-    .select({ id: actions.id, threadId: threads.id, title: threads.title })
+    .select({
+      id: actions.id,
+      summary: actions.summary,
+      run: actions.run,
+      threadId: threads.id,
+      title: threads.title,
+    })
     .from(actions)
     .leftJoin(threads, eq(threads.id, actions.threadId))
     .where(eq(actions.phase, "needs_owner"))
     .orderBy(asc(actions.createdAt))
     .limit(50);
-  return rows.map(({ id, threadId, title }) => ({
+  return rows.map(({ id, summary, run, threadId, title }) => ({
     id,
+    summary,
+    why: run.held,
     chat: threadId === null ? null : { id: threadId, title },
   }));
 }

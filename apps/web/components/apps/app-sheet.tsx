@@ -20,7 +20,7 @@ import { AppJobs } from "./app-jobs";
 import { AppKeysNeeded, AppSettings, KeysSaved } from "./app-keys";
 import { AppMark } from "./app-mark";
 import { AppPairing } from "./app-pairing";
-import { keysNeeded, waysToTry } from "./app-standing";
+import { keysNeeded, moneyInOut, waysToTry, type MoneyWay } from "./app-standing";
 import { AppSwitch } from "./app-switch";
 import { Section } from "./sheet-section";
 
@@ -63,8 +63,7 @@ export function AppSheet({
   const asksKey = neededKeys > 0;
   // The moment its last key went in, said once, while this sheet stays open.
   const [connected, setConnected] = useState(false);
-  // Money moves there only while it's on and nothing is missing, as its ways that move money do.
-  const movesMoney = app.on && app.needs.length === 0;
+  const money = moneyInOut(app);
   const { busy, start } = useStartConversation();
   const { openReport } = useAppDialogs();
   // The chat a tap starts takes the place of this page, and the sheet goes with it.
@@ -167,41 +166,37 @@ export function AppSheet({
           {app.canSwitch ? null : (
             <AppJobs app={app} apps={apps} onOpen={onOpen} whichBrain={whichBrain} />
           )}
-          {app.account ? (
+          {money ? (
             <Section title="Money in and out">
               <div
                 className={cn(
                   "grid gap-2.5",
                   // Two moves sit side by side; words take the width they need.
-                  !app.account.moneyIn && !app.account.moneyOut && "grid-cols-2",
+                  money.in &&
+                    "waits" in money.in &&
+                    money.out &&
+                    "waits" in money.out &&
+                    "grid-cols-2",
                 )}
               >
                 <Way
-                  words={app.account.moneyIn}
-                  off={!movesMoney}
+                  way={money.in}
                   busy={busy}
                   icon={<ArrowDownLeft aria-hidden className="size-4" strokeWidth={2.2} />}
                   label="Put money in"
                   onAsk={() => ask(`I want to put money into ${name}.`)}
                 />
                 <Way
-                  words={app.account.moneyOut}
-                  off={!movesMoney}
+                  way={money.out}
                   busy={busy}
                   icon={<ArrowUpRight aria-hidden className="size-4" strokeWidth={2.2} />}
                   label="Take money out"
                   onAsk={() => ask(`I want to take money out of ${name}.`)}
                 />
               </div>
-              {movesMoney || (app.account.moneyIn && app.account.moneyOut) ? null : (
-                <p className="mt-2.5 text-meta text-muted-foreground">
-                  {!app.on
-                    ? `Turn ${name} on to move money here.`
-                    : asksKey
-                      ? `Add your ${neededKeys === 1 ? "key" : "keys"} above to move money here.`
-                      : `Auni can move money here once ${name} is set up.`}
-                </p>
-              )}
+              {money.blocked ? (
+                <p className="mt-2.5 text-meta text-muted-foreground">{money.blocked}</p>
+              ) : null}
             </Section>
           ) : null}
           <AppSettings app={app} settingsFile={settingsFile} />
@@ -287,31 +282,30 @@ function Holdings({ app }: { readonly app: AppWire }) {
  * else the app's own words on how it happens, so a gap is said and never hidden.
  */
 function Way({
-  words,
-  off,
+  way,
   busy,
   icon,
   label,
   onAsk,
 }: {
-  readonly words: string | null;
-  readonly off: boolean;
+  readonly way: MoneyWay;
   readonly busy: boolean;
   readonly icon: ReactNode;
   readonly label: string;
   readonly onAsk: () => void;
 }) {
-  if (words)
+  if (!way) return null;
+  if ("words" in way)
     return (
       <p className="flex gap-3 text-meta leading-[1.55] text-muted-foreground">
         <span className="mt-px flex size-[18px] flex-none items-center justify-center text-faint">
           {icon}
         </span>
-        <span className="min-w-0 flex-1">{words}</span>
+        <span className="min-w-0 flex-1">{way.words}</span>
       </p>
     );
   return (
-    <Button variant="secondary" disabled={busy || off} onClick={onAsk} className="min-w-0">
+    <Button variant="secondary" disabled={busy || way.waits} onClick={onAsk} className="min-w-0">
       {icon}
       {label}
     </Button>

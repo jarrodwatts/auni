@@ -2,7 +2,7 @@
 
 import { listed } from "@auni/shared";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { AssetLogo } from "@/components/brand/marks";
 import { useMoney } from "@/components/money/money-provider";
@@ -20,14 +20,25 @@ import { otherTokensLabel } from "./other-tokens-text";
 
 const worth = (holding: Holding) => formatUsdcBalance(BigInt(holding.value.baseUnits));
 
-/** One holding: its logo, what it is and how much, and what it's worth. */
-export function HoldingRow({ holding }: { readonly holding: Holding }) {
+/** One holding: its logo, what it is and how much, and what it's worth, with `under` beneath. */
+export function HoldingRow({
+  holding,
+  under,
+}: {
+  readonly holding: Holding;
+  readonly under?: ReactNode;
+}) {
   return (
     <Row
       mark={<AssetLogo holding={holding} size={32} />}
       title={holding.name}
       meta={holding.detail}
-      end={<span className="font-medium tabular-nums">{worth(holding)}</span>}
+      end={
+        <span className="flex flex-col items-end">
+          <span className="font-medium tabular-nums">{worth(holding)}</span>
+          {under}
+        </span>
+      }
     />
   );
 }

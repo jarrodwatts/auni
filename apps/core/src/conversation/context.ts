@@ -5,13 +5,13 @@ import { fenced } from "../agent/fence.ts";
 import { reachWire } from "../always-on.ts";
 import { db } from "../db/client.ts";
 import { actions, automations, threads, type ThreadRow } from "../db/schema.ts";
-import { allFills, gainOf } from "../money/books.ts";
+import { gainOf } from "../money/books.ts";
 import { portfolioNow, type Holding, type Portfolio } from "../money/portfolio.ts";
 import { threadPot } from "../money/pot.ts";
 import { cardMoneys } from "../money/recipes/index.ts";
 import { dollars } from "../money/summaries.ts";
 import { within } from "../money/swaps/shared.ts";
-import { heldByTakes, takeChange } from "../money/takes.ts";
+import { heldByTakes, takeChange, takeRecords } from "../money/takes.ts";
 import { centsToUsd, sumUsd, usdToCents } from "../money/usd.ts";
 import { cardsOf } from "../money/waiting.ts";
 
@@ -131,9 +131,9 @@ function positionLine(holding: Holding): string {
  * appended to the turn's system reminder.
  */
 export async function threadContext(thread: ThreadRow): Promise<string> {
-  const [portfolio, everyFill, watches, reach] = await Promise.all([
+  const [portfolio, records, watches, reach] = await Promise.all([
     promptPortfolio(),
-    allFills(db),
+    takeRecords(),
     db
       .select({
         id: automations.id,
@@ -167,7 +167,7 @@ export async function threadContext(thread: ThreadRow): Promise<string> {
   }
 
   if (portfolio) {
-    const mine = heldByTakes(portfolio, everyFill).threads.get(thread.id) ?? [];
+    const mine = heldByTakes(portfolio, records).threads.get(thread.id) ?? [];
     if (mine.length > 0) {
       const { changeUsd, costUsd } = takeChange(mine);
       const together =

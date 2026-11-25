@@ -126,7 +126,13 @@ function TakeRow({
           <>
             <span className="flex flex-col items-end">
               <span className="text-body font-semibold">{formatUsdcBalance(take.value)}</span>
-              {take.change ? <TakeChange change={take.change} className="text-meta" /> : null}
+              {take.change ? (
+                <TakeChange
+                  change={take.change}
+                  savings={take.holdings.every(({ savings }) => savings)}
+                  className="text-meta"
+                />
+              ) : null}
             </span>
             <ChevronDown
               aria-hidden
@@ -197,7 +203,18 @@ function TakeInside({
       <ul className="divide-y divide-border border-t border-border">
         {take.holdings.map((holding) => (
           <li key={holding.id}>
-            <HoldingRow holding={holding} />
+            <HoldingRow
+              holding={holding}
+              under={
+                holding.change ? (
+                  <TakeChange
+                    change={holding.change}
+                    savings={holding.savings}
+                    className="text-meta"
+                  />
+                ) : null
+              }
+            />
           </li>
         ))}
       </ul>

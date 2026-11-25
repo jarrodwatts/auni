@@ -1,5 +1,6 @@
 import { EVM_CASH_KEYS } from "@auni/shared";
 
+import { heldLabel } from "../../money/format.ts";
 import { defineApp } from "../contract.ts";
 import { aaveMarket, aaveSupply, aaveWithdraw } from "./aave.ts";
 import about from "./about.ts";
@@ -21,7 +22,11 @@ export default defineApp({
         return market ? [{ chain, instrument: market.aUsdc, symbol: "aUSDC" }] : [];
       }),
     },
-    face: async () => ({ name: "Cash", detail: `Savings on ${about.name}`, logoUrl: null }),
+    face: async (holding) => ({
+      name: `Savings on ${about.name}`,
+      detail: `${heldLabel(holding.quantity)} ${holding.symbol}`,
+      logoUrl: null,
+    }),
     moneyIn: aaveSupply,
     moneyOut: aaveWithdraw,
     cash: {

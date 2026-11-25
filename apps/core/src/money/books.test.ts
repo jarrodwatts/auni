@@ -11,12 +11,13 @@ import {
   saleOwners,
   sharedFill,
   type PotFill,
+  worthUsd,
 } from "./books.ts";
-import { QUANTITY_DECIMALS } from "./fill-key.ts";
+import { fillIdentity, QUANTITY_DECIMALS } from "./fill-key.ts";
 import { madeUsd } from "./made.ts";
 import type { Holding } from "./portfolio.ts";
 import { plainCashUsd } from "./readings.ts";
-import { parseUnits } from "./usd.ts";
+import { centsToUsd, parseUnits, signedUsdToCents, usdToCents } from "./usd.ts";
 
 const fill = (
   side: "buy" | "sell",
@@ -386,38 +387,58 @@ describe("holdingsByThread, shared perps and growing savings", () => {
     Object.fromEntries(
       [...split.threads].map(([id, held]) => [id, held.map((holding) => gainOf(holding))]),
     );
+  // A shorted 1 ETH at $3,000 and B 1 at $2,000: the venue's entry is $2,500.
+  const twoShorts = [perpFill("A", "sell", "1", "3000.00"), perpFill("B", "sell", "1", "2000.00")];
+  const ethShort = (over: Partial<Holding>): Holding => ({
+    venue: "hyperliquid",
+    chain: "hyperliquid",
+    instrument: "ETH",
+    symbol: "ETH",
+    quantity: "2",
+    decimals: 18,
+    usdValue: "5200.00",
+    cash: false,
+    priceId: null,
+    short: true,
+    leverage: 1,
+    averageCostUsd: "2500",
+    unrealizedPnlUsd: "200.00",
+    ...over,
+  });
 
   it("gains each take on a shared perp from its own entry, not a split of the venue's", () => {
-    // A shorted 1 ETH at $3,000 and B 1 at $2,000: the venue's entry is $2,500, the mark $2,400.
-    const short: Holding = {
-      venue: "hyperliquid",
-      chain: "hyperliquid",
-      instrument: "ETH",
-      symbol: "ETH",
-      quantity: "2",
-      decimals: 18,
-      usdValue: "5200.00",
-      cash: false,
-      priceId: null,
-      short: true,
-      leverage: 1,
-      averageCostUsd: "2500",
-      unrealizedPnlUsd: "200.00",
-    };
-    const split = holdingsByThread(
-      [short],
-      [perpFill("A", "sell", "1", "3000.00"), perpFill("B", "sell", "1", "2000.00")],
-    );
+    // The mark is $2,400.
+    const split = holdingsByThread([ethShort({})], twoShorts);
     expect(gainsOf(split)).toEqual({
       A: [{ costCents: 300_000n, changeCents: 60_000n }],
       B: [{ costCents: 200_000n, changeCents: -40_000n }],
     });
-    // The shares still add up to the venue's position.
+    // Each keeps its part of what the venue holds, which closing it frees.
     const values = [...split.threads.values()].flat().map(({ usdValue }) => usdValue);
-    expect(values).toEqual(["3100.00", "2100.00"]);
+    expect(values).toEqual(["2600.00", "2600.00"]);
   });
 
-  it("keeps the venue's entry for what no take holds beside a take's own", () => {
+  it.each([
+    // At 10x the margin is $500, and the venue's value $500 + $200 made.
+    { leverage: 10, usdValue: "700.00", unrealizedPnlUsd: "200.00" },
+    // At 5x with the mark at $2,600, $1,000 of margin less $200 lost.
+    { leverage: 5, usdValue: "800.00", unrealizedPnlUsd: "-200.00" },
+  ])("never values a share of a shared perp at $leverage times leverage below nothing", (over) => {
+    const split = holdingsByThread([ethShort(over)], twoShorts);
+    const shares = [...split.threads.values()].flat();
+    expect(shares.map(({ usdValue }) => usdValue)).toEqual([
+      centsToUsd(usdToCents(over.usdValue) / 2n),
+      centsToUsd(usdToCents(over.usdValue) / 2n),
+    ]);
+    // What GET /takes adds up for each take.
+    for (const held of split.threads.values()) expect(() => worthUsd(held)).not.toThrow();
+    // Their own entries still part what the venue made: A's $3,000 short is $1,000 better off.
+    const made = shares.map(({ unrealizedPnlUsd }) => signedUsdToCents(unrealizedPnlUsd!));
+    expect(made[0]! - made[1]!).toBe(100_000n);
+    expect(made[0]! + made[1]!).toBe(signedUsdToCents(over.unrealizedPnlUsd));
+  });
+
+  it("gives what no take holds beside a take's own the rest of the venue's gain", () => {
     // A went long 1 BTC at $55,000; 1 more came from outside Auni. Venue entry $60,000, mark $60,000.
     const long: Holding = {
       venue: "hyperliquid",
@@ -437,9 +458,11 @@ describe("holdingsByThread, shared perps and growing savings", () => {
       [long],
       [{ threadId: "A", ...fill("buy", "1", "55000.00", "BTC", "hyperliquid") }],
     );
-    // The blend of $55,000 and the venue's $60,000 is $57,500: A made $2,500 more than half of $0.
-    expect(gainsOf(split).A).toEqual([{ costCents: 5_500_000n, changeCents: 250_000n }]);
-    expect(split.loose.map((holding) => holding.unrealizedPnlUsd)).toEqual(["-2500.00"]);
+    // A made $5,000; the other BTC, which must have got in at $65,000, lost it.
+    expect(gainsOf(split).A).toEqual([{ costCents: 5_500_000n, changeCents: 500_000n }]);
+    expect(
+      split.loose.map((holding) => [holding.averageCostUsd, holding.unrealizedPnlUsd]),
+    ).toEqual([["65000", "-5000.00"]]);
   });
 
   const aUsdc = savingsTokens("monad")[0]!.token;
@@ -459,14 +482,24 @@ describe("holdingsByThread, shared perps and growing savings", () => {
     createdAt,
     ...fill("buy", quantity, quantity, aUsdc, "monad"),
   });
+  /** aUSDC core recorded arriving from outside Auni (see arrivalFlows). */
+  const sentIn = (usd: number, at: Date) => ({
+    at: at.getTime(),
+    usd,
+    key: fillIdentity({ chain: "monad", instrument: aUsdc }),
+  });
   const now = new Date("2026-11-01T00:00:00Z");
-  const monthsAgo = (months: number) => new Date(now.getTime() - months * 30 * 86_400_000);
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000);
+  const quantities = (split: ReturnType<typeof holdingsByThread>) => ({
+    ...Object.fromEntries([...split.threads].map(([id, [held]]) => [id, held!.quantity])),
+    loose: split.loose.map(({ quantity }) => quantity),
+  });
 
   it("gives the interest savings earned to the takes that put them in, at what they paid", () => {
     // A saved $3,000 and B $1,000; it has grown to $4,012.50 since.
     const split = holdingsByThread(
       [savings("4012.5")],
-      [saved("A", "3000", monthsAgo(2)), saved("B", "1000", monthsAgo(2))],
+      [saved("A", "3000", daysAgo(60)), saved("B", "1000", daysAgo(60))],
       now,
     );
     expect(gainsOf(split)).toEqual({
@@ -476,12 +509,45 @@ describe("holdingsByThread, shared perps and growing savings", () => {
     expect(split.loose).toEqual([]);
   });
 
-  it("leaves savings sent in from elsewhere outside the takes", () => {
-    // A saved $4,000 a month ago; then $1,000 of aUSDC came in from an exchange.
-    const split = holdingsByThread([savings("5000")], [saved("A", "4000", monthsAgo(1))], now);
-    const [take] = split.threads.get("A")!;
-    // A month at the most savings are taken to earn (20% a year) is $65.75 on $4,000.
-    expect(take?.quantity).toBe("4065.753424");
-    expect(split.loose.map(({ quantity }) => quantity)).toEqual(["934.246576"]);
+  it("gives interest to the take that held the money while it earned", () => {
+    // A saved $1,000 a year ago and earned $50; B saved $1,000 yesterday.
+    const split = holdingsByThread(
+      [savings("2050")],
+      [saved("A", "1000", daysAgo(365)), saved("B", "1000", daysAgo(1))],
+      now,
+    );
+    expect(quantities(split)).toEqual({ A: "1049.863387", B: "1000.136613", loose: [] });
+  });
+
+  it("leaves savings sent in from outside out of the takes, however long they've saved", () => {
+    // A saved $100 a year ago, earning $5, and $10,000 yesterday; then $1,000 of aUSDC came in
+    // from an exchange.
+    const split = holdingsByThread(
+      [savings("11105")],
+      [saved("A", "100", daysAgo(365)), saved("A", "10000", daysAgo(1))],
+      now,
+      [sentIn(1000, daysAgo(0))],
+    );
+    expect(quantities(split)).toEqual({ A: "10105", loose: ["1000"] });
+  });
+
+  it("gives a take only the interest beside savings sent in a month after it saved", () => {
+    // A saved $4,000 a month ago and earned $15; then $1,000 of aUSDC came in from an exchange.
+    const split = holdingsByThread([savings("5015")], [saved("A", "4000", daysAgo(30))], now, [
+      sentIn(1000, daysAgo(0)),
+    ]);
+    expect(quantities(split)).toEqual({ A: "4015", loose: ["1000"] });
+  });
+
+  it("shares interest with the owner's own savings, by what each put in and for how long", () => {
+    // A saved $1,000 two months ago; the owner saved $1,000 themselves then too, and $1,000 was
+    // there when Auni first looked. All of it earned $30.
+    const split = holdingsByThread(
+      [savings("3030")],
+      [saved("A", "1000", daysAgo(60)), saved(null, "1000", daysAgo(60))],
+      now,
+      [sentIn(1000, daysAgo(60))],
+    );
+    expect(quantities(split)).toEqual({ A: "1010", loose: ["2020"] });
   });
 });

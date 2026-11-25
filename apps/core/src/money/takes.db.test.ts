@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireOwner } from "../auth/middleware.ts";
 import { db } from "../db/client.ts";
-import { fills, ownerSessions, threads } from "../db/schema.ts";
+import { arrivals, fills, ownerSessions, threads } from "../db/schema.ts";
 import { env } from "../env.ts";
 import { ownerRouter } from "../routes/owner.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
@@ -94,7 +94,7 @@ const url = serve(express().use("/owner", ownerRouter).use("/takes", requireOwne
 
 let cookie = "";
 beforeEach(async () => {
-  await wipe(ownerSessions, threads, fills);
+  await wipe(ownerSessions, threads, fills, arrivals);
   wallet.holdings = [nvidia, btcLong, cash];
   const { mintPairingCode } = await import("../auth/owner.ts");
   const paired = await fetch(url("/owner/pair"), {
@@ -164,6 +164,29 @@ describe("GET /takes", () => {
     expect(loose).toEqual([expect.objectContaining({ name: "NVDAx", usdValue: "600.00" })]);
   });
 
+  it("says what each holding in a take made, beside what the take made", async () => {
+    const ai = await insertThread({ title: "AI buildout" });
+    const tesla: Holding = {
+      ...nvidia,
+      instrument: "0x00000000000000000000000000000000000000bb",
+      symbol: "TSLAx",
+      quantity: "2",
+      usdValue: "500.00",
+      averageCostUsd: undefined,
+    };
+    wallet.holdings = [nvidia, tesla];
+    await bought(ai.id, nvidia, "15", "1500.00");
+    await bought(ai.id, tesla, "2", "600.00");
+
+    const [take] = (await read()).takes;
+
+    expect(take).toMatchObject({ changeUsd: "200.00", costUsd: "2100.00" });
+    expect(take!.holdings).toEqual([
+      expect.objectContaining({ name: "NVDAx", changeUsd: "300.00", costUsd: "1500.00" }),
+      expect.objectContaining({ name: "TSLAx", changeUsd: "-100.00", costUsd: "600.00" }),
+    ]);
+  });
+
   it("caps what takes hold at what the wallet holds, the first to buy first", async () => {
     const first = await insertThread({ title: "First" });
     const second = await insertThread({ title: "Second" });
@@ -224,11 +247,31 @@ describe("GET /takes", () => {
       },
     ];
     await bought(earning.id, aave, "4000", "4000.00");
+    // Saved a month ago, it has earned $10; the other $90 of aUSDC came in from an exchange.
+    await db.update(fills).set({ createdAt: new Date(Date.now() - 30 * 86_400_000) });
+    await db.insert(arrivals).values({
+      chain: "monad",
+      txHash: "0x01",
+      position: "log:0",
+      instrument: aave.instrument,
+      baseUnits: "90000000",
+      decimals: 6,
+      usdValue: "90.00",
+      symbol: "aUSDC",
+      kind: "deposit",
+      at: new Date(),
+      block: 1,
+    });
 
     const { takes, loose, cash: places } = await read();
 
     expect(takes).toEqual([
-      expect.objectContaining({ title: "Keep my idle cash earning", valueUsd: "4000.00" }),
+      expect.objectContaining({
+        title: "Keep my idle cash earning",
+        valueUsd: "4010.00",
+        changeUsd: "10.00",
+        costUsd: "4000.00",
+      }),
     ]);
     // Cash is never a holding of no take's.
     expect(loose).toEqual([]);
@@ -240,7 +283,7 @@ describe("GET /takes", () => {
         savings: false,
         usdValue: "950.15",
       }),
-      expect.objectContaining({ venue: "aave", name: "Aave", savings: true, usdValue: "100.00" }),
+      expect.objectContaining({ venue: "aave", name: "Aave", savings: true, usdValue: "90.00" }),
     ]);
   });
 });

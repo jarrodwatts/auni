@@ -16,9 +16,22 @@ export interface Take {
    * What they made since they were bought, signed, in base units, and as a percent of what they
    * cost; null when nothing records what any of them cost.
    */
-  readonly change: { readonly amount: bigint; readonly percent: number } | null;
+  readonly change: Change | null;
   /** Largest first. */
-  readonly holdings: readonly Holding[];
+  readonly holdings: readonly TakeHolding[];
+}
+
+/** What something made since it was bought, signed, in base units, and over what it cost. */
+interface Change {
+  readonly amount: bigint;
+  readonly percent: number;
+}
+
+/** One holding in a take, with what it alone made since the take bought it. */
+interface TakeHolding extends Holding {
+  readonly change: Change | null;
+  /** Savings, whose change is the interest they earned. */
+  readonly savings: boolean;
 }
 
 /** Cash no take holds, in one place: the owner's own wallets, or an app that keeps some. */
@@ -50,7 +63,11 @@ export async function getTakes(signal?: AbortSignal): Promise<Takes> {
       title: take.title,
       value: dollarsToBaseUnits(take.valueUsd),
       change: takeChange(take.changeUsd, take.costUsd),
-      holdings: take.holdings.map(toHolding),
+      holdings: take.holdings.map((holding) => ({
+        ...toHolding(holding),
+        change: takeChange(holding.changeUsd, holding.costUsd),
+        savings: holding.savings,
+      })),
     })),
     loose: body.loose.map(toHolding),
     cash: body.cash.map(({ usdValue, ...place }) => ({
@@ -61,7 +78,7 @@ export async function getTakes(signal?: AbortSignal): Promise<Takes> {
 }
 
 /** What a take made, and that over what it cost as a percent; null when either is unknown. */
-function takeChange(changeUsd: string | null, costUsd: string | null): Take["change"] {
+function takeChange(changeUsd: string | null, costUsd: string | null): Change | null {
   if (changeUsd === null || costUsd === null) return null;
   const amount = dollarsToBaseUnits(changeUsd);
   const cost = dollarsToBaseUnits(costUsd);

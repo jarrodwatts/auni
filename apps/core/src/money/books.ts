@@ -4,6 +4,7 @@ import type { Tx } from "../db/client.ts";
 import { fills } from "../db/schema.ts";
 import { isMargined, isSavings } from "../apps/registry.ts";
 import { fillIdentity, QUANTITY_DECIMALS } from "./fill-key.ts";
+import type { Flow } from "./flows.ts";
 import { unitUsd } from "./format.ts";
 import type { Holding, OnItsWay, Portfolio } from "./portfolio.ts";
 import {
@@ -305,12 +306,14 @@ export function buyersOf(
  * average: two takes that bought one stock at $100 and $200 each keep their own price, and
  * the owner's own buys of it change neither. Savings that grew stay with the takes that put
  * them in (see withGrowth), and a perp two takes share gains from each one's own entry (see
- * ownEntries). `at` is when the holdings were read.
+ * ownEntries). `at` is when the holdings were read; `sentIn`, the money core recorded coming in
+ * from outside Auni (see arrivalFlows in made.ts), which no take holds.
  */
 export function holdingsByThread(
   holdings: readonly Holding[],
   everyFill: readonly BookFill[],
   at: Date = new Date(),
+  sentIn: readonly Flow[] = [],
 ): { threads: Map<string, Holding[]>; loose: Holding[] } {
   const books = threadBooks(everyFill);
   const byOwner = Map.groupBy(everyFill, (fill) => fill.threadId);
@@ -322,8 +325,21 @@ export function holdingsByThread(
     if (total === 0n) continue;
     const key = fillIdentity(holding);
     const inBooks = holdersOf(holding.short ? -total : total, books, key);
+    const putsOf = (owner: string | null): Put[] => [
+      ...(byOwner.get(owner) ?? [])
+        .filter((fill) => fillIdentity(fill) === key)
+        .map((fill) => ({
+          units: signedQuantity(fill),
+          at: fill.createdAt?.getTime() ?? at.getTime(),
+        })),
+      ...(owner === null
+        ? sentIn
+            .filter((flow) => flow.key === key)
+            .flatMap((flow) => sentInUnits(holding, flow, total))
+        : []),
+    ];
     const held = isSavings(holding.venue)
-      ? withGrowth(inBooks, holding.decimals, (id) => firstBuy(byOwner.get(id), key), at)
+      ? withGrowth(inBooks, holding.decimals, putsOf, at)
       : inBooks;
     const owners = [...held.threads, ...(held.other > 0n ? [[null, held.other] as const] : [])];
     const shares = isMargined(holding)
@@ -341,43 +357,64 @@ export function holdingsByThread(
   return { threads, loose };
 }
 
-/** The most savings are taken to earn in a year: units past it came in from somewhere else. */
-const SAVINGS_MOST_A_YEAR_PERCENT = 20n;
-const YEAR_MS = 365n * 24n * 60n * 60n * 1000n;
+/** Units put into savings (signed, in QUANTITY_DECIMALS units; a withdrawal is negative), and when. */
+interface Put {
+  readonly units: bigint;
+  readonly at: number;
+}
 
 /**
  * Savings grow by themselves (aUSDC's balance rises as interest accrues, a dollar each), so the
- * wallet holds more than any fill bought. What no thread's books hold is the interest on what
- * the threads put in, shared by what each put in, as far as it could have earned since its
- * first buy there (see SAVINGS_MOST_A_YEAR_PERCENT); the rest stays unattributed, as savings
- * sent in from elsewhere are.
+ * wallet holds more than anything put in. Every unit earns at the same rate, so the growth is
+ * shared by what each holder put in times how long it has held it: a take that saved a year ago
+ * earned what a take that saved yesterday did not. What no take holds is the owner's own: what
+ * their own fills put in, and what core recorded coming in from outside Auni (an exchange's
+ * aUSDC, or what was there when Auni first looked), which is never a take's gain.
  */
 function withGrowth(
   held: Holders,
   decimals: number,
-  since: (threadId: string) => Date | undefined,
+  putsOf: (owner: string | null) => readonly Put[],
   at: Date,
 ): Holders {
-  const principal = held.threads.reduce((sum, [, units]) => sum + units, 0n);
-  if (held.other === 0n || principal === 0n) return held;
-  let other = held.other;
-  const threads = held.threads.map(([threadId, units]) => {
-    const start = since(threadId);
-    const elapsed = start ? BigInt(Math.max(0, at.getTime() - start.getTime())) : 0n;
-    const most = (units * SAVINGS_MOST_A_YEAR_PERCENT * elapsed) / (100n * YEAR_MS);
-    const share = (held.other * units) / principal;
-    // Whole base units of the token, so the shares still add up to the wallet.
-    const step = 10n ** BigInt(QUANTITY_DECIMALS - decimals);
-    const grown = ((share < most ? share : most) / step) * step;
-    other -= grown;
-    return [threadId, units + grown] as const;
-  });
-  return { threads, other };
+  if (held.other === 0n || held.threads.length === 0) return held;
+  const loose = stake(putsOf(null), at);
+  const kept = loose.units < 0n ? 0n : loose.units < held.other ? loose.units : held.other;
+  const growth = held.other - kept;
+  const weights = [...held.threads.map(([id]) => stake(putsOf(id), at).weight), loose.weight];
+  const total = weights.reduce((sum, weight) => sum + weight, 0n);
+  if (growth <= 0n || total === 0n) return held;
+  // Whole base units of the token, so the shares still add up to the wallet.
+  const step = 10n ** BigInt(QUANTITY_DECIMALS - decimals);
+  const shares = weights.map((weight) => ((growth * weight) / total / step) * step);
+  // What rounding leaves goes to the last take, rather than a crumb nobody holds.
+  const last = held.threads.length - 1;
+  shares[last] = shares[last]! + growth - shares.reduce((sum, share) => sum + share, 0n);
+  const threads = held.threads.map(
+    ([threadId, units], index) => [threadId, units + shares[index]!] as const,
+  );
+  return {
+    threads,
+    other: held.other - shares.slice(0, -1).reduce((sum, share) => sum + share, 0n),
+  };
 }
 
-/** When a thread first bought something, by its fills; undefined where nothing dates it. */
-function firstBuy(own: readonly BookFill[] | undefined, key: string): Date | undefined {
-  return own?.find((fill) => fill.side === "buy" && fillIdentity(fill) === key)?.createdAt;
+/** What a holder has put in, and that times how long each part has been in, to `at`. */
+function stake(puts: readonly Put[], at: Date): { units: bigint; weight: bigint } {
+  let units = 0n;
+  let weight = 0n;
+  for (const put of puts) {
+    units += put.units;
+    weight += put.units * BigInt(Math.max(0, at.getTime() - put.at));
+  }
+  return { units, weight: weight > 0n ? weight : 0n };
+}
+
+/** Money core recorded coming in from outside as units of `holding`, at its price now. */
+function sentInUnits(holding: Holding, flow: Flow, total: bigint): Put[] {
+  const worth = holding.usdValue === null ? 0n : usdToCents(holding.usdValue);
+  if (worth === 0n) return [];
+  return [{ units: (BigInt(Math.round(flow.usd * 100)) * total) / worth, at: flow.at }];
 }
 
 /** A thread's own entry price into a perp, in dollars to 12 places, by its fills (see walkPositions). */
@@ -389,11 +426,14 @@ function entryOf(own: readonly PotFill[], key: string): bigint | undefined {
 
 /**
  * A perp shared among owners. The venue keeps one position at one blended entry, so each share
- * of what it has made (see sharesOf) moves by how far its owner's own entry sits from the blend
- * of everyone's, and its value with it: the moves add to nothing, so the shares still add up to
- * what the venue says. Two takes short at $3,000 and $2,000 with the mark at $2,400 make +$600
- * and -$400, not +$100 each. A share with no entry of its own (what no take holds) keeps the
- * venue's.
+ * of what it has made (see sharesOf) moves by how far its owner's own entry sits from the
+ * venue's: two takes short at $3,000 and $2,000 with the mark at $2,400 make +$600 and -$400,
+ * not +$100 each. What no take holds has no entry of its own, so it takes what the takes' moves
+ * leave, and the entry that implies: a take long 1 BTC from $55,000 beside 1 more at a blended
+ * $60,000, the mark there too, made $5,000 and the other lost it. With every share a take's, the
+ * moves are measured from the blend of their own entries, so they still add to nothing. Each
+ * share's value stays its part of the venue's (sharesOf): what closing that part frees, and for
+ * a leveraged perp never below nothing, however far its own entry sits.
  */
 function ownEntries<Owner>(
   holding: Holding,
@@ -408,27 +448,36 @@ function ownEntries<Owner>(
     owner,
     share,
     units: parseUnits(share.quantity, QUANTITY_DECIMALS),
-    entry: entry(owner) ?? venue,
+    entry: entry(owner),
   }));
-  const units = sized.reduce((sum, { units }) => sum + units, 0n);
-  const blend = sized.reduce((sum, share) => sum + share.units * share.entry, 0n) / units;
+  const unknown = sized.findLastIndex((share) => share.entry === undefined);
+  const from =
+    unknown === -1
+      ? sized.reduce((sum, share) => sum + share.units * share.entry!, 0n) /
+        sized.reduce((sum, { units }) => sum + units, 0n)
+      : venue;
   // A long makes more the lower it got in; a short, the higher.
   const sign = holding.short ? -1n : 1n;
   // Units to 18 places times dollars to 12 is cents 28 places further.
   const fine = 10n ** 28n;
-  let moved = 0n;
+  // The share without an entry of its own balances the rest; with none, the last takes what
+  // rounding leaves.
+  const balancing = unknown === -1 ? sized.length - 1 : unknown;
+  const shifts = sized.map(({ units, entry }, index) =>
+    index === balancing || entry === undefined ? 0n : (sign * units * (from - entry)) / fine,
+  );
+  shifts[balancing] = -shifts.reduce((sum, shift) => sum + shift, 0n);
   return sized.map(({ owner, share, units, entry }, index) => {
-    const shift =
-      index === sized.length - 1 ? -moved : (sign * units * (blend - entry)) / fine;
-    moved += shift;
-    const plus = (usd: string) => centsToUsd(signedUsdToCents(usd) + shift);
+    const shift = shifts[index]!;
+    // The entry a share without its own must have had, for its part of the venue's to add up.
+    const implied = venue - (shift * fine) / (sign * units);
+    const own = entry ?? (index === balancing && implied > 0n ? implied : venue);
     return [
       owner,
       {
         ...share,
-        averageCostUsd: formatUnits(entry, 12),
-        usdValue: share.usdValue === null ? null : plus(share.usdValue),
-        unrealizedPnlUsd: plus(share.unrealizedPnlUsd ?? "0"),
+        averageCostUsd: formatUnits(own, 12),
+        unrealizedPnlUsd: centsToUsd(signedUsdToCents(share.unrealizedPnlUsd ?? "0") + shift),
       },
     ] as const;
   });

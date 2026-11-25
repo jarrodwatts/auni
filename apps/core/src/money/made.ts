@@ -76,7 +76,7 @@ export async function walletFlows(): Promise<Flow[]> {
  * was recorded first. One with no price counts as nothing, as the portfolio
  * counts it.
  */
-async function arrivalFlows(): Promise<Flow[]> {
+export async function arrivalFlows(): Promise<Flow[]> {
   const [moved, kept] = await Promise.all([
     db
       .select({

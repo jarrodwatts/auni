@@ -101,7 +101,16 @@ const takeWireSchema = z.object({
   /** What the holdings `changeUsd` counts cost (a perp's, the margin its entry put up); null with it. */
   costUsd: dollarsSchema.nullable(),
   /** Largest first. */
-  holdings: z.array(holdingWireSchema),
+  holdings: z.array(
+    holdingWireSchema.extend({
+      /** What this holding alone has made since the take bought it, as `changeUsd` counts it. */
+      changeUsd: dollarsSchema.nullable(),
+      /** What it cost, as `costUsd` counts it; null with its change. */
+      costUsd: dollarsSchema.nullable(),
+      /** Savings, whose change is the interest they earned. */
+      savings: z.boolean(),
+    }),
+  ),
 });
 export type TakeWire = z.infer<typeof takeWireSchema>;
 

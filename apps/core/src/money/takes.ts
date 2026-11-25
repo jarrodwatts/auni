@@ -7,12 +7,23 @@ import { theOwner } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
 import { allFills, gainOf, holdingsByThread, worthUsd } from "./books.ts";
-import { holdingViews } from "./holdings.ts";
+import { holdingId, holdingViews } from "./holdings.ts";
+import { arrivalFlows } from "./made.ts";
 import { portfolioNow, type Holding, type Portfolio } from "./portfolio.ts";
 import { centsToUsd, usdToCents } from "./usd.ts";
 import { startOfDay } from "./value-history.ts";
 
-type Fills = Parameters<typeof holdingsByThread>[1];
+/** What the takes are read from: every fill, and the money that came in from outside Auni. */
+interface TakeRecords {
+  readonly fills: Parameters<typeof holdingsByThread>[1];
+  readonly sentIn: Parameters<typeof holdingsByThread>[3];
+}
+
+/** Reads what heldByTakes splits the portfolio by. */
+export async function takeRecords(): Promise<TakeRecords> {
+  const [fills, sentIn] = await Promise.all([allFills(db), arrivalFlows()]);
+  return { fills, sentIn };
+}
 
 /** Cash that only waits to be spent: what no take holds, wherever it sits. */
 const waiting = (holding: Holding) => holding.cash && !holding.heldForOrders;
@@ -25,13 +36,14 @@ const waiting = (holding: Holding) => holding.cash && !holding.heldForOrders;
  */
 export function heldByTakes(
   portfolio: Pick<Portfolio, "assets" | "cash" | "observedAt">,
-  everyFill: Fills,
+  records: TakeRecords,
 ): ReturnType<typeof holdingsByThread> {
   const savings = portfolio.cash.holdings.filter((holding) => isSavings(holding.venue));
   return holdingsByThread(
     [...portfolio.assets.holdings, ...savings],
-    everyFill,
+    records.fills,
     new Date(portfolio.observedAt),
+    records.sentIn,
   );
 }
 
@@ -41,12 +53,12 @@ export function heldByTakes(
  * no take holds, by where it is.
  */
 export async function readTakes(): Promise<z.input<typeof takesWireSchema>> {
-  const [portfolio, everyFill, { timeZone }] = await Promise.all([
+  const [portfolio, records, { timeZone }] = await Promise.all([
     portfolioNow(),
-    allFills(db),
+    takeRecords(),
     theOwner(),
   ]);
-  const split = heldByTakes(portfolio, everyFill);
+  const split = heldByTakes(portfolio, records);
   const ids = [...split.threads.keys()];
   const titles = new Map(
     ids.length === 0
@@ -65,7 +77,7 @@ export async function readTakes(): Promise<z.input<typeof takesWireSchema>> {
       title: titles.get(threadId) ?? "Untitled take",
       valueUsd: worthUsd(held),
       ...takeChange(held),
-      holdings: await holdingViews(held, today),
+      holdings: await takeHoldings(held, today),
     })),
   );
   return {
@@ -82,6 +94,15 @@ export async function readTakes(): Promise<z.input<typeof takesWireSchema>> {
       ...split.loose.filter(waiting),
     ]),
   };
+}
+
+/** A take's holdings as a person reads them, each with what it alone has made (see takeChange). */
+async function takeHoldings(held: readonly Holding[], today: number) {
+  const byId = new Map(held.map((holding) => [holdingId(holding), holding]));
+  return (await holdingViews(held, today)).map((view) => {
+    const holding = byId.get(view.id)!;
+    return { ...view, ...takeChange([holding]), savings: isSavings(holding.venue) };
+  });
 }
 
 /**

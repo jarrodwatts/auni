@@ -27,6 +27,7 @@ import {
   declineAction,
   declineProposal,
   OUT_OF_DATE,
+  outOfDate,
 } from "./decide.ts";
 import { checkHeld, closeHeld } from "./held.ts";
 import { proposalFunding } from "./funding.ts";
@@ -187,7 +188,8 @@ async function answerProposal(proposalId: string, req: Request, res: Response): 
   if (legs.length === 0) return void res.status(404).json({ error: "proposal_not_found" });
   // A moved price is weighed when the card quotes it again, so none is left out here.
   const retrying = new Set(legsToRetry(legs, new Set()) ?? []);
-  const funding = await proposalFunding(legs);
+  // A plan that can never run (see outOfDate) asks for no money: its Allow says why.
+  const funding = outOfDate(legs) ? null : await proposalFunding(legs);
   res.json({
     // Each leg offers Try again only if a tap on the card would run it (see legsToRetry).
     actions: legs.map((leg) => ({ ...actionWire(leg), retryable: retrying.has(leg.id) })),

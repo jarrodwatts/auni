@@ -26,6 +26,7 @@ import {
   declineAction,
   declineProposal,
   OUT_OF_DATE,
+  outOfDate,
 } from "../money/decide.ts";
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
@@ -375,6 +376,8 @@ async function allowed(
     if (outcome.kind === "out_of_date") return OUT_OF_DATE_DECIDED;
     return { won: true, answer: "Allowed." };
   }
+  // Said before asking for money a plan that can never run would need.
+  if (outOfDate(legs)) return OUT_OF_DATE_DECIDED;
   const waiting = legs.filter((leg) => leg.status === "awaiting_permission");
   if ((await Promise.all(waiting.map((leg) => needsStepUp(leg)))).some(Boolean)) return TAKES_PROOF;
   // As the web app's card does, a plan short of cash asks for it before it runs.

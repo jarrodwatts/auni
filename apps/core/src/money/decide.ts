@@ -19,9 +19,10 @@ export const OUT_OF_DATE = "This card is out of date. Ask Auni to put it up agai
 /**
  * Whether any waiting money card here was drawn before cards said all they say now (see
  * CARD_FORMAT): the owner saw less than a card says today, so a tap on it allows nothing. An ask's
- * card says what it changes in Auni, which no format has changed.
+ * card says what it changes in Auni, which no format has changed. Such a plan asks for no money
+ * either, since it can never run.
  */
-function outOfDate(rows: readonly ActionRow[]): boolean {
+export function outOfDate(rows: readonly ActionRow[]): boolean {
   return rows.some(
     (row) =>
       row.status === "awaiting_permission" && !isAsk(row.tool) && row.cardFormat < CARD_FORMAT,

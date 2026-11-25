@@ -760,6 +760,8 @@ describe("approving a plan", () => {
   it("refuses a plan with a leg drawn before cards said all they say now", async () => {
     const legs = await planLegs({ cardFormat: 1 });
     await deliverPlan(PLAN);
+    // Short of cash, it still says it can never run, not to add money first.
+    funding.needUsd = "5.00";
     expect(await press({ from: OWNER }, await planMessage(), `allow:${grantOnCard()}`)).toBe(
       OUT_OF_DATE,
     );

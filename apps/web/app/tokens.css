@@ -312,6 +312,23 @@
     :focus-visible {
       outline: 2px solid Highlight !important;
     }
+
+    /* The system palette paints a switch's track and knob alike, so on and off would look the
+       same: draw the knob in the text colour, and fill the track when it's on. */
+    [data-slot="switch"] {
+      border-color: ButtonText !important;
+      forced-color-adjust: none;
+      background: Canvas !important;
+    }
+    [data-slot="switch"][data-state="checked"] {
+      background: Highlight !important;
+    }
+    [data-slot="switch-thumb"] {
+      background: ButtonText !important;
+    }
+    [data-slot="switch"][data-state="checked"] [data-slot="switch-thumb"] {
+      background: HighlightText !important;
+    }
   }
 }
 

@@ -20,13 +20,20 @@ import { placesRouter } from "./places.ts";
 
 // A wallet made only when asked, once, or not at all while `fails`. money/wallets.ts is imported
 // above before anything loads the registry, so its own lookup of the wallet finds this one.
-const wallet = vi.hoisted(() => ({ made: null as WalletAddresses | null, fails: false, makes: 0 }));
+// While `held` is set, each make waits for it before looking, like a wallet service that hangs.
+const wallet = vi.hoisted(() => ({
+  made: null as WalletAddresses | null,
+  fails: false,
+  makes: 0,
+  held: null as Promise<void> | null,
+}));
 vi.mock("../apps/registry.ts", async (importOriginal) => {
   const real = await importOriginal<typeof import("../apps/registry.ts")>();
   const { WalletExists: Exists } = await import("../apps/contract.ts");
   const provided = {
     addresses: async () => wallet.made ?? { evm: null, solana: null },
     create: async () => {
+      await wallet.held;
       if (wallet.fails) throw new Error("the wallet's service is down");
       if (wallet.made) throw new Exists();
       wallet.made = { evm: "0x00000000000000000000000000000000000000e1", solana: null };
@@ -47,6 +54,7 @@ beforeEach(async () => {
   wallet.made = null;
   wallet.fails = false;
   wallet.makes = 0;
+  wallet.held = null;
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -121,6 +129,33 @@ describe("the owner's first chat", () => {
       "0x00000000000000000000000000000000000000e1",
     ]);
     expect(wallet.makes).toBe(1);
+  });
+
+  // Review, 2026-11-25 (round 6): a wallet service that hung, rather than failed, held the first
+  // take's request open with nothing saved, for as long as its client kept retrying.
+  it("starts the chat when making the wallet hangs, and still makes only one", async () => {
+    let release = () => {};
+    wallet.held = new Promise((resolve) => (release = resolve));
+    const started = await startChat("Why did BTC fall?");
+    expect(started.status).toBe(200);
+    const { thread } = (await started.json()) as { thread: { id: string } };
+    expect(await threadMessages(thread.id)).toMatchObject([{ role: "user" }]);
+    expect(await queued("turn")).toHaveLength(1);
+    expect(await walletAddresses()).toEqual({ evm: null, solana: null });
+
+    // The first move makes the wallet while the first take's try is still out; once that try
+    // finishes too, there is still the one wallet.
+    const buy = stubRecipe({
+      direction: undefined,
+      describe: async () => ({ summary: "Buy $10 of Nvidia", amountUsd: "10", effect: NO_EFFECT }),
+    });
+    const moved = prepareLeg(buy, {});
+    release();
+    await moved;
+    await vi.waitFor(() => expect(wallet.makes).toBe(1));
+    expect(await walletAddresses()).toMatchObject({
+      evm: "0x00000000000000000000000000000000000000e1",
+    });
   });
 
   it("makes no wallet once first run is over", async () => {

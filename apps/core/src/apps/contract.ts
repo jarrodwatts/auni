@@ -749,7 +749,10 @@ export interface WalletProvider {
    * and readings ask each minute, so it stays cheap once there is one.
    */
   addresses(): Promise<WalletAddresses>;
-  /** Makes the owner's wallet, once: throws WalletExists when there is one. */
+  /**
+   * Makes the owner's wallet, once, even when asked twice at once (a first take's try still out
+   * as a move asks): throws WalletExists when there is one.
+   */
   create(): Promise<WalletAddresses>;
   /** Takes in keys the owner already holds, typed into a private field, while there's no wallet. */
   readonly bring?: PrivateField;

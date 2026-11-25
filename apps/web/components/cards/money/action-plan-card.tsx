@@ -173,7 +173,7 @@ export function ActionPlanCard({
           ? permissions.map((says, index) => (
               <p
                 key={index}
-                className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive"
+                className="mt-3 text-meta leading-[1.45] font-medium break-words text-destructive"
               >
                 {says}
               </p>

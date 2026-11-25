@@ -132,7 +132,8 @@ export async function retractStale(tx: Tx): Promise<string[]> {
   for (const [threadId, cards] of byThread(old))
     await wakeThread(
       threadId,
-      `Auni updated, and its cards now say more about each move, so it took back the cards still waiting here from before, which the owner can no longer allow: ${cards.map((card) => `"${card.asks}" (card ${card.id})`).join(", ")}. Nothing moved, and each can be put up again as a fresh card.`,
+      // Every card's id before what any asked, which a wake may cut short.
+      `Auni updated, and its cards now say more about each move, so it took back the cards still waiting here from before, which the owner can no longer allow: ${cards.map((card) => `card ${card.id}`).join(", ")}. Nothing moved, and each can be put up again as a fresh card. They asked: ${cards.map((card) => `"${card.asks}" (card ${card.id})`).join(", ")}.`,
       { tx },
     );
   return [...new Set([...stale, ...old].flatMap((row) => row.threadId ?? []))];

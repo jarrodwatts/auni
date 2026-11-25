@@ -229,4 +229,22 @@ describe("a card drawn before cards said all they say now", () => {
     await staleCardsJob.run({}, {} as never);
     expect(await queued("turn")).toHaveLength(1);
   });
+
+  // Found in review: a wake keeps its first 4,000 characters, and a card's summary has no cap.
+  it("names every card it took back, however long what one asked", async () => {
+    const thread = await insertThread();
+    const old = [];
+    for (const summary of ["x".repeat(5_000), "Sell half of the Fed bet"])
+      old.push(
+        await insertAction({
+          threadId: thread.id,
+          status: "awaiting_permission",
+          summary,
+          cardFormat: CARD_FORMAT - 1,
+        }),
+      );
+    await db.transaction(retractStale);
+    const [woke] = await queued("turn");
+    for (const card of old) expect(woke?.data.reason).toContain(card.id);
+  });
 });

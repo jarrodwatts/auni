@@ -48,7 +48,7 @@ const MAY: Record<MoveState, Partial<Record<Step, MoveState>>> = {
     replace: "replaced",
     retract: "retracted",
   },
-  queued: { claim: "sending", skip: "failed", apply: "done" },
+  queued: { recall: "retracted", claim: "sending", skip: "failed", apply: "done" },
   sending: {
     finish: "done",
     fail: "failed",

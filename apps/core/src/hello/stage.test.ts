@@ -110,7 +110,7 @@ describe("the terminal's Auni", () => {
     scene.run(300);
     scene.hear({ kind: "brain", found: FOUND });
     // The page comes up, and the browser starts to open on it, as Auni hops onto the brain's stone.
-    scene.until(() => scene.stage.view.said === "Found your AI");
+    scene.until(() => scene.stage.view.said === "Your AI is ready");
     scene.run(300);
     scene.hear({ kind: "page" });
     const asked = scene.now;
@@ -165,7 +165,7 @@ describe("the terminal's Auni", () => {
     scene.leapt();
     expect(scene.views.some((view) => view.auni?.face === "worry")).toBe(true);
     expect(scene.views.some((view) => view.said === "Your AI needs attention")).toBe(true);
-    expect(scene.views.some((view) => view.said === "Let's sort it out in your browser!")).toBe(
+    expect(scene.views.some((view) => view.said === "Let's set up your AI in the browser!")).toBe(
       true,
     );
     expect(scene.stage.view.stones[1]?.state).toBe("missing");

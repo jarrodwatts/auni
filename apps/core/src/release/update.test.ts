@@ -187,11 +187,9 @@ describe("auni update", { timeout: 20_000 }, () => {
     );
     expect(all()).toContain("the new version broke as it started");
     expect(all()).toContain(
-      "v0.1.1 stopped as it started, so Auni is back on v0.1.0 with your data as it was. Its output is above.",
+      "v0.1.1 exited during startup, so Auni rolled back to v0.1.0 with your data intact. Startup output is above.",
     );
-    expect(all()).toContain(
-      `What v0.1.1 left of your database is kept at ${join(dataDir(), failed[0]!)}`,
-    );
+    expect(all()).toContain(`Files left by v0.1.1 are saved at ${join(dataDir(), failed[0]!)}`);
     expect(did).toEqual([
       asked,
       "stop service",
@@ -275,7 +273,7 @@ describe("auni update", { timeout: 20_000 }, () => {
       host: host({ export: () => Promise.reject(new Error("the disk is full")) }),
     });
     await expect(refused).rejects.toThrow(
-      /couldn't export its database first \(the disk is full\)/u,
+      /Couldn't export your database before updating \(the disk is full\)/u,
     );
     expect(currentTag()).toBe("v0.1.0");
     expect(marker()).toBe("the owner's data\n");
@@ -290,7 +288,7 @@ describe("auni update", { timeout: 20_000 }, () => {
     // Said before the owner is asked, so their yes is to stopping it too.
     const before = said.findIndex((line) => line.startsWith("Auni is running in the background."));
     expect(said[before]).toBe(
-      "Auni is running in the background. It will finish moves in progress, stop, then start in the background after v0.1.1 is checked.",
+      "Auni is running in the background. It will finish any moves in progress, stop, and restart in the background once v0.1.1 is verified.",
     );
     expect(did).toEqual([
       "asked: Update from v0.1.0 to v0.1.1?",
@@ -301,7 +299,7 @@ describe("auni update", { timeout: 20_000 }, () => {
       "release",
       "start background",
     ]);
-    expect(said.indexOf("Stopping Auni after any moves in progress finish.")).toBeGreaterThan(
+    expect(said.indexOf("Stopping Auni. Moves in progress will finish first.")).toBeGreaterThan(
       before,
     );
     // It answers again, on the new version, with its jobs on.
@@ -318,7 +316,7 @@ describe("auni update", { timeout: 20_000 }, () => {
     const terminal = host({ running: async () => runs("terminal") });
     expect(await update({ version: "v0.1.1", host: terminal })).toBe("updated");
     expect(all()).toContain(
-      "Auni is running in a terminal. It will finish moves in progress, stop, then start in the background after v0.1.1 is checked.",
+      "Auni is running in a terminal. It will finish any moves in progress, stop, and restart in the background once v0.1.1 is verified.",
     );
     expect(did).toEqual([
       asked,
@@ -350,7 +348,7 @@ describe("auni update", { timeout: 20_000 }, () => {
       stop: async () => false,
     });
     await expect(update({ version: "v0.1.1", host: stuck })).rejects.toThrow(
-      "Auni didn't stop within two and a half minutes, so nothing changed.",
+      "Auni didn't stop within 2.5 minutes, so nothing changed.",
     );
     expect(currentTag()).toBe("v0.1.0");
   });
@@ -358,7 +356,7 @@ describe("auni update", { timeout: 20_000 }, () => {
   it("refuses to stop an Auni on another computer sharing this database, before asking", async () => {
     const elsewhere = host({ running: async () => ({ as: "background", pid: 4242, here: false }) });
     await expect(update({ version: "v0.1.1", host: elsewhere })).rejects.toThrow(
-      "Auni runs on this database from another computer: stop it there, then run auni update.",
+      "Auni is running on this database from another computer. Stop it there, then run auni update.",
     );
     expect(did).toEqual([]);
     expect(existsSync(versionDir("v0.1.1"))).toBe(false);
@@ -373,7 +371,7 @@ describe("auni update", { timeout: 20_000 }, () => {
       join(versionDir("v0.1.0"), "install.sh"),
     );
     expect(vi.mocked(checkRelease)).not.toHaveBeenCalled();
-    expect(all()).toContain("Update v0.1.0 → v0.1.2 from the source you supplied (unsigned).");
+    expect(all()).toContain("Update v0.1.0 -> v0.1.2 from the source you supplied (unsigned).");
     expect(currentTag()).toBe("v0.1.2");
   });
 
@@ -382,7 +380,7 @@ describe("auni update", { timeout: 20_000 }, () => {
     const source = host({ env: { ...host().env, AUNI_SOURCE: "/somewhere/auni.tar.gz" } });
     expect(await update({ host: source })).toBe("same");
     expect(all()).toContain(
-      "Auni is already on v0.1.0. Use auni update --version <vX.Y.Z> to build the supplied source as a different version.",
+      "Auni is already on v0.1.0. Pass --version <vX.Y.Z> to build this source under a different version.",
     );
   });
 
@@ -393,7 +391,7 @@ describe("auni update", { timeout: 20_000 }, () => {
       version: "v0.1.1",
       host: { ...running, postgres: { ...running.postgres!, running: async () => true } },
     });
-    await expect(refused).rejects.toThrow("can't be copied whole; nothing changed");
+    await expect(refused).rejects.toThrow("can't be copied safely. Nothing changed.");
     expect(currentTag()).toBe("v0.1.0");
     // Not even the export it began with is left.
     expect(readdirSync(backupsDir())).toEqual([]);
@@ -411,17 +409,17 @@ describe("auni update", { timeout: 20_000 }, () => {
   it("exports the owner's own database without copying its files, nor restores it on a roll back", async () => {
     version("v0.1.1", HANGS);
     expect(await update({ version: "v0.1.1", host: host({ postgres: null }) })).toBe("rolled-back");
-    expect(all()).toContain("Your external database stays where it is. Only the export was saved.");
+    expect(all()).toContain("Your external database stays untouched. Only the export was saved.");
     // It is exported all the same, which is theirs to load back.
     expect(all()).toMatch(/Saved a database export to .*export\.jsonl\.gz/u);
     expect(all()).toContain(
-      "v0.1.1 didn't come up within 3 seconds, so Auni is back on v0.1.0. Your database was not restored, and v0.1.1 may have changed it.",
+      "v0.1.1 didn't start within 3 seconds, so Auni rolled back to v0.1.0. Your external database wasn't restored, and v0.1.1 may have changed it.",
     );
     expect(marker()).toContain("changed by the new version");
     // The export is all that was taken, and it is kept: the one way back to how things were.
     const [kept] = readdirSync(backupsDir());
     expect(readdirSync(join(backupsDir(), kept!))).toEqual(["export.jsonl.gz"]);
-    expect(all()).toContain(`The export taken before the update is under ${backupsDir()}`);
+    expect(all()).toContain(`A pre-update backup is in ${backupsDir()}`);
   });
 
   it("builds the version with the installer the running one came with, and stays put when it fails", async () => {
@@ -431,7 +429,7 @@ describe("auni update", { timeout: 20_000 }, () => {
     );
     const refused = update({ version: "v0.1.1", host: host() });
     await expect(refused).rejects.toThrow(
-      "v0.1.1 didn't build, so Auni stays on v0.1.0. Why is above.",
+      "v0.1.1 failed to build, so Auni stays on v0.1.0. See the build output above.",
     );
     expect(all()).toContain(`building v0.1.1 into ${dataDir()}`);
     expect(all()).toContain("npm is unreachable");
@@ -443,7 +441,7 @@ describe("auni update", { timeout: 20_000 }, () => {
     version("v0.1.1", SERVES);
     const no = host({ confirm: async () => false });
     expect(await update({ host: no })).toBe("declined");
-    expect(all()).toContain("Update v0.1.0 → v0.1.1 (12 November 2026, signature verified)");
+    expect(all()).toContain("Update v0.1.0 -> v0.1.1 (12 November 2026, signature verified)");
     expect(all()).toContain("Hyperliquid orders can be cancelled.");
     expect(all()).toContain("Nothing changed.");
     expect(currentTag()).toBe("v0.1.0");
@@ -469,12 +467,12 @@ describe("auni update", { timeout: 20_000 }, () => {
   it("says plainly when the version the owner named is older than the one running", async () => {
     version("v0.0.9", SERVES);
     expect(await update({ version: "v0.0.9", host: host() })).toBe("updated");
-    expect(all()).toContain("Go back v0.1.0 → v0.0.9");
+    expect(all()).toContain("Switch back v0.1.0 -> v0.0.9");
   });
 
   it("does nothing when that version is the one running", async () => {
     expect(await update({ version: "v0.1.0", host: host() })).toBe("same");
-    expect(all()).toContain("Auni is on v0.1.0 already.");
+    expect(all()).toContain("Auni is already on v0.1.0.");
     expect(did).toEqual([]);
   });
 });

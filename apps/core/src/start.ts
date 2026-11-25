@@ -91,7 +91,7 @@ export async function start(
       await database?.stopping();
       if (runner)
         console.log(
-          `Auni is stopping: running moves finish first${runsAs() === "terminal" ? " (Ctrl-C again stops at once)" : ""}.`,
+          `Stopping Auni. Moves in progress will finish first${runsAs() === "terminal" ? " (press Ctrl-C again to stop immediately)" : ""}.`,
         );
       webApp?.kill();
       // No new requests; one in flight, such as a money tool call waiting on its send, carries on.
@@ -103,7 +103,7 @@ export async function start(
       await database?.release();
     } catch (error) {
       // Stopping ends in an exit whatever failed on the way, said once, never an unhandled crash.
-      console.error("Auni stopped, but not cleanly:", error);
+      console.error("Auni stopped with an error:", error);
       code = 1;
     }
     process.exit(code);
@@ -119,7 +119,7 @@ export async function start(
     stopping = true;
     told.abandon();
     console.error(
-      `Auni's database stopped (its log: ${postgresLog()}), so Auni stops too. ${runsAs() === "service" ? "Its service starts it again." : "Start it again with: auni"}`,
+      `Auni's database stopped, so Auni is stopping too. Your wallet is untouched. See ${postgresLog()}. ${runsAs() === "service" ? "Its background service will restart it." : `Run ${auniCommand()} to start it again.`}`,
     );
     webApp?.kill();
     process.exit(1);
@@ -127,7 +127,7 @@ export async function start(
 
   if (takingOver()) {
     console.error(
-      "Auni is on its way into this machine from your laptop, and isn't in place yet: run the auni take-over command again to finish.",
+      "Auni is still moving from the other computer and isn't ready yet. Run the auni take-over command again to finish.",
     );
     return void (await stop(1));
   }
@@ -149,13 +149,13 @@ export async function start(
       if (!held) throw new AlreadyRunning();
       runner = { stop: () => held.close() };
       console.log(
-        `Auni moved to ${handed.machine} (${handed.to}), so this copy runs nothing. Your data and keys stay here until you remove them: auni uninstall.`,
+        `Auni moved to ${handed.machine} (${handed.to}), so this copy is paused. Your local data and keys stay here until you run auni uninstall.`,
       );
     } else if (runJobs) {
       runner = await startRunnerWhenFree(jobs, coreServing, {
         onWait: () =>
           told.waiting(
-            "The Auni stopped a moment ago is still finishing what it was running. This one starts as soon as it has.",
+            "A previous Auni process is still finishing work in progress. Starting as soon as it finishes.",
           ),
       });
       // A handover to another machine stops the runner while it hands Auni over (handover/).
@@ -181,7 +181,7 @@ export async function start(
       webApp.once("exit", (exitCode) => {
         if (stopping) return;
         told.abandon();
-        console.error(`The web app stopped (${exitCode}), so Auni stops too.`);
+        console.error(`The web app exited (code ${exitCode}), so Auni is stopping too.`);
         void stop(exitCode || 1);
       });
     }
@@ -222,7 +222,7 @@ export async function start(
   if (mode === "terminal") told.say("Keep this terminal open. Ctrl-C stops Auni.");
   else if (options.stopHint) told.say(options.stopHint);
   else if (!runJobs && !handed) told.say("Stop this process to shut down Auni.");
-  else told.say(`Auni runs ${where({ as: mode })}. Stop it with ${auniCommand()} stop`);
+  else told.say(`Auni is running ${where({ as: mode })}. Stop it with ${auniCommand()} stop.`);
   told.up(opened);
 }
 
@@ -324,7 +324,7 @@ export async function openOwner({
  */
 async function brainFound(): Promise<BrainFound> {
   const picked = await brainSeen().catch((error: unknown) => {
-    console.error("couldn't check the brains", error);
+    console.error("Couldn't check your AI:", error);
     return { fixes: [] as string[] };
   });
   return "about" in picked

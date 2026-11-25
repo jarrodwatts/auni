@@ -250,7 +250,7 @@ describe("nextStep", () => {
   it("reads as plain words, with the command to run", () => {
     expect(said(thinking)).toMatch(/^Run auni\n\nAuni is stopped/u);
     expect(said({ ...thinking, webBuilt: false })).toContain(
-      "The web app builds on the first start.",
+      "The web app builds on the first start (about a minute).",
     );
     expect(nextStep(thinking).run).toEqual({ command: "auni", background: true });
   });

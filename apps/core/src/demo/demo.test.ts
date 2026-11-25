@@ -89,8 +89,8 @@ describe("auni demo", () => {
       join(scratch, `auni-demo-${userInfo().uid}-${port}`, "auni.log"),
       "utf8",
     );
-    expect(said).toMatch(/^Demo mode. No real money./u);
-    expect(said).toContain("Preparing the sample takes.");
+    expect(said).toMatch(/^Demo mode\. Fake money only; your real data is untouched\./u);
+    expect(said).toContain("Preparing sample takes.");
     expect(said).not.toContain("is held for the owner");
     expect(said).not.toContain("owner is ready");
     expect(log).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);

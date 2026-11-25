@@ -35,11 +35,11 @@ export async function startDemo({
   readonly firstRun?: boolean;
 }): Promise<void> {
   console.log(
-    "Demo mode. No real money.\n" +
+    "Demo mode. Fake money only; your real data is untouched.\n" +
       (firstRun
         ? 'Try a first take: "Peptides go mainstream by 2028".'
-        : "Open the tour in the first chat.") +
-      "\nNever send money to a demo address.\n\nStarting the demo.",
+        : 'Tap "Take the tour" once Auni opens.') +
+      "\nNever send real money to a demo address.\n\nStarting the demo.",
   );
   const { home, ports } = await demoEnvironment(port, [...EVM_CHAIN_KEYS, "solana"]);
   takeHome(home);
@@ -71,7 +71,7 @@ export async function startDemo({
     jobs: true,
     onceUp: async () => {
       if (firstRun) return seed();
-      console.log("Preparing the sample takes.");
+      console.log("Preparing sample takes.");
       // The sample history plays real jobs. Keep their diagnostics in the demo log and show
       // them in the terminal if setup fails.
       const output = takeOutput(process.stdout, process.stderr);

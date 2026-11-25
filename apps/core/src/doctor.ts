@@ -473,10 +473,10 @@ const LABELS: Record<Finding["check"], string> = {
   service: "Background service",
   rpc: "Networks",
   brain: "Your AI",
-  wallet: "Wallet",
+  wallet: "Your wallet",
   apps: "Apps",
   web: "Web app",
-  "always-on": "Access from other devices",
+  "always-on": "Remote access",
 };
 
 /** Summarizes the same findings that --json and web diagnostics read. */
@@ -508,18 +508,18 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
         ? `${auni} doctor --fix`
         : details;
   const state = databaseDown
-    ? "Auni can't check its database."
+    ? "Auni can't reach its database."
     : needsStart
       ? "Auni is stopped."
       : stopped
-        ? "Auni's web app is open. Background work is stopped."
+        ? "Web app is running, but background work is stopped."
         : followUp
           ? webReady
             ? "Auni is running, with checks to review."
             : "Auni needs attention."
           : "Auni is running.";
   const lines = [state];
-  if (followUp) lines.push(`Run ${next}`);
+  if (followUp) lines.push(`Run: ${next}`);
 
   const issues = new Set(
     fixes
@@ -536,19 +536,20 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
   if (issues.size) lines.push(`Needs attention: ${[...issues].join(", ")}`);
   if (needsStart)
     lines.push(
-      database ? "Waiting for startup: Web app, Wallet, Apps" : "Waiting for startup: Web app",
+      database ? "Waiting for startup: Web app, Your wallet, Apps" : "Waiting for startup: Web app",
     );
-  else if (database) lines.push("Waiting for the database: Wallet, Apps");
+  else if (database) lines.push("Waiting for the database: Your wallet, Apps");
 
-  if (needsRestart) lines.push("Stop Auni, then start it from this folder to use this version.");
+  if (needsRestart)
+    lines.push("Update pending: stop Auni and start it from this folder to run this version");
   if (failedJobs) {
     const tasks = failedJobs === 1 ? "task" : "tasks";
-    lines.push(`Background work: ${failedJobs} ${tasks} failed in the last 24 hours.`);
+    lines.push(`Background work: ${failedJobs} ${tasks} failed in the last 24 hours`);
   }
   const localOnly =
     !env.TAILSCALE_OWNER &&
     findings.some(({ check, status }) => check === "always-on" && status !== "fix");
-  if (localOnly) lines.push("Access: this computer only.");
+  if (localOnly) lines.push("Access: Only on this computer");
 
   const networks = findings.filter(({ check }) => check === "rpc");
   if (networks.length) {
@@ -582,6 +583,6 @@ export function doctorSummary(findings: readonly Finding[], auni: string): strin
       .map(({ check }) => LABELS[check]),
   );
   if (healthy.size) lines.push(`Passed: ${[...healthy].join(", ")}`);
-  if (next !== details || !followUp) lines.push(`Every check: ${details}`);
+  if (next !== details || !followUp) lines.push(`All checks: ${details}`);
   return lines.join("\n");
 }

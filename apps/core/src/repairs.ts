@@ -39,7 +39,7 @@ async function bringUp(start: () => void): Promise<void> {
     start();
     if (!(await cameUp({ withinMs: UP_MS })))
       throw new Error(
-        `Auni didn't come up within ${UP_MS / 1_000} seconds: \`${serviceOutput()}\` says why`,
+        `Auni didn't start within ${UP_MS / 1_000} seconds. Check logs with: ${serviceOutput()}`,
       );
   } finally {
     await holdAgain();
@@ -109,7 +109,7 @@ export async function runUiRepair(id: RepairId): Promise<{
     return {
       ok: false,
       message:
-        "Restart Auni from your terminal so this session doesn't cut off mid-request: `auni stop && auni service install`.",
+        "Restart Auni from your terminal so this page isn't cut off mid-request: `auni stop && auni service install`.",
       sudoCommand: null,
     };
   }
@@ -119,7 +119,7 @@ export async function runUiRepair(id: RepairId): Promise<{
       enableLinger();
       return {
         ok: true,
-        message: "Enabled boot lingering for your user service.",
+        message: "Auni will now start on boot and keep running after you sign out.",
         sudoCommand: null,
       };
     }
@@ -127,7 +127,7 @@ export async function runUiRepair(id: RepairId): Promise<{
       await serveDoorAgain();
       return {
         ok: true,
-        message: "Restored the Tailscale Serve route to Auni's door.",
+        message: "Restored Tailscale access to Auni.",
         sudoCommand: null,
       };
     }
@@ -139,14 +139,14 @@ export async function runUiRepair(id: RepairId): Promise<{
         return {
           ok: false,
           message:
-            "Auni is currently running from a terminal or background process. Stop it and run `auni stop && auni service install` so the OS service takes over cleanly.",
+            "Auni is running in a terminal or background process. Run `auni stop && auni service install` to switch to the background service.",
           sudoCommand: null,
         };
       }
       notes.push(installService());
       return {
         ok: true,
-        message: notes.join(" ").trim() || "Service installed.",
+        message: notes.join(" ").trim() || "Background service installed.",
         sudoCommand: null,
       };
     }
@@ -154,7 +154,7 @@ export async function runUiRepair(id: RepairId): Promise<{
       if (!(await runningAuni())) startService();
       return { ok: true, message: "Started Auni's background service.", sudoCommand: null };
     }
-    return { ok: false, message: "Unsupported repair.", sudoCommand: null };
+    return { ok: false, message: "That repair isn't available.", sudoCommand: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const sudoMatch = /run `(sudo [^`]+)`/u.exec(message);
@@ -196,19 +196,20 @@ export async function whileStopped(run: Repair["run"], say: (text: string) => vo
   const running = await runningAuni();
   const service = running?.as === "service" && running.here ? running : null;
   if (service) {
-    say("  Stopping Auni's service, letting running moves finish first.");
+    say("  Stopping Auni's background service. Moves in progress will finish first.");
     if (!(await stopAuni(service)))
-      throw new Error("Auni is still stopping after two and a half minutes, so nothing changed");
+      throw new Error("Auni didn't stop within 2.5 minutes, so nothing changed");
   }
   try {
     await run(say);
   } finally {
     if (service) {
-      say("  Starting Auni's service again.");
+      say("  Starting Auni's background service again.");
       await bringUp(startService);
     }
   }
-  if (running && !service) say(`  Auni runs ${where(running)}: restart it there to use this.`);
+  if (running && !service)
+    say(`  Auni is running ${where(running)}. Restart it there to apply this change.`);
 }
 
 /** Runs each repair in turn, saying how each went; one that fails leaves the next to run. */
@@ -220,7 +221,7 @@ async function repair(chosen: readonly Offer[], say: (text: string) => void): Pr
       await (repair.stopsAuni ? whileStopped(repair.run, say) : repair.run(say));
       say("  Done.");
     } catch (error) {
-      say(`  That didn't work: ${error instanceof Error ? error.message : String(error)}.`);
+      say(`  Failed: ${error instanceof Error ? error.message : String(error)}.`);
     }
   }
 }
@@ -275,13 +276,13 @@ export async function doctorCommand(run: DoctorRun): Promise<number> {
       const chosen: Offer[] = [];
       for (const each of eligible) if (run.fix || (await run.ask!(each))) chosen.push(each);
       if (chosen.length === 0) {
-        if (run.fix) say("None is recommended: nothing changed.");
+        if (run.fix) say("No recommended repairs to run. Nothing changed.");
         else if (eligible.length) say("Nothing changed.");
       } else {
         say("");
         await repair(chosen, say);
         findings = await doctor();
-        if (!run.json) say(`\nAfter repairs\n${print(findings)}`);
+        if (!run.json) say(`\nAfter repairs:\n${print(findings)}`);
       }
     }
   }

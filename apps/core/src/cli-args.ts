@@ -13,22 +13,22 @@ const COMMANDS: Readonly<Record<string, Command>> = {
   "": {
     summary: "Start Auni and open it in your browser",
     synopsis: "[--no-open] [--no-web] [--no-jobs]",
-    details: `  --no-open   Leave the browser closed.
+    details: `  --no-open   Start without opening your browser.
   --no-web    Run only the API, for use with pnpm dev.
-  --no-jobs   Pause background work, including turns, watches, and moves.`,
+  --no-jobs   Run without background work (turns, watches, and moves).`,
     flags: { "--no-open": false, "--no-web": false, "--no-jobs": false },
   },
   demo: {
     summary: "Try Auni with fake money",
     synopsis: "[--first-run] [--port <n>] [--no-open] [--no-web] [--at <time>]",
-    details: `The demo uses its own temporary data and needs no login. Never send money
-to an address it shows.
+    details: `Runs in a temporary folder with fake money and no login. Your real data is
+untouched. Never send real money to a demo address.
 
   --first-run   Start from your first take, with an empty wallet and no history.
-  --port <n>    Open the demo on this web port (default 3939).
-  --no-open     Print a link so you can open the demo yourself.
+  --port <n>    Open the demo on this port (default 3939).
+  --no-open     Print the demo link instead of opening your browser.
   --no-web      Run only the API.
-  --at <time>   Freeze time for repeatable captures (e.g. 2026-11-11T12:00:00Z).`,
+  --at <time>   Freeze the demo clock at a timestamp (e.g. 2026-11-11T12:00:00Z).`,
     flags: {
       "--no-open": false,
       "--no-web": false,
@@ -42,34 +42,34 @@ to an address it shows.
     synopsis: "[--sign-out-everywhere | --channel <id>]",
     details: `The link works once and expires after 15 minutes.
 
-  --sign-out-everywhere   Sign out all browsers before making a new link.
+  --sign-out-everywhere   Sign out every browser before creating a new link.
   --channel <id>          Pair a chat app such as Telegram instead.`,
     flags: { "--sign-out-everywhere": false, "--channel": true },
   },
   doctor: {
-    summary: "Check what works and see what to do next",
+    summary: "Check Auni's health and see what to do next",
     synopsis: "[--fix | --dry-run] [--verbose | --json]",
     details: `  --verbose   Show every check, including technical details.
   --fix       Run the recommended repairs without asking.
-  --dry-run   List possible repairs and make no changes.
+  --dry-run   List possible repairs without making changes.
   --json      Print the full findings as JSON.
 
-In a terminal, doctor asks about recommended repairs. With --verbose it
-also offers optional repairs. Repairs do not touch your money or keys.`,
+In a terminal, doctor asks about recommended repairs. With --verbose, it
+also offers optional repairs. Repairs never touch your money, keys, or data.`,
     flags: { "--json": false, "--verbose": false, "--fix": false, "--dry-run": false },
   },
   triage: {
     summary: "Investigate a problem with your AI",
     synopsis: "[--brain <id>]",
     details: `Choose claude-code or codex with --brain. Your AI uses the doctor report,
-Auni's logs and its source to investigate and draft a GitHub issue. It asks
+Auni's logs, and its source to investigate and draft a GitHub issue. It asks
 before changing or posting anything.`,
     flags: { "--brain": true },
   },
   setup: {
-    summary: "Find the next setup step",
+    summary: "Show the next setup step",
     synopsis: "[--json]",
-    details: "Use --json to give the setup step to a coding agent.",
+    details: "Use --json for machine-readable output (for coding agents).",
     flags: { "--json": false },
   },
   stop: {
@@ -79,58 +79,65 @@ before changing or posting anything.`,
   up: {
     summary: "Keep Auni online for your devices over Tailscale",
     synopsis: "--always-on [--port <n>] [--json]",
-    details: `Set up Auni to start on boot and let your devices reach it over Tailscale.
---port sets the Tailscale HTTPS port (default 443 or the next free port).
-Setup asks once for permission to run Tailscale Serve. With --json, it
-prints the required command instead.`,
+    details: `Starts Auni on boot and makes it reachable from your other devices over
+Tailscale. Asks once for permission to configure Tailscale Serve.
+
+  --port <n>   Tailscale HTTPS port (default 443, or the next free port).
+  --json       Print the setup status and required command as JSON.`,
     flags: { "--always-on": false, "--port": true, "--json": false },
   },
   service: {
     summary: "Manage Auni's background service",
     synopsis: "install|uninstall",
-    details: "Install starts Auni now and sets it up to start again when you sign in.",
+    details: `  install     Start Auni now and restart it automatically when you sign in.
+  uninstall   Remove the background service without deleting your data.`,
     flags: {},
     words: ["install", "uninstall"],
   },
   export: {
-    summary: "Save a copy of your chats, activity, and routines",
+    summary: "Save a backup of your takes, activity, and routines",
     synopsis: "[--to <file>]",
-    details: `Exports go into the data folder's exports directory unless you pass --to.
-Exports contain the database and routines. Your wallet keys and settings
-stay where they are.`,
+    details: `Saves your database and routines to the exports folder in your data
+directory, or to --to <file>. Your wallet keys and settings stay on this
+computer and are not included.`,
     flags: { "--to": true },
   },
   import: {
-    summary: "Restore a copy into a fresh Auni",
+    summary: "Restore a backup into a fresh Auni",
     synopsis: "--from <file>",
-    details: "Use a fresh data folder (AUNI_HOME) or an empty database (DATABASE_URL).",
+    details: "Requires an empty Auni data folder or database (set AUNI_HOME or DATABASE_URL).",
     flags: { "--from": true },
   },
   "take-over": {
     summary: "Move Auni from another computer over Tailscale",
     synopsis: "--from <host> [--finish]",
     details: `Copy the command from Settings on the computer where Auni runs now.
-It moves your database, settings and wallet keys here, then stops the other
-copy. Use --finish to resume an interrupted move after the other computer
-says Auni moved here.`,
+It moves your database, settings, and wallet keys here, then stops the
+other copy.
+
+  --from <host>   The computer to move Auni from.
+  --finish        Resume an interrupted move after the other computer says
+                  Auni moved here.`,
     flags: { "--from": true, "--finish": false },
   },
   update: {
-    summary: "Install an Auni update",
+    summary: "Update Auni to the latest release",
     synopsis: "[--version <vX.Y.Z>] [--yes]",
-    details: `The update checks the release signature, backs up your database, and checks
-that the new version starts. If that check fails, it switches back.
+    details: `Verifies the release signature, backs up your database, and checks that
+the new version starts. If that check fails, Auni switches back automatically.
 
   --version <vX.Y.Z>   Install a specific release.
-  --yes               Update without asking for confirmation.`,
+  --yes                Update without asking for confirmation.`,
     flags: { "--version": true, "--yes": false },
   },
   uninstall: {
     summary: "Remove Auni and keep your data",
     synopsis: "[--yes]",
-    details: `Uninstall stops Auni and removes the app, command and background service.
-Your data stays. Removing wallet keys requires separate confirmation.
---yes confirms uninstalling only.`,
+    details: `Stops Auni and removes the app, command, and background service. Your
+data stays on disk. Removing wallet keys always requires a separate
+confirmation.
+
+  --yes   Confirm uninstalling without prompting (never removes keys).`,
     flags: { "--yes": false },
   },
   build: {
@@ -166,7 +173,7 @@ export const USAGE = [
       }),
     ].join("\n"),
   ),
-  "For options, run auni <command> --help. For startup flags, run auni help start.",
+  "Run auni <command> --help for options, or auni help start for startup flags.",
 ].join("\n\n");
 
 /** What to run: a command with its flags (a value, or true for a switch) and its one word. */

@@ -271,7 +271,7 @@ export class Stage {
       }
       case "memory": {
         if (this.brain?.name) {
-          this.say("Found your AI");
+          this.say("Your AI is ready");
           this.face("open", 0);
           this.hop(standingX(STONE.brain));
           // Behind a page already waiting, it doesn't stop to cheer.
@@ -370,7 +370,7 @@ export class Stage {
 
   private get goodbye(): string {
     return this.brain && !this.brain.name
-      ? "Let's sort it out in your browser!"
+      ? "Let's set up your AI in the browser!"
       : "See you in your browser!";
   }
 

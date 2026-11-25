@@ -45,36 +45,36 @@ export async function askAboutKeys(
   ask: Ask,
   say: (line: string) => void,
 ): Promise<"keep" | "remove" | "stop"> {
-  say(`Your wallet's keys are ${kept.place}.`);
+  say(`Your wallet keys are ${kept.place}.`);
   if (addresses) {
     const signed = [
-      addresses.evm && `EVM ${addresses.evm}`,
-      addresses.solana && `Solana ${addresses.solana}`,
+      addresses.evm && `${addresses.evm} (Ethereum, Base, Monad, and other networks)`,
+      addresses.solana && `${addresses.solana} (Solana)`,
     ];
     say(`They sign for ${signed.filter(Boolean).join(" and ")}.`);
   }
   if (!ask) return "keep";
   if (!backupSavedAt) {
-    say("You haven't saved this wallet's backup (first run asks for it), so its keys stay.");
+    say("You haven't saved a backup of this wallet yet, so its keys will stay on this computer.");
     return "keep";
   }
   say(
     reading
-      ? `Auni's last reading, at ${when(reading.takenAt)}, put everything you hold at $${Number(reading.usd).toFixed(2)}.`
-      : "Auni has no reading of what you hold.",
+      ? `Last recorded balance (${when(reading.takenAt)}): $${Number(reading.usd).toFixed(2)}.`
+      : "Auni has no recorded balance for this wallet.",
   );
   say(
-    "Removing the keys loses this wallet for good, with whatever is still in it or in an " +
-      `app's account it holds, unless you have the backup you saved at ${when(backupSavedAt)}. ` +
-      "Keep them if you're not sure: they do nothing while Auni is gone, and an Auni installed " +
-      "here again uses them.",
+    "Removing these keys permanently deletes access to this wallet and any funds or connected " +
+      `accounts it controls, unless you have your backup from ${when(backupSavedAt)}. ` +
+      "If you're unsure, keep them: they stay idle while Auni is uninstalled, and reinstalling " +
+      "Auni will pick them up again.",
   );
   const answer = (
     await ask(`Press Enter to keep them, or type "${REMOVE_KEYS}" to remove them: `)
   ).trim();
   if (answer === "") return "keep";
   if (answer === REMOVE_KEYS) return "remove";
-  say("That isn't the sentence, so nothing was removed. Run auni uninstall again to answer again.");
+  say("Confirmation didn't match, so nothing was removed. Run auni uninstall to try again.");
   return "stop";
 }
 
@@ -128,7 +128,7 @@ export async function uninstall({ kept, remove }: Exclude<KeysChoice, "stop">): 
 export function farewell(dir: string, kept: KeptKeys | null, removed: boolean): string {
   const data = `Your database and settings stay in ${dir}.`;
   const lines = ["Auni is uninstalled.", data];
-  if (removed) lines.push("Your wallet's keys were removed.");
+  if (removed) lines.push("Your wallet keys were removed.");
   else if (kept?.inDataFolder) {
     lines.push(
       "Your wallet keys are in that folder.",

@@ -73,9 +73,9 @@ logged() {
 need() {
   command -v "$1" >/dev/null 2>&1 && return
   if [ "$os" = linux ]; then
-    fail "it needs $1. Install it with: sudo apt-get install $2 (or your system's package manager)"
+    fail "$1 is required. Install it with: sudo apt-get install $2 (or your system's package manager)."
   fi
-  fail "it needs $1. Install Xcode's command line tools with: xcode-select --install"
+  fail "$1 is required. Install Xcode command line tools with: xcode-select --install"
 }
 
 sha256() {
@@ -228,17 +228,17 @@ main() {
     done_ "$tag from the source you supplied (unsigned)"
   else
     check_release
-    done_ "$tag ($made). Release signature verified."
+    done_ "$tag ($made), signature verified"
   fi
   dir="$APP/versions/$tag"
 
   if [ -f "$dir/.auni-built" ]; then
     step 3 "Source"
-    done_ "$tag is built already"
+    done_ "$tag is already built"
     step 4 "Node"
     done_ "$(readlink "$dir/.node" | sed 's#.*/##')"
     step 5 "Build"
-    done_ "Build already complete"
+    done_ "Already built"
   else
     step 3 "Source"
     # A folder without .auni-built is a build that didn't finish: it starts over.
@@ -328,15 +328,15 @@ EOF
   printf '\n'
   if [ "$current" != "$tag" ]; then
     say "Auni $tag is built. $current is still the active version."
-    say "Switch with $command update --version $tag"
+    say "Switch to it with: $command update --version $tag"
     return
   fi
-  say "Auni $tag is installed."
+  say "Done. Auni $tag is installed."
   say "Run $command to start Auni and open it in your browser."
   say "Run $command demo to try it with fake money."
   if [ "$command" != auni ]; then
     say ""
-    say "To use auni by name, run this now and add it to the startup file your shell reads:"
+    say "To run auni from anywhere, add it to your PATH now and in your shell profile:"
     say '  export PATH="$HOME/.local/bin:$PATH"'
   fi
 }

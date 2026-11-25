@@ -145,12 +145,12 @@ describe("auni doctor", () => {
     expect(doctorSummary(findings, "pnpm auni")).toBe(
       [
         "Auni is stopped.",
-        "Run pnpm auni",
+        "Run: pnpm auni",
         "Needs attention: Your AI",
-        "Waiting for startup: Web app, Wallet, Apps",
+        "Waiting for startup: Web app, Your wallet, Apps",
         "Networks: 7 chains ready, 1 with limits, check Monad, Polygon",
         "Passed: Version",
-        "Every check: pnpm auni doctor --verbose",
+        "All checks: pnpm auni doctor --verbose",
       ].join("\n"),
     );
     // Machine readers still see the individual findings and no presentation fields.
@@ -172,7 +172,7 @@ describe("auni doctor", () => {
       ],
       "auni",
     );
-    expect(summary).toMatch(/^Auni can't check its database\.\nRun auni doctor --verbose/u);
+    expect(summary).toMatch(/^Auni can't reach its database\.\nRun: auni doctor --verbose/u);
     expect(summary).not.toContain("Background work");
     expect(summary).not.toContain("Web app");
   });
@@ -193,7 +193,7 @@ describe("auni doctor", () => {
         ]),
       );
       const summary = doctorSummary(findings, "auni");
-      expect(summary).toContain("Background work: 2 tasks failed in the last 24 hours.");
+      expect(summary).toContain("Background work: 2 tasks failed in the last 24 hours");
       expect(summary).not.toMatch(/no price|RPC busy/u);
     } finally {
       await auni.end();
@@ -209,9 +209,9 @@ describe("auni doctor", () => {
       ],
       "auni",
     );
-    expect(summary).toContain("Access: this computer only.");
+    expect(summary).toContain("Access: Only on this computer");
     expect(summary).toContain("Passed: Background work\n");
-    expect(summary).not.toContain("Access from other devices");
+    expect(summary).not.toContain("Remote access");
   });
 
   it("says what keeps going wrong for an app, the oldest first: a read a service retired, a key out of credits", async () => {
@@ -397,7 +397,7 @@ describe("auni doctor", () => {
       service.command = ["/elsewhere/node", "/elsewhere/auni.mjs", "--no-open"];
       const findings = await doctor();
       expect(doctorSummary(findings, "pnpm auni")).toContain(
-        "Stop Auni, then start it from this folder to use this version.",
+        "Update pending: stop Auni and start it from this folder to run this version",
       );
       expect(repairs(findings, "runner")).toEqual([
         {

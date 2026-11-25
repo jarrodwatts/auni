@@ -79,9 +79,9 @@ export class UpdateRefused extends Error {}
 
 /** Stopping waits up to two minutes for a send in flight (start.ts). */
 const STOP_MS = 150_000;
-const STOP_TIMEOUT = "Auni didn't stop within two and a half minutes, so nothing changed.";
+const STOP_TIMEOUT = "Auni didn't stop within 2.5 minutes, so nothing changed.";
 const ELSEWHERE =
-  "Auni runs on this database from another computer: stop it there, then run auni update.";
+  "Auni is running on this database from another computer. Stop it there, then run auni update.";
 
 const say = (line: string) => console.log(line);
 
@@ -95,19 +95,19 @@ export async function update({
 }): Promise<"updated" | "same" | "declined" | "rolled-back"> {
   return withLock(async () => {
     const from = currentTag();
-    if (!from) throw new UpdateRefused("Auni isn't installed here: install.sh installs it.");
+    if (!from) throw new UpdateRefused("Auni isn't installed here yet. Run install.sh first.");
     if (version !== undefined && !isReleaseTag(version))
-      throw new UpdateRefused(`${version} isn't a version, such as v0.1.0.`);
+      throw new UpdateRefused(`"${version}" isn't a valid version (expected format like v0.1.0).`);
     const own = Boolean(host.env.AUNI_SOURCE);
-    say(own ? "Checking the source you supplied." : "Checking for an Auni release.");
+    say(own ? "Checking the source you supplied." : "Checking for updates.");
     const release = own ? null : await check(from, version, host);
     // A source is the version --version names, or the one its package.json says, as install.sh reads it.
     const to = release?.version ?? version ?? (await tagOf(from, host));
     if (to === from) {
       say(
         own && !version
-          ? `Auni is already on ${to}. Use auni update --version <vX.Y.Z> to build the supplied source as a different version.`
-          : `Auni is on ${to} already${version ? "" : ", the newest"}.`,
+          ? `Auni is already on ${to}. Pass --version <vX.Y.Z> to build this source under a different version.`
+          : `Auni is already on ${to}${version ? "" : " (latest)"}.`,
       );
       return "same";
     }
@@ -117,7 +117,7 @@ export async function update({
     say(
       release
         ? described(release, from)
-        : `Update ${from} → ${to} from the source you supplied (unsigned).`,
+        : `Update ${from} -> ${to} from the source you supplied (unsigned).`,
     );
     // Said before asking, so the yes is to stopping it too.
     if (running) say(stopsAndStarts(running, to));
@@ -128,7 +128,7 @@ export async function update({
     if (!existsSync(join(versionDir(to), BUILT))) await build(from, to, host);
 
     if (running) {
-      say("Stopping Auni after any moves in progress finish.");
+      say("Stopping Auni. Moves in progress will finish first.");
       if (!(await host.stop(running))) throw new UpdateRefused(STOP_TIMEOUT);
       // Its own Postgres stopped with it (db/embedded.ts): held again, for the export.
       await host.postgres?.hold();
@@ -160,14 +160,14 @@ export async function update({
     keepOnly(listVersions().filter((tag) => tag !== to));
     const what =
       came === "stopped"
-        ? `${to} stopped as it started`
-        : `${to} didn't come up within ${Math.round(host.healthyWithinMs / 1_000)} seconds`;
+        ? `${to} exited during startup`
+        : `${to} didn't start within ${Math.round(host.healthyWithinMs / 1_000)} seconds`;
     say(
       left
-        ? `\n${what}, so Auni is back on ${from} with your data as it was. Its output is above.\n` +
-            `What ${to} left of your database is kept at ${left}; delete it once you don't need it.`
-        : `\n${what}, so Auni is back on ${from}. Your database was not restored, and ${to} may have changed it. Its output is above.\n` +
-            `The export taken before the update is under ${backupsDir()}: auni import loads it into an empty database.`,
+        ? `\n${what}, so Auni rolled back to ${from} with your data intact. Startup output is above.\n` +
+            `Files left by ${to} are saved at ${left}; delete them once you no longer need them.`
+        : `\n${what}, so Auni rolled back to ${from}. Your external database wasn't restored, and ${to} may have changed it. Startup output is above.\n` +
+            `A pre-update backup is in ${backupsDir()} (restore into an empty database with auni import).`,
     );
     await again();
     return "rolled-back";
@@ -200,8 +200,8 @@ function described(release: Release, from: string): string {
     timeZone: "UTC",
   });
   const notes = release.notes || "This release has no notes.";
-  const action = byRelease(release.version, from) < 0 ? "Go back" : "Update";
-  return `${action} ${from} → ${release.version} (${day}, signature verified)\n\n${notes}\n`;
+  const action = byRelease(release.version, from) < 0 ? "Switch back" : "Update";
+  return `${action} ${from} -> ${release.version} (${day}, signature verified)\n\n${notes}\n`;
 }
 
 /**
@@ -209,7 +209,7 @@ function described(release: Release, from: string): string {
  * fails, as the probe's output is: the rest of the time update tells the story.
  */
 async function build(from: string, to: string, host: UpdateHost): Promise<void> {
-  say(`Building ${to} beside ${from} (a few minutes).`);
+  say(`Building ${to} alongside ${from} (this takes a few minutes).`);
   const installer = spawn("sh", [join(versionDir(from), "install.sh")], {
     env: { ...host.env, AUNI_HOME: dataDir(), AUNI_VERSION: to },
     stdio: ["ignore", "pipe", "pipe"],
@@ -220,7 +220,9 @@ async function build(from: string, to: string, host: UpdateHost): Promise<void> 
   const [code] = (await once(installer, "close")) as [number | null];
   if (code === 0) return;
   process.stdout.write(output());
-  throw new UpdateRefused(`\n${to} didn't build, so Auni stays on ${from}. Why is above.`);
+  throw new UpdateRefused(
+    `\n${to} failed to build, so Auni stays on ${from}. See the build output above.`,
+  );
 }
 
 /** Everything `child` writes, stdout and stderr in the order written. */
@@ -246,7 +248,7 @@ async function tagOf(from: string, host: UpdateHost): Promise<string> {
 /** What becomes of the running Auni, said before the owner says yes. */
 function stopsAndStarts(running: RunningAuni, to: string): string {
   const again = running.as === "service" ? "as a service" : "in the background";
-  return `Auni is running ${where(running)}. It will finish moves in progress, stop, then start ${again} after ${to} is checked.`;
+  return `Auni is running ${where(running)}. It will finish any moves in progress, stop, and restart ${again} once ${to} is verified.`;
 }
 
 /**
@@ -281,20 +283,20 @@ async function backUp(from: string, host: UpdateHost): Promise<string | null> {
   const exported = join(backup, "export.jsonl.gz");
   await host.export(exported).catch((error: unknown) => {
     throw new UpdateRefused(
-      `Auni couldn't export its database first (${error instanceof Error ? error.message : String(error)}), so nothing changed.`,
+      `Couldn't export your database before updating (${error instanceof Error ? error.message : String(error)}), so nothing changed.`,
     );
   });
   say(`Saved a database export to ${exported}`);
   if (!host.postgres) {
-    say("Your external database stays where it is. Only the export was saved.");
+    say("Your external database stays untouched. Only the export was saved.");
     return null;
   }
   await host.postgres.release();
   if (await host.postgres.running()) {
     rmSync(backup, { recursive: true, force: true });
     throw new UpdateRefused(
-      "Auni's database is still running, so it can't be copied whole; nothing changed. Is " +
-        "another auni command running? Run auni update again once it's done.",
+      "Auni's database is still running, so it can't be copied safely. Nothing changed. " +
+        "Wait for any other auni command to finish, then run auni update again.",
     );
   }
   cpSync(liveDatabase(), join(backup, "postgres"), {
@@ -411,7 +413,7 @@ async function withLock<T>(work: () => Promise<T>): Promise<T> {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     const holder = Number(readFileSync(lock, "utf8"));
-    if (alivePid(holder)) throw new UpdateRefused("Another auni update is running.");
+    if (alivePid(holder)) throw new UpdateRefused("Another auni update is already running.");
     writeFileSync(lock, String(process.pid));
   }
   try {

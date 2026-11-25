@@ -378,18 +378,20 @@ export function said(facts: SetupFacts, answer = nextStep(facts)): string {
       `Run ${answer.run.command}`,
       "",
       "Auni is stopped. Keep the terminal open while you use it.",
-      ...(facts.webBuilt ? [] : ["The web app builds on the first start."]),
+      ...(facts.webBuilt ? [] : ["The web app builds on the first start (about a minute)."]),
     ].join("\n");
   if (answer.step === "start" && answer.next === "wait")
-    return facts.running.webAnswers ? "Opening the browser." : "Auni is starting its web app.";
+    return facts.running.webAnswers
+      ? "Auni is up. Opening your browser."
+      : "Auni is starting the web app.";
   if (answer.step === "start" && answer.next === "tell") {
     const command = `${auniCommand(facts.install)} pair`;
     if (facts.running.browser === "opened")
-      return `Open the Auni tab in your browser. If you closed it, run ${command}.`;
+      return `Open the Auni tab in your browser. If you closed it, run ${command} for a new sign-in link.`;
     const tunnel = facts.running.browser === "no-screen" ? tunnelCommand() : null;
     const pair = `Run ${command} on the computer running Auni, then open the link. It works once and expires after 15 minutes.`;
     return tunnel
-      ? `If your browser is on another computer, connect to Auni from there first.\n  ${tunnel}\n\n${pair}`
+      ? `If your browser is on another computer, forward the port from there first:\n  ${tunnel}\n\n${pair}`
       : pair;
   }
   if (answer.step === "done")

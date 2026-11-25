@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 
 import { mustPairAgain } from "@/components/auth/pair-again";
-import { MoneyButton, MoneyButtons } from "@/components/cards/money/money-card-parts";
+import { Button } from "@/components/ui/button";
 import { WalletKeyList } from "@/components/settings/wallet-keys-dialog";
 import { CopyLine } from "@/components/ui/copy-line";
 import { revealWalletKeys } from "@/lib/data/me";
@@ -94,7 +94,7 @@ export function SpareKey() {
 
   const later = async () => {
     try {
-      await save.mutateAsync({ path: "setup/backup/later", body: {} });
+      await save.mutateAsync({ path: "setup/backup/later" });
     } catch {
       setError("That didn't reach Auni, so try again.");
     }
@@ -145,7 +145,7 @@ export function SpareKey() {
 
   const keep = async () => {
     try {
-      await save.mutateAsync({ path: "setup/backup", body: {} });
+      await save.mutateAsync({ path: "setup/backup" });
       setStage({ kind: "saved" });
     } catch {
       setError("That didn't reach Auni. Your key is still here, so try again.");
@@ -192,35 +192,40 @@ export function SpareKey() {
         {showing ? (
           <>
             <WalletKeyList keys={stage.keys} className="mt-4" />
-            <MoneyButton
-              tone="primary"
+            <Button
+              size="lg"
               className="mt-4 w-full"
-              busy={save.isPending}
-              busyLabel="Saving"
+              disabled={save.isPending}
+              aria-busy={save.isPending}
               onClick={() => void keep()}
             >
-              I saved it
-            </MoneyButton>
+              {save.isPending ? "Saving" : "I saved it"}
+            </Button>
           </>
         ) : stage.kind === "pair-again" ? (
           <div role="status" aria-busy className="mt-4">
             <CopyLine value="auni pair" command focused />
           </div>
         ) : (
-          <div className="mt-4">
-            <MoneyButtons>
-              <MoneyButton tone="quiet" disabled={save.isPending} onClick={() => void later()}>
-                Later
-              </MoneyButton>
-              <MoneyButton
-                tone="primary"
-                busy={revealing}
-                busyLabel="Checking it's you"
-                onClick={() => void show()}
-              >
-                Save it
-              </MoneyButton>
-            </MoneyButtons>
+          <div className="mt-4 flex gap-2">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              disabled={save.isPending}
+              onClick={() => void later()}
+            >
+              Later
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              disabled={revealing}
+              aria-busy={revealing}
+              onClick={() => void show()}
+            >
+              {revealing ? "Checking it's you" : "Save it"}
+            </Button>
           </div>
         )}
         {error ? (

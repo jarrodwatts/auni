@@ -5,10 +5,12 @@ import { useEffect, useEffectEvent, useRef } from "react";
 import { AppMark } from "@/components/apps/app-mark";
 import { BrainRow } from "@/components/brains/brain-row";
 import { MascotArt } from "@/components/brand/mascot-art";
+import { useMe } from "@/components/personalization/use-me";
 import { useBrains, useBrainsSeen } from "@/lib/data/brains";
 
 import { nothingThinks, readyBrain } from "./first-run";
 import styles from "./first-run.module.css";
+import { whereAuniRuns } from "./where";
 
 /** How long "Now I can think" shows before the take goes again. */
 const CARRY_ON_MS = 1_400;
@@ -28,6 +30,7 @@ export function BrainNeeded({
   readonly onReady: () => void;
 }) {
   const rows = useBrains().data?.rows ?? [];
+  const machine = whereAuniRuns(useMe().reach);
   const ready = readyBrain(rows);
   const carried = useRef(false);
   const carryOn = useEffectEvent(() => {
@@ -74,7 +77,7 @@ export function BrainNeeded({
             </p>
             <ul className={styles.brainRows}>
               {rows.map((item) => (
-                <BrainRow key={item.row.id} item={item} machine="this computer" />
+                <BrainRow key={item.row.id} item={item} machine={machine} />
               ))}
             </ul>
           </>

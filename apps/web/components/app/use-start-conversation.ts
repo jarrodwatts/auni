@@ -9,6 +9,7 @@ import { useConversationLaunch } from "@/components/app/conversation-launch-cont
 import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
 import { useThreads } from "@/components/app/use-threads";
 import { START_FAILURE } from "@/components/app/thread-failure";
+import { useFinishFirstRun } from "@/components/first-run/finish";
 import { isModifiedClick } from "@/components/places/open-place";
 import { startChat, threadHref, type StartChatOptions } from "@/lib/data/places";
 import { threadSession } from "@/lib/data/thread-session";
@@ -27,26 +28,24 @@ export function useStartConversation() {
   const { begin, cancel, continueToThread, launch } = useConversationLaunch();
   const [error, setError] = useState<string | null>(null);
   const [, startNavigation] = useTransition();
+  const finishFirstRun = useFinishFirstRun();
   const start = useCallback(
-    async (
-      prompt: string,
-      carried?: CarriedTake,
-      options?: StartChatOptions,
-    ): Promise<void> => {
+    async (prompt: string, carried?: CarriedTake, options?: StartChatOptions): Promise<void> => {
       const content = prompt.trim();
       if (!content || launch) return;
 
       setError(null);
       const composerFromTop =
         pathname === "/app/new" && !carried
-          ? (document
-              .querySelector('[data-slot="welcome-composer"] form')
-              ?.getBoundingClientRect().top ?? null)
+          ? (document.querySelector('[data-slot="welcome-composer"] form')?.getBoundingClientRect()
+              .top ?? null)
           : null;
       const started = begin(content, carried, composerFromTop);
       if (!started) return;
 
       try {
+        // The owner's first take finishes first run as it goes (core makes their wallet).
+        await finishFirstRun();
         const thread = await startChat(content, options);
         rememberThread(thread);
         continueToThread(started.id, thread);
@@ -75,7 +74,7 @@ export function useStartConversation() {
         requestComposerFocus("new", content);
       }
     },
-    [begin, cancel, continueToThread, launch, pathname, rememberThread, router],
+    [begin, cancel, continueToThread, finishFirstRun, launch, pathname, rememberThread, router],
   );
 
   return { busy: launch !== null, error, start } as const;

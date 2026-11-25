@@ -10,6 +10,7 @@ import { useAppDialogs } from "@/components/app/app-dialogs";
 import { requestComposerFocus } from "@/components/app/composer";
 import { useMoney } from "@/components/money/money-provider";
 import { LogoImage, preloadLogo } from "@/components/brand/marks";
+import { useFirstRun } from "@/components/first-run/use-first-run";
 import { useMe } from "@/components/personalization/use-me";
 import { useStartingPoints, useStartingPointsKept } from "@/lib/data/starting-points";
 import tightMascot from "@/public/brand/auni-mascot-tight.png";
@@ -44,7 +45,9 @@ export function StartingPoints() {
   const { portfolio } = useMoney();
   const me = useMe();
   const { addMoneyHref, settingsHref } = useAppDialogs();
-  const needsSignals = !me.xHandle && me.watchedWallets.length === 0;
+  // First run asks only for the take: money and signals come after it.
+  const firstRun = useFirstRun();
+  const needsSignals = !firstRun && !me.xHandle && me.watchedWallets.length === 0;
 
   return (
     <div className="w-full">
@@ -100,7 +103,7 @@ export function StartingPoints() {
         className="mt-2 flex h-5 items-center pr-2 text-meta text-muted-foreground"
         style={{ paddingLeft: WORDS_START }}
       >
-        {portfolio?.empty ? (
+        {portfolio?.empty && !firstRun ? (
           <span className="auni-stagger-in truncate">
             Your balance is $0.{" "}
             <Link

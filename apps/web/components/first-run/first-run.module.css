@@ -1,135 +1,14 @@
 /*
- * First run, past its landing (components/landing): the door for an auni.io wallet, and what
- * first run asks in the chat when it must (a brain, the spare key). Light and still, Auni
- * the only thing that moves much; where motion is reduced, everything shows without moving.
+ * What first run asks in the chat when it must (a brain, the spare key), and Auni looking away
+ * from a secret. Light and still, Auni the only thing that moves much; where motion is reduced,
+ * everything shows without moving.
  */
-
-/* A door, not a button: quiet until pointed at. */
-.door {
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  color: var(--color-muted-foreground);
-  font-size: var(--text-ui);
-  font-weight: 500;
-  transition:
-    color 160ms ease,
-    background-color 160ms ease;
-}
-
-.door:hover {
-  background: color-mix(in srgb, var(--color-foreground) 4%, transparent);
-  color: var(--color-ink);
-}
-
-.door:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--color-ring) 45%, transparent);
-}
 
 @keyframes take-in {
   from {
     opacity: 0;
     transform: translateY(14px);
   }
-}
-
-/*
- * The door's own scene: Auni, what to do in a line, the private field. It hangs from a fixed
- * height rather than sitting in the middle, so what grows under the field (a Solana key's own
- * field, what the keys sign for, a refusal) grows down and never lifts the words above it.
- */
-.scene {
-  display: flex;
-  width: min(480px, 100%);
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  margin: 0 auto;
-  padding: max(40px, calc(50dvh - 300px)) 16px 40px;
-  text-align: center;
-  animation: take-in 600ms var(--motion-drift) both;
-}
-
-.sceneTitle {
-  margin-top: 18px;
-  color: var(--color-ink);
-  font-size: var(--text-title);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
-}
-
-/* Focus lands here as the scene opens, for a screen reader to read it; it is no control. */
-.sceneTitle:focus {
-  outline: none;
-}
-
-.sceneLine {
-  margin-top: 14px;
-  color: var(--color-ink-soft);
-  font-size: var(--text-reading);
-  line-height: 1.5;
-  text-wrap: balance;
-}
-
-.sceneLine b {
-  color: var(--color-ink);
-  font-weight: 600;
-}
-
-.sceneLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  color: var(--color-primary);
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
-  text-underline-offset: 3px;
-}
-
-.sceneLink:hover {
-  text-decoration-color: currentColor;
-}
-
-.sceneField {
-  width: 100%;
-  margin-top: 22px;
-  text-align: left;
-}
-
-.sceneNote {
-  margin-top: 8px;
-  color: var(--color-muted-foreground);
-  font-size: var(--text-body);
-  line-height: 1.5;
-}
-
-.scene .door {
-  margin-top: 14px;
-}
-
-/* An auni.io wallet come home, at the take's foot: its vault, and what it holds. */
-.home {
-  display: flex;
-  height: 40px;
-  align-items: center;
-  gap: 10px;
-  color: var(--color-ink-soft);
-  font-size: var(--text-ui);
-  animation: take-in 500ms var(--motion-drift) both;
-}
-
-.homeVault {
-  position: relative;
-  width: 32px;
-  height: 32px;
-}
-
-.homeAmount {
-  color: var(--color-ink);
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
 }
 
 /*
@@ -275,7 +154,7 @@
   position: absolute;
   z-index: -1;
   inset: 0;
-  border-radius: var(--radius-sheet);
+  border-radius: var(--radius-card);
   background: var(--color-card);
   box-shadow: 0 0 0 1px var(--color-border);
   content: "";
@@ -446,7 +325,7 @@
   /* As far under the words over it as one answer is under another, its actions row included. */
   margin: 6px 0 4px;
   padding: 24px 24px 22px;
-  border-radius: var(--radius-sheet);
+  border-radius: var(--radius-card);
   background: var(--color-card);
   box-shadow: 0 0 0 1px var(--color-border);
   animation: take-in 600ms var(--motion-drift) both;
@@ -508,12 +387,10 @@
 }
 
 .keySaved svg {
-  color: var(--color-positive);
+  color: var(--color-ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scene,
-  .home,
   .key,
   .thought,
   .thoughtMark,

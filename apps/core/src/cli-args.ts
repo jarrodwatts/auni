@@ -20,11 +20,12 @@ const COMMANDS: Readonly<Record<string, Command>> = {
   },
   demo: {
     summary: "Try Auni with fake money",
-    synopsis: "[--first-run] [--port <n>] [--no-open] [--no-web] [--at <time>]",
+    synopsis: "[--first-run [--signed-out]] [--port <n>] [--no-open] [--no-web] [--at <time>]",
     details: `Runs in a temporary folder with fake money and no login. Your real data is
 untouched. Never send real money to a demo address.
 
   --first-run   Start from your first take, with an empty wallet and no history.
+  --signed-out  With --first-run, the AI waits to be signed in.
   --port <n>    Open the demo on this port (default 3939).
   --no-open     Print the demo link instead of opening your browser.
   --no-web      Run only the API.
@@ -35,6 +36,7 @@ untouched. Never send real money to a demo address.
       "--port": true,
       "--at": true,
       "--first-run": false,
+      "--signed-out": false,
     },
   },
   pair: {

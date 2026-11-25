@@ -84,6 +84,7 @@ switch (command) {
       open: !flags.has("--no-open"),
       at,
       firstRun: flags.has("--first-run"),
+      signedOut: flags.has("--signed-out"),
     });
     break;
   }

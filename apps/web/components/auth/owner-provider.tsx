@@ -15,7 +15,7 @@ import {
 import { CoreApiError } from "@/lib/core";
 import { handedOverTo } from "@/lib/data/handover";
 import { getMe } from "@/lib/data/me";
-import { pairBrowser, whyUnreachable } from "@/lib/data/owner";
+import { pairBrowser, refusedAs, whyUnreachable } from "@/lib/data/owner";
 import { pairingCodeIn } from "@/lib/pairing";
 
 /**
@@ -29,6 +29,8 @@ export type OwnerState =
   | { readonly status: "paired"; readonly owner: Me }
   /** No session, and no link brought one. */
   | { readonly status: "unpaired" }
+  /** Always on: core opens only to its owner's Tailscale login, and this request wasn't that. */
+  | { readonly status: "tailscale-only" }
   /** The link's code was refused: used already, or past its 15 minutes. */
   | { readonly status: "link-used" }
   /** No core answers yet; read again every few seconds. */
@@ -42,16 +44,17 @@ interface OwnerContextValue {
   readonly state: OwnerState;
   /** Keeps the owner as core said them now, after a change such as finishing first run. */
   readonly setOwner: (owner: Me) => void;
-  /** Reads again, for Try again. */
-  readonly retry: () => void;
   /** This page spent a pairing link as it opened, so the browser paired seconds ago. */
   readonly pairedHere: boolean;
 }
 
 const OwnerContext = createContext<OwnerContextValue | null>(null);
 
-/** While Auni is still starting, it's read again this often, so the page carries on by itself. */
-const STARTING_RETRY_MS = 2_000;
+/**
+ * While the app can't open, it's read again this often, so the page carries on by itself: once
+ * Auni is up or its database back, or once the owner paired this browser from another tab.
+ */
+const AGAIN_MS = { starting: 2_000, database: 3_000, unpaired: 3_000, "link-used": 3_000 } as const;
 
 type Spent = "none" | "spent" | "refused" | "failed";
 
@@ -95,8 +98,8 @@ export function OwnerProvider({ children }: { readonly children: ReactNode }) {
         setState({ status: "paired", owner });
       } catch (error) {
         if (!current) return;
-        if (error instanceof CoreApiError && error.status === 401)
-          return setState({ status: spent === "refused" ? "link-used" : "unpaired" });
+        const refused = refusedAs(error, spent === "refused");
+        if (refused) return setState({ status: refused });
         if (error instanceof CoreApiError && error.code === "handed_over") {
           const went = await handedOverTo();
           if (current && went)
@@ -111,11 +114,18 @@ export function OwnerProvider({ children }: { readonly children: ReactNode }) {
     };
   }, [reads]);
 
+  const waitsOn = state.status in AGAIN_MS ? (state.status as keyof typeof AGAIN_MS) : null;
   useEffect(() => {
-    if (state.status !== "starting") return;
-    const again = setTimeout(() => setReads((count) => count + 1), STARTING_RETRY_MS);
-    return () => clearTimeout(again);
-  }, [state]);
+    if (!waitsOn) return undefined;
+    const readAgain = () => setReads((count) => count + 1);
+    const again = setTimeout(readAgain, AGAIN_MS[waitsOn]);
+    // Back from the terminal or the tab the link opened: read now rather than in a moment.
+    window.addEventListener("focus", readAgain);
+    return () => {
+      clearTimeout(again);
+      window.removeEventListener("focus", readAgain);
+    };
+  }, [waitsOn, state]);
 
   // A link pasted into a tab already open here changes only the fragment, which loads nothing.
   useEffect(() => {
@@ -131,14 +141,7 @@ export function OwnerProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   const setOwner = useCallback((owner: Me) => setState({ status: "paired", owner }), []);
-  const retry = useCallback(() => {
-    setState({ status: "loading" });
-    setReads((count) => count + 1);
-  }, []);
-  const value = useMemo(
-    () => ({ state, setOwner, retry, pairedHere }),
-    [state, setOwner, retry, pairedHere],
-  );
+  const value = useMemo(() => ({ state, setOwner, pairedHere }), [state, setOwner, pairedHere]);
   return <OwnerContext value={value}>{children}</OwnerContext>;
 }
 

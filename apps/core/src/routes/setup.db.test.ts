@@ -176,16 +176,4 @@ describe("finishing first run", () => {
       wallet: { addresses: { evm: "0x00000000000000000000000000000000000000b1" } },
     });
   });
-
-  it("rejects invalid X handle or watched wallet before marking onboarding done", async () => {
-    const badX = await post("done", { xHandle: "invalid handle with spaces!!" });
-    expect(badX.status).toBe(400);
-    expect(await badX.json()).toMatchObject({ error: "invalid_x_handle" });
-    expect((await db.select().from(owner))[0]!.welcomedAt).toBeNull();
-
-    const badWallet = await post("done", { watchedWallet: "not-a-valid-address" });
-    expect(badWallet.status).toBe(400);
-    expect(await badWallet.json()).toMatchObject({ error: "invalid_wallet" });
-    expect((await db.select().from(owner))[0]!.welcomedAt).toBeNull();
-  });
 });

@@ -8,9 +8,9 @@
 // state the demo's owner has one in, and one Auni itself runs on), a new chat, each pane of
 // Settings, every conversation the demo's owner has, and the states between them (the search
 // palette, a thread's details pane, Needs you, a phone's Chats and More, a turn's work opened up,
-// a message that may not have reached Auni, a page that isn't there, and a browser that isn't
-// paired, or brings a link already used), and first run as a new
-// owner meets it (each step of its setup), each at a desktop and a phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
+// a message that may not have reached Auni, a page that isn't there, a browser that isn't
+// paired, or brings a link already used, and one Auni can't answer yet), and first run as a new
+// owner meets it (the take, and the ask for an AI), each at a desktop and a phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
 // A screen longer than the window is taken a window at a time: a conversation from its end back
 // to its start, a page from its top down. The demo makes the same owner every time (apps/core/src/demo), and here its clock
 // and the browser's both stand at one moment in one time zone, so two runs of one build give the
@@ -191,6 +191,28 @@ const OPEN_RECEIPT: Opener = {
   shows: `document.querySelector('[role="dialog"]')`,
 };
 
+/** What core answers a browser that isn't let in, by the picture it makes: null is no answer. */
+const CORE_ANSWERS: Record<string, { status: number; error: string } | null> = {
+  "gate-starting": null,
+  "gate-database": { status: 503, error: "database_unreachable" },
+  "gate-tailscale-only": { status: 401, error: "tailscale_owner_only" },
+};
+
+/** A page whose every request to core gets `answer`, or never reaches it. */
+const answerCore = (answer: (typeof CORE_ANSWERS)[string]) => `(() => {
+  const real = globalThis.fetch;
+  globalThis.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (!new URL(url, location.href).pathname.startsWith("/core/")) return real(input, init);
+    const answer = ${JSON.stringify(answer)};
+    if (!answer) return Promise.reject(new TypeError("Failed to fetch"));
+    return Promise.resolve(new Response(JSON.stringify({ error: answer.error }), {
+      status: answer.status,
+      headers: { "content-type": "application/json" },
+    }));
+  };
+})()`;
+
 /** Opens the search palette, as its shortcut does. */
 const SEARCH: Opener = {
   does: `void window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`,
@@ -207,11 +229,11 @@ const OPEN_WORK: Opener = {
   shows: `document.querySelector('.auni-steps-line[aria-expanded="true"]')`,
 };
 
-/** A step of first run's wizard, by the words on its button. */
-const STEP = (label: string): Opener => ({
-  does: PRESS(label),
-  shows: `document.querySelector('[aria-current="step"]')?.textContent.includes(${JSON.stringify(label)})`,
-});
+/** Starts the AI's own sign-in from first run's ask for one, which shows it under way. */
+const SIGN_IN: Opener = {
+  does: PRESS("Sign in"),
+  shows: `[...document.querySelectorAll("button")].some((el) => el.textContent?.trim() === "Cancel")`,
+};
 
 /**
  * Sends a message core never confirms: the page's own fetch answers the send with a server fault,
@@ -261,6 +283,19 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       await take(stranger.page, out, "pairing-link-used", link, "top");
     } finally {
       await stranger.close();
+    }
+    // The same browser while Auni can't answer it: still starting, its database down, or always
+    // on and opening only through Tailscale.
+    for (const [name, answer] of Object.entries(CORE_ANSWERS)) {
+      const waiting = await launch();
+      try {
+        await waiting.page.look(look);
+        await waiting.page.standAt(Date.parse(AT), TIME_ZONE);
+        await waiting.page.beforeEachPage(answerCore(answer));
+        await take(waiting.page, out, name, `${origin}/app`, "top");
+      } finally {
+        await waiting.close();
+      }
     }
     const core = <T>(path: string) =>
       page.evaluate<T>(`fetch("/core/${path}").then((response) => response.json())`);
@@ -396,26 +431,33 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
 }
 
 /**
- * First run, as a new owner meets it (`auni demo --first-run`): the local setup wizard, each of
- * its steps.
+ * First run, as a new owner meets it (`auni demo --first-run`): their first take's question, and,
+ * with their AI not yet signed in (`--signed-out`), its ask for one and the sign-in it starts.
  */
 async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
-  const browser = await launch();
-  const demo = startDemo("--first-run");
-  try {
-    const { page } = browser;
-    await page.look(look);
-    await page.standAt(Date.parse(AT), TIME_ZONE);
-    const link = await demo.link;
-    const origin = new URL(link).origin;
-    await page.open(link);
-    await page.until("location.pathname.startsWith('/app') && !location.hash");
-    await take(page, out, "first-run", `${origin}/app/new`, "top");
-    await take(page, out, "first-run-wallet", `${origin}/app/new`, "top", STEP("Wallet"));
-    await take(page, out, "first-run-yours", `${origin}/app/new`, "top", STEP("Make it yours"));
-  } finally {
-    await browser.close();
-    await demo.stop();
+  for (const signedOut of [false, true]) {
+    const browser = await launch();
+    const demo = startDemo("--first-run", ...(signedOut ? ["--signed-out"] : []));
+    try {
+      const { page } = browser;
+      await page.look(look);
+      await page.standAt(Date.parse(AT), TIME_ZONE);
+      const link = await demo.link;
+      const origin = new URL(link).origin;
+      await page.open(link);
+      await page.until("location.pathname.startsWith('/app') && !location.hash");
+      if (!signedOut) {
+        await take(page, out, "first-run", `${origin}/app/new`, "top");
+        continue;
+      }
+      await take(page, out, "first-run-pick-your-ai", `${origin}/app/new`, "top");
+      await take(page, out, "first-run-signing-in", `${origin}/app/new`, "top", SIGN_IN, {
+        once: true,
+      });
+    } finally {
+      await browser.close();
+      await demo.stop();
+    }
   }
 }
 

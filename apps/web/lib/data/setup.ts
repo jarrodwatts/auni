@@ -21,25 +21,18 @@ export function useSetup() {
 }
 
 /**
- * Setup steps the owner takes during onboarding or first run: creating a local wallet, backing
- * up keys, or completing onboarding (optionally with X handle and a watch-only wallet).
+ * The steps only the owner takes: finishing first run as their first take is sent, and saving
+ * the spare key, or putting it off.
  */
-type SetupStep =
-  | {
-      readonly path: "setup/backup" | "setup/backup/later" | "setup/wallet";
-      readonly body: Record<string, never>;
-    }
-  | {
-      readonly path: "setup/done";
-      readonly body: { readonly xHandle?: string; readonly watchedWallet?: string };
-    };
+interface SetupStep {
+  readonly path: "setup/done" | "setup/backup" | "setup/backup/later";
+}
 
 /** Takes one step, keeping core's answer as where first run stands now. */
 export function useSetupStep() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, body }: SetupStep) =>
-      parsed(requestCore(path, { method: "POST", body: JSON.stringify(body) })),
+    mutationFn: ({ path }: SetupStep) => parsed(requestCore(path, { method: "POST", body: "{}" })),
     onSuccess: (setup) => queryClient.setQueryData(SETUP_KEY, setup),
   });
 }

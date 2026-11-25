@@ -18,7 +18,7 @@ Code or Codex). No hosted account, no cloud relay, no fees.
 
 Every local configuration area lives in **Settings** (press `/` or `Cmd+F` inside Settings to search any option):
 
-- **General** (`/app?settings=general`): display name, time zone, daily brief schedule, show-thinking toggle, and re-running the setup wizard.
+- **General** (`/app?settings=general`): display name, time zone, daily brief schedule, and the show-thinking toggle.
 - **Appearance** (`/app?settings=appearance`): Light, Dark, or app-provided themes (synced across devices; Auni can switch this directly with `update_auni_preferences`).
 - **Personalization** (`/app?settings=personalization`): inspectable, editable "What Auni knows about you" summary, public X/Twitter handle (`@handle`), watch-only external wallets (public EVM, ENS, or Solana addresses — zero keys needed), and refreshing tailored starting prompts.
 - **AI Brains** (`/app?settings=brains`): live status of Claude Code and Codex, one-click CLI install or inline sign-in from any device, and picking a preferred brain (takes effect immediately; if one hits a usage limit, Auni automatically falls back to another ready brain).

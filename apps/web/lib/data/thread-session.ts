@@ -52,6 +52,17 @@ interface ThreadSessionHandle {
     text: string,
     options?: { readonly id?: string; readonly supersedesId?: MessageId; readonly sentAt?: number },
   ): Promise<void>;
+  /**
+   * Begins this new thread with its first message. `create` asks core to make the thread with
+   * the message in it, which queues its turn as it does, so the live stream opens first and the
+   * turn's first steps are heard. Drawn as sent from now; rejects with create's error, leaving
+   * nothing drawn, when the thread isn't made.
+   */
+  start<Made extends { readonly keyKeptOut: boolean }>(
+    text: string,
+    options: { readonly id: string; readonly sentAt?: number },
+    create: () => Promise<Made>,
+  ): Promise<Made>;
   stop(): Promise<void>;
   /** Reads history in whole, one read at a time; one asked for meanwhile runs after it. */
   resync(): Promise<void>;
@@ -335,6 +346,39 @@ function createSession(threadId: ThreadId, isNew: boolean) {
     release();
   };
 
+  const start: ThreadSessionHandle["start"] = async (text, { id, sentAt }, create) => {
+    update({
+      messages: upsertMessage(state.messages, createOptimisticUserMessage(id, text, { sentAt })),
+      turn: { id, stage: "submitted", sent: true },
+      send: { messageId: id, text, failure: null },
+    });
+    const unsend = () => {
+      const { messages, turn, send } = state;
+      update({
+        messages: messages.filter((message) => message.id !== id),
+        turn: turn?.id === id ? null : turn,
+        send: send?.messageId === id ? null : send,
+      });
+    };
+    const making = watch().then(create);
+    posting = making;
+    try {
+      const made = await making;
+      // Kept out for the private key it held, as a send is: history brings Auni's answer.
+      if (made.keyKeptOut) {
+        unsend();
+        void resync();
+      }
+      return made;
+    } catch (error) {
+      unsend();
+      throw error;
+    } finally {
+      posting = null;
+      release();
+    }
+  };
+
   const stop = async () => {
     // Pressed while `/live` was opening: the message never goes.
     if (opening) {
@@ -362,6 +406,7 @@ function createSession(threadId: ThreadId, isNew: boolean) {
     },
     read: () => state,
     send,
+    start,
     stop,
     resync,
     idle: () => !busy() && !state.send?.failure,

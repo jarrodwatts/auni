@@ -3,11 +3,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { and, eq, ne, sql } from "drizzle-orm";
 
-import { startChat } from "../conversation/places.ts";
 import { archiveChat, pinChat } from "../conversation/tidy.ts";
 import { sendMessage } from "../conversation/send.ts";
 import { db } from "../db/client.ts";
-import { actions, arrivals, owner, type ThreadRow } from "../db/schema.ts";
+import { actions, arrivals, owner, threads, type ThreadRow } from "../db/schema.ts";
 import { JOBS_CHANNEL } from "../jobs/queue.ts";
 import { accounts } from "../apps/registry.ts";
 import { allowAction, allowProposal } from "../money/decide.ts";
@@ -65,6 +64,12 @@ async function quiet(): Promise<void> {
     }
     await sleep(50);
   }
+}
+
+/** A chat under its own short title, which the owner's words (`say`) then begin. */
+async function newChat(title: string): Promise<ThreadRow> {
+  const [chat] = await db.insert(threads).values({ title }).returning();
+  return chat!;
 }
 
 /** The owner says something in a thread, and core does everything that follows from it. */
@@ -308,7 +313,7 @@ export async function seed(): Promise<void> {
   let aiBuildout!: ThreadRow;
   await step(21, "09:40", async () => {
     await arrives("monad", 12_000);
-    aiBuildout = await startChat("AI buildout");
+    aiBuildout = await newChat("AI buildout");
     await say(
       aiBuildout,
       "I think the AI buildout has years to run. Can you run that for me with $3,000?",
@@ -322,27 +327,27 @@ export async function seed(): Promise<void> {
   await step(17, "19:05", async () => {
     // More than the long needs, so `demo: plan` can be played again and allowed.
     await arrives("arbitrum", 5_000);
-    trading = await startChat("I want to go long bitcoin");
+    trading = await newChat("I want to go long bitcoin");
     await say(trading, "I want to go long bitcoin with a bit of leverage.");
     await allowWaiting();
   });
 
   await step(14, "08:30", async () => {
-    const chat = await startChat("Keep my idle cash earning");
+    const chat = await newChat("Keep my idle cash earning");
     await say(chat, "Can you keep my idle cash earning?");
     await allowWaiting();
   });
 
   // Watching an existing Solana position in its own thread.
   await step(11, "13:20", async () => {
-    const chat = await startChat("Solana");
+    const chat = await newChat("Solana");
     await say(chat, "I think Solana keeps taking share. Keep an eye on the Solana I hold.");
     await allowWaiting();
   });
 
   // Something no app covers: Auni built it by hand, and afterwards offered to ask for an app.
   await step(9, "20:15", async () => {
-    const chat = await startChat("Stake 40 of my MON with Kintsu");
+    const chat = await newChat("Stake 40 of my MON with Kintsu");
     await say(chat, "Stake 40 of my MON with Kintsu.");
     await allowWaiting();
   });
@@ -368,7 +373,7 @@ export async function seed(): Promise<void> {
   });
 
   await step(4, "18:10", async () => {
-    const chat = await startChat("Every Friday, tell me how the week went");
+    const chat = await newChat("Every Friday, tell me how the week went");
     await say(chat, "Every Friday, tell me how the week went.");
     await allowWaiting();
   });
@@ -382,7 +387,7 @@ export async function seed(): Promise<void> {
   // owner closed it.
   let trimming!: ThreadRow;
   await step(3, "19:20", async () => {
-    trimming = await startChat("Take a little off my Fed bet");
+    trimming = await newChat("Take a little off my Fed bet");
     await say(trimming, "Take a little off my Fed bet.");
     await allowWaiting();
     await closeWhatIsHeld();
@@ -390,7 +395,7 @@ export async function seed(): Promise<void> {
 
   // A move that failed, left as it is so its card shows why and what can help.
   await step(2, "10:25", async () => {
-    const chat = await startChat("Buy $400 of Coinbase");
+    const chat = await newChat("Buy $400 of Coinbase");
     await say(chat, "Buy $400 of Coinbase.");
     await allowWaiting();
   });
@@ -411,7 +416,7 @@ export async function seed(): Promise<void> {
 
   // A token that isn't a stock, bought for cash: Activity tells what it paid, got and went through.
   await step(1, "16:30", async () => {
-    await say(await startChat("Buy $30 of gold"), "Buy $30 of gold.");
+    await say(await newChat("Buy $30 of gold"), "Buy $30 of gold.");
     await allowWaiting();
   });
 
@@ -422,23 +427,23 @@ export async function seed(): Promise<void> {
     await say(trimming, "Try that sale again.");
     await allowWaiting();
     // Answered and tidied away: archived, so search finds it and History doesn't list it.
-    const asked = await startChat("How am I doing?");
+    const asked = await newChat("How am I doing?");
     await say(asked, "How am I doing?");
     await archiveChat(asked, true);
-    await say(await startChat("Buy $250 of Nvidia"), "Buy $250 of Nvidia.");
+    await say(await newChat("Buy $250 of Nvidia"), "Buy $250 of Nvidia.");
     // A plan of two moves on one card, left for one tap.
     await say(
-      await startChat("Double down on AI"),
+      await newChat("Double down on AI"),
       "I think the AI buildout has years to run. Can you run that for me with $3,000?",
     );
-    await say(await startChat("Close my bitcoin long"), "Close my bitcoin long.");
-    await say(await startChat("Sell half of my Fed bet"), "Sell half of my Fed bet.");
-    await say(await startChat("Stake 60 of my MON with Kintsu"), "Stake 60 of my MON with Kintsu.");
+    await say(await newChat("Close my bitcoin long"), "Close my bitcoin long.");
+    await say(await newChat("Sell half of my Fed bet"), "Sell half of my Fed bet.");
+    await say(await newChat("Stake 60 of my MON with Kintsu"), "Stake 60 of my MON with Kintsu.");
     await say(
-      await startChat("What's the story with SOL this week?"),
+      await newChat("What's the story with SOL this week?"),
       "What's the story with SOL this week?",
     );
-    await say(await startChat("I'm going to send some money"), "I'm going to send some money in.");
+    await say(await newChat("I'm going to send some money"), "I'm going to send some money in.");
   });
   const tookMs = Date.now() - seedBegan;
   // A demo started at a moment stands still at it from here on, so what it shows of now, today

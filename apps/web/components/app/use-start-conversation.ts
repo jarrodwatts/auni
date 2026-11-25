@@ -1,5 +1,6 @@
 "use client";
 
+import type { ThreadId } from "@auni/shared";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState, useTransition, type MouseEvent } from "react";
 import { toast } from "sonner";
@@ -18,7 +19,7 @@ import type { CarriedTake } from "@/lib/first-message";
 
 /**
  * Something new, typed in a new thread or carried in from first run's landing: the thread starts
- * with any picked model and autonomy budget, the message carries into it, and the answer streams
+ * with the message in it and any picked model and autonomy budget, and the answer streams
  * there. The launch stage holds the words on screen throughout, and a carried take's thread waits
  * for the landing's dive to land in it.
  */
@@ -44,17 +45,21 @@ export function useStartConversation() {
       const started = begin(content, carried, composerFromTop);
       if (!started) return;
 
+      // Chosen here, so this tab hears the chat's first turn from before core makes it.
+      const threadId = crypto.randomUUID() as ThreadId;
       await startInOrder({
-        createChat: () => startChat(content, options),
+        createChat: async () => {
+          const made = await threadSession(threadId, { isNew: true }).start(
+            content,
+            { id: started.messageId, sentAt: started.startedAt },
+            () => startChat({ id: threadId, messageId: started.messageId, text: content }, options),
+          );
+          return made.thread;
+        },
         welcome,
         open: async (thread) => {
           rememberThread(thread);
           continueToThread(started.id, thread);
-          // The tab's session sends it, so navigating can't cut it off.
-          void threadSession(thread.id, { isNew: true }).send(content, {
-            id: started.messageId,
-            sentAt: started.startedAt,
-          });
           const href = threadHref(thread);
           router.prefetch(href);
           await carried?.landed;
@@ -80,16 +85,7 @@ export function useStartConversation() {
         },
       });
     },
-    [
-      begin,
-      cancel,
-      continueToThread,
-      launch,
-      pathname,
-      rememberThread,
-      router,
-      welcome,
-    ],
+    [begin, cancel, continueToThread, launch, pathname, rememberThread, router, welcome],
   );
 
   return { busy: launch !== null, error, start } as const;

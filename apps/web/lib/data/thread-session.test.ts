@@ -223,6 +223,51 @@ describe("a sent message", () => {
   });
 });
 
+describe("a new thread's start", () => {
+  // Core queues the first message's turn as it makes the thread, so its first words can come
+  // before core's answer does.
+  it("hears its first turn from before core makes the thread, so none of it is missed", async () => {
+    let open = () => {};
+    live.opened = () => new Promise((resolve) => (open = resolve));
+    const thread = newThread();
+    const session = threadSession(thread, { isNew: true });
+    const create = vi.fn(async () => {
+      hear(thread, { kind: "chunks", turnId: PROMPT, chunks: answerChunks("Rates rose.") });
+      return { keyKeptOut: false };
+    });
+    const starting = session.start("Why did BTC fall?", { id: PROMPT }, create);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(create).not.toHaveBeenCalled();
+    open();
+    await starting;
+    await vi.waitFor(() => expect(textOf(thread, STORED)).toBe("Rates rose."));
+    expect(session.read().messages.map(({ id }) => id)).toEqual([PROMPT, STORED]);
+    expect(session.read().send).toEqual({
+      messageId: PROMPT,
+      text: "Why did BTC fall?",
+      failure: null,
+    });
+  });
+
+  it("leaves nothing drawn when the thread wasn't made, and says why", async () => {
+    const session = threadSession(newThread(), { isNew: true });
+    const refused = new CoreApiError({ message: "", status: 502, code: "wallet_not_made" });
+    await expect(
+      session.start("Why did BTC fall?", { id: PROMPT }, () => Promise.reject(refused)),
+    ).rejects.toBe(refused);
+    expect(session.read()).toMatchObject({ messages: [], turn: null, send: null });
+    expect(posts()).toHaveLength(0);
+  });
+
+  it("draws Auni's answer in place of a message kept out for the private key it held", async () => {
+    const thread = newThread();
+    const session = threadSession(thread, { isNew: true });
+    await session.start("my key", { id: PROMPT }, async () => ({ keyKeptOut: true }));
+    expect(session.read()).toMatchObject({ messages: [], turn: null, send: null });
+    await vi.waitFor(() => expect(reads(thread)).toBeGreaterThan(0));
+  });
+});
+
 describe("a turn core started on its own", () => {
   it("is starting from its first step, and streams under the id its answer is stored as", async () => {
     const thread = newThread();

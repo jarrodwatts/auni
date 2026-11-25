@@ -248,7 +248,8 @@ async function rowFacts(threadIds: readonly string[]) {
 
 /**
  * Every conversation, archived ones too: the web lists the rest, and opens an archived one search
- * finds. Threads with no messages (a start whose first message never arrived) stay hidden.
+ * finds. Threads with no messages yet (the main conversation, made just before Auni speaks in it)
+ * stay hidden.
  */
 export async function listThreads(): Promise<ThreadWire[]> {
   const rows = await db

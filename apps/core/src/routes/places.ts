@@ -9,15 +9,15 @@ import { makeWalletIfNone } from "../money/wallets.ts";
 
 /**
  * Every conversation with Auni is a thread. A new message from `/app/new` or
- * search starts a thread first with its initial title and composer controls.
+ * search starts one, with its initial title and composer controls.
  */
 export const placesRouter = Router();
 placesRouter.use(express.json({ limit: "64kb" }));
 
 /**
- * A new thread, titled by its first message, which the web then sends there. A new owner's first
- * take is the first thing that can lead to a move, so the wallet they didn't bring is made before
- * its chat; one that can't be made starts no chat, and they stay in first run, free to bring one.
+ * A new thread, made with its first message (conversation/places.ts). A new owner's first take is
+ * the first thing that can lead to a move, so the wallet they didn't bring is made before its
+ * chat; one that can't be made starts no chat, and they stay in first run, free to bring one.
  */
 placesRouter.post("/chat", async (req, res) => {
   const body = startChatRequestSchema.safeParse(req.body);
@@ -30,12 +30,19 @@ placesRouter.post("/chat", async (req, res) => {
       return void res.status(502).json({ error: "wallet_not_made" });
     }
   }
-  const chat = await startChat(body.data.text, {
-    ...(body.data.modelSelection !== undefined ? { modelSelection: body.data.modelSelection } : {}),
-    ...(body.data.actMode !== undefined ? { actMode: body.data.actMode } : {}),
-    ...(body.data.budgetUsd !== undefined ? { budgetUsd: body.data.budgetUsd } : {}),
-  });
-  const thread = await readThreadWire(chat.id);
+  const { id, messageId, text, modelSelection, actMode, budgetUsd } = body.data;
+  const started = await startChat(
+    { id, firstMessage: { id: messageId, text } },
+    {
+      ...(modelSelection !== undefined ? { modelSelection } : {}),
+      ...(actMode !== undefined ? { actMode } : {}),
+      ...(budgetUsd !== undefined ? { budgetUsd } : {}),
+    },
+  );
+  const thread = await readThreadWire(started.thread.id);
   if (!thread) return void res.status(404).json({ error: "thread_not_found" });
-  res.json({ thread } satisfies z.input<typeof startedChatWireSchema>);
+  res.json({
+    thread,
+    ...(started.keyKeptOut ? { keyKeptOut: true as const } : {}),
+  } satisfies z.input<typeof startedChatWireSchema>);
 });

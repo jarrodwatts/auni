@@ -30,15 +30,19 @@ export interface Jump {
 export const JumpedTo = createContext<Jump | null>(null);
 
 /**
- * For whatever has the id a search went to: it scrolls into view once it's drawn (a pane may
- * draw it only once its data is in), and whether it's still flashing.
+ * For whatever has the id a search (or a link naming it) went to: it scrolls into view once it's
+ * drawn (a pane may draw it only once its data is in), and whether it's still flashing.
  */
 export function useJumpTarget<T extends HTMLElement>(id: string | undefined) {
   const jump = useContext(JumpedTo);
   const ref = useRef<T>(null);
   const landing = jump !== null && id !== undefined && jump.target === id ? jump.n : null;
   useEffect(() => {
-    if (landing !== null) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const target = ref.current;
+    if (landing === null || !target) return;
+    // A short one sits mid-view; one taller than half the view shows from its heading down.
+    const tall = target.offsetHeight > window.innerHeight / 2;
+    target.scrollIntoView({ behavior: "smooth", block: tall ? "start" : "center" });
   }, [landing]);
   return { ref, lit: landing !== null && jump!.lit };
 }

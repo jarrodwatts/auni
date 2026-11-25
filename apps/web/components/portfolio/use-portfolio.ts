@@ -74,17 +74,22 @@ export function useTakes() {
 const NO_DEPOSITS: readonly DepositWire[] = [];
 
 /**
- * The read of a deposit wait's start mark, for the wait begun at `opened`: asked again until it
- * comes, 1s, 2s, 4s and on to every 30s apart, since a core restarting or a database blip must
- * never leave the screen unable to watch (review of 2026-11-25).
+ * For an ask Add money can't do without: asked again until it's answered, 1s, 2s, 4s and on to
+ * every 30s apart, since a core restarting or a database blip must never leave it stuck (review
+ * of 2026-11-25), and kept once answered.
  */
+export const UNTIL_ANSWERED = {
+  staleTime: Infinity,
+  retry: true,
+  retryDelay: (failures: number) => Math.min(1_000 * 2 ** failures, 30_000),
+} as const;
+
+/** The read of a deposit wait's start mark, for the wait begun at `opened`, until it comes. */
 export const depositMarkQuery = (opened: number) =>
   queryOptions({
     queryKey: ["deposit-mark", opened],
     queryFn: ({ signal }) => markDepositWait(signal),
-    staleTime: Infinity,
-    retry: true,
-    retryDelay: (failures) => Math.min(1_000 * 2 ** failures, 30_000),
+    ...UNTIL_ANSWERED,
   });
 
 /**

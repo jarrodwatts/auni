@@ -139,7 +139,7 @@ export function Portal({
     name: networkName,
     logo,
   }));
-  const { coin, usdc } = NETWORKS[network.key];
+  const { coin } = NETWORKS[network.key];
   const needOn = need ? NETWORKS[need.chain].name : null;
 
   return (
@@ -223,7 +223,9 @@ export function Portal({
             <p className="mt-3 text-center text-meta text-muted-foreground">
               {need && need.chain !== network.key
                 ? `Your card needs USDC on ${needOn}. Money sent on ${network.networkName} won't count toward it.`
-                : `${need ? "Send USDC" : usdc ? "Send USDC or any coin" : "Send any coin"} on ${network.networkName}.`}
+                : need
+                  ? `Send USDC on ${network.networkName}.`
+                  : whatToSend(network.key)}
               {/* Only where the wallet can't pay a fee yet (see feesPayable in core's fee-coin.ts). */}
               {feesPayable && !feesPayable.includes(network.key)
                 ? network.key === "solana"
@@ -285,6 +287,19 @@ export function Portal({
       </span>
     </div>
   );
+}
+
+/**
+ * What to send on a network, by the coins Auni always recognises there (its USDC, its USDT and
+ * its own coin, see coinName in core's coins.ts), then those a token list or real trading
+ * vouches for (core's recognised.ts). The watch counts only those: anyone can mint a token, so
+ * one Auni doesn't recognise lands in the wallet unannounced, and the sheet says so.
+ */
+export function whatToSend(key: NetworkKey): string {
+  const { name, usdc, usdt, coin } = NETWORKS[key];
+  const named = [usdc && "USDC", usdt && "USDT", coin.asset.symbol].filter(Boolean);
+  const coins = named.length > 1 ? `${named.slice(0, -1).join(", ")} or ${named.at(-1)}` : named[0];
+  return `Send ${coins} on ${name}, or another widely traded coin. Other coins still arrive, but may not show here.`;
 }
 
 /**

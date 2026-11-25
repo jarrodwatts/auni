@@ -22,6 +22,7 @@ import { enqueueSignalsRefresh, forceRefreshStartingPoints } from "../jobs/kinds
 import { postgresKnowsZone } from "../money/value-history.ts";
 import {
   addMissingKey,
+  makeWalletIfNone,
   missingAddress,
   noSolanaBring,
   revealWalletKeys,
@@ -215,6 +216,16 @@ meRouter.post("/keys", async (req, res) => {
   });
   if (!keys) return void res.status(409).json({ error: "no_wallet" });
   res.json({ keys });
+});
+
+/**
+ * Makes the owner's wallet when there's none yet, as Add money opens on none (a first take that
+ * couldn't make it, say), so there's always an address to send to; one there already, or made
+ * by a second tab asking at once, is the one it answers with (see makeWalletIfNone).
+ */
+meRouter.post("/wallet", async (req, res) => {
+  await makeWalletIfNone();
+  res.json(await meWire(ownerHere(req)));
 });
 
 /**

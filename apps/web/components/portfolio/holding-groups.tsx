@@ -2,13 +2,14 @@
 
 import { listed } from "@auni/shared";
 import { ChevronDown } from "lucide-react";
-import { useState, type ComponentProps } from "react";
+import { useState } from "react";
 
 import { AssetLogo } from "@/components/brand/marks";
 import { useMoney } from "@/components/money/money-provider";
 import { Card } from "@/components/ui/card";
 import { Row, Rows } from "@/components/ui/row";
 import { Section } from "@/components/ui/section";
+import type { CashPlace } from "@/lib/data/takes";
 import type { Holding } from "@/lib/data/views";
 import { formatUsdcBalance } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -18,20 +19,6 @@ import { OtherTokensDialog, OtherTokensMark } from "./other-tokens";
 import { otherTokensLabel } from "./other-tokens-text";
 
 const worth = (holding: Holding) => formatUsdcBalance(BigInt(holding.value.baseUnits));
-
-/** A row that presses: a receipt, a take's move, a fold that opens. */
-export function RowButton({ className, ...props }: ComponentProps<"button">) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "relative -mx-2 block w-[calc(100%+16px)] rounded-control px-2 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.04] focus-visible:ring-[3px] focus-visible:ring-ring/40",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
 
 /** One holding: its logo, what it is and how much, and what it's worth. */
 export function HoldingRow({ holding }: { readonly holding: Holding }) {
@@ -45,8 +32,12 @@ export function HoldingRow({ holding }: { readonly holding: Holding }) {
   );
 }
 
-/** Cash on its own: what is ready to use, and any of it still on its way between networks. */
-export function CashGroup() {
+/**
+ * Cash no take holds, by where it is, as Withdraw says it: what's in the owner's wallet, ready
+ * to use or send; what an app keeps, earning there or waiting to trade there; and any of it on
+ * its way between networks.
+ */
+export function CashGroup({ places }: { readonly places: readonly CashPlace[] }) {
   const { portfolio } = useMoney();
   if (!portfolio) return null;
   const moving = portfolio.holdings.filter(({ id }) => id === "on-the-way");
@@ -54,14 +45,21 @@ export function CashGroup() {
     <Section heading="Cash" aria-label="Cash">
       <Card>
         <Rows className="px-4 sm:px-5">
-          <li>
-            <Row
-              mark={<AssetLogo holding={portfolio.cash} size={32} />}
-              title="Cash"
-              meta={BigInt(portfolio.cash.value.baseUnits) > 0n ? "Ready to use" : "None available"}
-              end={<span className="font-medium tabular-nums">{worth(portfolio.cash)}</span>}
-            />
-          </li>
+          {places.map((place) => (
+            <li key={place.venue}>
+              <Row
+                mark={
+                  <AssetLogo
+                    holding={{ logoUrl: place.venue === "wallet" ? USDC_LOGO : place.logoUrl }}
+                    size={32}
+                  />
+                }
+                title={place.venue === "wallet" ? "In your wallet" : place.name}
+                meta={placeNote(place)}
+                end={<span className="font-medium">{formatUsdcBalance(place.value)}</span>}
+              />
+            </li>
+          ))}
           {moving.map((holding) => (
             <li key={holding.id}>
               <HoldingRow holding={holding} />
@@ -71,6 +69,13 @@ export function CashGroup() {
       </Card>
     </Section>
   );
+}
+
+const USDC_LOGO = "/brand/tokens/usdc.svg";
+
+function placeNote(place: CashPlace): string {
+  if (place.venue !== "wallet") return place.savings ? "Earning interest" : "Ready to trade there";
+  return place.value > 0n ? "Ready to use" : "None available";
 }
 
 /**
@@ -101,33 +106,34 @@ export function OtherHoldings({ loose }: { readonly loose: readonly Holding[] })
           ))}
           {folded > 0 ? (
             <li>
-              <RowButton aria-expanded={open} onClick={() => setOpen(!open)}>
-                <Row
-                  mark={<OtherTokensMark size={32} />}
-                  title="Small balances"
-                  meta={
-                    names.length > 3
-                      ? `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`
-                      : listed(names)
-                  }
-                  end={
-                    <>
-                      {dust.length > 0 ? (
-                        <span className="font-medium tabular-nums text-muted-foreground">
-                          {formatUsdcBalance(dustWorth)}
-                        </span>
-                      ) : null}
-                      <ChevronDown
-                        aria-hidden
-                        className={cn(
-                          "size-4 text-faint transition-transform duration-200 ease-settle motion-reduce:transition-none",
-                          open && "rotate-180",
-                        )}
-                      />
-                    </>
-                  }
-                />
-              </RowButton>
+              <Row
+                asChild
+                mark={<OtherTokensMark size={32} />}
+                title="Small balances"
+                meta={
+                  names.length > 3
+                    ? `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`
+                    : listed(names)
+                }
+                end={
+                  <>
+                    {dust.length > 0 ? (
+                      <span className="font-medium text-muted-foreground">
+                        {formatUsdcBalance(dustWorth)}
+                      </span>
+                    ) : null}
+                    <ChevronDown
+                      aria-hidden
+                      className={cn(
+                        "size-4 text-faint transition-transform duration-200 ease-settle motion-reduce:transition-none",
+                        open && "rotate-180",
+                      )}
+                    />
+                  </>
+                }
+              >
+                <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} />
+              </Row>
             </li>
           ) : null}
           {open
@@ -139,13 +145,14 @@ export function OtherHoldings({ loose }: { readonly loose: readonly Holding[] })
             : null}
           {open && uncounted > 0 ? (
             <li className="pl-4">
-              <RowButton onClick={() => setTokensOpen(true)}>
-                <Row
-                  mark={<OtherTokensMark size={32} />}
-                  title={otherTokensLabel(uncounted)}
-                  meta="Not counted in your total"
-                />
-              </RowButton>
+              <Row
+                asChild
+                mark={<OtherTokensMark size={32} />}
+                title={otherTokensLabel(uncounted)}
+                meta="Not counted in your total"
+              >
+                <button type="button" onClick={() => setTokensOpen(true)} />
+              </Row>
             </li>
           ) : null}
         </Rows>

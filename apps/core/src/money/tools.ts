@@ -76,7 +76,9 @@ const planLeg = z.object({
     .min(1)
     .max(200)
     .optional()
-    .describe('Optional short reason this pick belongs, e.g. "Makes the leading weight-loss drugs".'),
+    .describe(
+      'Optional short reason this pick belongs, e.g. "Makes the leading weight-loss drugs".',
+    ),
   note: z
     .string()
     .min(1)
@@ -118,7 +120,7 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
         "there, so say so before judging a total. `averageCostUsd` is what one unit cost on average; " +
         "without it, nothing records what was paid, so say that rather than judge a gain or loss " +
         "from the price alone. A perp's is its entry price, and its value is the margin in it, not " +
-        "its size. `cashFreeUsd`, when present, is Cash less what cards still waiting in the " +
+        "its size; its `unrealizedPnlUsd` is what it has made so far, as its venue says. `cashFreeUsd`, when present, is Cash less what cards still waiting in the " +
         "owner's other threads count on: plan with that.",
       inputSchema: {},
       async handler() {
@@ -347,7 +349,9 @@ function proposeActions(context: ToolTurn): AuniTool {
         .string()
         .min(1)
         .max(80)
-        .describe('What the card does, plainly: "Weight-loss drug picks" or "Close your Fed rate bets".'),
+        .describe(
+          'What the card does, plainly: "Weight-loss drug picks" or "Close your Fed rate bets".',
+        ),
       legs: z.array(planLeg).min(1).max(PLAN_LEGS),
       pays_with: payWithInput,
       replaces: replacesInput,

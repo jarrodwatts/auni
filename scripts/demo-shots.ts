@@ -181,7 +181,14 @@ const PRESS = (label: string) => `(() => {
 })()`;
 
 /** Opens the receipt of the latest move on Money. */
-const OPEN_RECEIPT = `document.querySelector('[aria-label="Recent"] ul button')?.click()`;
+const OPEN_RECEIPT: Opener = {
+  does: `(() => {
+  const row = document.querySelector('[aria-label="Recent"] ul button');
+  row?.click();
+  return row !== null;
+})()`,
+  shows: `document.querySelector('[role="dialog"]')`,
+};
 
 /** Opens the search palette, as its shortcut does. */
 const SEARCH: Opener = {

@@ -19,7 +19,7 @@ import type { Take } from "@/lib/data/takes";
 import { formatUsdcBalance } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-import { HoldingRow, RowButton } from "./holding-groups";
+import { HoldingRow } from "./holding-groups";
 import { takeTimeline } from "./money-groups";
 import { TakeChange } from "./take-change";
 
@@ -47,6 +47,7 @@ export function YourTakes({
   return (
     <Section
       heading="Your takes"
+      description={takes && takes.length > 0 ? "Change since entry" : undefined}
       aria-label="Your takes"
       action={
         <Link
@@ -66,7 +67,7 @@ export function YourTakes({
         <Skeleton className="h-[148px] w-full rounded-card" />
       ) : takes.length === 0 ? (
         <p className="text-ui text-muted-foreground">
-          No takes yet. Start a take and the positions you allow will group here.
+          No open takes. Start a take and the positions you allow will group here.
         </p>
       ) : (
         <Card className="divide-y divide-border">
@@ -97,6 +98,12 @@ function TakeRow({
   readonly onOpenMove: (move: ActivityItemWire) => void;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
+  // A link to this take opens it whenever it's followed, the page already open or not.
+  const [asked, setAsked] = useState(initiallyOpen);
+  if (asked !== initiallyOpen) {
+    setAsked(initiallyOpen);
+    if (initiallyOpen) setOpen(true);
+  }
   const row = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // The page's own scroller, never the layout around it, brings the take to the top.
@@ -109,37 +116,35 @@ function TakeRow({
   const panel = `take-${take.threadId}`;
   return (
     <div ref={row}>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panel}
-        onClick={() => setOpen(!open)}
-        className="block w-full px-4 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.03] focus-visible:bg-foreground/[0.04] sm:px-5"
+      <Row
+        asChild
+        className="mx-0 min-h-16 w-full rounded-none px-4 sm:px-5"
+        mark={<LogoStack take={take} />}
+        title={<span className="text-body">{take.title}</span>}
+        meta={listed(take.holdings.map(({ name }) => name))}
+        end={
+          <>
+            <span className="flex flex-col items-end">
+              <span className="text-body font-semibold">{formatUsdcBalance(take.value)}</span>
+              {take.change ? <TakeChange change={take.change} className="text-meta" /> : null}
+            </span>
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                "size-4 text-faint transition-transform duration-200 ease-settle motion-reduce:transition-none",
+                open && "rotate-180",
+              )}
+            />
+          </>
+        }
       >
-        <Row
-          className="min-h-16"
-          mark={<LogoStack take={take} />}
-          title={<span className="text-body">{take.title}</span>}
-          meta={listed(take.holdings.map(({ name }) => name))}
-          end={
-            <>
-              <span className="flex flex-col items-end">
-                <span className="text-body font-semibold tabular-nums">
-                  {formatUsdcBalance(take.value)}
-                </span>
-                {take.change ? <TakeChange change={take.change} className="text-meta" /> : null}
-              </span>
-              <ChevronDown
-                aria-hidden
-                className={cn(
-                  "size-4 text-faint transition-transform duration-200 ease-settle motion-reduce:transition-none max-sm:hidden",
-                  open && "rotate-180",
-                )}
-              />
-            </>
-          }
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panel}
+          onClick={() => setOpen(!open)}
         />
-      </button>
+      </Row>
       <div
         id={panel}
         className={cn(
@@ -249,28 +254,28 @@ function TimelineMove({
   readonly onOpen: () => void;
 }) {
   return (
-    <RowButton onClick={onOpen}>
-      {last ? null : (
-        <span aria-hidden className="absolute top-1/2 -bottom-1/2 left-[13px] w-px bg-border" />
-      )}
-      <Row
-        className="min-h-12 py-2"
-        mark={
-          <span
-            aria-hidden
-            className="relative flex size-2.5 rounded-full border-2 border-ink bg-card"
-          />
-        }
-        title={move.title}
-        meta={DAY.format(new Date(move.at))}
-        end={
-          move.amount ? (
-            <span className={cn("tabular-nums", TONE_CLASS_NAME[move.amount.tone])}>
-              {amountText(move.amount)}
-            </span>
-          ) : null
-        }
-      />
-    </RowButton>
+    <Row
+      asChild
+      className="relative min-h-12 py-2"
+      mark={
+        <span
+          aria-hidden
+          className="relative flex size-2.5 rounded-full border-2 border-ink bg-card"
+        />
+      }
+      title={move.title}
+      meta={DAY.format(new Date(move.at))}
+      end={
+        move.amount ? (
+          <span className={TONE_CLASS_NAME[move.amount.tone]}>{amountText(move.amount)}</span>
+        ) : null
+      }
+    >
+      <button type="button" onClick={onOpen}>
+        {last ? null : (
+          <span aria-hidden className="absolute top-1/2 -bottom-1/2 left-[13px] w-px bg-border" />
+        )}
+      </button>
+    </Row>
   );
 }

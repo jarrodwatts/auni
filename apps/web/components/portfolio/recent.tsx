@@ -14,7 +14,6 @@ import { Row } from "@/components/ui/row";
 import { Eyebrow, Section } from "@/components/ui/section";
 import { cn } from "@/lib/utils";
 
-import { RowButton } from "./holding-groups";
 import { RECENT_FILTERS, recentOf, type RecentFilter } from "./money-groups";
 
 /** How many moves show before the owner asks for more, and how many more each time. */
@@ -112,24 +111,25 @@ function RecentRow({
   readonly onOpen: () => void;
 }) {
   return (
-    <RowButton onClick={onOpen}>
-      <Row
-        mark={<ItemMark item={item} size={36} />}
-        title={
-          <span className={cn(fresh && "font-semibold")}>
-            {fresh ? <span className="sr-only">New: </span> : null}
-            {item.title}
+    <Row
+      asChild
+      mark={<ItemMark item={item} size={36} />}
+      title={
+        <span className={cn(fresh && "font-semibold")}>
+          {fresh ? <span className="sr-only">New: </span> : null}
+          {item.title}
+        </span>
+      }
+      meta={item.subtitle}
+      end={
+        item.amount ? (
+          <span className={cn("font-medium", TONE_CLASS_NAME[item.amount.tone])}>
+            {amountText(item.amount)}
           </span>
-        }
-        meta={item.subtitle}
-        end={
-          item.amount ? (
-            <span className={cn("font-medium tabular-nums", TONE_CLASS_NAME[item.amount.tone])}>
-              {amountText(item.amount)}
-            </span>
-          ) : null
-        }
-      />
-    </RowButton>
+        ) : null
+      }
+    >
+      <button type="button" onClick={onOpen} />
+    </Row>
   );
 }

@@ -2,7 +2,11 @@ import type { Take } from "@/lib/data/takes";
 import { formatUsdcChange } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-/** What a take made since it was bought, in its gain or loss colour: "+$232.29 (8.6%)". */
+/**
+ * What a take made since it was bought, in its gain or loss colour: "+$232.29 (8.6%)". Your
+ * takes says "Change since entry" over them all, so it is never read as the day's move the
+ * sidebar shows; a screen reader hears it on each.
+ */
 export function TakeChange({
   change,
   className,
@@ -16,7 +20,6 @@ export function TakeChange({
   const down = !up && !amount.startsWith("$");
   return (
     <span
-      title={`${amount} since entry`}
       className={cn(
         "whitespace-nowrap tabular-nums",
         up ? "text-positive" : down ? "text-negative" : "text-muted-foreground",

@@ -20,6 +20,7 @@ import { useMediaQuery } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
 
 import { CashGroup, OtherHoldings } from "./holding-groups";
+import { moneyView } from "./money-groups";
 import { Recent } from "./recent";
 import { TotalHero } from "./total-hero";
 import { usePortfolio, useTakes } from "./use-portfolio";
@@ -34,13 +35,19 @@ const COLUMN = "mx-auto w-full max-w-[760px] px-4 sm:px-8";
 /**
  * Money: everything the owner has, in the order they think of it. The total and its line, then
  * each take with what it holds and the moves that built it, then cash, then what no take holds,
- * then every move as a receipt. A receipt opens over the page, from the right on a wide screen
+ * then every move as a receipt, even at a zero balance: only an owner with no past at all sees
+ * the first-use prompt instead. A receipt opens over the page, from the right on a wide screen
  * and from the bottom on a phone.
  */
 export function MoneyScreen({ openTake }: { readonly openTake: ThreadId | null }) {
   const money = useMoney();
   const portfolio = usePortfolio();
+  const activity = useActivity();
   const failed = portfolio.isError && !portfolio.data;
+  const view = moneyView(
+    money.portfolio?.empty === true,
+    activity.isError && !activity.data ? null : activity.data?.items,
+  );
   const [loadedOnArrival] = useState(!money.loading);
   const reveal = !loadedOnArrival;
   return (
@@ -50,12 +57,12 @@ export function MoneyScreen({ openTake }: { readonly openTake: ThreadId | null }
         <div className={cn(COLUMN, "pt-6")}>
           <ThreadFailureNotice failure={READ_FAILURE} onRetry={() => void portfolio.refetch()} />
         </div>
-      ) : money.loading ? (
+      ) : money.loading || view === "waiting" ? (
         <MoneyLoading />
-      ) : money.portfolio?.empty ? (
+      ) : view === "first-use" ? (
         <NothingYet reveal={reveal} />
       ) : (
-        <Overview reveal={reveal} openTake={openTake} />
+        <Overview reveal={reveal} openTake={openTake} activity={activity} />
       )}
     </section>
   );
@@ -64,12 +71,13 @@ export function MoneyScreen({ openTake }: { readonly openTake: ThreadId | null }
 function Overview({
   reveal,
   openTake,
+  activity,
 }: {
   readonly reveal: boolean;
   readonly openTake: ThreadId | null;
+  readonly activity: ReturnType<typeof useActivity>;
 }) {
   const takes = useTakes();
-  const activity = useActivity();
   const { chats, archived } = usePlaces();
   const [receipt, setReceipt] = useState<ActivityItemWire | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -101,7 +109,7 @@ function Overview({
           openTake={openTake}
           onOpenMove={open}
         />
-        <CashGroup />
+        <CashGroup places={takes.data?.cash ?? []} />
         <OtherHoldings loose={takes.data?.loose ?? []} />
         <Recent activity={activity} onOpen={open} />
       </div>

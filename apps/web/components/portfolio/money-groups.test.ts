@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { usdc } from "@/lib/data/usdc";
 import type { Holding } from "@/lib/data/views";
 
-import { recentOf, splitDust, takeTimeline } from "./money-groups";
+import { moneyView, recentOf, splitDust, takeTimeline } from "./money-groups";
 
 const holding = (id: string, dollars: number): Holding => ({
   id,
@@ -55,5 +55,21 @@ describe("takeTimeline", () => {
     const { moves, earlier } = takeTimeline(items, "take");
     expect(moves.map(({ id }) => id)).toEqual(["3", "4", "5", "6"]);
     expect(earlier).toBe(2);
+  });
+});
+
+describe("moneyView", () => {
+  it("shows the first-use prompt only with no money and no past", () => {
+    expect(moneyView(true, [])).toBe("first-use");
+    expect(moneyView(false, [])).toBe("overview");
+  });
+
+  it("keeps the receipts in reach after the owner withdraws it all", () => {
+    expect(moneyView(true, [item({ kind: "move" })])).toBe("overview");
+  });
+
+  it("waits to tell while the moves are still loading, and shows the page when they can't be read", () => {
+    expect(moneyView(true, undefined)).toBe("waiting");
+    expect(moneyView(true, null)).toBe("overview");
   });
 });

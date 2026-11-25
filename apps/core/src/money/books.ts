@@ -6,7 +6,15 @@ import { isMargined } from "../apps/registry.ts";
 import { fillIdentity, QUANTITY_DECIMALS } from "./fill-key.ts";
 import { unitUsd } from "./format.ts";
 import type { Holding, OnItsWay, Portfolio } from "./portfolio.ts";
-import { centsToUsd, formatUnits, parseUnits, signedUnits, sumUsd, usdToCents } from "./usd.ts";
+import {
+  centsToUsd,
+  formatUnits,
+  parseUnits,
+  signedUnits,
+  signedUsdToCents,
+  sumUsd,
+  usdToCents,
+} from "./usd.ts";
 
 // The books: who holds what by the fills Auni recorded, what a sale or a shared fill leaves
 // each thread, and what the fills paid. All pure but for allFills, the one read they start from.
@@ -213,23 +221,25 @@ export function allFills(q: Pick<Tx, "select">) {
     .orderBy(asc(fills.createdAt), asc(fills.id));
 }
 
-type BookFill = Pick<
-  PotFill & { threadId: string | null },
-  "threadId" | "chain" | "instrument" | "side" | "quantity"
->;
+type BookFill = PotFill & { readonly threadId: string | null };
 
 /**
  * Each thread's net filled quantity of each holding, keyed by `fillIdentity`
  * in QUANTITY_DECIMALS units, ordered by each thread's first fill.
  */
-export function threadBooks(from: readonly BookFill[]): Map<string, Map<string, bigint>> {
+export function threadBooks(
+  from: readonly Omit<BookFill, "usdValue">[],
+): Map<string, Map<string, bigint>> {
   const books = new Map<string, Map<string, bigint>>();
   for (const fill of from) addToBooks(books, fill);
   return books;
 }
 
 /** Adds one more fill, the newest, to threadBooks' books. */
-export function addToBooks(books: Map<string, Map<string, bigint>>, fill: BookFill): void {
+export function addToBooks(
+  books: Map<string, Map<string, bigint>>,
+  fill: Omit<BookFill, "usdValue">,
+): void {
   if (!fill.threadId) return;
   const book = books.get(fill.threadId) ?? new Map<string, bigint>();
   const key = fillIdentity(fill);
@@ -271,64 +281,144 @@ export function holdersOf(
 }
 
 /**
- * The share of each live holding that belongs to one thread by its fills,
- * capped at what the wallet really holds, for the thread inspector and agent context.
+ * Who a move's buys belong to, from who owned what it sold: another thread's holding sold
+ * buys for that thread, so its books follow it; the owner's own loose holding sold buys for
+ * the thread that made the move (`place`), as their loose cash would.
  */
-export function holdingsOfThread(
-  threadId: string,
-  holdings: readonly Holding[],
-  everyFill: readonly BookFill[],
-): Holding[] {
-  return holdingsByThread(holdings, everyFill).threads.get(threadId) ?? [];
+export function buyersOf(
+  sellers: readonly (readonly [string | null, bigint])[],
+  place: string | null,
+): (readonly [string | null, bigint])[] {
+  const merged = new Map<string | null, bigint>();
+  for (const [owner, units] of sellers) {
+    const buyer = owner ?? place;
+    merged.set(buyer, (merged.get(buyer) ?? 0n) + units);
+  }
+  return [...merged];
 }
 
 /**
  * Each live holding split among the threads whose fills hold it, in order of each thread's
  * first fill as far as the wallet goes (see holdersOf), and what no thread holds: so the
- * threads' shares and the rest add up to the wallet, and every screen gives a thread the same.
+ * threads' shares and the rest add up to the wallet, to the cent, and every screen gives a
+ * thread the same. Each share costs what its own fills paid (see paidFor), never the wallet's
+ * average: two takes that bought one stock at $100 and $200 each keep their own price, and
+ * the owner's own buys of it change neither.
  */
 export function holdingsByThread(
   holdings: readonly Holding[],
   everyFill: readonly BookFill[],
 ): { threads: Map<string, Holding[]>; loose: Holding[] } {
   const books = threadBooks(everyFill);
+  const paid = new Map(
+    [...Map.groupBy(everyFill, (fill) => fill.threadId)].map(([owner, own]) => [
+      owner,
+      purchases(own),
+    ]),
+  );
   const threads = new Map<string, Holding[]>();
   const loose: Holding[] = [];
   for (const holding of holdings) {
     const total = parseUnits(holding.quantity, QUANTITY_DECIMALS);
     if (total === 0n) continue;
-    const held = holdersOf(holding.short ? -total : total, books, fillIdentity(holding));
-    for (const [threadId, units] of held.threads)
-      threads.set(threadId, [...(threads.get(threadId) ?? []), shareOf(holding, units, total)]);
-    if (held.other > 0n) loose.push(shareOf(holding, held.other, total));
+    const key = fillIdentity(holding);
+    const held = holdersOf(holding.short ? -total : total, books, key);
+    const owners = [...held.threads, ...(held.other > 0n ? [[null, held.other] as const] : [])];
+    for (const [owner, share] of sharesOf(holding, owners, total)) {
+      const costed = paidFor(share, paid.get(owner)?.get(key));
+      if (owner === null) loose.push(costed);
+      else threads.set(owner, [...(threads.get(owner) ?? []), costed]);
+    }
   }
   return { threads, loose };
 }
 
-/** `units` of a holding's `total` (both in QUANTITY_DECIMALS units), its value in proportion. */
-function shareOf(holding: Holding, units: bigint, total: bigint): Holding {
-  if (units === total) return holding;
-  const cents = holding.usdValue === null ? null : usdToCents(holding.usdValue);
-  return {
-    ...holding,
-    quantity: formatUnits(
-      units / 10n ** BigInt(QUANTITY_DECIMALS - holding.decimals),
-      holding.decimals,
-    ),
-    usdValue: cents === null ? null : centsToUsd((cents * units) / total),
+/**
+ * A holding cut into each owner's `units` of its `total` (both in QUANTITY_DECIMALS units),
+ * its value and what it has made in proportion, the last share taking what rounding leaves,
+ * so the shares add up to the holding exactly.
+ */
+function sharesOf<Owner>(
+  holding: Holding,
+  owners: readonly (readonly [Owner, bigint])[],
+  total: bigint,
+): [Owner, Holding][] {
+  if (owners.length === 1 && owners[0]![1] === total) return [[owners[0]![0], holding]];
+  const whole = {
+    value: holding.usdValue === null ? null : usdToCents(holding.usdValue),
+    made:
+      holding.unrealizedPnlUsd === undefined ? null : signedUsdToCents(holding.unrealizedPnlUsd),
   };
+  const left = { ...whole };
+  return owners.map(([owner, units], index) => {
+    const last = index === owners.length - 1;
+    const part = (key: keyof typeof whole) => {
+      const all = whole[key];
+      if (all === null) return null;
+      const piece = last ? left[key]! : (all * units) / total;
+      left[key] = left[key]! - piece;
+      return centsToUsd(piece);
+    };
+    const value = part("value");
+    const made = part("made");
+    return [
+      owner,
+      {
+        ...holding,
+        quantity: formatUnits(
+          units / 10n ** BigInt(QUANTITY_DECIMALS - holding.decimals),
+          holding.decimals,
+        ),
+        usdValue: value,
+        ...(made === null ? {} : { unrealizedPnlUsd: made }),
+      },
+    ];
+  });
 }
 
 /**
- * What a holding cost, in cents, from what one unit cost on average: a perp's is the margin its
- * entry put up (its size at the entry price over its leverage), so what it made is its value
- * less that. Null when nothing records the cost, or it has no price now to compare.
+ * A share of a holding with what its owner's own fills paid for it (`book`, see purchases):
+ * their average, where they bought at least what the share is; else nothing records its cost.
+ * A perp keeps its venue's entry price and what the venue says it has made, in proportion
+ * (see sharesOf), since its fills are its size, not the margin it put up.
  */
-export function costCents(holding: Holding): bigint | null {
+function paidFor(share: Holding, book: { held: bigint; cost: bigint } | undefined): Holding {
+  if (isMargined(share)) return share;
+  const rest = unpaid(share);
+  const units = parseUnits(share.quantity, QUANTITY_DECIMALS);
+  if (!book || units === 0n || book.held < units) return rest;
+  // Its cost is in cents carried 18 places further (FINE_CENTS); the average, in dollars to 12.
+  return { ...rest, averageCostUsd: formatUnits((book.cost * 10n ** 10n) / book.held, 12) };
+}
+
+/** A holding with nothing recording what it cost. */
+const unpaid = ({ averageCostUsd: _, ...rest }: Holding): Holding => rest;
+
+/**
+ * What a holding has made since it was bought, and what it cost, in cents. A perp's gain is
+ * what its venue says it has made so far, over the margin its entry put up (its size at the
+ * entry price over its leverage); anything else's is its value now less what its units cost at
+ * their average. Null when nothing records the cost or the gain, or it has no price now.
+ */
+export function gainOf(holding: Holding): { costCents: bigint; changeCents: bigint } | null {
   if (!holding.averageCostUsd || holding.usdValue === null) return null;
-  const units = Number(holding.quantity) * Number(holding.averageCostUsd);
-  const cost = isMargined(holding) ? units / (holding.leverage ?? 1) : units;
-  return Number.isFinite(cost) ? BigInt(Math.round(cost * 100)) : null;
+  const margined = isMargined(holding);
+  const made = margined ? holding.unrealizedPnlUsd : undefined;
+  if (margined && made === undefined) return null;
+  // Units to 18 places times dollars to 12 is cents 28 places further, over the leverage (to
+  // three places) for a perp, rounded once to the nearest cent.
+  const leverage = margined ? BigInt(Math.round((holding.leverage ?? 1) * 1000)) : 1000n;
+  const fine =
+    parseUnits(holding.quantity, QUANTITY_DECIMALS) *
+    parseUnits(holding.averageCostUsd, 12) *
+    1000n;
+  const scale = 10n ** 28n * leverage;
+  const costCents = (fine + scale / 2n) / scale;
+  return {
+    costCents,
+    changeCents:
+      made === undefined ? usdToCents(holding.usdValue) - costCents : signedUsdToCents(made),
+  };
 }
 
 /** Cents carried 18 places further, so the cost left after selling most of something stays exact. */

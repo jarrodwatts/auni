@@ -21,11 +21,25 @@ export interface Take {
   readonly holdings: readonly Holding[];
 }
 
+/** Cash no take holds, in one place: the owner's own wallets, or an app that keeps some. */
+export interface CashPlace {
+  /** "wallet" for the owner's own wallets, which Withdraw sends from; else the app's id. */
+  readonly venue: string;
+  readonly name: string;
+  readonly logoUrl: string | null;
+  /** It earns there, rather than waiting to trade there. */
+  readonly savings: boolean;
+  /** In USDC base units. */
+  readonly value: bigint;
+}
+
 export interface Takes {
   /** Largest first. */
   readonly takes: readonly Take[];
-  /** What no take holds, largest first. */
+  /** What no take holds and isn't cash, largest first. */
   readonly loose: readonly Holding[];
+  /** The owner's own wallets first, always; then each app that keeps some, largest first. */
+  readonly cash: readonly CashPlace[];
 }
 
 export async function getTakes(signal?: AbortSignal): Promise<Takes> {
@@ -39,6 +53,10 @@ export async function getTakes(signal?: AbortSignal): Promise<Takes> {
       holdings: take.holdings.map(toHolding),
     })),
     loose: body.loose.map(toHolding),
+    cash: body.cash.map(({ usdValue, ...place }) => ({
+      ...place,
+      value: dollarsToBaseUnits(usdValue),
+    })),
   };
 }
 

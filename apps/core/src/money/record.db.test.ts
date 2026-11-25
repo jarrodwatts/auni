@@ -252,6 +252,38 @@ describe("recordResult", () => {
     );
   });
 
+  it("gives a thread what it bought with the owner's loose holding", async () => {
+    // "Stake 40 of my MON with Kintsu": the MON was the owner's own, the sMON is this take's.
+    const kintsu = await insertThread();
+    const stake = await insertAction({
+      threadId: kintsu.id,
+      tool: "send_evm_transaction",
+      details: { [APPROVED_SALE_OF]: "monad:native" },
+    });
+    await recordResult(
+      stake,
+      {
+        txs: [],
+        fills: [
+          { chain: "monad", instrument: "native", side: "sell", quantity: "40", usdValue: "15.38" },
+          { chain: "monad", instrument: "0xsmon", side: "buy", quantity: "40", usdValue: "15.38" },
+        ],
+      },
+      { units: parseUnits("100", QUANTITY_DECIMALS), readAt: Date.now() },
+    );
+    expect(
+      await db
+        .select({ threadId: fills.threadId, instrument: fills.instrument })
+        .from(fills)
+        .where(eq(fills.actionId, stake.id)),
+    ).toEqual(
+      expect.arrayContaining([
+        { threadId: null, instrument: "native" },
+        { threadId: kintsu.id, instrument: "0xsmon" },
+      ]),
+    );
+  });
+
   it("writes what a card converts to pay for its picks to no thread, though it holds the same token", async () => {
     const ai = await insertThread();
     const bought = await insertAction({ threadId: ai.id, status: "done" });

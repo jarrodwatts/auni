@@ -29,7 +29,7 @@ const nvidia: Holding = {
   averageCostUsd: "100",
 };
 
-/** 0.01 BTC long at 3x, entered at $60,000 (so $200 of margin), now worth $250. */
+/** 0.01 BTC long at 3x, entered at $60,000 (so $200 of margin), now worth $250: $50 made, says the venue. */
 const btcLong: Holding = {
   venue: "hyperliquid",
   chain: "hyperliquid",
@@ -42,6 +42,7 @@ const btcLong: Holding = {
   priceId: null,
   leverage: 3,
   averageCostUsd: "60000",
+  unrealizedPnlUsd: "50.00",
 };
 
 const cash: Holding = {
@@ -56,13 +57,16 @@ const cash: Holding = {
   priceId: null,
 };
 
+/** What the wallet and its venues hold in each test. */
+const wallet = vi.hoisted(() => ({ holdings: [] as Holding[] }));
+
 vi.mock("./portfolio.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   portfolioNow: () =>
     Promise.resolve(
       buildPortfolio({
         observedAt: new Date(),
-        holdings: [nvidia, btcLong, cash],
+        holdings: wallet.holdings,
         onItsWay: [],
         unavailable: [],
         looking: [],
@@ -91,6 +95,7 @@ const url = serve(express().use("/owner", ownerRouter).use("/takes", requireOwne
 let cookie = "";
 beforeEach(async () => {
   await wipe(ownerSessions, threads, fills);
+  wallet.holdings = [nvidia, btcLong, cash];
   const { mintPairingCode } = await import("../auth/owner.ts");
   const paired = await fetch(url("/owner/pair"), {
     method: "POST",
@@ -173,5 +178,69 @@ describe("GET /takes", () => {
     ]);
     // No share of Nvidia is left over, and the long no take bought is the owner's own.
     expect(loose).toEqual([expect.objectContaining({ name: "BTC" })]);
+  });
+
+  it("costs each take what its own fills paid, whatever the owner bought beside it", async () => {
+    const low = await insertThread({ title: "Bought low" });
+    const high = await insertThread({ title: "Bought high" });
+    // 3 shares at $120 now: one each take bought, at $100 and $200, and one bought loose at $90.
+    wallet.holdings = [{ ...nvidia, quantity: "3", usdValue: "360.00", averageCostUsd: "130" }];
+    await bought(low.id, nvidia, "1", "100.00");
+    await bought(high.id, nvidia, "1", "200.00");
+    await bought(null, nvidia, "1", "90.00");
+
+    const { takes, loose } = await read();
+
+    expect(
+      takes.map(({ title, valueUsd, changeUsd, costUsd }) => [title, valueUsd, changeUsd, costUsd]),
+    ).toEqual([
+      ["Bought low", "120.00", "20.00", "100.00"],
+      ["Bought high", "120.00", "-80.00", "200.00"],
+    ]);
+    expect(loose).toEqual([expect.objectContaining({ name: "NVDAx", usdValue: "120.00" })]);
+  });
+
+  it("puts savings a take bought under it, and the rest of the cash by where it sits", async () => {
+    const earning = await insertThread({ title: "Keep my idle cash earning" });
+    const aave = {
+      venue: "aave",
+      chain: "monad",
+      instrument: "0x35a73BAcb179d3740395A3ceCc87FF2e581d6042",
+      symbol: "aUSDC",
+      decimals: 6,
+      cash: true,
+      priceId: null,
+    } as const;
+    wallet.holdings = [
+      cash,
+      { ...aave, quantity: "4100", usdValue: "4100.00" },
+      {
+        ...cash,
+        venue: "hyperliquid",
+        chain: "hyperliquid",
+        instrument: "USDC",
+        quantity: "950.15",
+        usdValue: "950.15",
+      },
+    ];
+    await bought(earning.id, aave, "4000", "4000.00");
+
+    const { takes, loose, cash: places } = await read();
+
+    expect(takes).toEqual([
+      expect.objectContaining({ title: "Keep my idle cash earning", valueUsd: "4000.00" }),
+    ]);
+    // Cash is never a holding of no take's.
+    expect(loose).toEqual([]);
+    expect(places).toEqual([
+      { venue: "wallet", name: "Your wallet", logoUrl: null, savings: false, usdValue: "500.00" },
+      expect.objectContaining({
+        venue: "hyperliquid",
+        name: "Hyperliquid",
+        savings: false,
+        usdValue: "950.15",
+      }),
+      expect.objectContaining({ venue: "aave", name: "Aave", savings: true, usdValue: "100.00" }),
+    ]);
   });
 });

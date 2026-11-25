@@ -17,6 +17,21 @@ export function splitDust(
   };
 }
 
+/**
+ * What Money opens on: the first-use prompt only for an owner with nothing and no past (no
+ * balance and not one move), never for one who withdrew it all, whose receipts stay in Recent;
+ * a wait while the moves are still loading. Moves that couldn't be read (null) can't say there
+ * are none, so the page shows, with Recent saying it couldn't load them.
+ */
+export function moneyView(
+  empty: boolean,
+  moves: readonly ActivityItemWire[] | null | undefined,
+): "first-use" | "overview" | "waiting" {
+  if (!empty || moves === null) return "overview";
+  if (moves === undefined) return "waiting";
+  return moves.length === 0 ? "first-use" : "overview";
+}
+
 /** What the owner can narrow Recent to. */
 export const RECENT_FILTERS = [
   { value: "all", name: "All" },

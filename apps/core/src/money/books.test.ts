@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { savingsTokens } from "../apps/registry.ts";
 import {
   buildPortfolio,
-  costCents,
+  buyersOf,
+  gainOf,
   holdersOf,
-  holdingsOfThread,
+  holdingsByThread,
   ownedMoveFills,
   saleOwners,
   sharedFill,
@@ -67,7 +68,7 @@ describe("buildPortfolio", () => {
   });
 });
 
-describe("holdingsOfThread", () => {
+describe("holdingsByThread", () => {
   const btcShort: Holding = {
     venue: "hyperliquid",
     chain: "hyperliquid",
@@ -80,6 +81,11 @@ describe("holdingsOfThread", () => {
     priceId: null,
     short: true,
   };
+  const ofThread = (
+    threadId: string,
+    holdings: Holding[],
+    fills: Parameters<typeof holdingsByThread>[1],
+  ) => holdingsByThread(holdings, fills).threads.get(threadId) ?? [];
 
   it("attributes a short to the thread whose sell opened it, never to a buyer", () => {
     const sellFill = {
@@ -88,14 +94,143 @@ describe("holdingsOfThread", () => {
       instrument: "BTC",
       side: "sell" as const,
       quantity: "0.00023",
+      usdValue: "20.00",
     };
     const buyFill = { ...sellFill, side: "buy" as const };
-    expect(holdingsOfThread("btc", [btcShort], [sellFill])).toEqual([btcShort]);
-    expect(holdingsOfThread("btc", [btcShort], [buyFill])).toEqual([]);
+    expect(ofThread("btc", [btcShort], [sellFill])).toEqual([btcShort]);
+    expect(ofThread("btc", [btcShort], [buyFill])).toEqual([]);
+  });
+
+  /** Nvidia shares in the wallet, worth $150 each, and the wallet's own average from every fill. */
+  const nvidia = (quantity: string, averageCostUsd?: string): Holding => ({
+    venue: "wallet",
+    chain: "monad",
+    instrument: "0xnvda",
+    symbol: "NVDAx",
+    quantity,
+    decimals: 18,
+    usdValue: (Number(quantity) * 150).toFixed(2),
+    cash: false,
+    priceId: null,
+    ...(averageCostUsd ? { averageCostUsd } : {}),
+  });
+  const bought = (
+    threadId: string | null,
+    side: "buy" | "sell",
+    quantity: string,
+    usd: string,
+  ) => ({
+    threadId,
+    ...fill(side, quantity, usd, "0xnvda", "monad"),
+  });
+  const gains = (split: ReturnType<typeof holdingsByThread>) =>
+    Object.fromEntries(
+      [...split.threads].map(([id, held]) => [
+        id,
+        held.map((holding) => {
+          const gain = gainOf(holding)!;
+          return { cost: gain.costCents, change: gain.changeCents };
+        }),
+      ]),
+    );
+
+  it("costs each take what its own fills paid, never the wallet's average", () => {
+    // A bought one at $100 and B one at $200: the wallet's average is $150, and they're worth $150.
+    const split = holdingsByThread(
+      [nvidia("2", "150")],
+      [bought("A", "buy", "1", "100.00"), bought("B", "buy", "1", "200.00")],
+    );
+    expect(gains(split)).toEqual({
+      A: [{ cost: 10_000n, change: 5_000n }],
+      B: [{ cost: 20_000n, change: -5_000n }],
+    });
+  });
+
+  it("keeps a take's cost when the owner buys more of it outside any take", () => {
+    // A bought 2 for $200 and sold 1; then 1 was bought loose for $120.
+    const split = holdingsByThread(
+      [nvidia("2")],
+      [
+        bought("A", "buy", "2", "200.00"),
+        bought("A", "sell", "1", "150.00"),
+        bought(null, "buy", "1", "120.00"),
+      ],
+    );
+    expect(gains(split)).toEqual({ A: [{ cost: 10_000n, change: 5_000n }] });
+    expect(split.loose.map(({ quantity }) => quantity)).toEqual(["1"]);
+  });
+
+  it("knows a take's cost though some of the holding came from elsewhere", () => {
+    // 5 sent in from an exchange, and 10 a take bought at $100: the wallet's own cost is unknown.
+    const split = holdingsByThread([nvidia("15")], [bought("A", "buy", "10", "1000.00")]);
+    expect(gains(split)).toEqual({ A: [{ cost: 100_000n, change: 50_000n }] });
+    expect(split.loose.map((holding) => [holding.quantity, gainOf(holding)])).toEqual([
+      ["5", null],
+    ]);
+  });
+
+  it("adds the shares up to the wallet, to the cent", () => {
+    const split = holdingsByThread(
+      [{ ...nvidia("3"), usdValue: "100.00" }],
+      ["A", "B", "C"].map((id) => bought(id, "buy", "1", "10.00")),
+    );
+    const cents = [...split.threads.values(), split.loose]
+      .flat()
+      .reduce((sum, holding) => sum + BigInt(Math.round(Number(holding.usdValue) * 100)), 0n);
+    expect(cents).toBe(10_000n);
+  });
+
+  it("gives a take its share of what the venue says a perp made", () => {
+    // 0.02 BTC long at 3x from $60,000: $400 of margin, now worth $450, $50 made by the venue.
+    const long: Holding = {
+      venue: "hyperliquid",
+      chain: "hyperliquid",
+      instrument: "BTC",
+      symbol: "BTC",
+      quantity: "0.02",
+      decimals: 18,
+      usdValue: "450.00",
+      cash: false,
+      priceId: null,
+      leverage: 3,
+      averageCostUsd: "60000",
+      unrealizedPnlUsd: "50.01",
+    };
+    const perp = (threadId: string) => ({
+      threadId,
+      ...fill("buy", "0.01", "600.00", "BTC", "hyperliquid"),
+    });
+    const split = holdingsByThread([long], [perp("A"), perp("B")]);
+    // Each holds half: $200 of margin, and half the venue's $50.01, the last share the odd cent.
+    expect(gains(split)).toEqual({
+      A: [{ cost: 20_000n, change: 2_500n }],
+      B: [{ cost: 20_000n, change: 2_501n }],
+    });
   });
 });
 
-describe("costCents", () => {
+describe("buyersOf", () => {
+  it("gives what a sale of the owner's loose holding bought to the thread that made it", () => {
+    expect(buyersOf([[null, 40n]], "kintsu")).toEqual([["kintsu", 40n]]);
+    expect(
+      buyersOf(
+        [
+          ["kintsu", 10n],
+          [null, 30n],
+          ["ai", 5n],
+        ],
+        "kintsu",
+      ),
+    ).toEqual([
+      ["kintsu", 40n],
+      ["ai", 5n],
+    ]);
+    // Converting to cash belongs to no thread, and neither does what it brings in.
+    expect(buyersOf([[null, 40n]], null)).toEqual([[null, 40n]]);
+  });
+});
+
+describe("gainOf", () => {
   const held = (fields: Partial<Holding>): Holding => ({
     venue: "wallet",
     chain: "monad",
@@ -109,18 +244,34 @@ describe("costCents", () => {
     ...fields,
   });
 
-  it("is what the units cost at their average", () => {
-    expect(costCents(held({ averageCostUsd: "100.505" }))).toBe(20_101n);
+  it("is what the units cost at their average, against their value now", () => {
+    expect(gainOf(held({ averageCostUsd: "100.505" }))).toEqual({
+      costCents: 20_101n,
+      changeCents: 4_899n,
+    });
   });
 
-  it("is a perp's margin: its size at the entry price over its leverage", () => {
+  it("is what the venue says a perp made, over the margin its entry put up", () => {
     const long = { venue: "hyperliquid", chain: "hyperliquid", instrument: "BTC", leverage: 3 };
-    expect(costCents(held({ ...long, quantity: "0.01", averageCostUsd: "60000" }))).toBe(20_000n);
+    // Worth $190 with extra margin added, yet $12.50 down by the venue: never value less margin.
+    expect(
+      gainOf(
+        held({
+          ...long,
+          quantity: "0.01",
+          averageCostUsd: "60000",
+          usdValue: "190.00",
+          unrealizedPnlUsd: "-12.50",
+        }),
+      ),
+    ).toEqual({ costCents: 20_000n, changeCents: -1_250n });
+    // What the venue doesn't say, Auni doesn't work out.
+    expect(gainOf(held({ ...long, quantity: "0.01", averageCostUsd: "60000" }))).toBeNull();
   });
 
   it("is unknown without an average cost or a price now", () => {
-    expect(costCents(held({}))).toBeNull();
-    expect(costCents(held({ averageCostUsd: "100", usdValue: null }))).toBeNull();
+    expect(gainOf(held({}))).toBeNull();
+    expect(gainOf(held({ averageCostUsd: "100", usdValue: null }))).toBeNull();
   });
 });
 

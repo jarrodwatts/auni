@@ -15,21 +15,17 @@ export const placesRouter = Router();
 placesRouter.use(express.json({ limit: "64kb" }));
 
 /**
- * A new thread, made with its first message (conversation/places.ts). A new owner's first take is
- * the first thing that can lead to a move, so the wallet they didn't bring is made before its
- * chat; one that can't be made starts no chat, and they stay in first run, free to bring one.
+ * A new thread, made with its first message (conversation/places.ts). A new owner's first take
+ * makes the wallet they didn't bring, so it's there to add money to. One that can't be made now
+ * never stops the chat: a question needs no wallet, and the first move makes it (money/actions.ts).
  */
 placesRouter.post("/chat", async (req, res) => {
   const body = startChatRequestSchema.safeParse(req.body);
   if (!body.success) return void res.status(400).json({ error: "invalid_body" });
-  if ((await theOwner()).welcomedAt === null) {
-    try {
-      await makeWalletIfNone();
-    } catch (error) {
-      console.error("The owner's wallet couldn't be made:", error);
-      return void res.status(502).json({ error: "wallet_not_made" });
-    }
-  }
+  if ((await theOwner()).welcomedAt === null)
+    await makeWalletIfNone().catch((error: unknown) =>
+      console.error("The owner's wallet couldn't be made yet:", error),
+    );
   const { id, messageId, text, modelSelection, actMode, budgetUsd } = body.data;
   const started = await startChat(
     { id, firstMessage: { id: messageId, text } },

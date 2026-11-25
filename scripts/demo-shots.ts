@@ -238,6 +238,24 @@ const BRING_WALLET: Opener = {
   shows: `document.querySelector('[role="dialog"]')`,
 };
 
+/**
+ * A first take whose start is asked for twice and both answers are lost (neither reaches core
+ * here), from the first starting point: its words back in the box, and the line under it.
+ */
+const START_LOST: Opener = {
+  does: `(() => {
+  const real = globalThis.fetch;
+  globalThis.fetch = (input, init) =>
+    new URL(typeof input === "string" ? input : input.url, location.href).pathname === "/core/places/chat"
+      ? Promise.reject(new TypeError("Failed to fetch"))
+      : real(input, init);
+  const point = [...document.querySelectorAll("li > button")].find((el) => el.getClientRects().length > 0);
+  point?.click();
+  return Boolean(point);
+})()`,
+  shows: `[...document.querySelectorAll('[role="alert"]')].some((el) => el.textContent?.includes("couldn't confirm"))`,
+};
+
 /** The AI's sign-in under way, as its Cancel shows. */
 const SIGNING_IN = `[...document.querySelectorAll("button")].some((el) => el.textContent?.trim() === "Cancel")`;
 
@@ -446,10 +464,10 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
 }
 
 /**
- * First run, as a new owner meets it (`auni demo --first-run`): their first take's question, as
- * one who made a wallet already sees it and as one with none yet does (`--no-wallet`, with the
- * dialog to bring one), and, with their AI not yet signed in (`--signed-out`), its ask for one and
- * the sign-in it starts.
+ * First run, as a new owner meets it (`auni demo --first-run`): their first take's question (and
+ * what it says when both answers to its start are lost), as one who made a wallet already sees it
+ * and as one with none yet does (`--no-wallet`, with the dialog to bring one), and, with their AI
+ * not yet signed in (`--signed-out`), its ask for one and the sign-in it starts.
  */
 async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
   for (const mode of ["wallet", "no-wallet", "signed-out"] as const) {
@@ -468,6 +486,9 @@ async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise
       await page.until("location.pathname.startsWith('/app') && !location.hash");
       if (mode === "wallet") {
         await take(page, out, "first-run", `${origin}/app/new`, "top");
+        await take(page, out, "first-run-start-lost", `${origin}/app/new`, "top", START_LOST, {
+          once: true,
+        });
         continue;
       }
       if (mode === "no-wallet") {

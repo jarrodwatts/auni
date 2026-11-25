@@ -33,19 +33,8 @@ describe("starting a chat from the owner's words", () => {
     expect(done).toEqual(["create", "welcome", "opened chat"]);
   });
 
-  it("says the wallet couldn't be made when that's what stopped the chat", async () => {
-    const { done, steps: all } = steps(
-      new CoreApiError({ message: "", status: 502, code: "wallet_not_made" }),
-    );
-    await startInOrder(all);
-    expect(done).toEqual([
-      "create",
-      "give back: Auni couldn't make your wallet, so this chat didn't start. Your words are back in the box to send again.",
-    ]);
-  });
-
-  it("says the chat couldn't start when the chat itself failed", async () => {
-    const { done, steps: all } = steps(new CoreApiError({ message: "", status: 500 }));
+  it("gives the words back with why when the chat didn't start", async () => {
+    const { done, steps: all } = steps(new CoreApiError({ message: "", status: 400 }));
     await startInOrder(all);
     expect(done).toEqual([
       "create",

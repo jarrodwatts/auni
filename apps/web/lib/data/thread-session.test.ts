@@ -251,7 +251,7 @@ describe("a new thread's start", () => {
 
   it("leaves nothing drawn when the thread wasn't made, and says why", async () => {
     const session = threadSession(newThread(), { isNew: true });
-    const refused = new CoreApiError({ message: "", status: 502, code: "wallet_not_made" });
+    const refused = new CoreApiError({ message: "", status: 400, code: "invalid_body" });
     await expect(
       session.start("Why did BTC fall?", { id: PROMPT }, () => Promise.reject(refused)),
     ).rejects.toBe(refused);

@@ -21,9 +21,21 @@ export interface StartChatOptions {
 }
 
 /**
+ * Neither ask to start a chat was answered with it: core may have made it all the same, and the
+ * same words sent again (the same ids, see start-ids.ts) open it, or start it now if it wasn't.
+ */
+export class StartUnconfirmed extends Error {
+  constructor(cause: unknown) {
+    super("The chat's start wasn't confirmed.", { cause });
+    this.name = "StartUnconfirmed";
+  }
+}
+
+/**
  * A new thread with Auni, made with its first message: titled by it, with any starting settings,
  * and that message's turn queued. A lost answer or a server fault may still have made it, so it's
- * asked for once more, which core makes once (the same ids); a refusal comes back at once.
+ * asked for once more, which core makes once (the same ids), and failing again it's unconfirmed;
+ * a refusal comes back at once.
  */
 export async function startChat(
   start: { readonly id: ThreadId; readonly messageId: string; readonly text: string },
@@ -38,7 +50,10 @@ export async function startChat(
   const ask = () => requestCore("places/chat", { method: "POST", body: JSON.stringify(body) });
   const answer = await ask().catch((error: unknown) => {
     if (error instanceof CoreApiError && error.status < 500) throw error;
-    return ask();
+    // The first may have gone through, so even a refusal now proves nothing.
+    return ask().catch((again: unknown) => {
+      throw new StartUnconfirmed(again);
+    });
   });
   const { thread, keyKeptOut } = startedChatWireSchema.parse(answer);
   return { thread: toThread(thread), keyKeptOut: keyKeptOut === true };

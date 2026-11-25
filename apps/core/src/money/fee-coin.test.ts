@@ -38,6 +38,7 @@ vi.mock(import("./wallets.ts"), async (original) => ({
   ...(await original()),
   evmAddress: async () => "0x2222222222222222222222222222222222222222",
   paysOwnGas: async (chain: number | "solana") => chain !== NETWORKS.base.viem.id,
+  makeWalletIfNone: async () => {},
 }));
 vi.mock(import("./gas.ts"), () => ({ ownGas: vi.fn(), ownGasFees: vi.fn() }));
 

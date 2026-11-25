@@ -830,10 +830,13 @@ export class WalletExists extends Error {
   }
 }
 
-/** There is no wallet yet: one is made with the owner's first take, unless they bring theirs. */
+/**
+ * There is no wallet yet: one is made with the owner's first take, unless they bring theirs, or
+ * by the first move when it couldn't be then.
+ */
 export class NoWallet extends Error {
   constructor() {
-    super("There's no wallet yet: Auni makes one with your first take.");
+    super("There's no wallet yet: Auni makes one when a move first needs it.");
   }
 }
 

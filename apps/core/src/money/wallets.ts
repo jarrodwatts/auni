@@ -1,6 +1,7 @@
 import { SOLANA_BRING_FIELD } from "@auni/shared";
 import type { Address } from "viem";
 
+import { publishMe } from "../conversation/stream.ts";
 import type { Tx } from "../db/client.ts";
 import { WalletExists, type WalletAddresses, type WalletKeys } from "../apps/contract.ts";
 import type { PrivateField } from "../private-fields.ts";
@@ -38,12 +39,14 @@ export async function hasWallet(): Promise<boolean> {
 }
 
 /**
- * Makes the owner's wallet unless there is one. One made meanwhile, say by a second tab sending
- * its first take at once, is theirs.
+ * Makes the owner's wallet unless there is one: as their first take starts its chat, and again
+ * as any move is prepared (money/actions.ts), so one that couldn't be made then is made when a
+ * move first needs it. One made meanwhile, say by a second tab sending its first take at once,
+ * or brought by the owner, is theirs. Open tabs hear of a new one, to show its addresses.
  */
 export async function makeWalletIfNone(): Promise<void> {
   if (await hasWallet()) return;
-  await (await theWallet()).create().catch((error: unknown) => {
+  await (await theWallet()).create().then(publishMe, (error: unknown) => {
     if (!(error instanceof WalletExists)) throw error;
   });
 }

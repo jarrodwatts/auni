@@ -248,10 +248,10 @@ const START_SMALL: FactStart = {
 /**
  * Before the owner's first take there is no wallet to be empty: it's made as that take is sent,
  * unless they bring their own first (routes/setup.ts), so first run's line under the box and
- * these never say two things.
+ * these never say two things. One that couldn't be made then is made by the first move.
  */
 const NO_WALLET_YET: Fact = {
-  text: "The owner has no wallet yet: Auni makes one as they send their first take.",
+  text: "The owner has no wallet yet: Auni makes one with their first take, or with the first move if it couldn't then.",
   source: { app: AUNI, label: "Your money", link: "/app" },
   image: null,
   starts: [NEW_HERE, A_BELIEF, START_SMALL, MOVING],

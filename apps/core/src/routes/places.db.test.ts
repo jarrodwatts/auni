@@ -8,17 +8,19 @@ import type { WalletAddresses } from "../apps/contract.ts";
 import { db } from "../db/client.ts";
 import { jobs, messages, owner, threads } from "../db/schema.ts";
 import { walletAddresses } from "../money/wallets.ts";
+import { prepareLeg } from "../money/actions.ts";
 // After the wallet (above): these load the registry.
 import { listThreads, threadMessages } from "../conversation/threads.ts";
 import { turnKind } from "../jobs/kinds.ts";
 import { setOwner, wipe } from "../test/db.ts";
 import { queued } from "../test/jobs.ts";
+import { stubRecipe } from "../test/recipe.ts";
 import { serve } from "../test/serve.ts";
 import { placesRouter } from "./places.ts";
 
 // A wallet made only when asked, once, or not at all while `fails`. money/wallets.ts is imported
 // above before anything loads the registry, so its own lookup of the wallet finds this one.
-const wallet = vi.hoisted(() => ({ made: null as WalletAddresses | null, fails: false }));
+const wallet = vi.hoisted(() => ({ made: null as WalletAddresses | null, fails: false, makes: 0 }));
 vi.mock("../apps/registry.ts", async (importOriginal) => {
   const real = await importOriginal<typeof import("../apps/registry.ts")>();
   const { WalletExists: Exists } = await import("../apps/contract.ts");
@@ -28,11 +30,14 @@ vi.mock("../apps/registry.ts", async (importOriginal) => {
       if (wallet.fails) throw new Error("the wallet's service is down");
       if (wallet.made) throw new Exists();
       wallet.made = { evm: "0x00000000000000000000000000000000000000e1", solana: null };
+      wallet.makes += 1;
       return wallet.made;
     },
   };
   return { ...real, theWallet: () => provided };
 });
+
+const NO_EFFECT = { gives: [], gets: [], grants: [] };
 
 const url = serve(express().use("/places", placesRouter));
 
@@ -41,6 +46,7 @@ beforeEach(async () => {
   await setOwner({ welcomedAt: null });
   wallet.made = null;
   wallet.fails = false;
+  wallet.makes = 0;
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -82,20 +88,39 @@ describe("the owner's first chat", () => {
     expect(await welcomedAt()).toBeInstanceOf(Date);
   });
 
-  // Review, 2026-11-25: first run ended as the wallet was made, before any chat, so a chat that
-  // then failed left a reload on the ordinary new chat, with no way to bring a wallet.
-  it("starts no chat when the wallet can't be made, and leaves them in first run", async () => {
+  // Review, 2026-11-25 (round 5): a wallet that couldn't be made started no chat, so a first
+  // question that needed no wallet couldn't be asked. The wallet is made when a move needs it.
+  it("starts the chat when the wallet can't be made yet, and the first move makes it", async () => {
     wallet.fails = true;
-    const failed = await startChat();
-    expect(failed.status).toBe(502);
-    expect(await failed.json()).toEqual({ error: "wallet_not_made" });
-    expect(await db.select().from(threads)).toEqual([]);
-    expect(await welcomedAt()).toBeNull();
-    expect(await queued("starting-points")).toEqual([]);
-    // Sent again once it can be made, the take starts its chat.
-    wallet.fails = false;
-    expect((await startChat()).status).toBe(200);
+    const started = await startChat("Why did BTC fall?");
+    expect(started.status).toBe(200);
+    expect(
+      await threadMessages(((await started.json()) as { thread: { id: string } }).thread.id),
+    ).toMatchObject([{ role: "user", parts: [{ type: "text", text: "Why did BTC fall?" }] }]);
     expect(await welcomedAt()).toBeInstanceOf(Date);
+    expect(await walletAddresses()).toEqual({ evm: null, solana: null });
+
+    // A move while it still can't be made makes no card.
+    const seen: (string | null)[] = [];
+    const buy = stubRecipe({
+      direction: undefined,
+      describe: async () => {
+        seen.push((await walletAddresses()).evm);
+        return { summary: "Buy $10 of Nvidia", amountUsd: "10", effect: NO_EFFECT };
+      },
+    });
+    await expect(prepareLeg(buy, {})).rejects.toThrow("wallet couldn't be made");
+    expect(seen).toEqual([]);
+
+    // Once it can be, the first move makes it, once, before its card reads where money is.
+    wallet.fails = false;
+    await prepareLeg(buy, {});
+    await prepareLeg(buy, {});
+    expect(seen).toEqual([
+      "0x00000000000000000000000000000000000000e1",
+      "0x00000000000000000000000000000000000000e1",
+    ]);
+    expect(wallet.makes).toBe(1);
   });
 
   it("makes no wallet once first run is over", async () => {

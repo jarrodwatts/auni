@@ -110,7 +110,7 @@ describe("readFacts", () => {
     read.portfolio = portfolio([]);
     const [money] = await readFacts();
     expect(money!.text).toBe(
-      "The owner has no wallet yet: Auni makes one as they send their first take.",
+      "The owner has no wallet yet: Auni makes one with their first take, or with the first move if it couldn't then.",
     );
     expect(money!.starts.map(({ statement }) => statement)).not.toContain("Your wallet is empty.");
     expect(money!.starts).toHaveLength(STARTING_POINTS);

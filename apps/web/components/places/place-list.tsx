@@ -121,6 +121,7 @@ export function PlaceList({
                   thread={place.thread}
                   status={place.status}
                   detail={<span className="text-waiting">{askOf(place)}</span>}
+                  wrapDetail
                 />
               ))}
             </ul>
@@ -140,11 +141,11 @@ export function PlaceList({
                 thread={place.thread}
                 status={place.status}
                 detail={
-                  place.take === undefined ? (
-                    <Skeleton aria-hidden className="my-1 h-3 w-24 rounded-full" />
-                  ) : place.take ? (
+                  place.take ? (
                     <TakeFigures take={place.take} />
-                  ) : undefined
+                  ) : (
+                    <Skeleton aria-hidden className="my-1 h-3 w-24 rounded-full" />
+                  )
                 }
               />
             ))}

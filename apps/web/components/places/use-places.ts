@@ -43,7 +43,7 @@ export interface ChatPlace {
   /** A card or a question in it waits on the person. */
   readonly waiting: boolean;
   readonly status: ChatStatus;
-  /** A take's value: undefined until read, null when it holds nothing now or isn't a take. */
+  /** A take's value: undefined until read, null when it holds nothing now (closed) or isn't a take. */
   readonly take: TakeValue | null | undefined;
 }
 
@@ -71,9 +71,9 @@ const pinnedFirst = (a: Thread, b: Thread) =>
 /**
  * Every thread, sorted into the places it shows: each once, in the first that fits.
  * - needsYou: a card or a question waits on the person, newest first
- * - takes: it moved money (known before its value is), pinned first, then newest, so a row
- *   never moves as its value loads or prices tick
- * - others: every other chat, pinned first, then newest
+ * - takes: it moved money (known before its value is) and holds something still, pinned first,
+ *   then newest, so a row never moves as prices tick
+ * - others: every other chat, a closed take among them as Money drops it, pinned first, then newest
  * - archived: put away, with nothing waiting (search finds them)
  * `chats` is every listed thread, newest first.
  */
@@ -91,10 +91,10 @@ export function placesOf(
   const listed = all.filter(({ thread, waiting }) => !thread.archived || waiting);
   const needsYou = listed.filter(({ waiting }) => waiting);
   const takesHeld = listed
-    .filter(({ waiting, thread }) => !waiting && isTake(thread))
+    .filter(({ waiting, take }) => !waiting && take !== null)
     .toSorted((a, b) => pinnedFirst(a.thread, b.thread));
   const others = listed
-    .filter(({ waiting, thread }) => !waiting && !isTake(thread))
+    .filter(({ waiting, take }) => !waiting && take === null)
     .toSorted((a, b) => pinnedFirst(a.thread, b.thread));
   return {
     chats: listed,

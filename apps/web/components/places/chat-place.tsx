@@ -24,6 +24,14 @@ import { takeValue } from "./use-takes";
 
 export const CHAT_PLACEHOLDER = "Ask Auni anything";
 
+/**
+ * Auto in the header: what it has left, once the chat's state says. Until then, or if that read
+ * fails, just "Auto": the whole budget in its place would say nothing of it was spent.
+ */
+export function autoLabel(state: ThreadState | undefined): string {
+  return state ? `Auto: ${formatUsd(state.freeBudgetUsd)} left` : "Auto";
+}
+
 /** A chat: the conversation down the middle, with its inspector on the right when wanted. */
 export function ChatPlace({ threadId }: { readonly threadId: ThreadId }) {
   const { loading, threads } = useThreads();
@@ -97,13 +105,10 @@ function headerFigures(
       {take ? <TakeFigures take={take} /> : null}
       {auto ? (
         <span
-          className={cn(
-            "flex items-center gap-1 text-primary tabular-nums",
-            take && "max-sm:hidden",
-          )}
+          className={cn("flex items-center gap-1 text-ink tabular-nums", take && "max-sm:hidden")}
         >
           <Zap aria-hidden className="size-3.5" />
-          Auto: {formatUsd(state?.freeBudgetUsd ?? thread.budgetUsd)} left
+          {autoLabel(state)}
         </span>
       ) : null}
       {!take && !auto && watch ? (

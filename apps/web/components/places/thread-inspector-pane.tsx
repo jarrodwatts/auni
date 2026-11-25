@@ -115,27 +115,20 @@ function SpendingLine({
   const { openSettings } = useAppDialogs();
   const auto = thread.actMode === "within_limits";
   const budget = Number(state?.budgetUsd ?? thread.budgetUsd);
-  const free = Number(state?.freeBudgetUsd ?? thread.budgetUsd);
-  const leftPct = budget > 0 ? Math.max(0, Math.min(100, (free / budget) * 100)) : 0;
   const sleeps = !me.reach.staysOn.stays && (auto || thread.watchCount > 0);
 
   return (
     <>
       {auto ? (
         <div className="mt-2">
-          <p className="text-ui text-ink tabular-nums lining-nums">
-            {formatUsd(String(free))}{" "}
-            <span className="text-muted-foreground">of {formatUsd(String(budget))} left</span>
-          </p>
-          <div
-            aria-hidden
-            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.07]"
-          >
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-settle"
-              style={{ width: `${leftPct}%` }}
-            />
-          </div>
+          {/* What's left only once the state read says; the whole budget would claim none spent. */}
+          {state ? (
+            <BudgetLeft left={Number(state.freeBudgetUsd)} budget={budget} />
+          ) : (
+            <p className="text-ui text-muted-foreground tabular-nums lining-nums">
+              {formatUsd(String(budget))} budget
+            </p>
+          )}
           <p className="mt-2 text-meta text-muted-foreground">
             Buys and sells inside this budget without asking. Perps, bridges, and withdrawals still
             ask.
@@ -164,6 +157,28 @@ function SpendingLine({
           </span>
         </p>
       ) : null}
+    </>
+  );
+}
+
+/** Auto's budget as what's left of it, in words and as an ink bar. */
+function BudgetLeft({ left, budget }: { readonly left: number; readonly budget: number }) {
+  const leftPct = budget > 0 ? Math.max(0, Math.min(100, (left / budget) * 100)) : 0;
+  return (
+    <>
+      <p className="text-ui text-ink tabular-nums lining-nums">
+        {formatUsd(String(left))}{" "}
+        <span className="text-muted-foreground">of {formatUsd(String(budget))} left</span>
+      </p>
+      <div
+        aria-hidden
+        className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.07]"
+      >
+        <div
+          className="h-full rounded-full bg-ink transition-[width] duration-300 ease-settle"
+          style={{ width: `${leftPct}%` }}
+        />
+      </div>
     </>
   );
 }

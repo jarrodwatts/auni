@@ -98,7 +98,7 @@ export function AutonomyPicker({
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
             "-mr-2 gap-1.5 px-2 data-[state=open]:bg-foreground/[0.05]",
-            auto && "text-primary hover:text-primary",
+            auto && "text-ink",
           )}
         >
           {auto ? (
@@ -153,10 +153,10 @@ export function AutonomyPicker({
             onClick={() => setDraftMode("within_limits")}
             className={cn(
               "flex w-full items-start gap-2.5 rounded-control px-2.5 py-2.5 text-left transition-colors focus-ring-inset hover:bg-foreground/[0.045]",
-              draftMode === "within_limits" && "bg-primary/[0.06]",
+              draftMode === "within_limits" && "bg-foreground/[0.045]",
             )}
           >
-            <span className="mt-0.5 flex size-7 flex-none items-center justify-center rounded-full bg-glyph-plate text-primary">
+            <span className="mt-0.5 flex size-7 flex-none items-center justify-center rounded-full bg-surface text-ink">
               <Zap aria-hidden className="size-3.5" />
             </span>
             <span className="min-w-0 flex-1">
@@ -167,7 +167,7 @@ export function AutonomyPicker({
               </span>
             </span>
             {actMode === "within_limits" ? (
-              <Check aria-hidden className="mt-1 size-4 flex-none text-primary" strokeWidth={2.4} />
+              <Check aria-hidden className="mt-1 size-4 flex-none text-ink" strokeWidth={2.4} />
             ) : null}
           </button>
         </div>

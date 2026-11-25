@@ -28,8 +28,8 @@ describe("takeValue", () => {
     });
   });
 
-  it("is no take when it holds nothing", () => {
+  it("is no take when it holds nothing, and a take worth $0 while it still holds something", () => {
     expect(takeValue([])).toBeNull();
-    expect(takeValue([holding(0n, 0n)])).toBeNull();
+    expect(takeValue([holding(0n, 0n)])).toEqual({ value: 0n, change: 0n });
   });
 });

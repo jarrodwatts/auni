@@ -64,14 +64,21 @@ describe("placesOf", () => {
     expect(order(998n, 999n)).toEqual(["Pinned", "Newer", "Older"]);
   });
 
-  it("keeps a take in Your takes before its value is read, and once it holds nothing priced", () => {
+  it("keeps a take in Your takes before its value is read", () => {
     const threads = [thread("AI buildout", { moveCount: 2 }), thread("Chat")];
     const before = placesOf(threads, new Map());
     expect(titles(before.takes)).toEqual(["AI buildout"]);
     expect(before.takes[0]?.take).toBeUndefined();
-    const read = placesOf(threads, new Map([["AI buildout" as ThreadId, null]]));
-    expect(titles(read.takes)).toEqual(["AI buildout"]);
-    expect(titles(read.others)).toEqual(["Chat"]);
+    expect(titles(before.others)).toEqual(["Chat"]);
+  });
+
+  // A take that sold everything sat in Your takes as a blank row for good, while Money dropped it.
+  it("moves a take that holds nothing any more to Chats, as Money drops it", () => {
+    const threads = [thread("Close my bitcoin long", { moveCount: 2 }), thread("Chat")];
+    const closed = placesOf(threads, new Map([["Close my bitcoin long" as ThreadId, null]]));
+    expect(titles(closed.takes)).toEqual([]);
+    expect(titles(closed.others)).toEqual(["Chat", "Close my bitcoin long"]);
+    expect(closed.others[1]?.take).toBeNull();
   });
 
   it("keeps a held order in Needs you while Auni answers in its chat", () => {

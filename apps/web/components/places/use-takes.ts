@@ -18,7 +18,8 @@ export interface TakeValue {
 
 /**
  * A thread's holdings as one take: their value summed, and their day's change summed only when
- * every holding's is known, as a part of it would understate the move. Null when it holds nothing.
+ * every holding's is known, as a part of it would understate the move. Null when it holds nothing,
+ * which is when Money stops listing it: the take is closed.
  */
 export function takeValue(holdings: readonly Holding[]): TakeValue | null {
   let value = 0n;
@@ -30,10 +31,13 @@ export function takeValue(holdings: readonly Holding[]): TakeValue | null {
         ? null
         : change + BigInt(holding.todayChangeBaseUnits);
   }
-  return value > 0n ? { value, change } : null;
+  return holdings.length > 0 ? { value, change } : null;
 }
 
-/** A take is a chat that moved money, which the thread list says before any value is read. */
+/**
+ * A chat that moved money, which the thread list says before any value is read: a take until its
+ * read says it holds nothing.
+ */
 export const isTake = (thread: Thread) => thread.moveCount > 0;
 
 /**

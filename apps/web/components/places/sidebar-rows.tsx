@@ -27,6 +27,10 @@ export const ROW_LINE_CLASS_NAME =
 /** A row with a second line under its title. */
 export const ROW_DETAIL_CLASS_NAME = "h-12 group-data-mobile/sidebar:h-14";
 
+/** A row whose second line may wrap: as tall as it needs, never shorter than one line's row. */
+export const ROW_WRAP_CLASS_NAME =
+  "h-auto min-h-12 py-1.5 group-data-mobile/sidebar:h-auto group-data-mobile/sidebar:min-h-14";
+
 export const ROW_ACTIVE_CLASS_NAME =
   "before:bg-foreground/[0.06] hover:before:bg-foreground/[0.06]";
 

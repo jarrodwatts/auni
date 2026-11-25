@@ -19,6 +19,7 @@ import {
   ROW_CLASS_NAME,
   ROW_DETAIL_CLASS_NAME,
   ROW_LINE_CLASS_NAME,
+  ROW_WRAP_CLASS_NAME,
 } from "./sidebar-rows";
 
 const REVEAL_ACTIONS =
@@ -43,12 +44,15 @@ export function ChatRow({
   thread,
   status,
   detail,
+  wrapDetail = false,
 }: {
   readonly active: boolean;
   readonly href: string;
   readonly thread: Thread;
   readonly status: ChatStatus;
   readonly detail?: ReactNode;
+  /** The second line wraps rather than fades, for one whose end matters: a card's amount. */
+  readonly wrapDetail?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -93,6 +97,7 @@ export function ChatRow({
               ROW_CLASS_NAME,
               ROW_LINE_CLASS_NAME,
               detail !== undefined && ROW_DETAIL_CLASS_NAME,
+              wrapDetail && ROW_WRAP_CLASS_NAME,
               "select-none [-webkit-touch-callout:none] group-hover/chat:before:bg-foreground/[0.04]",
               MAKE_ROOM,
               active && [ROW_ACTIVE_CLASS_NAME, "group-hover/chat:before:bg-foreground/[0.06]"],
@@ -109,7 +114,12 @@ export function ChatRow({
                 {thread.title}
               </span>
               {detail === undefined ? null : (
-                <span className="auni-row-fade min-w-0 overflow-hidden text-meta whitespace-nowrap text-muted-foreground group-data-mobile/sidebar:text-ui">
+                <span
+                  className={cn(
+                    "min-w-0 text-meta text-muted-foreground group-data-mobile/sidebar:text-ui",
+                    wrapDetail ? "text-pretty" : "auni-row-fade overflow-hidden whitespace-nowrap",
+                  )}
+                >
                   {detail}
                 </span>
               )}
@@ -120,7 +130,7 @@ export function ChatRow({
               {status.money ? (
                 <MoneyRing money={status.money} />
               ) : auto ? (
-                <span title="Auto" className="flex text-primary">
+                <span title="Auto" className="flex text-ink-soft">
                   <Zap aria-hidden className="size-3.5" />
                   <span className="sr-only">Auto</span>
                 </span>

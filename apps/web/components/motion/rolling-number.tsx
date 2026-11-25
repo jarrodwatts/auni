@@ -55,7 +55,7 @@ export function RollingNumber({
   const text = String(value);
   const slots = rollingSlots(text);
   return (
-    <span aria-label={text} className={cn("inline-flex items-center", className)}>
+    <span aria-label={text} className={cn("inline-flex items-center tabular-nums", className)}>
       {slots.map((slot) =>
         slot.isDigit ? (
           <RollingDigit char={slot.char} key={slot.key} />

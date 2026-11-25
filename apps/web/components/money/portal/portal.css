@@ -30,10 +30,6 @@
   transition-duration: 350ms;
 }
 
-.auni-portal .auni-mascot-art {
-  filter: drop-shadow(0 14px 22px color-mix(in oklab, var(--primary) 22%, transparent));
-}
-
 .auni-portal .auni-mascot-attention,
 .auni-portal .auni-mascot-joy {
   opacity: 0;

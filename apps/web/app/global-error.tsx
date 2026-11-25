@@ -5,6 +5,7 @@ import "./globals.css";
 import { AUNI_REPO_URL } from "@auni/shared";
 import { useEffect, useLayoutEffect } from "react";
 
+import { Button } from "@/components/ui/button";
 import { LOOK_KEY } from "@/lib/look-first";
 
 import { FONT_VARIABLES } from "./fonts";
@@ -13,6 +14,8 @@ import { FONT_VARIABLES } from "./fonts";
  * What shows when the app's own frame threw: this page stands in for the whole document, so it
  * wears the look the owner picked itself, and offers the two ways out there are: load the page
  * again, or tell Auni's makers (with only the error's digest, which names nothing of the owner's).
+ * Of money it says only what's true: core runs moves on its own, so a move already allowed may
+ * still be going out, and a page can't know it didn't (the in-app error.tsx says the same).
  */
 export default function GlobalError({ error }: { error: Error & { digest?: string } }) {
   useEffect(() => {
@@ -39,24 +42,17 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
         <main className="flex max-w-sm flex-col items-center">
           <h1 className="text-section text-ink">This page hit an error</h1>
           <p className="mt-2 text-body text-muted-foreground">
-            Your money is untouched. Loading the page again usually clears it.
+            A move you&apos;d already allowed may still be finishing. Reload to see where it stands.
           </p>
           <div className="mt-6 flex gap-2">
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="h-10 rounded-control bg-ink px-4 text-ui font-medium text-paper hover:bg-ink/90"
-            >
+            <Button type="button" onClick={() => window.location.reload()}>
               Reload
-            </button>
-            <a
-              href={report.href}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-10 items-center rounded-control border border-border px-4 text-ui font-medium text-ink hover:bg-accent"
-            >
-              Report it
-            </a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={report.href} target="_blank" rel="noreferrer">
+                Report it
+              </a>
+            </Button>
           </div>
           {error.digest ? (
             <p className="mt-6 font-mono text-caption font-medium text-faint">{error.digest}</p>

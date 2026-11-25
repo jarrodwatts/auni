@@ -88,7 +88,7 @@ export function AppTile({ app, onOpen }: { readonly app: AppWire; readonly onOpe
             {held.slice(0, LOGOS_SHOWN).map((holding, index) => (
               <span
                 key={holding.id}
-                className="rounded-full ring-2 ring-surface"
+                className="rounded-full ring-2 ring-card"
                 style={{ marginLeft: index === 0 ? 0 : -8, zIndex: LOGOS_SHOWN - index }}
               >
                 <AssetLogo holding={holding} size={26} />

@@ -186,6 +186,7 @@ function WizardSurface({
               <li key={entry.id}>
                 <button
                   type="button"
+                  aria-current={active ? "step" : undefined}
                   onClick={() => setStep(entry.id)}
                   className={cn(
                     "flex items-center gap-2 rounded-full border px-3 py-1.5 text-meta font-medium transition-colors",

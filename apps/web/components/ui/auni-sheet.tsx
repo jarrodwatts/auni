@@ -51,12 +51,10 @@ export function AuniSheet({
   readonly className?: string;
   readonly children: ReactNode;
 }) {
-  const sheet = useRef<HTMLDivElement>(null);
   // It opens from state, not from a trigger, so it keeps what had focus (the row or tile that
   // opened it) and hands focus back there as it closes: else a keyboard user loses their place.
   const opener = useRef<Element | null>(null);
-  const shade = useRef<HTMLDivElement>(null);
-  const drag = useSheetDrag(side, () => onOpenChange(false), sheet, shade);
+  const { sheet, shade, ...drag } = useSheetDrag(side, () => onOpenChange(false));
 
   return (
     <SheetPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -123,15 +121,13 @@ export function AuniSheet({
  * Dragging the sheet toward its edge: it follows the finger and the shade
  * thins with it, then it either closes or springs back. A gesture that
  * starts across the axis is a scroll and is left alone; a drag that moved
- * never also counts as a tap on what it started over.
+ * never also counts as a tap on what it started over. It holds the sheet's and the shade's refs
+ * itself, as it moves them.
  */
-function useSheetDrag(
-  side: Side,
-  onClose: () => void,
-  sheet: RefObject<HTMLDivElement | null>,
-  shade: RefObject<HTMLDivElement | null>,
-) {
+function useSheetDrag(side: Side, onClose: () => void) {
   const { axis, sign } = AXIS[side];
+  const sheet = useRef<HTMLDivElement>(null);
+  const shade = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; at: number; d: number; live: boolean } | null>(null);
   const dragged = useRef(false);
 
@@ -149,6 +145,8 @@ function useSheetDrag(
   };
 
   return {
+    sheet,
+    shade,
     onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
       // The edge panels follow a finger; a mouse is there to click, select, and scroll.
       if (event.button !== 0 || (side !== "bottom" && event.pointerType === "mouse")) return;

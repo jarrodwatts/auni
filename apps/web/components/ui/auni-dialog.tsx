@@ -40,7 +40,10 @@ export const auniDialogOutlineButtonClass = buttonVariants({
   className: "w-full",
 });
 
-/** The mascot leads a popup that waits on the owner. */
+/**
+ * The mascot leads a popup where Auni itself waits on the owner (a withdrawal, a report). The
+ * generic ones below go without it: a confirm or a notice is chrome, and the mascot is never that.
+ */
 export function AuniDialogMascot({ state }: { readonly state: MascotState }) {
   return (
     <div className="mx-auto mt-1 w-fit">
@@ -84,8 +87,7 @@ export function ConfirmDialog({
           returnFocus.current?.focus();
         }}
       >
-        <AuniDialogMascot state="listening" />
-        <AlertDialogHeader className="mt-4 gap-0 sm:place-items-center sm:text-center">
+        <AlertDialogHeader className="gap-0 sm:place-items-center sm:text-center">
           <AlertDialogTitle className={cn(auniDialogTitleClass, "line-clamp-2 break-words")}>
             {title}
           </AlertDialogTitle>
@@ -129,8 +131,7 @@ export function NoticeDialog({
         className={cn(auniDialogCardClass, "max-w-[calc(100%-2rem)]")}
         overlayClassName={auniDialogOverlayClass}
       >
-        <AuniDialogMascot state="sad" />
-        <AlertDialogHeader className="mt-4 gap-0 sm:place-items-center sm:text-center">
+        <AlertDialogHeader className="gap-0 sm:place-items-center sm:text-center">
           <AlertDialogTitle className={cn(auniDialogTitleClass, "line-clamp-2 break-words")}>
             {title}
           </AlertDialogTitle>

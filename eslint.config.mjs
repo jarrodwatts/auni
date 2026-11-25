@@ -197,9 +197,8 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/coverage/**",
       "**/next-env.d.ts",
-      // Auni's primitives with the vendored shadcn/ui parts they're built on, and AI Elements
-      // sources, owned upstream: reviewed on add rather than linted to project rules.
-      "apps/web/components/ui/**",
+      // AI Elements sources, owned upstream: reviewed on add rather than linted to project
+      // rules. Auni's primitives (components/ui) are Auni's own, so they're linted like any code.
       "apps/web/components/ai-elements/**",
     ],
   },

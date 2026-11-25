@@ -156,7 +156,7 @@ export function AppSheet({
                       onClick={() => ask(way.prompt)}
                       className={cn(
                         CHIP,
-                        "border-foreground/[0.08] bg-card text-ink transition-[transform,box-shadow,border-color] duration-200 ease-settle hover:-translate-y-px hover:border-foreground/[0.12] hover: focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
+                        "border-foreground/[0.08] bg-card text-ink transition-[transform,box-shadow,border-color] duration-200 ease-settle hover:-translate-y-px hover:border-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
                       )}
                     >
                       <span className="truncate">{way.title}</span>

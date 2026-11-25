@@ -17,7 +17,6 @@
 
 .auni-mascot-art {
   overflow: visible;
-  filter: drop-shadow(0 12px 16px color-mix(in oklab, var(--ring) 14%, transparent));
 }
 
 .auni-mascot-eye {

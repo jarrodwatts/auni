@@ -211,7 +211,7 @@ function themeCss(n: Names): string {
   --border: #e4e7ec;
   --ring: #3d63e0;
   --ink: #101623;
-  --faint: #6b7484;
+  --faint: #656e7e;
   --surface: #f5f6f8;
 }
 `;

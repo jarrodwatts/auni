@@ -100,11 +100,11 @@ export function SettingsRow({
 
 export type BadgeTone = "ok" | "warn" | "error" | "accent" | "neutral";
 
-/** Each tone as the Badge primitive's: amber only for what waits on the owner. */
+/** Each tone as the Badge primitive's: what works is neutral, what's broken waits on the owner. */
 const BADGE_TONES: Record<BadgeTone, Parameters<typeof badgeClass>[0]> = {
-  ok: "positive",
+  ok: "neutral",
   warn: "waiting",
-  error: "negative",
+  error: "waiting",
   accent: "neutral",
   neutral: "neutral",
 };

@@ -53,7 +53,7 @@ export function CopyLine({
           className="flex h-8 flex-none items-center gap-1.5 self-center rounded-control px-2.5 text-meta font-medium text-muted-foreground transition-colors hover:bg-card hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
         >
           {copied ? (
-            <Check aria-hidden className="size-3.5 text-positive" />
+            <Check aria-hidden className="size-3.5 text-ink" />
           ) : (
             <Copy aria-hidden className="size-3.5" />
           )}

@@ -71,14 +71,15 @@ const GLYPH: Record<Status, string | undefined> = {
 const BARE_GLYPH: Record<Status, string | undefined> = {
   waiting: "border-[1.5px] border-dashed border-ink/[0.2]",
   now: styles.arcThin,
-  done: "flex items-center justify-center text-positive",
+  done: "flex items-center justify-center text-ink",
   failed: "flex items-center justify-center text-negative",
 };
 
 /**
  * A step's status as one small glyph: a dashed ring while it waits, a
  * turning arc while it runs, an ink disc with a tick once done (or a bare
- * green check on chat step rows), and red if it didn't go through. A change
+ * ink check on chat step rows: green is money's), and red if it didn't go
+ * through. A change
  * hands over: the old glyph shrinks away as the new one pops in. 14px beside
  * chat steps, 16px in the sidebar, 18px on cards.
  */

@@ -12,8 +12,8 @@
  *   ink     the strong action: a money button is ink with paper words on it
  *   blue    Auni itself: a link, focus, Auni at work. Never a status
  *   amber   waiting on the owner, and nothing else
- *   green   a gain, on a number
- *   red     a loss, on a number; a failed card's edge; a destructive button
+ *   green   a gain on a number, or money done; never a thing that merely works
+ *   red     a loss on a number, or something that failed; a destructive button
  *
  * Everything else is paper and ink: a cool slate ramp. No gradients, washes, glows or tinted
  * tiles. The colour on a screen comes from the logos of real things.
@@ -52,23 +52,26 @@
 
   --destructive: light-dark(#b8372b, #f47c66);
 
-  /* Hairlines. */
+  /* Hairlines, for what only groups (a card, a list). A field's edge is no hairline: it is the
+     only thing showing where to type, so it is 3:1 on every surface a field sits on. */
   --border: light-dark(#e4e7ec, #262a31);
-  --input: light-dark(#d9dde4, #30353d);
+  --input: light-dark(#848d9d, #666f7f);
   --ring: light-dark(#3d63e0, #7d9cff);
 
   --sidebar-border: light-dark(#e9ecf0, #1c1f25);
 
-  /* Gain and loss, on numbers. */
-  --positive: light-dark(#18804f, #4cc38a);
+  /* Gain and loss: green on a number, or money done (arrived, landed), and never a thing that
+     merely works; red on a number, or something that failed. */
+  --positive: light-dark(#16794a, #4cc38a);
   --negative: light-dark(#c0392b, #f47c66);
 
   /* The ink ramp. Primary is --ink; --ink-soft a step softer, for a note read at length;
      secondary is --muted-foreground, a quiet word; --faint, the quietest, for an
-     icon at rest or a field's hint. Each one is AA as text on the page in its look. */
+     icon at rest or a field's hint. Each one is AA as text on every surface in its look
+     (tokens.test.ts). */
   --ink: light-dark(#101623, #f1f3f6);
   --ink-soft: light-dark(#3f4856, #c8cdd5);
-  --faint: light-dark(#6b7484, #7f8896);
+  --faint: light-dark(#656e7e, #858e9e);
   /* What is set on ink: a money button's words. */
   --paper: light-dark(#ffffff, #0e1014);
 
@@ -179,9 +182,8 @@
   --radius-3xl: var(--radius-sheet);
 
   /* Type: one scale, each step named for what it sets. Size and line height always; weight and
-     tracking for the display steps, which are always set the same way. Money is in the face's
-     tabular lining figures everywhere (the body says so below), so a column of figures lines up
-     and a changing total doesn't jiggle.
+     tracking for the display steps, which are always set the same way. The two money steps set
+     their figures tabular (see the base layer below), so a changing total doesn't jiggle.
 
        caption     12/16   a field's label, a table's head, a badge
        meta        13/18   a quiet second line: a time, a note under a row
@@ -279,7 +281,6 @@
     0 12px 32px -8px color-mix(in oklab, var(--color-shade) 16%, transparent);
 }
 
-
 @layer base {
   * {
     border-color: var(--border);
@@ -291,8 +292,16 @@
     font-family: var(--font-sans);
     /* Inter's own spacing at text sizes, a touch tighter as it's read on screens. */
     letter-spacing: -0.011em;
-    /* Every figure lines up: money, a percent, a count, a timer. */
-    font-variant-numeric: tabular-nums lining-nums;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Figures, tabular, so a column of them lines up and a changing one doesn't jiggle: the money
+     steps here, and anywhere else a figure sits (an amount, a count, a timer) by `tabular-nums`
+     (a Row's end, a Badge and the rolling numbers wear it already). Never on the body: Inter's
+     tabular set widens the hyphen, the brackets and the stops too, so "stop-loss" reads
+     "stop - loss" in prose (tokens.test.ts). */
+  [class*="text-card-money"],
+  [class*="text-hero-money"] {
+    font-variant-numeric: tabular-nums;
   }
 }

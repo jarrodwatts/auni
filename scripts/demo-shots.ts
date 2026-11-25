@@ -88,13 +88,13 @@ const slug = (text: string) =>
     .slice(0, 40);
 
 /**
- * Moves the page's main scroller (an open sheet, a conversation's list of messages, or the page
- * itself): to its top or its end when `to` says which, else one window back from that end. Says
- * whether it moved.
+ * Moves the page's main scroller (what's open over the page, such as a sheet or Settings, else a
+ * conversation's list of messages, or the page itself): to its top or its end when `to` says
+ * which, else one window back from that end. Says whether it moved.
  */
 const SCROLL = (from: "top" | "end", to?: "top" | "end") => `(() => {
-  const sheet = document.querySelector('[data-testid="app-sheet"]');
-  const scrollers = (sheet ? [sheet] : [document.scrollingElement, ...document.querySelectorAll("main, main *")]).filter(
+  const open = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+  const scrollers = (open ? [open, ...open.querySelectorAll("*")] : [document.scrollingElement, ...document.querySelectorAll("main, main *")]).filter(
     (el) => el && el.scrollHeight > el.clientHeight + 40 && getComputedStyle(el).overflowY !== "visible",
   );
   const scroller = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
@@ -106,9 +106,19 @@ const SCROLL = (from: "top" | "end", to?: "top" | "end") => `(() => {
 })()`;
 
 /**
+ * What the owner does on a screen before its picture, as script run in the page (false when
+ * there was nothing to press), and what is true in the page once the state it opens shows.
+ */
+interface Opener {
+  readonly does: string;
+  readonly shows: string;
+}
+
+/**
  * Takes `url` into `out` at each width, a window at a time across all of it: from its top down
  * for a page, from its end back up for a conversation, which opens at its latest message.
- * `first` is what the owner does there before the picture, as script run in the page; `only`
+ * `first` opens the state the picture is of; if it can't, the run stops, so no picture of the
+ * screen it was opened over is ever saved under that state's name. `only`
  * takes one width, for a state the other doesn't have (a phone's menu), and `once` one window,
  * for something open over the page (the page scrolling under it shows nothing new).
  */
@@ -118,7 +128,7 @@ async function take(
   name: string,
   url: string,
   from: "top" | "end",
-  first?: string,
+  first?: Opener,
   { only, once = false }: { only?: (typeof WIDTHS)[number]["name"]; once?: boolean } = {},
 ): Promise<void> {
   for (const { name: size, width, height } of WIDTHS.filter((w) => !only || w.name === only)) {
@@ -131,7 +141,14 @@ async function take(
     // What a page shows of money comes a moment after it loads.
     await sleep(1_200);
     if (first) {
-      await page.evaluate(first);
+      const at = `${name} at ${size} width`;
+      if ((await page.evaluate<unknown>(first.does)) === false)
+        throw new Error(`${at}: nothing on screen opens it (${first.does.trim().slice(0, 80)})`);
+      try {
+        await page.until(first.shows, 5_000);
+      } catch {
+        throw new Error(`${at}: it never showed (${first.shows})`);
+      }
       await sleep(600);
     }
     await page.evaluate(SCROLL(from, from));
@@ -146,7 +163,10 @@ async function take(
   }
 }
 
-/** Presses the first button on screen whose label or words (after any number) start with `label`. */
+/**
+ * Presses the first button on screen whose label or words (after any number) start with `label`,
+ * and says whether there was one.
+ */
 const PRESS = (label: string) => `(() => {
   const wanted = ${JSON.stringify(label)};
   const button = [...document.querySelectorAll("button")].find(
@@ -161,14 +181,26 @@ const PRESS = (label: string) => `(() => {
 })()`;
 
 /** Opens the search palette, as its shortcut does. */
-const SEARCH = `window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`;
+const SEARCH: Opener = {
+  does: `void window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`,
+  shows: `document.querySelector('[role="dialog"] [role="combobox"]')`,
+};
 
 /** Opens the last turn's work that can open: the steps Auni took for its latest answer. */
-const OPEN_WORK = `(() => {
+const OPEN_WORK: Opener = {
+  does: `(() => {
   const closed = [...document.querySelectorAll('.auni-work-header[aria-expanded="false"]')];
   closed.at(-1)?.click();
   return closed.length > 0;
-})()`;
+})()`,
+  shows: `document.querySelector('.auni-work-header[aria-expanded="true"]')`,
+};
+
+/** A step of first run's wizard, by the words on its button. */
+const STEP = (label: string): Opener => ({
+  does: PRESS(label),
+  shows: `document.querySelector('[aria-current="step"]')?.textContent.includes(${JSON.stringify(label)})`,
+});
 
 /**
  * Every screen, into `out`, as an owner whose system is set to `look` sees it. Each look gets a
@@ -223,7 +255,10 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const yours = apps.filter((app) => app.canSwitch);
     const holds = (app: (typeof yours)[number]) => Number(app.account?.usd ?? 0) > 0;
     const sheet = (id: string) => `${origin}/app/apps?app=${id}`;
-    const SWITCH = `document.querySelector('[data-testid="app-switch"]').click()`;
+    const SWITCH: Opener = {
+      does: `document.querySelector('[data-testid="app-switch"]').click()`,
+      shows: `document.querySelector('[data-testid="app-switch-question"], [data-testid="app-switch-refused"]')`,
+    };
     const stays = yours.find((app) => holds(app) && app.stays);
     const leaves = yours.find((app) => holds(app) && !app.stays && app.needs.length === 0);
     const needs = yours.find((app) => !app.account && app.needs.length > 0);
@@ -273,7 +308,11 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const busiest =
       threads.find((thread) => /long bitcoin/iu.test(thread.title ?? "")) ?? threads[0];
     await take(page, out, "search", `${origin}/app`, "top", SEARCH, { once: true });
-    await take(page, out, "phone-menu", `${origin}/app`, "top", PRESS("Open places"), {
+    const places: Opener = {
+      does: PRESS("Open places"),
+      shows: `document.querySelector('[role="dialog"]')`,
+    };
+    await take(page, out, "phone-menu", `${origin}/app`, "top", places, {
       only: "phone",
       once: true,
     });
@@ -282,7 +321,11 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       const chat = `${origin}/app/chat/${busiest.id}`;
       await take(page, out, "work-open", chat, "end", OPEN_WORK);
       // Last, as the pane stays open once opened (on this device) for every thread after it.
-      await take(page, out, "thread-details", chat, "top", PRESS("Show details"), {
+      const details: Opener = {
+        does: PRESS("Show details"),
+        shows: `document.querySelector('[aria-label="Hide details"], [role="dialog"]')`,
+      };
+      await take(page, out, "thread-details", chat, "top", details, {
         once: true,
       });
     }
@@ -308,8 +351,8 @@ async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise
     await page.open(link);
     await page.until("location.pathname.startsWith('/app') && !location.hash");
     await take(page, out, "first-run", `${origin}/app/new`, "top");
-    await take(page, out, "first-run-wallet", `${origin}/app/new`, "top", PRESS("Wallet"));
-    await take(page, out, "first-run-yours", `${origin}/app/new`, "top", PRESS("Make it yours"));
+    await take(page, out, "first-run-wallet", `${origin}/app/new`, "top", STEP("Wallet"));
+    await take(page, out, "first-run-yours", `${origin}/app/new`, "top", STEP("Make it yours"));
   } finally {
     await browser.close();
     await demo.stop();

@@ -16,7 +16,7 @@ export function RollingNumber({
 }) {
   const chars = [...value];
   return (
-    <span className={cn("inline-flex leading-[1.1] whitespace-pre", className)}>
+    <span className={cn("inline-flex leading-[1.1] whitespace-pre tabular-nums", className)}>
       <span className="sr-only">{value}</span>
       {chars.map((char, index) => {
         // Keyed from the right, so the cents keep their columns when a thousands digit arrives.

@@ -4,12 +4,12 @@ import { AUNI_REPO_URL } from "@auni/shared";
 import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 
-import { Mascot } from "@/components/brand/mascot";
 import { Button } from "@/components/ui/button";
 
 /**
  * A screen that threw stays inside the app's frame, with the ways out there are: try it again,
- * or tell Auni's makers (with only the error's digest, which names nothing of the owner's).
+ * or tell Auni's makers (with only the error's digest, which names nothing of the owner's). Of
+ * money it says only what's true: a move already allowed may still be going out.
  */
 export default function AppError({
   error,
@@ -28,10 +28,9 @@ export default function AppError({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center px-6 pb-16 text-center">
-      <Mascot alt="" size={64} state="sad" />
-      <h2 className="mt-5 text-section text-ink">This view hit an error</h2>
+      <h2 className="text-section text-ink">This view hit an error</h2>
       <p className="mt-2 max-w-[380px] text-body text-muted-foreground">
-        Your money is untouched. Trying again usually clears it.
+        A move you&apos;d already allowed may still be finishing. Try again to see where it stands.
       </p>
       <div className="mt-6 flex gap-2">
         <Button onClick={() => retry()} type="button">

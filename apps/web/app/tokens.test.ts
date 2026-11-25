@@ -241,3 +241,90 @@ describe("the scale cn knows", () => {
     expect(cn("rounded-card", "rounded-sheet")).toBe("rounded-sheet");
   });
 });
+
+// Each pair of colours a screen sets one on the other, read in both looks. Words are AA (4.5:1);
+// a field's edge, the only thing that shows where to type, is 3:1 against its own fill and what
+// it sits on (WCAG 1.4.11). Light `--faint` read 4.24 on a muted fill and a field's edge 1.36 on
+// the page (2026-11-25 council), so a change of token now fails here first.
+
+const TOKENS_CSS = readFileSync(join(WEB, "app/tokens.css"), "utf8");
+
+/** Each token in both looks, as `light-dark(light, dark)` declares it. */
+const LOOKS = Object.fromEntries(
+  [...TOKENS_CSS.matchAll(/--([a-z-]+):\s*light-dark\((#[0-9a-f]{6}),\s*(#[0-9a-f]{6})\)/gu)].map(
+    ([, name, light, dark]) => [name!, { light: light!, dark: dark! }],
+  ),
+);
+
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((at) => {
+    const v = Number.parseInt(hex.slice(at, at + 2), 16) / 255;
+    return v <= 0.039_28 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+};
+
+const contrast = (a: string, b: string) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+};
+
+/** What words and edges are set on. */
+const SURFACES = [
+  "background",
+  "sidebar",
+  "card",
+  "popover",
+  "muted",
+  "surface",
+  "floor",
+  "accent",
+];
+
+/** [what's set, what it's set on, the least it may read at]. */
+const PAIRS: readonly (readonly [string, readonly string[], number])[] = [
+  // The ink ramp, on every surface, the amber one too (a waiting card's notes).
+  ...["foreground", "ink", "ink-soft", "muted-foreground", "faint"].map(
+    (ink) => [ink, [...SURFACES, "waiting-surface"], 4.5] as const,
+  ),
+  // Money's colours, a link, and a destructive word, on every surface; a Badge's gain and loss.
+  ...["positive", "negative", "primary", "destructive"].map((ink) => [ink, SURFACES, 4.5] as const),
+  ["waiting", [...SURFACES, "waiting-surface"], 4.5],
+  ["popover-foreground", ["popover"], 4.5],
+  ["accent-foreground", ["accent"], 4.5],
+  // Words on a filled button, a glyph on its plate, and a logo's plate.
+  ["paper", ["ink", "destructive"], 4.5],
+  ["glyph-ink", ["glyph-plate"], 4.5],
+  // A field's edge.
+  ["input", ["background", "sidebar", "card", "popover", "muted", "surface"], 3],
+];
+
+describe("contrast", () => {
+  it("reads every token pair a screen uses at AA, in both looks", () => {
+    const short = PAIRS.flatMap(([ink, on, least]) =>
+      on.flatMap((surface) =>
+        (["light", "dark"] as const).flatMap((look) => {
+          const ratio = contrast(LOOKS[ink]![look], LOOKS[surface]![look]);
+          return ratio < least ? [`${look} ${ink} on ${surface}: ${ratio.toFixed(2)}`] : [];
+        }),
+      ),
+    );
+    expect(short, "darken (light) or lighten (dark) the token in app/tokens.css").toEqual([]);
+  });
+
+  it("knows each token it checks", () => {
+    for (const [ink, on] of PAIRS)
+      for (const name of [ink, ...on]) expect(LOOKS).toHaveProperty(name);
+  });
+});
+
+describe("figures", () => {
+  // Tabular figures on the body widened every hyphen in prose too: "stop - loss" (2026-11-25).
+  it("are tabular where a figure is, never on the body", () => {
+    const body = /\bbody\s*\{[^}]*\}/u.exec(code(TOKENS_CSS))?.[0] ?? "";
+    expect(body).not.toContain("font-variant-numeric");
+    expect(code(TOKENS_CSS)).toMatch(
+      /\[class\*="text-card-money"\],\s*\[class\*="text-hero-money"\]\s*\{\s*font-variant-numeric: tabular-nums;/u,
+    );
+  });
+});

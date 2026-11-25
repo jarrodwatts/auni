@@ -9,12 +9,12 @@ import {
   parseTransferCheckedInstruction,
   TokenInstruction,
 } from "@solana-program/token";
-import { AMOUNT, cardFaceSchema } from "@auni/shared";
+import { AMOUNT, CARD_FORMAT, cardFaceSchema } from "@auni/shared";
 import { decodeFunctionData, erc20Abi, getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { CARD_FORMAT, type ActionRow } from "../db/schema.ts";
+import type { ActionRow } from "../db/schema.ts";
 import { approvedDetails } from "../money/actions.ts";
 import {
   APPROVED_PRICE_AT_LEAST,

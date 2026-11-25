@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import { brainSeen, nothingToThinkWith, onBrainReady, proveLogins } from "./agent/brain.ts";
 import { lastPaired, mintPairingCode, pairingLink, theOwner } from "./auth/owner.ts";
 import { doorSocket } from "./auth/tailscale.ts";
-import { closeDatabaseConnection } from "./db/client.ts";
+import { closeDatabaseConnection, db } from "./db/client.ts";
 import { postgresLog, type Postgres } from "./db/embedded.ts";
 import { migrateDatabase } from "./db/migrations.ts";
 import { env } from "./env.ts";
@@ -18,6 +18,7 @@ import {
   type Runner,
 } from "./jobs/runner.ts";
 import { lendToHandover, packHere } from "./handover/hand-over.ts";
+import { retractStale } from "./money/waiting.ts";
 import { takingOver, handedOver } from "./handover/marks.ts";
 import { listen } from "./server.ts";
 import type { BrainFound } from "./hello/stage.ts";
@@ -156,6 +157,8 @@ export async function start(
             "The Auni stopped a moment ago is still finishing what it was running. This one starts as soon as it has.",
           ),
       });
+      // Before any tab can see one: a card from before this version doesn't wait looking allowable.
+      await retractStale(db);
       // A handover to another machine stops the runner while it hands Auni over (handover/).
       lendToHandover({
         stopJobs: async () => {

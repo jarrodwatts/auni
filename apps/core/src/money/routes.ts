@@ -1,4 +1,5 @@
 import {
+  CARD_FORMAT,
   NETWORK_KEYS,
   valueRangeSchema,
   type ActionQuoteWire,
@@ -44,6 +45,20 @@ import { startOfDay, valueHistory } from "./value-history.ts";
 
 const uuid = z.uuid();
 
+/** What a tab running the web app from before an update is told when it taps Allow. */
+const RELOAD = "Reload Auni to see this card.";
+
+/**
+ * Whether the web app that sent this Allow draws cards as they are now (CARD_FORMAT), which it
+ * says in the tap: a tab left open across an update still runs the web app from before, and could
+ * show a fresh card without all it says, so its tap allows nothing and it is told to reload.
+ */
+function drawnFully(req: Request, res: Response): boolean {
+  const drawn = z.object({ cardFormat: z.literal(CARD_FORMAT) }).safeParse(req.body ?? {});
+  if (!drawn.success) res.status(409).json({ error: "out_of_date", message: RELOAD });
+  return drawn.success;
+}
+
 export const actionsRouter = Router();
 actionsRouter.use(express.json({ limit: "4kb" }));
 actionsRouter.get("/", async (req, res) => {
@@ -85,6 +100,7 @@ actionsRouter.get("/:id/detail", async (req, res) => {
 actionsRouter.post("/:id/allow", async (req, res) => {
   const id = uuid.safeParse(req.params.id);
   if (!id.success) return void res.status(404).json({ error: "action_not_found" });
+  if (!drawnFully(req, res)) return;
   const allowed = await allowAction(id.data, ownerHere(req));
   switch (allowed.kind) {
     case "refused":
@@ -206,6 +222,7 @@ proposalsRouter.get("/:id", async (req, res) => {
 proposalsRouter.post("/:id/allow", async (req, res) => {
   const id = uuid.safeParse(req.params.id);
   if (!id.success) return void res.status(404).json({ error: "proposal_not_found" });
+  if (!drawnFully(req, res)) return;
   if ((await allowProposal(id.data)) === "out_of_date")
     return void res.status(409).json({ error: "out_of_date", message: OUT_OF_DATE });
   await answerProposal(id.data, req, res);

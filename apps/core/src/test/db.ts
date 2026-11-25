@@ -1,3 +1,4 @@
+import { CARD_FORMAT } from "@auni/shared";
 import { getTableName, sql } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 
@@ -5,7 +6,6 @@ import { db } from "../db/client.ts";
 import {
   actions,
   arrivalCursors,
-  CARD_FORMAT,
   arrivals,
   automations,
   channelLinks,

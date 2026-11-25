@@ -20,8 +20,9 @@ import { actions, type ActionRow } from "../db/schema.ts";
  *     |- replace -> replaced       a newer card that names it (recordActions), or a specialist's
  *     |                            newer plan; a cut-off turn's card the owner never saw
  *     |- retract -> retracted      Auni takes it back, saying why (RETRACTED): the agent
- *     |                            (retract_cards), a day untapped (retractStale), its
- *     |                            specialist retired, or what it sells moved (move_holding)
+ *     |                            (retract_cards), a day untapped or a card from before
+ *     |                            (retractStale), its specialist retired, or what it sells
+ *     |                            moved (move_holding)
  *     '- allow ---> queued         the owner's tap (decideActions); one a specialist makes on
  *          |                       its own starts here, as does one a card showed coming later
  *          |                       (ExecuteResult.later), its job due then

@@ -1,6 +1,7 @@
 import {
   actionQuoteWireSchema,
   actionWireSchema,
+  CARD_FORMAT,
   pickDetailWireSchema,
   type ActionQuoteWire,
   type ActionRecordId,
@@ -27,7 +28,8 @@ export const NOT_REACHED =
 
 /**
  * What a card says when its tap didn't go: core's own words when it refused a card drawn before
- * cards said all they say now (`out_of_date`, which allowed nothing), else NOT_REACHED.
+ * cards said all they say now, or a tap from a web app older than core (`out_of_date`, which
+ * allowed nothing), else NOT_REACHED.
  */
 export function tapFailed(caught: unknown): string {
   return caught instanceof CoreApiError && caught.code === "out_of_date" && caught.detail
@@ -86,13 +88,22 @@ export async function heldTap(
   }
 }
 
+/**
+ * A tap's body: the card format this web app draws (CARD_FORMAT), so core allows nothing a tab
+ * from before an update drew without all it says, and tells it to reload.
+ */
+export const DRAWN = JSON.stringify({ cardFormat: CARD_FORMAT });
+
 /** One tap on a single-action card; a row that already moved on comes back as it is. */
 export async function decideAction(
   actionReference: ActionRecordId,
   decision: "allow" | "decline",
 ): Promise<ActionWire> {
   try {
-    const body = await requestCore(`actions/${actionReference}/${decision}`, { method: "POST" });
+    const body = await requestCore(`actions/${actionReference}/${decision}`, {
+      method: "POST",
+      body: DRAWN,
+    });
     return actionResponseSchema.parse(body).action;
   } catch (error) {
     // Refused because the row had already moved on: read it as it is now.

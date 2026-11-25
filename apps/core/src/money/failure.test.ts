@@ -1,3 +1,4 @@
+import { CARD_FORMAT } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
 import { assertApprovedSpend, PriceMoved } from "./approved.ts";
@@ -22,6 +23,7 @@ describe("failureKind", () => {
       tool: "bridge_usdc" as const,
       details: {},
       txs: [{ chain: "monad", hash: "0xbought", setup: true as const, buysFees: "0xorder" }],
+      cardFormat: CARD_FORMAT,
     };
     expect(retryRefusal(row)).toBeNull();
   });
@@ -113,6 +115,7 @@ describe("retryRefusal", () => {
     tool: "stock_trade",
     details: {},
     txs: [],
+    cardFormat: CARD_FORMAT,
   };
 
   it("lets a blip, a busy venue, a moved price or anything unknown run again", () => {
@@ -135,6 +138,11 @@ describe("retryRefusal", () => {
       retryRefusal({ ...failed, failureKind: "unfilled", txs: [{ chain: "monad", hash: "0x1" }] }),
     ).toBe("not_retryable");
     expect(retryRefusal({ ...failed, status: "done" })).toBe("not_failed");
+  });
+
+  // Its run may grant what that card never showed, such as a first sale's lasting permission.
+  it("never runs a card drawn before cards said all they say now again", () => {
+    expect(retryRefusal({ ...failed, cardFormat: CARD_FORMAT - 1 })).toBe("not_retryable");
   });
 
   it("never runs money leaving the person, or anything the owner's proof vouched for, again on a tap", () => {

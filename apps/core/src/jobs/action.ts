@@ -97,8 +97,8 @@ export const reconcileJob = defineJob({
 });
 
 /**
- * Every 10 minutes, takes back the cards that have waited a day for the owner's tap (see
- * retractStale), and tells their threads' open tabs.
+ * Every 10 minutes, takes back the cards that have waited a day for the owner's tap, or were drawn
+ * before cards said all they say now (see retractStale), and tells their threads' open tabs.
  */
 export const staleCardsJob = defineJob({
   kind: jobKind("stale-cards", z.object({})),

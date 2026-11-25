@@ -198,13 +198,6 @@ export interface PreviousError {
   readonly at: string;
 }
 
-/**
- * How a money card recorded now is drawn, which recordActions stamps on its row. Raise it whenever
- * cards start saying something they didn't: a card still waiting from before is refused Allow,
- * as it was shown (money/decide.ts). 2 says every permission a move leaves.
- */
-export const CARD_FORMAT = 2;
-
 export const actions = pgTable(
   "actions",
   {

@@ -1,3 +1,4 @@
+import { CARD_FORMAT } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -339,7 +340,7 @@ describe("legsToRetry", () => {
     each: Row,
     status: RetryLeg["status"],
     failureKind: RetryLeg["failureKind"] = null,
-  ): RetryLeg => ({ ...each, status, failureKind, txs: [] });
+  ): RetryLeg => ({ ...each, status, failureKind, txs: [], cardFormat: CARD_FORMAT });
   const retried = (rows: readonly RetryLeg[], pricedPast: readonly string[] = []) =>
     legsToRetry(rows, new Set(pricedPast));
 
@@ -370,6 +371,15 @@ describe("legsToRetry", () => {
       ]),
     ).toEqual(["savings", "ether"]);
     expect(retried([as(bridge, "failed", "rule"), as(ether, "failed", "stopped")])).toBeNull();
+  });
+
+  it("runs nothing when a leg it would run was drawn before cards said all they say now", () => {
+    expect(
+      retried([
+        { ...as(bridge, "failed", "glitch"), cardFormat: CARD_FORMAT - 1 },
+        as(ether, "failed", "stopped"),
+      ]),
+    ).toBeNull();
   });
 
   it("runs nothing while a leg still runs, or once something went out", () => {

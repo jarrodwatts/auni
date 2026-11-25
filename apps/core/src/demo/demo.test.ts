@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import type { StartingPoint } from "@auni/shared";
+import { CARD_FORMAT, type StartingPoint } from "@auni/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { sceneFor } from "./scenes.ts";
@@ -132,9 +132,9 @@ describe("auni demo", () => {
     const waiting = (await cards(thread)).filter(({ status }) => status === "awaiting_permission");
     expect(waiting.length).toBeGreaterThan(0);
     for (const proposal of new Set(waiting.flatMap(({ proposalId }) => proposalId ?? [])))
-      await ask(`/proposals/${proposal}/allow`, {});
+      await ask(`/proposals/${proposal}/allow`, { cardFormat: CARD_FORMAT });
     for (const { id, proposalId } of waiting)
-      if (!proposalId) await ask(`/actions/${id}/allow`, {});
+      if (!proposalId) await ask(`/actions/${id}/allow`, { cardFormat: CARD_FORMAT });
     const ended = async () => {
       const now = await cards(thread);
       return waiting.map(({ id }) => now.find((card) => card.id === id)?.status);
@@ -206,7 +206,7 @@ describe("auni demo", () => {
     // again finds nothing new, and Close ends it as closed by the owner, with nothing sold.
     const unheard = await type("demo: held");
     const [sale] = await cards(unheard);
-    await ask(`/actions/${sale!.id}/allow`, {});
+    await ask(`/actions/${sale!.id}/allow`, { cardFormat: CARD_FORMAT });
     const phase = async () => (await cards(unheard))[0]?.phase;
     await expect.poll(phase, { timeout: 60_000, interval: 250 }).toBe("needs_owner");
     await says(unheard, /never got an answer.*check again now, or close it/su);

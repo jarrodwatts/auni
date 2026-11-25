@@ -80,13 +80,23 @@ export const HELD_SAFE =
 export const CARD_WAITS_MS = 24 * 60 * 60_000;
 
 /**
+ * How a money card recorded now is drawn, which core stamps on its row and the web app names when
+ * it allows one, as the format it drew. Raise it whenever cards start saying something they
+ * didn't: a card recorded before is taken back, never allowed or tried again as it was shown, and
+ * a tab still running the web app from before is told to reload (core's money/decide.ts).
+ * 2 says every permission a move leaves.
+ */
+export const CARD_FORMAT = 2;
+
+/**
  * Why Auni took back a card still waiting for the owner's tap, in the words its card, its
- * channel message and the agent all read: it waited a day (CARD_WAITS_MS) or Auni no longer
- * stands behind it.
+ * channel message and the agent all read: it waited a day (CARD_WAITS_MS), Auni no longer
+ * stands behind it, or it was drawn before cards said all they say now (CARD_FORMAT).
  */
 export const RETRACTED = {
   stale: "Taken back after a day without a tap. Ask again if you still want it.",
   agent: "Taken back by Auni: it no longer fits.",
+  outOfDate: "Out of date: Auni's cards now say more about each move. Ask again for a fresh one.",
 } as const;
 
 /** How a held move the owner closed reads afterwards: when its money had moved, and when nothing showed it had. */

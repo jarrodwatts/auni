@@ -1,4 +1,4 @@
-import { ASK_TOOL_NAMES, CARD_WAITS_MS } from "@auni/shared";
+import { ASK_TOOL_NAMES, CARD_FORMAT, CARD_WAITS_MS } from "@auni/shared";
 import { and, eq, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -6,6 +6,7 @@ import { result, type AuniTool } from "../agent/tool.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
 import { actions, type ActionRow } from "../db/schema.ts";
+import { wakeThread } from "../jobs/kinds.ts";
 import { retract, step } from "./life.ts";
 
 // Cards still waiting for the owner's tap, and the three ways one stops waiting untapped: a newer
@@ -108,18 +109,40 @@ export function replacedNote(replaced: readonly WaitingCard[]): string | null {
 }
 
 /**
- * Takes back every card that has waited a day for the owner's tap (CARD_WAITS_MS): its prices
- * and the agent's reasons for it are a day old, so it says so and the owner asks again. Taken
- * as a cron runs and before any tap, in that tap's transaction, so none past its day is allowed.
- * Its thread isn't woken: nothing happened there. Returns the threads whose cards it took back.
+ * Takes back every card that can no longer be allowed as it was shown, as Auni starts, as a cron
+ * runs and before any tap, in that tap's transaction. One that has waited a day for the owner's
+ * tap (CARD_WAITS_MS): its prices and the agent's reasons for it are a day old, so it says so and
+ * the owner asks again; its thread isn't woken, since nothing happened there. And a money card
+ * drawn before cards said all they say now (CARD_FORMAT), which Allow would refuse: it says it is
+ * out of date, and its thread is woken, so the agent can put the move up again. Either way its
+ * sealed card is left as it was shown. Returns the threads whose cards it took back.
  */
-export async function retractStale(executor: Pick<Tx, "update">): Promise<string[]> {
+export async function retractStale(executor: Pick<Tx, "update" | "execute">): Promise<string[]> {
   const stale = await retract(
     executor,
     lt(actions.createdAt, sql`now() - make_interval(secs => ${CARD_WAITS_MS / 1_000})`),
     "stale",
   );
-  return [...new Set(stale.flatMap((row) => row.threadId ?? []))];
+  const old = await retract(
+    executor,
+    and(lt(actions.cardFormat, CARD_FORMAT), notInArray(actions.tool, [...ASK_TOOL_NAMES])),
+    "outOfDate",
+  );
+  for (const [threadId, cards] of byThread(old))
+    await wakeThread(
+      threadId,
+      `Auni updated, and its cards now say more about each move, so it took back the cards still waiting here from before, which the owner can no longer allow: ${cards.map((card) => `"${card.asks}" (card ${card.id})`).join(", ")}. Nothing moved, and each can be put up again as a fresh card.`,
+      { tx: executor },
+    );
+  return [...new Set([...stale, ...old].flatMap((row) => row.threadId ?? []))];
+}
+
+/** Each thread's cards among `rows`. */
+function byThread(rows: readonly ActionRow[]): Map<string, WaitingCard[]> {
+  const threads = new Map<string, ActionRow[]>();
+  for (const row of rows)
+    if (row.threadId) threads.set(row.threadId, [...(threads.get(row.threadId) ?? []), row]);
+  return new Map([...threads].map(([threadId, here]) => [threadId, cardsOf(here)]));
 }
 
 /**

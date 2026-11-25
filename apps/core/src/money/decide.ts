@@ -1,9 +1,9 @@
-import { isAsk } from "@auni/shared";
+import { CARD_FORMAT, isAsk } from "@auni/shared";
 import { and, eq, sql } from "drizzle-orm";
 
 import type { ProofRefusal } from "../auth/proof.ts";
 import { db } from "../db/client.ts";
-import { actions, CARD_FORMAT, type ActionRow } from "../db/schema.ts";
+import { actions, type ActionRow } from "../db/schema.ts";
 import { actionById, decideActions, proposalActions } from "./actions.ts";
 import { stepUpRefusal } from "./step-up.ts";
 

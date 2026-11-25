@@ -153,6 +153,15 @@ describe("retryAction", () => {
     expect(await started()).toEqual([]);
   });
 
+  // Allowed before an update, its card may not have shown what its run grants (a first sale's
+  // lasting permission), so a tap on Try again can't stand in for a fresh card.
+  it("refuses one whose card was drawn before cards said all they say now", async () => {
+    const row = await insertAction({ ...blipped, cardFormat: 1 });
+    expect(await retryAction(row, 1)).toEqual({ kind: "refused", reason: "not_retryable" });
+    expect(await actionRow(row.id)).toMatchObject({ status: "failed", attempts: 1 });
+    expect(await started()).toEqual([]);
+  });
+
   it("refuses one whose cash isn't there now, changing nothing", async () => {
     const row = await insertAction(blipped);
     cash.short = "Solana is $5 short";
@@ -237,6 +246,16 @@ describe("retryProposal", () => {
     expect(await retryProposal(proposalId, 2)).toEqual({ kind: "running" });
     expect(await actionRow(blip.id)).toMatchObject({ status: "running", attempts: 2 });
     expect(await actionRow(moved.id)).toMatchObject({ status: "failed", attempts: 1 });
+  });
+
+  it("runs no leg of a card drawn before cards said all they say now", async () => {
+    const { proposalId } = await card();
+    await db.update(actions).set({ cardFormat: 1 }).where(eq(actions.proposalId, proposalId));
+    expect(await retryProposal(proposalId, 3)).toEqual({
+      kind: "refused",
+      reason: "not_retryable",
+    });
+    expect(await started()).toEqual([]);
   });
 
   it("finds no card to run again for a proposal there is none of", async () => {

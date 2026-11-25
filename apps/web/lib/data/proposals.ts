@@ -7,6 +7,7 @@ import {
 } from "@auni/shared";
 
 import { requestCore } from "@/lib/core";
+import { DRAWN } from "@/lib/data/actions";
 
 /**
  * A plan card's legs, live from core: GET /proposals/:id, one tap that
@@ -81,6 +82,9 @@ export async function decideProposal(
   proposalId: string,
   decision: "allow" | "decline",
 ): Promise<LiveProposal> {
-  const body = await requestCore(`proposals/${proposalId}/${decision}`, { method: "POST" });
+  const body = await requestCore(`proposals/${proposalId}/${decision}`, {
+    method: "POST",
+    body: DRAWN,
+  });
   return toLiveProposal(body);
 }

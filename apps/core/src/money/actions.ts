@@ -1,4 +1,4 @@
-import { RAW_TRANSACTION_TOOLS, type actionWireSchema } from "@auni/shared";
+import { CARD_FORMAT, RAW_TRANSACTION_TOOLS, type actionWireSchema } from "@auni/shared";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -7,7 +7,7 @@ import { appById, closedHere } from "../apps/registry.ts";
 import { applyAsk, isAsk } from "../asks.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
-import { actions, CARD_FORMAT, threads, type ActionRow } from "../db/schema.ts";
+import { actions, threads, type ActionRow } from "../db/schema.ts";
 import { actionKind, wakeThread } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";

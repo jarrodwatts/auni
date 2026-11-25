@@ -3,6 +3,7 @@
 import { ChevronRight } from "lucide-react";
 
 import { Mascot } from "@/components/brand/mascot";
+import { Row, Rows } from "@/components/ui/row";
 import { chatHref } from "@/lib/app-links";
 
 import { PlaceLink } from "./open-place";
@@ -32,27 +33,20 @@ export function NeedsYouPlace() {
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-border lg:mt-4">
+            <Rows className="lg:mt-4">
               {needsYou.map((place) => (
                 <li key={place.thread.id}>
-                  <PlaceLink
-                    href={chatHref(place.thread.id)}
-                    thread={place.thread.id}
-                    className="-mx-2 flex min-h-16 items-center gap-3 rounded-control px-2 py-3 outline-none transition-colors duration-150 hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-ring/50"
+                  <Row
+                    asChild
+                    title={place.thread.title}
+                    meta={<span className="text-waiting">{askOf(place)}</span>}
+                    end={<ChevronRight aria-hidden className="size-4 text-faint" />}
                   >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-body font-medium text-ink">
-                        {place.thread.title}
-                      </span>
-                      <span className="mt-0.5 block truncate text-ui text-waiting">
-                        {askOf(place)}
-                      </span>
-                    </span>
-                    <ChevronRight aria-hidden className="size-4 flex-none text-faint" />
-                  </PlaceLink>
+                    <PlaceLink href={chatHref(place.thread.id)} thread={place.thread.id} />
+                  </Row>
                 </li>
               ))}
-            </ul>
+            </Rows>
           )}
         </div>
       </div>

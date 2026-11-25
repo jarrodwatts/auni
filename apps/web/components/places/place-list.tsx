@@ -1,9 +1,10 @@
 "use client";
 
-import { LayoutGrid } from "lucide-react";
+import { ChevronRight, Hand, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 
 import { useMoney } from "@/components/money/money-provider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { APPS_HREF, NEEDS_YOU_HREF, chatHref } from "@/lib/app-links";
 import { formatUsdcBalance } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,11 @@ function visibleChats(chats: readonly ChatPlace[], route: PlaceRoute): readonly 
   );
 }
 
+/** How many chats wait on the owner, as a phone's Chats leads to them: "2 need you". */
+function needYou(count: number): string {
+  return `${count} ${count === 1 ? "needs" : "need"} you`;
+}
+
 /** What a waiting chat asks of the person, in one line. */
 export function askOf({ thread }: ChatPlace): string {
   return thread.moneyLine ?? "Waiting for your answer";
@@ -38,8 +44,9 @@ export function askOf({ thread }: ChatPlace): string {
 
 /**
  * The places, then every chat in the one place it belongs: Needs you while something in it
- * waits on the person, Your takes while it holds positions, and Chats for the rest. On a phone's
- * Chats page (`nav={false}`) the tab bar holds Money and the rest, so only the chats show.
+ * waits on the person, Your takes while it moved money, and Chats for the rest. On a phone's
+ * Chats page (`nav={false}`) the tab bar holds Money, Needs you and the rest, so only the chats
+ * show, under one row that leads to Needs you.
  */
 export function PlaceList({
   folded = false,
@@ -92,22 +99,32 @@ export function PlaceList({
             active={route.kind === "needs-you"}
             folded={folded}
             href={NEEDS_YOU_HREF}
-            mark={<WaitingCount count={places.waitingCount} className="px-1" />}
-            title="Needs you"
+            mark={
+              nav ? (
+                <WaitingCount count={places.waitingCount} className="px-1" />
+              ) : (
+                <Hand aria-hidden className="size-[18px] text-waiting" strokeWidth={ICON_STROKE} />
+              )
+            }
+            title={nav ? "Needs you" : needYou(places.waitingCount)}
             titleClassName="font-medium text-waiting"
+            trailing={nav ? null : <ChevronRight aria-hidden className="size-4 text-faint" />}
           />
-          <ul inert={folded} className={cn("flex flex-col gap-px", FOLD_FADE)}>
-            {places.needsYou.map((place) => (
-              <ChatRow
-                key={place.thread.id}
-                active={isOpen(place)}
-                href={chatHref(place.thread.id)}
-                thread={place.thread}
-                status={place.status}
-                detail={<span className="text-waiting">{askOf(place)}</span>}
-              />
-            ))}
-          </ul>
+          {/* On a phone's Chats the tab holds the list itself; one row leads to it. */}
+          {nav ? (
+            <ul inert={folded} className={cn("flex flex-col gap-px", FOLD_FADE)}>
+              {places.needsYou.map((place) => (
+                <ChatRow
+                  key={place.thread.id}
+                  active={isOpen(place)}
+                  href={chatHref(place.thread.id)}
+                  thread={place.thread}
+                  status={place.status}
+                  detail={<span className="text-waiting">{askOf(place)}</span>}
+                />
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
@@ -122,7 +139,13 @@ export function PlaceList({
                 href={chatHref(place.thread.id)}
                 thread={place.thread}
                 status={place.status}
-                detail={place.take ? <TakeFigures take={place.take} layout="inline" /> : undefined}
+                detail={
+                  place.take === undefined ? (
+                    <Skeleton aria-hidden className="my-1 h-3 w-24 rounded-full" />
+                  ) : place.take ? (
+                    <TakeFigures take={place.take} />
+                  ) : undefined
+                }
               />
             ))}
           </ul>

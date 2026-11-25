@@ -11,7 +11,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { inputClass } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const PRESET_BUDGETS = [100, 250, 500, 1_000] as const;
@@ -129,7 +130,7 @@ export function AutonomyPicker({
             type="button"
             onClick={chooseAskFirst}
             className={cn(
-              "flex w-full items-start gap-2.5 rounded-control px-2.5 py-2.5 text-left transition-colors outline-none hover:bg-foreground/[0.045]",
+              "flex w-full items-start gap-2.5 rounded-control px-2.5 py-2.5 text-left transition-colors focus-ring-inset hover:bg-foreground/[0.045]",
               draftMode === "ask_first" && "bg-foreground/[0.045]",
             )}
           >
@@ -151,7 +152,7 @@ export function AutonomyPicker({
             type="button"
             onClick={() => setDraftMode("within_limits")}
             className={cn(
-              "flex w-full items-start gap-2.5 rounded-control px-2.5 py-2.5 text-left transition-colors outline-none hover:bg-foreground/[0.045]",
+              "flex w-full items-start gap-2.5 rounded-control px-2.5 py-2.5 text-left transition-colors focus-ring-inset hover:bg-foreground/[0.045]",
               draftMode === "within_limits" && "bg-primary/[0.06]",
             )}
           >
@@ -193,7 +194,7 @@ export function AutonomyPicker({
                     type="button"
                     onClick={() => setDraftBudget(String(preset))}
                     className={cn(
-                      "h-7 rounded-control text-caption font-medium transition-colors outline-none tabular-nums",
+                      "h-7 rounded-control text-caption font-medium tabular-nums transition-colors focus-ring",
                       activePreset
                         ? "bg-foreground text-background"
                         : "bg-background text-ink-soft ring-1 ring-foreground/[0.08] hover:text-ink",
@@ -228,16 +229,12 @@ export function AutonomyPicker({
                   step="any"
                   value={draftBudget}
                   onChange={(event) => setDraftBudget(event.target.value)}
-                  className="h-8 w-full rounded-control bg-background pr-2.5 pl-6 text-meta text-ink ring-1 ring-foreground/[0.1] outline-none focus:ring-ring tabular-nums"
+                  className={cn(inputClass, "h-8 pr-2.5 pl-6 text-meta tabular-nums")}
                 />
               </div>
-              <button
-                type="submit"
-                disabled={!validBudget}
-                className="h-8 flex-none rounded-control bg-foreground px-3 text-meta font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
+              <Button type="submit" size="sm" disabled={!validBudget} className="flex-none">
                 {auto ? "Update" : "Turn on"}
-              </button>
+              </Button>
             </form>
 
             {!alwaysOn ? (

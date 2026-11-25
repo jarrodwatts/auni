@@ -6,6 +6,7 @@ import { Eye, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { Thread } from "@/lib/data/views";
+import { inputClass } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import type { ChatStatus } from "./attention";
@@ -188,10 +189,7 @@ function TitleField({
         }
       }}
       onBlur={(event) => finish(event.currentTarget.value, false)}
-      className={cn(
-        ROW_LINE_CLASS_NAME,
-        "flex w-full rounded-control bg-background text-ink ring-1 ring-foreground/[0.14] outline-none ring-inset focus:ring-ring/70",
-      )}
+      className={cn(inputClass, ROW_LINE_CLASS_NAME, "flex")}
     />
   );
 }

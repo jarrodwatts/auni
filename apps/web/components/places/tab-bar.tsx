@@ -15,6 +15,7 @@ import { useAppDialogs } from "@/components/app/app-dialogs";
 import { VaultArt } from "@/components/brand/vault-art";
 import { useMe } from "@/components/personalization/use-me";
 import { AuniSheet } from "@/components/ui/auni-sheet";
+import { Row } from "@/components/ui/row";
 import { APPS_HREF, CHATS_HREF, NEEDS_YOU_HREF } from "@/lib/app-links";
 import { UNNAMED_OWNER } from "@/lib/account-display";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ import { PortfolioMark } from "./place-marks";
 import { usePlaceRoute, usePlaces } from "./use-places";
 
 const TAB_CLASS_NAME =
-  "group/tab relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 pt-1.5 text-caption font-medium outline-none transition-colors duration-150 focus-visible:text-ink";
+  "group/tab relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 pt-1.5 text-caption font-medium transition-colors duration-150 focus-ring-inset";
 const ICON = "size-[22px]";
 
 /**
@@ -47,7 +48,7 @@ export function TabBar({
   return (
     <nav
       aria-label="Places"
-      className="flex flex-none border-t border-border bg-background pb-[env(safe-area-inset-bottom)] pointer-coarse:group-has-[textarea:focus]/shell:hidden lg:hidden"
+      className="flex flex-none border-t border-border bg-background pb-[max(0.5rem,env(safe-area-inset-bottom))] pointer-coarse:group-has-[textarea:focus]/shell:hidden lg:hidden"
     >
       <PlaceLink
         href={CHATS_HREF}
@@ -119,8 +120,7 @@ function TabMark({
   );
 }
 
-const MORE_ROW_CLASS_NAME =
-  "flex h-14 w-full items-center gap-3.5 rounded-control px-3 text-left text-body text-ink outline-none transition-colors duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 active:bg-foreground/[0.06]";
+const MORE_ICON = "size-5 text-muted-foreground";
 
 /** More, as a sheet from the bottom: the owner, then Apps, Add money and Settings. */
 export function MoreSheet({
@@ -136,7 +136,7 @@ export function MoreSheet({
     onOpenChange(false);
     open();
   };
-  const chevron = <ChevronRight aria-hidden className="ml-auto size-4 text-faint" />;
+  const chevron = <ChevronRight aria-hidden className="size-4 text-faint" />;
 
   return (
     <AuniSheet open={open} onOpenChange={onOpenChange} side="bottom" title="More">
@@ -154,21 +154,30 @@ export function MoreSheet({
             </span>
           </span>
         </div>
-        <PlaceLink href={APPS_HREF} className={MORE_ROW_CLASS_NAME}>
-          <LayoutGrid aria-hidden className="size-5 text-muted-foreground" strokeWidth={1.75} />
-          Apps
-          {chevron}
-        </PlaceLink>
-        <button type="button" onClick={run(openAddMoney)} className={MORE_ROW_CLASS_NAME}>
-          <Plus aria-hidden className="size-5 text-muted-foreground" strokeWidth={1.75} />
-          Add money
-          {chevron}
-        </button>
-        <button type="button" onClick={run(() => openSettings())} className={MORE_ROW_CLASS_NAME}>
-          <Settings aria-hidden className="size-5 text-muted-foreground" strokeWidth={1.75} />
-          Settings
-          {chevron}
-        </button>
+        <Row
+          asChild
+          mark={<LayoutGrid aria-hidden className={MORE_ICON} strokeWidth={1.75} />}
+          title="Apps"
+          end={chevron}
+        >
+          <PlaceLink href={APPS_HREF} />
+        </Row>
+        <Row
+          asChild
+          mark={<Plus aria-hidden className={MORE_ICON} strokeWidth={1.75} />}
+          title="Add money"
+          end={chevron}
+        >
+          <button type="button" onClick={run(openAddMoney)} />
+        </Row>
+        <Row
+          asChild
+          mark={<Settings aria-hidden className={MORE_ICON} strokeWidth={1.75} />}
+          title="Settings"
+          end={chevron}
+        >
+          <button type="button" onClick={run(() => openSettings())} />
+        </Row>
       </div>
     </AuniSheet>
   );

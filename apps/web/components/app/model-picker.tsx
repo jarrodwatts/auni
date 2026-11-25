@@ -201,7 +201,7 @@ export function ModelPicker({
                         type="button"
                         onClick={() => selectModel(brain, model)}
                         className={cn(
-                          "flex w-full items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-ui transition-colors outline-none hover:bg-foreground/[0.045] focus-visible:bg-foreground/[0.045]",
+                          "flex w-full items-center justify-between gap-2 rounded-control px-2.5 py-2 text-left text-ui transition-colors focus-ring-inset hover:bg-foreground/[0.045]",
                           selected ? "bg-foreground/[0.045] font-medium text-ink" : "text-ink-soft",
                         )}
                       >
@@ -245,7 +245,7 @@ export function ModelPicker({
                     aria-checked={selected}
                     onClick={() => selectEffort(effort)}
                     className={cn(
-                      "flex h-7 items-center justify-center rounded-control text-caption font-medium transition-colors outline-none",
+                      "flex h-7 items-center justify-center rounded-control text-caption font-medium transition-colors focus-ring",
                       selected
                         ? "bg-background text-ink ring-1 ring-border"
                         : "text-muted-foreground hover:text-ink",

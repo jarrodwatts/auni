@@ -28,10 +28,10 @@ const take = (value: bigint) => ({ value, change: null });
 describe("placesOf", () => {
   it("puts each chat in one place: waiting on the owner, holding positions, or the rest", () => {
     const threads = [
-      thread("Buy $250 of Nvidia", { state: "needs_user" }),
-      thread("AI buildout"),
+      thread("Buy $250 of Nvidia", { moneyLine: "Buy $250" }),
+      thread("AI buildout", { moveCount: 2 }),
       thread("How am I doing?"),
-      thread("Fed bet", { asking: true }),
+      thread("Fed bet", { asking: true, moveCount: 1 }),
     ];
     const takes = new Map([
       ["AI buildout" as ThreadId, take(2_000_000n)],
@@ -44,30 +44,48 @@ describe("placesOf", () => {
     expect(places.waitingCount).toBe(2);
   });
 
-  it("orders takes pinned first, then by what they hold", () => {
+  it("orders takes pinned first, then newest, never by what they're worth as prices tick", () => {
     const threads = [
-      thread("Small"),
-      thread("Big"),
-      thread("Pinned", { pinned: true, pinnedAt: "2026-11-01T00:00:00Z" }),
+      thread("Older", { moveCount: 1 }),
+      thread("Newer", { moveCount: 1 }),
+      thread("Pinned", { moveCount: 1, pinned: true, pinnedAt: "2026-11-01T00:00:00Z" }),
     ];
-    const takes = new Map([
-      ["Small" as ThreadId, take(1n)],
-      ["Big" as ThreadId, take(9n)],
-      ["Pinned" as ThreadId, take(5n)],
-    ]);
-    expect(titles(placesOf(threads, takes).takes)).toEqual(["Pinned", "Big", "Small"]);
+    const order = (older: bigint, newer: bigint) =>
+      titles(
+        placesOf(
+          threads,
+          new Map([
+            ["Older" as ThreadId, take(older)],
+            ["Newer" as ThreadId, take(newer)],
+          ]),
+        ).takes,
+      );
+    expect(order(1_000n, 999n)).toEqual(["Pinned", "Newer", "Older"]);
+    expect(order(998n, 999n)).toEqual(["Pinned", "Newer", "Older"]);
   });
 
-  it("keeps a chat Auni is still answering out of Needs you until it's the owner's turn", () => {
-    const places = placesOf([thread("Busy", { state: "running", asking: true })], new Map());
-    expect(places.needsYou).toEqual([]);
+  it("keeps a take in Your takes before its value is read, and once it holds nothing priced", () => {
+    const threads = [thread("AI buildout", { moveCount: 2 }), thread("Chat")];
+    const before = placesOf(threads, new Map());
+    expect(titles(before.takes)).toEqual(["AI buildout"]);
+    expect(before.takes[0]?.take).toBeUndefined();
+    const read = placesOf(threads, new Map([["AI buildout" as ThreadId, null]]));
+    expect(titles(read.takes)).toEqual(["AI buildout"]);
+    expect(titles(read.others)).toEqual(["Chat"]);
+  });
+
+  it("keeps a held order in Needs you while Auni answers in its chat", () => {
+    const held = thread("Fed bet", { state: "running", moneyLine: "Status unknown: Sell Yes" });
+    const places = placesOf([held, thread("Busy", { state: "running" })], new Map());
+    expect(titles(places.needsYou)).toEqual(["Fed bet"]);
+    expect(places.waitingCount).toBe(1);
   });
 
   it("leaves archived chats to search, unless something in one still waits", () => {
     const places = placesOf(
       [
         thread("Old", { archived: true }),
-        thread("Old but waiting", { archived: true, state: "needs_user" }),
+        thread("Old but waiting", { archived: true, moneyLine: "Sell Yes" }),
       ],
       new Map(),
     );

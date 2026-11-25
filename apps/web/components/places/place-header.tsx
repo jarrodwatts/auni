@@ -5,9 +5,9 @@ import { createContext, useContext, type ReactNode } from "react";
 
 import { HEADER_BUTTON_CLASS_NAME } from "@/components/app/mobile-thread-menu";
 import { buttonVariants } from "@/components/ui/button";
-import { CHATS_HREF } from "@/lib/app-links";
 import { cn } from "@/lib/utils";
 
+import { backPlace } from "./back-place";
 import { PlaceLink } from "./open-place";
 
 interface PlaceLayout {
@@ -32,7 +32,8 @@ function usePlaceLayout(): PlaceLayout {
  * Where you are: the place's mark and name, and when its pane is closed (or the screen too narrow
  * for it), what it is worth, which opens the pane; one with no money has the pane's button
  * instead. `actions` holds the place's own menu. On a phone a `root` place (one the tab bar or
- * More reaches) has no way back, as the tab bar is under it; a chat goes back to Chats.
+ * More reaches) has no way back, as the tab bar is under it; a chat goes back to the list it was
+ * opened from.
  */
 export function PlaceHeader({
   icon,
@@ -129,8 +130,9 @@ export function PlaceHeader({
 const BACK_CHEVRON = <ChevronLeft aria-hidden className="size-[22px]" strokeWidth={2} />;
 
 /**
- * A phone's one tap from a chat back to the list of them; wide screens have the sidebar instead.
- * The preview draws outside the app's providers, which PlaceLink reads, so it gets a bare chevron.
+ * A phone's one tap from a chat back to the list it came from (see backPlace); wide screens have
+ * the sidebar instead. The preview draws outside the app's providers, which PlaceLink reads, so
+ * it gets a bare chevron.
  */
 function BackToChats({ preview }: { readonly preview: boolean }) {
   if (preview)
@@ -139,10 +141,11 @@ function BackToChats({ preview }: { readonly preview: boolean }) {
         {BACK_CHEVRON}
       </span>
     );
+  const back = backPlace();
   return (
     <PlaceLink
-      href={CHATS_HREF}
-      aria-label="Back to chats"
+      href={back.href}
+      aria-label={back.label}
       className={cn(HEADER_BUTTON_CLASS_NAME, "-mr-1.5")}
     >
       {BACK_CHEVRON}

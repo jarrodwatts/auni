@@ -33,19 +33,22 @@ export function takeValue(holdings: readonly Holding[]): TakeValue | null {
   return value > 0n ? { value, change } : null;
 }
 
+/** A take is a chat that moved money, which the thread list says before any value is read. */
+export const isTake = (thread: Thread) => thread.moveCount > 0;
+
 /**
- * Every take's value, by thread: a take is a thread that holds positions. Only threads that
- * moved money can hold any, so only theirs are read, each from the same read as its inspector.
- * (Core's `GET /takes`, once there, answers this in one read.)
+ * Every take's value, by thread, each from the same read as its inspector: absent until its read
+ * lands, null once read when it holds nothing now. (Core's `GET /takes`, once there, answers this
+ * in one read.)
  */
-export function useTakes(threads: readonly Thread[]): ReadonlyMap<ThreadId, TakeValue> {
-  const moved = useMemo(() => threads.filter((thread) => thread.moveCount > 0), [threads]);
+export function useTakes(threads: readonly Thread[]): ReadonlyMap<ThreadId, TakeValue | null> {
+  const moved = useMemo(() => threads.filter(isTake), [threads]);
   const combine = useCallback(
     (states: readonly { readonly data?: ThreadState }[]) => {
-      const takes = new Map<ThreadId, TakeValue>();
+      const takes = new Map<ThreadId, TakeValue | null>();
       moved.forEach((thread, index) => {
-        const take = takeValue(states[index]?.data?.holdings ?? []);
-        if (take) takes.set(thread.id, take);
+        const holdings = states[index]?.data?.holdings;
+        if (holdings) takes.set(thread.id, takeValue(holdings));
       });
       return takes;
     },

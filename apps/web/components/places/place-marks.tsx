@@ -34,33 +34,27 @@ const MONEY_LABEL: Record<
 };
 
 /**
- * A take's worth and its day: "$2,932.30" over "+2.1%" in a list, or side by side in a header.
- * The change is green or red only as a number, and absent when a holding's day isn't known.
+ * A take's worth and its day, side by side: "$2,932.30 ▲1.5% today". The word says which change
+ * it is, since Money shows each take's change since entry. The change is green or red only as a
+ * number, and absent when a holding's day isn't known.
  */
 export function TakeFigures({
   take,
-  layout = "stacked",
   className,
 }: {
   readonly take: TakeValue;
-  readonly layout?: "stacked" | "inline";
   readonly className?: string;
 }) {
   return (
-    <span
-      className={cn(
-        "flex flex-none tabular-nums lining-nums",
-        layout === "stacked" ? "flex-col items-end" : "items-baseline gap-2",
-        className,
-      )}
-    >
+    <span className={cn("flex flex-none items-baseline gap-2 tabular-nums", className)}>
       <span className="font-medium text-ink">{formatUsdcBalance(take.value)}</span>
       {take.change === null ? null : (
-        <Change
-          pct={changePercent(take.change, take.value)}
-          period="today"
-          className={layout === "stacked" ? "text-caption" : undefined}
-        />
+        <span className="flex items-baseline gap-1">
+          <Change pct={changePercent(take.change, take.value)} period="today" />
+          <span aria-hidden className="text-muted-foreground">
+            today
+          </span>
+        </span>
       )}
     </span>
   );

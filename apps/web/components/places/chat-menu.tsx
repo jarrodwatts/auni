@@ -30,7 +30,7 @@ const ITEM =
   "min-h-9 gap-2.5 rounded-control px-2.5 py-1.5 text-ui text-ink focus:bg-foreground/[0.045] focus:text-ink [&_svg]:text-faint";
 
 function heldBy(thread: Thread): { archive: boolean; delete: boolean; why: string } | null {
-  if (thread.state === "needs_user")
+  if (thread.moneyLine)
     return {
       archive: true,
       delete: true,
@@ -85,7 +85,7 @@ export function ChatMenu({
             className={
               place === "header"
                 ? "flex size-8 flex-none items-center justify-center rounded-card text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-ink"
-                : "auni-touch-target flex size-6 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors duration-150 hover:bg-foreground/[0.06] hover:text-ink focus-visible:text-ink focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-ink"
+                : "auni-touch-target flex size-6 items-center justify-center rounded-control text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.06] hover:text-ink focus-visible:text-ink focus-ring data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-ink"
             }
           >
             <Ellipsis aria-hidden className={place === "header" ? "size-[18px]" : "size-4"} />

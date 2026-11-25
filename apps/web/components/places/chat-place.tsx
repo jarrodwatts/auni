@@ -94,9 +94,14 @@ function headerFigures(
   if (!take && !auto && !watch) return undefined;
   return (
     <>
-      {take ? <TakeFigures take={take} layout="inline" /> : null}
+      {take ? <TakeFigures take={take} /> : null}
       {auto ? (
-        <span className={cn("flex items-center gap-1 text-primary", take && "max-sm:hidden")}>
+        <span
+          className={cn(
+            "flex items-center gap-1 text-primary tabular-nums",
+            take && "max-sm:hidden",
+          )}
+        >
           <Zap aria-hidden className="size-3.5" />
           Auto: {formatUsd(state?.freeBudgetUsd ?? thread.budgetUsd)} left
         </span>

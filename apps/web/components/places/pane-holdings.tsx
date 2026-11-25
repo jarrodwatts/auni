@@ -105,9 +105,7 @@ function HoldingRow({ holding }: { readonly holding: Holding }) {
         ) : null}
       </div>
       <div className="flex-none text-right">
-        <p className="text-body font-semibold text-ink tabular-nums">
-          {formatUsdcBalance(value)}
-        </p>
+        <p className="text-body font-semibold text-ink tabular-nums">{formatUsdcBalance(value)}</p>
         {change === null ? null : (
           <Change
             pct={changePercent(change, value)}

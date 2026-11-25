@@ -8,8 +8,10 @@ import type { Thread } from "@/lib/data/views";
 export type PlaceAttention = "waiting" | "unread" | null;
 
 export function attentionOf(thread: Thread | undefined): PlaceAttention {
-  if (!thread || thread.state === "running") return null;
-  if (thread.state === "needs_user" || thread.asking) return "waiting";
+  if (!thread) return null;
+  // A card waits on the person even while Auni writes (a held order wakes it to say so); core
+  // calls a question asked only once the answer is done.
+  if (thread.moneyLine || thread.asking) return "waiting";
   return thread.unread ? "unread" : null;
 }
 

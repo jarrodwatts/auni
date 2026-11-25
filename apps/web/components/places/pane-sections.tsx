@@ -44,7 +44,7 @@ export function PaneWatches({ threadId }: { readonly threadId: ThreadId }) {
               type="button"
               aria-haspopup="dialog"
               onClick={() => setOpen(true)}
-              className="flex w-full items-center gap-3 rounded-control px-2 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="flex w-full items-center gap-3 rounded-control px-2 py-2.5 text-left transition-colors duration-150 hover:bg-foreground/[0.03] focus-ring-inset"
             >
               <WatchIcon watch={watch} />
               <span className="min-w-0 flex-1">

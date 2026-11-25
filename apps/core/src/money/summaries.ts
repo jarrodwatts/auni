@@ -38,13 +38,17 @@ export function moneyLine(moneys: readonly (Money | null)[]): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** What a waiting card asks, in one line: the move itself, or its moves counted with their money. */
+/**
+ * What a waiting card asks, in one line: its move in the card's own short words with the money
+ * beside it ("Sell Yes, about $201 back"; "Buy $250" already says it), or its moves counted with
+ * their money.
+ */
 export function askLine(
-  legs: readonly { readonly summary: string; readonly money: Money | null }[],
+  legs: readonly { readonly says: string; readonly money: Money | null }[],
 ): string | null {
   const [first] = legs;
   if (!first) return null;
-  if (legs.length === 1) return first.summary;
   const money = moneyLine(legs.map((leg) => leg.money));
-  return `${legs.length} moves${money ? `, ${money}` : ""}`;
+  if (legs.length > 1) return `${legs.length} moves${money ? `, ${money}` : ""}`;
+  return money && !first.says.includes("$") ? `${first.says}, ${money}` : first.says;
 }

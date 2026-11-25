@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
+import { requestComposerFocus } from "@/components/app/composer";
 import { useStartConversation } from "@/components/app/use-start-conversation";
 import { useMoney } from "@/components/money/money-provider";
 import { LogoImage, preloadLogo } from "@/components/brand/marks";
@@ -37,7 +38,8 @@ const ROW_SPACING = { paddingLeft: INSET, gap: GAP } as const;
 
 /**
  * Ways into a new chat, drawn from what Auni sees of the owner (core's starting points), each
- * wearing a picture of what it's about. A tap starts the chat with its prompt.
+ * wearing a picture of what it's about. A click starts the chat with its prompt; a tap on a phone
+ * puts the prompt in the box for the owner to read and send.
  */
 export function StartingPoints() {
   const { busy, error, start } = useStartConversation();
@@ -73,10 +75,16 @@ export function StartingPoints() {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void start(point.prompt)}
+                onClick={() => {
+                  // A phone has no pointer to show a point's sources or its words before they
+                  // go: the words land in the box, to read, change, then send.
+                  if (matchMedia("(pointer: coarse)").matches)
+                    requestComposerFocus("new", point.prompt, true);
+                  else void start(point.prompt);
+                }}
                 title={point.sources.map(cited).join("\n")}
                 style={ROW_SPACING}
-                className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60`}
+                className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-ring-inset disabled:pointer-events-none disabled:opacity-60`}
               >
                 {/* 15px on a phone, PHONE_TEXT_PX, which core measures each line at (lineFits). */}
                 <PointImage image={point.image} />

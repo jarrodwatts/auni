@@ -9,7 +9,7 @@ import { APPS_HREF, CHATS_HREF, NEEDS_YOU_HREF } from "@/lib/app-links";
 import type { Thread } from "@/lib/data/views";
 
 import { attentionOf, chatStatus, type ChatStatus } from "./attention";
-import { useTakes, type TakeValue } from "./use-takes";
+import { isTake, useTakes, type TakeValue } from "./use-takes";
 
 /** Where the person is: Money, Activity, Apps, Needs you, Chats, a new take, or a thread. */
 export type PlaceRoute =
@@ -43,8 +43,8 @@ export interface ChatPlace {
   /** A card or a question in it waits on the person. */
   readonly waiting: boolean;
   readonly status: ChatStatus;
-  /** What it holds, when it holds positions: then it is a take. */
-  readonly take: TakeValue | null;
+  /** A take's value: undefined until read, null when it holds nothing now or isn't a take. */
+  readonly take: TakeValue | null | undefined;
 }
 
 const MINUTE_MS = 60_000;
@@ -64,10 +64,6 @@ export function useMinute(): number {
 }
 
 const newestFirst = (a: Thread, b: Thread) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-const mostFirst = (a: TakeValue | null, b: TakeValue | null) => {
-  const [left, right] = [a?.value ?? 0n, b?.value ?? 0n];
-  return left === right ? 0 : left > right ? -1 : 1;
-};
 const pinnedFirst = (a: Thread, b: Thread) =>
   Number(b.pinned) - Number(a.pinned) ||
   Date.parse(b.pinnedAt ?? "0") - Date.parse(a.pinnedAt ?? "0");
@@ -75,26 +71,30 @@ const pinnedFirst = (a: Thread, b: Thread) =>
 /**
  * Every thread, sorted into the places it shows: each once, in the first that fits.
  * - needsYou: a card or a question waits on the person, newest first
- * - takes: it holds positions, pinned first, then the most money first
+ * - takes: it moved money (known before its value is), pinned first, then newest, so a row
+ *   never moves as its value loads or prices tick
  * - others: every other chat, pinned first, then newest
  * - archived: put away, with nothing waiting (search finds them)
  * `chats` is every listed thread, newest first.
  */
-export function placesOf(threads: readonly Thread[], takes: ReadonlyMap<ThreadId, TakeValue>) {
+export function placesOf(
+  threads: readonly Thread[],
+  takes: ReadonlyMap<ThreadId, TakeValue | null>,
+) {
   const toPlace = (thread: Thread): ChatPlace => ({
     thread,
     waiting: attentionOf(thread) === "waiting",
     status: chatStatus(thread),
-    take: takes.get(thread.id) ?? null,
+    take: isTake(thread) ? takes.get(thread.id) : null,
   });
   const all = threads.toSorted(newestFirst).map(toPlace);
   const listed = all.filter(({ thread, waiting }) => !thread.archived || waiting);
   const needsYou = listed.filter(({ waiting }) => waiting);
   const takesHeld = listed
-    .filter(({ waiting, take }) => !waiting && take)
-    .toSorted((a, b) => pinnedFirst(a.thread, b.thread) || mostFirst(a.take, b.take));
+    .filter(({ waiting, thread }) => !waiting && isTake(thread))
+    .toSorted((a, b) => pinnedFirst(a.thread, b.thread));
   const others = listed
-    .filter(({ waiting, take }) => !waiting && !take)
+    .filter(({ waiting, thread }) => !waiting && !isTake(thread))
     .toSorted((a, b) => pinnedFirst(a.thread, b.thread));
   return {
     chats: listed,

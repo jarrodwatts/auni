@@ -19,7 +19,7 @@ export const RAIL_FADE =
   "opacity-0 transition-opacity duration-100 ease-settle group-data-folded/sidebar:opacity-100 group-data-folded/sidebar:delay-100 group-data-folded/sidebar:duration-200 motion-reduce:transition-none";
 
 export const ROW_CLASS_NAME =
-  "group/row relative isolate flex items-center rounded-control outline-none before:absolute before:inset-y-0 before:right-0 before:left-0 before:-z-10 before:rounded-control before:[transition:right_340ms_var(--motion-settle),background-color_150ms] hover:before:bg-foreground/[0.04] focus-visible:before:ring-2 focus-visible:before:ring-ring/50 group-data-folded/sidebar:before:right-[calc(100%-44px)] motion-reduce:before:transition-none";
+  "group/row relative isolate flex items-center rounded-control outline-none before:absolute before:inset-y-0 before:right-0 before:left-0 before:-z-10 before:rounded-control before:[transition:right_340ms_var(--motion-settle),background-color_150ms] hover:before:bg-foreground/[0.04] focus-visible:before:ring-2 focus-visible:before:ring-ring focus-visible:before:ring-inset group-data-folded/sidebar:before:right-[calc(100%-44px)] motion-reduce:before:transition-none";
 
 export const ROW_LINE_CLASS_NAME =
   "h-9 gap-2.5 px-3 text-ui group-data-mobile/sidebar:h-11 group-data-mobile/sidebar:text-reading";
@@ -212,7 +212,7 @@ function Hint({
 }
 
 const HEADER_BUTTON_CLASS_NAME =
-  "group/row auni-touch-target flex size-8 flex-none items-center justify-center rounded-control outline-none transition-[background-color,transform] duration-200 ease-settle hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95";
+  "group/row auni-touch-target flex size-8 flex-none items-center justify-center rounded-control transition-[background-color,transform] duration-200 ease-settle hover:bg-foreground/[0.04] focus-ring active:scale-95";
 
 export function SearchButton({ onClick }: { readonly onClick: () => void }) {
   return (

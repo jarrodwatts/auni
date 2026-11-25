@@ -92,6 +92,55 @@ describe("listThreads", () => {
     expect(await moving()).toBeNull();
   });
 
+  it("says what a waiting card asks as its button does, with its money", async () => {
+    const sell = await insertThread();
+    const buy = await insertThread();
+    const key = await insertThread();
+    for (const thread of [sell, buy, key]) {
+      await say(thread.id, "assistant", [{ type: "text", text: "Here it is." }], 1);
+    }
+    const face = (action: string) => ({
+      title: action,
+      action,
+      working: action,
+      context: "Will the Fed cut rates in December?",
+      figures: [],
+      finePrint: null,
+      receipt: { title: action, detail: null, amount: null },
+    });
+    await insertAction({
+      threadId: sell.id,
+      status: "awaiting_permission",
+      summary: 'Sell 310 Yes shares on "Will the Fed cut rates in December?"',
+      amountUsd: "0",
+      details: { returnsUsd: "201.50" },
+      card: face("Sell Yes"),
+    });
+    await insertAction({
+      threadId: buy.id,
+      status: "awaiting_permission",
+      amountUsd: "250",
+      card: face("Buy {amount}"),
+    });
+    await insertAction({
+      threadId: key.id,
+      status: "awaiting_permission",
+      tool: "request_secret",
+      summary: "Elfa API key",
+      amountUsd: "0",
+      input: { field: "ELFA_API_KEY", app: "elfa", why: "To read what's being said" },
+    });
+
+    const lines = Object.fromEntries(
+      (await listThreads()).map(({ id, moneyLine }) => [id, moneyLine]),
+    );
+    expect(lines).toEqual({
+      [sell.id]: "Sell Yes, about $201.50 back",
+      [buy.id]: "Buy $250",
+      [key.id]: "Paste your Elfa API key",
+    });
+  });
+
   it("leaves out a card that was declined, waits, or started before the person last read", async () => {
     const thread = await insertThread({ readAt: at(5) });
     await say(thread.id, "assistant", [{ type: "text", text: "Want it?" }], 1);

@@ -256,6 +256,18 @@ function whatItAsksFor(row: ActionRow): Pick<AskCard, "app" | "field"> {
   return { field, app };
 }
 
+/**
+ * What an ask waits on the owner to do, in a few words, for a list of what needs them: its
+ * button's words ("Auto up to $500", "Connect Elfa"), or, for a secret, the field to paste, since
+ * its button says only "Save".
+ */
+export function askWaits(row: Pick<ActionRow, "tool" | "input" | "summary">): string {
+  if (!isAsk(row.tool)) throw new Error(`${row.tool} is not an ask.`);
+  if (row.tool === "request_secret") return `Paste your ${row.summary}`;
+  const ask = ASKS[row.tool] as Ask<unknown>;
+  return ask.action(ask.input.parse(row.input));
+}
+
 /** An ask no card was recorded for; its message says why, for the agent. */
 export class AskRefused extends Error {}
 

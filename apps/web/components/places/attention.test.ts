@@ -9,10 +9,16 @@ const thread = (fields: Partial<Thread>) =>
 
 describe("attentionOf", () => {
   it("marks a thread waiting while a card or a question waits on the person", () => {
-    expect(attentionOf(thread({ state: "needs_user" }))).toBe("waiting");
+    expect(attentionOf(thread({ moneyLine: "Buy $250" }))).toBe("waiting");
     expect(attentionOf(thread({ asking: true }))).toBe("waiting");
     expect(attentionOf(thread({ unread: true }))).toBe("unread");
     expect(attentionOf(thread({}))).toBeNull();
+  });
+
+  it("keeps a card waiting while Auni is answering in its chat", () => {
+    const held = thread({ state: "running", moneyLine: "Status unknown: Sell Yes" });
+    expect(attentionOf(held)).toBe("waiting");
+    expect(attentionOf(thread({ state: "running" }))).toBeNull();
   });
 });
 

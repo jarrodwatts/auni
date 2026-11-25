@@ -1114,7 +1114,7 @@ export interface Channel {
    * like an event's `id`, is never another message's, even after the owner moves to a new bot or
    * account, since the hub keys replies and cards by it for good.
    */
-  send(chat: string, message: ChannelMessage): Promise<readonly string[]>;
+  send(chat: string, message: ChannelMessage, replyTo?: string): Promise<readonly string[]>;
   /**
    * Replaces what one sent message shows, with a message that fits in one (the hub draws every
    * card to, see channels/draw.ts): false when it never can again (the owner deleted it, or it was
@@ -1123,6 +1123,8 @@ export interface Channel {
   edit(ref: string, message: ChannelMessage): Promise<boolean>;
   /** Shows the chat that an answer is being written. */
   typing(chat: string): Promise<void>;
+  /** Acknowledges a message the hub accepted from the owner. */
+  acknowledge?(ref: string): Promise<void>;
   /** How the owner sends this pairing code from the app: a link that opens the chat with it. */
   pairingHint(code: string): Promise<string>;
 }
@@ -1154,6 +1156,7 @@ export type ChannelEvent =
       readonly direct: boolean;
       /** The pairing code the link that opened the chat carried, if it did. */
       readonly code: string | null;
+      readonly command?: "pending" | "portfolio";
     }
   | {
       readonly kind: "press";
@@ -1164,6 +1167,8 @@ export type ChannelEvent =
       readonly message: string;
       /** The button's `press`, exactly as the hub drew it. */
       readonly data: string;
+      /** Show the decision before the card is redrawn, when the channel supports it. */
+      readonly answer?: (text: string) => void;
     };
 
 export interface ChannelMessage {
@@ -1172,6 +1177,8 @@ export interface ChannelMessage {
    * backslash is the mark itself, which is how core draws words from outside (`literal`).
    */
   readonly text: string;
+  /** More Markdown the channel can fold under the message, with a short heading first. */
+  readonly detail?: string;
   /** Rows of buttons under it. */
   readonly buttons?: readonly (readonly ChannelButton[])[];
 }
@@ -1179,6 +1186,7 @@ export interface ChannelMessage {
 export type ChannelButton =
   /** `press` (at most 64 characters) comes back as a press event's `data`. */
   | { readonly label: string; readonly press: string }
+  | { readonly label: string; readonly copy: string }
   | { readonly label: string; readonly url: string };
 
 /** The source won't watch this condition: it's malformed, or names something it doesn't know. */

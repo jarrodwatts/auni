@@ -1,4 +1,4 @@
-import { CLOSED, HELD, HELD_SAFE, type HeldWhy } from "@auni/shared";
+import { CLOSED, HELD, type HeldWhy } from "@auni/shared";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -576,9 +576,10 @@ describe("a run cut off after its order went out with no answer", () => {
       moving: null,
     });
     // A channel's copy of the card: the same words, and the way to its two taps.
-    const drawn = drawCard({ legs: [row], inTheApp: false, decidedIn: null, link: "/app" }, null);
-    expect(drawn.text).toContain(`Not confirmed: ${HELD.unanswered} ${HELD_SAFE}`);
-    expect(drawn.buttons).toEqual([[{ label: "Open in the app", url: "/app" }]]);
+    const link = "https://evo-t1.example.ts.net/app";
+    const drawn = drawCard({ legs: [row], inTheApp: false, decidedIn: null, link }, null);
+    expect(drawn.text).toContain(`Status unknown. ${HELD.unanswered} Auni won't send this again.`);
+    expect(drawn.buttons).toEqual([[{ label: "Check status", url: link }]]);
     // The agent: woken once, told what is known and not to send it again.
     const [turn] = await jobsOf("turn");
     expect(turn?.data.reason).toContain("is held.");

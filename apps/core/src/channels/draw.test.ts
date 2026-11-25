@@ -1,9 +1,11 @@
+import { depositCardSchema } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
 import type { ActionRow } from "../db/schema.ts";
 import {
   drawCard,
   drawLink,
+  drawNotice,
   drawQuestion,
   fitsHere,
   literal,
@@ -15,6 +17,9 @@ import {
 const leg = (fields: Partial<ActionRow> = {}): ActionRow =>
   ({
     id: "a1",
+    tool: "stock_trade",
+    amountUsd: "10.00",
+    input: {},
     summary: "Buy about $10 of Nvidia",
     status: "awaiting_permission",
     lines: [
@@ -40,10 +45,10 @@ const view = (legs: ActionRow[], fields: Partial<CardView> = {}): CardView => ({
 describe("drawCard", () => {
   it("draws a waiting card from its row, with the grant on Allow and Decline", () => {
     expect(drawCard(view([leg()]), "g1")).toEqual({
-      text: "**Buy about $10 of Nvidia**\nYou give: 10 USDC\nYou get: NVDAx\nWaiting for you",
+      text: "**Buy about $10 of Nvidia**\n> You give: 10 USDC\n> You get: NVDAx\nWaiting on you",
       buttons: [
         [
-          { label: "Allow", press: "allow:g1" },
+          { label: "Buy about $10 of Nvidia", press: "allow:g1" },
           { label: "Decline", press: "decline:g1" },
         ],
       ],
@@ -53,7 +58,7 @@ describe("drawCard", () => {
   it("sends a card that takes the owner's proof to the app, with no button that decides it", () => {
     const drawn = drawCard(view([leg()], { inTheApp: true }), "g1");
     expect(drawn.buttons).toEqual([
-      [{ label: "Open in the app", url: "https://auni.example/app/chat/t" }],
+      [{ label: "Open in Auni", url: "https://auni.example/app/chat/t" }],
     ]);
     expect(JSON.stringify(drawn)).not.toContain("g1");
   });
@@ -68,13 +73,13 @@ describe("drawCard", () => {
     expect(fitsHere([leg()])).toBe(true);
     const drawn = drawCard(view([long], { inTheApp: true }), null);
     expect(drawn.text).toBe(
-      "**Save a routine: check-rates**\nWaiting for you\nIt's too long to show here in full, so it's allowed in the app, where all of it shows.",
+      "**Save a routine: check-rates**\nWaiting on you\n\nSee the full card in Auni before you decide.",
     );
     expect(drawn.buttons).toEqual([
-      [{ label: "Open in the app", url: "https://auni.example/app/chat/t" }],
+      [{ label: "Open in Auni", url: "https://auni.example/app/chat/t" }],
     ]);
     expect(drawCard(view([{ ...long, status: "done" }], { decidedIn: "the app" }), null).text).toBe(
-      "**Save a routine: check-rates**\nSaved\nAllowed in the app.",
+      "**Save a routine: check-rates**\nSaved\n\nAllowed in the app.",
     );
   });
 
@@ -90,13 +95,14 @@ describe("drawCard", () => {
       steps.map((row) =>
         drawCard(view([row], { decidedIn: "here" }), null)
           .text.split("\n")
+          .filter(Boolean)
           .slice(-2),
       ),
     ).toEqual([
-      ["Starting", "Allowed here."],
-      ["Running", "Allowed here."],
-      ["Sent, on its way", "Allowed here."],
-      ["Landed", "Allowed here."],
+      ["Queued to send", "Allowed here."],
+      ["Sending", "Allowed here."],
+      ["On its way: USDC on Base", "Allowed here."],
+      ["**Landed: USDC on Base**", "Allowed here."],
     ]);
     expect(drawCard(view([leg({ status: "done" })]), null).buttons).toBeUndefined();
   });
@@ -104,19 +110,71 @@ describe("drawCard", () => {
   it("says a card was declined elsewhere, and says nothing of one a newer card replaced", () => {
     expect(
       drawCard(view([leg({ status: "cancelled" })], { decidedIn: "the app" }), null).text,
-    ).toMatch(/Declined\nDeclined in the app\.$/u);
+    ).toMatch(/Declined\n\nDeclined in the app\.$/u);
     expect(
       drawCard(view([leg({ status: "replaced" })], { decidedIn: "the app" }), null).text,
     ).toMatch(/Replaced by a newer card$/u);
   });
 
-  it("draws a plan's legs one per line under one pair of buttons", () => {
-    const legs = [leg(), leg({ id: "a2", summary: "Move $5 to Solana" })];
+  it("shows every leg's review facts before offering one tap for both", () => {
+    const sell = leg({
+      id: "a2",
+      summary: "Buy $5 of Tesla",
+      amountUsd: "5.00",
+      lines: [{ label: "Price cap", value: "$50 per share" }],
+    });
+    const legs = [leg(), sell];
     const drawn = drawCard(view(legs), "g");
-    expect(drawn.text).toBe(
-      "**A plan of 2 moves, one tap for all of them**\n1. Buy about $10 of Nvidia: Waiting for you\n2. Move $5 to Solana: Waiting for you",
+    expect(drawn.text).toContain(`**${literal("2 moves ($15 in)")}**`);
+    expect(drawn.text).toContain("> You give: 10 USDC");
+    expect(drawn.text).toContain("> Price cap: $50 per share");
+    expect(drawn.buttons?.flat()).toContainEqual({ label: "Buy both for $15", press: "allow:g" });
+
+    const oversized = [leg(), { ...sell, lines: [{ label: "Terms", value: "x".repeat(3_500) }] }];
+    expect(fitsHere(oversized)).toBe(false);
+    expect(drawCard(view(oversized), "g").buttons?.flat()).toEqual([
+      { label: "Open in Auni", url: "https://auni.example/app/chat/t" },
+    ]);
+    const settled = drawCard(
+      view([
+        { ...oversized[0]!, status: "done" },
+        { ...oversized[1]!, status: "failed" },
+      ]),
+      null,
     );
-    expect(drawn.buttons).toHaveLength(1);
+    expect(settled.text).toContain("> Done: 1\n> Didn't go through: 1");
+    expect(settled.buttons?.flat()).toEqual([
+      { label: "Open in Auni", url: "https://auni.example/app/chat/t" },
+    ]);
+  });
+
+  it("names the local computer for owner proof and removes approval buttons", () => {
+    const drawn = drawCard(
+      view([leg()], { proof: true, inTheApp: true, link: null, machine: "evo-t1" }),
+      "g",
+    );
+    expect(drawn.text).toContain("Confirm it's you in Auni.");
+    expect(drawn.text).toContain("Open Auni on evo-t1 to review this card.");
+    expect(drawn.buttons).toBeUndefined();
+  });
+
+  it("uses the actual fill as the title after settlement", () => {
+    const drawn = drawCard(
+      view([leg({ status: "done", run: { filled: "Bought 1.43 NVDAx for $250" } })]),
+      null,
+    );
+    expect(drawn.text).toBe("**Bought 1.43 NVDAx for $250**");
+  });
+
+  it("shows the note when a move was closed because its landing never confirmed", () => {
+    const done = leg({
+      status: "done",
+      run: { lands: "USDC on Base" },
+      error: "It hasn't shown up on Base yet.",
+    });
+    const drawn = drawCard(view([done]), null);
+    expect(drawn.text).toContain(done.error);
+    expect(drawn.text).not.toContain("Landed");
   });
 
   it("says, while a plan waits, that a trade behind its money moves is priced again then", () => {
@@ -135,7 +193,7 @@ describe("drawCard", () => {
     });
     const said =
       "Sell Nvidia waits for the moves before it to land and is priced again then. If its price has moved past what this card allows, it doesn't go, and Auni tells you.";
-    expect(drawCard(view([bridge, sale]), "g").text).toMatch(new RegExp(`\\n${said}$`, "u"));
+    expect(drawCard(view([bridge, sale]), "g").text).toContain(`> ${said}`);
     const done = [bridge, sale].map((each) => ({ ...each, status: "done" as const }));
     expect(drawCard(view(done), null).text).not.toContain("priced again");
   });
@@ -148,7 +206,7 @@ describe("words from outside", () => {
 
   /** What a message says once every escaped mark is taken out, and the card's own bold title. */
   const unescaped = (text: string) =>
-    text.replace(/^\*\*|\*\*(?=\n|$)/gmu, "").replace(/\\./gu, "");
+    text.replace(/^(?:> |\*\*)|\*\*(?=\n|$)/gmu, "").replace(/\\./gu, "");
 
   it("draws them on one line, every mark escaped, on every kind of card a channel draws", () => {
     const hostile = leg({
@@ -173,7 +231,7 @@ describe("words from outside", () => {
       // No line of the card's own can be faked: none begins with what the name said after its break.
       expect(text).not.toMatch(/^\\?#? ?Allowed here/mu);
     }
-    expect(drawn[0]!.text.split("\n")[0]).toBe(`**${literal(HOSTILE)}**`);
+    expect(drawn[0]!.text.split("\n").filter(Boolean)[0]).toBe(`**${literal(HOSTILE)}**`);
   });
 
   it("escapes each mark Markdown reads, and nothing else", () => {
@@ -246,5 +304,60 @@ describe("drawQuestion", () => {
       [{ label: "No", press: "reply:1" }],
     ]);
     expect(drawQuestion(question, "No")).toEqual({ text: "Go ahead?\n\nYou answered: No" });
+  });
+});
+
+describe("deposit notices", () => {
+  const deposit = depositCardSchema.parse({
+    id: "00000000-0000-4000-8000-000000000001",
+    updatedAt: new Date().toISOString(),
+    kind: "deposit",
+    network: "base",
+    title: "Deposit USDC",
+    tokens: [{ name: "USDC", address: "0x1234567890123456789012345678901234567890" }],
+    landed: null,
+  });
+  const wallet = {
+    evm: "0x0123456789abcdef0123456789abcdef01234567",
+    solana: "11111111111111111111111111111111",
+  } as const;
+  const where = { link: null, machine: "evo-t1" };
+
+  it("matches the wallet address to the network and never copies the token address", () => {
+    const base = drawNotice(deposit, where, wallet);
+    expect(base.text).toContain(deposit.tokens[0]?.address);
+    expect(base.buttons).toEqual([[{ label: "Copy Base wallet address", copy: wallet.evm }]]);
+    const solana = drawNotice({ ...deposit, network: "solana" }, where, wallet);
+    expect(solana.buttons).toEqual([
+      [{ label: "Copy Solana wallet address", copy: wallet.solana }],
+    ]);
+    expect(drawNotice({ ...deposit, network: null }, where, wallet).buttons).toBeUndefined();
+    expect(drawNotice(deposit, where, { ...wallet, evm: null }).text).toContain(
+      "Open Auni on evo-t1",
+    );
+    expect(drawNotice(deposit, where, wallet, true).buttons).toBeUndefined();
+  });
+
+  it("keeps a large deposit receipt under one message and removes the copy button", () => {
+    const message = drawNotice(
+      {
+        ...deposit,
+        landed: {
+          usdValue: "250.00",
+          network: "Base",
+          moved: Array.from({ length: 40 }, () => ({
+            amount: "1".repeat(80),
+            symbol: "TOKEN",
+            to: null,
+          })),
+        },
+      },
+      where,
+      wallet,
+    );
+    expect(message.text).toContain("**$250 arrived**");
+    expect(message.text).toContain("Open Auni on evo-t1 to see the full deposit.");
+    expect(message.text.length).toBeLessThan(3_000);
+    expect(message.buttons).toBeUndefined();
   });
 });

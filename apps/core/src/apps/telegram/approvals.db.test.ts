@@ -228,7 +228,7 @@ describe("pairing", () => {
       Array.from({ length: 4 }, () =>
         expect.objectContaining({
           chat_id: String(OWNER),
-          text: "You're paired with your Auni. Ask it anything here.",
+          text: expect.stringContaining("Send a take, or reply to a message"),
         }),
       ),
     );
@@ -261,15 +261,37 @@ describe("pairing", () => {
     expect(await db.select().from(messages)).toEqual([]);
     expect(fake.sent("sendMessage").at(-1)?.text).toContain("now paired");
   });
+
+  it("shows pending cards only to the paired owner, without granting a tap from the list", async () => {
+    const action = await waiting();
+    fake.calls.length = 0;
+    fake.message({ from: STRANGER }, "/pending");
+    fake.message({ from: OWNER, chat: GROUP, chatType: "group" }, "/pending");
+    fake.message({ from: OWNER }, "/pending");
+    await fake.handled();
+    expect(fake.sent("sendMessage")).toMatchObject([
+      {
+        chat_id: String(OWNER),
+        text: expect.stringContaining("1 card needs your tap"),
+      },
+    ]);
+    expect(fake.sent("sendMessage")[0]?.text).toContain(action.summary);
+    expect(JSON.stringify(fake.sent("sendMessage"))).not.toContain("callback_data");
+    expect(await queued("turn")).toEqual([]);
+  });
 });
 
 describe("the owner's messages", () => {
   it("join their main chat, or the thread of the card they reply to", async () => {
-    fake.message({ from: OWNER }, "What do I hold?");
+    const incoming = fake.message({ from: OWNER }, "What do I hold?");
     await fake.handled();
     const main = await mainChat(db);
     const [first] = await db.select().from(messages).where(eq(messages.threadId, main.id));
     expect(first).toMatchObject({ role: "user", metadata: { channel: "telegram" } });
+    expect(first?.metadata.channelRef).toBe(`123456:${OWNER}:${incoming}`);
+    expect(fake.sent("setMessageReaction")).toMatchObject([
+      { chat_id: String(OWNER), message_id: incoming },
+    ]);
     expect(fake.sent("sendChatAction")).toHaveLength(1);
     // The next one, replying to nothing, joins the same chat: one memory.
     fake.message({ from: OWNER }, "And in cash?");
@@ -386,11 +408,34 @@ describe("questions", () => {
     const [asked] = await db.select().from(messages).where(eq(messages.role, "user"));
     // The turn's deliver job, queued with no answer to send.
     await deliver({ channel: "telegram", threadId: asked!.threadId });
-    expect(fake.sent("sendMessage").at(-1)?.text).toContain("Something went wrong");
+    expect(fake.sent("sendMessage").at(-1)?.text).toContain("couldn't finish my reply");
   });
 });
 
 describe("approving a card", () => {
+  it("refreshes a pre-upgrade card after a press and requires a separate tap on the full review", async () => {
+    const action = await waiting();
+    await deliverCard(action);
+    const oldGrant = grantOnCard();
+    await db
+      .update(channelDeliveries)
+      .set({ shown: "old-layout-digest" })
+      .where(eq(channelDeliveries.actionId, action.id));
+    const id = await messageIdOf(action.id);
+    expect(await press({ from: OWNER }, id, `allow:${oldGrant}`)).toBe(
+      "Look over the updated card before you tap.",
+    );
+    expect(await statusOf(action.id)).toBe("awaiting_permission");
+    expect(signer.calls).toBe(0);
+
+    const refreshed = JSON.stringify(fake.sent("editMessageText").at(-1)?.reply_markup);
+    const grant = /allow:([^"]+)/u.exec(refreshed)?.[1];
+    expect(grant).toBeTruthy();
+    expect(grant).not.toBe(oldGrant);
+    expect(await press({ from: OWNER }, id, `allow:${grant}`)).toBe("Allowed.");
+    expect(signer.calls).toBe(1);
+  });
+
   it("runs it on the owner's press in their direct chat, once, and shows it allowed here", async () => {
     const action = await waiting();
     await deliverCard(action);
@@ -406,8 +451,14 @@ describe("approving a card", () => {
 
     await syncCards();
     const edits = fake.sent("editMessageText");
-    expect(edits.at(-1)).toMatchObject({ reply_markup: { inline_keyboard: [] } });
-    expect(String(edits.at(-1)!.text)).toMatch(/Done\nAllowed here\.$/u);
+    expect(edits.at(-1)).toMatchObject({
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "View transaction", url: expect.stringContaining("/tx/0xabc") }],
+        ],
+      },
+    });
+    expect(String(edits.at(-1)!.text)).toMatch(/Done\n\nAllowed here\.$/u);
   });
 
   it("applies an ask on the owner's press, through the same path, with nothing to sign", async () => {
@@ -421,7 +472,9 @@ describe("approving a card", () => {
     expect(await actModes()).toContain("within_limits");
     expect(signer.calls).toBe(0);
     await syncCards();
-    expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(/Updated\nAllowed here\.$/u);
+    expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(
+      /Updated\n\nAllowed here\.$/u,
+    );
   });
 
   it("keeps a routine of the largest size one message, allowed in the app, and shows it saved", async () => {
@@ -443,7 +496,7 @@ describe("approving a card", () => {
     });
     await deliverCard(ask);
     const card = fake.sent("sendMessage").at(-1)!;
-    expect(String(card.text)).toMatch(/^<b>Save a routine: check-rates<\/b>\nWaiting for you\n/u);
+    expect(String(card.text)).toMatch(/<b>Save a routine: check-rates<\/b>\nWaiting on you\n/u);
     expect(JSON.stringify(fake.sent("sendMessage"))).not.toContain("allow:");
     expect(await deliveryOf(ask.id)).toMatchObject({ grantHash: null });
 
@@ -451,8 +504,8 @@ describe("approving a card", () => {
     await syncCards();
     const edit = fake.sent("editMessageText").at(-1)!;
     expect(edit.message_id).toBe(await messageIdOf(ask.id));
-    expect(String(edit.text)).toBe(
-      "<b>Save a routine: check-rates</b>\nSaved\nAllowed in the app.",
+    expect(String(edit.text)).toContain(
+      "<b>Save a routine: check-rates</b>\nSaved\n\nAllowed in the app.",
     );
   });
 
@@ -470,8 +523,9 @@ describe("approving a card", () => {
     });
     await deliverCard(ask);
     const sent = fake.sent("sendMessage").at(-1)!;
-    expect(String(sent.text)).toContain("Paste it in the app");
-    expect(JSON.stringify(sent)).toContain(`?card=${ask.id}`);
+    expect(String(sent.text)).toContain("Never paste a key in this chat.");
+    expect(String(sent.text)).toContain("to enter the key.");
+    expect(sent.reply_markup).toBeUndefined();
     expect(JSON.stringify(fake.sent("sendMessage"))).not.toContain("allow:");
     expect(await deliveryOf(ask.id)).toMatchObject({ grantHash: null });
 

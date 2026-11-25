@@ -9,6 +9,7 @@ import { sendMessage } from "../conversation/send.ts";
 import { threadById } from "../conversation/threads.ts";
 import { db } from "../db/client.ts";
 import {
+  actions,
   channelDeliveries,
   channelLinks,
   messages,
@@ -24,7 +25,9 @@ import { allowAction, allowProposal, declineAction, declineProposal } from "../m
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
+import { cardsOf } from "../money/waiting.ts";
 import {
+  appDestination,
   hashOf,
   legsDigest,
   legsOf,
@@ -34,7 +37,14 @@ import {
   syncCards,
   syncDelivery,
 } from "./cards.ts";
-import { drawQuestion, replySegments, waitingOn } from "./draw.ts";
+import {
+  drawLink,
+  drawQuestion,
+  literal,
+  replySegments,
+  showsFullReview,
+  waitingOn,
+} from "./draw.ts";
 import { usedChannel } from "./home.ts";
 
 // The owner talks to Auni from channel apps (Telegram) as well as the web app, in one shared
@@ -178,12 +188,45 @@ export async function receive(channelId: string, event: ChannelEvent): Promise<s
   if (event.kind === "message") return ownerSaid(found, event);
   // The app's own start or help, answered here: it was never words for the agent.
   await usedChannel(db, channelId);
+  if (event.command === "pending") return pending(found, event.chat);
+  if (event.command === "portfolio") {
+    const { link, machine } = appDestination("/app");
+    await found.channel.send(event.chat, drawLink("Your portfolio", link, machine));
+    return;
+  }
   await found.channel.send(event.chat, { text: STILL_PAIRED });
 }
 
 const PAIRED =
-  "This chat is now paired with your Auni. Talk to it here, and allow its moves with a tap.";
-const STILL_PAIRED = "You're paired with your Auni. Ask it anything here.";
+  "**You're now paired with Auni.**\n\nTell me a take, like “AI power demand keeps climbing.” Use /pending to see what's waiting on you.";
+const STILL_PAIRED =
+  "**Talk to Auni here**\n\nSend a take, or reply to a message to pick up its chat.\n\n/pending shows what's waiting on you. /portfolio opens your portfolio.";
+
+async function pending(found: Found, chat: string): Promise<void> {
+  const rows = await db
+    .select()
+    .from(actions)
+    .where(eq(actions.status, "awaiting_permission"))
+    .orderBy(actions.createdAt);
+  const pending = cardsOf(rows);
+  if (!pending.length) {
+    await found.channel.send(chat, { text: "You're caught up. No cards need your tap." });
+    return;
+  }
+  const { link, machine } = appDestination("/app/activity");
+  const overview = drawLink(
+    `${pending.length} ${pending.length === 1 ? "card needs" : "cards need"} your tap`,
+    link,
+    machine,
+  );
+  const list = pending.slice(0, 4).map(({ asks }) => `> ${literal(asks.slice(0, 180))}`);
+  if (pending.length > list.length) list.push(`> And ${pending.length - list.length} more`);
+  const [title, ...directions] = overview.text.split("\n\n");
+  await found.channel.send(chat, {
+    ...overview,
+    text: [title, list.join("\n"), ...directions].join("\n\n"),
+  });
+}
 
 /** Spends a pairing code sent in a direct chat, making its sender the owner here. */
 async function pair(
@@ -229,11 +272,13 @@ async function ownerSaid(found: Found, event: ChannelEvent & { kind: "message" }
     (repliedTo && (await threadById(repliedTo.threadId))) ??
     (await threadById((await mainChat(db)).id));
   if (!thread) throw new Error("The owner's main chat is gone.");
-  await sendMessage(thread, {
+  const sent = await sendMessage(thread, {
     id: messageIdFrom(`${found.id}:${event.id}`),
     text: event.text,
     channel: found.id,
+    channelRef: event.id,
   });
+  if (sent === "sent") void found.channel.acknowledge?.(event.id).catch(() => undefined);
   void typingWhileAnswering(found, event.chat, thread.id);
 }
 
@@ -248,7 +293,7 @@ const TYPING_MOST_MS = 3 * 60_000;
  * next message from the chat app is read meanwhile.
  */
 async function typingWhileAnswering(found: Found, chat: string, threadId: string): Promise<void> {
-  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until; ) {
+  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until;) {
     await found.channel.typing(chat).catch(() => undefined);
     await sleep(TYPING_SHOWS_MS);
     const thread = await threadById(threadId).catch(() => undefined);
@@ -300,7 +345,9 @@ async function answered(
     id: messageIdFrom(`${found.id}:answer:${delivery.id}`),
     text: label,
     channel: found.id,
+    channelRef: event.message,
   });
+  event.answer?.("Sent.");
   await found.channel.edit(delivery.ref, drawQuestion(delivery.question, label));
   void typingWhileAnswering(found, event.chat, thread.id);
   return "Sent.";
@@ -330,6 +377,7 @@ async function decide(
   else if (legsDigest(legs) !== delivery.cardDigest)
     answer = "This card changed since it was sent, so nothing was done. Look again before you tap.";
   else if (!waitingOn(legs)) answer = "That was decided already.";
+  else if (!showsFullReview(delivery.shown)) answer = "Look over the updated card before you tap.";
   else {
     const decided = verb === "allow" ? await allowed(target, legs) : await declined(target);
     if (decided.won)
@@ -339,6 +387,7 @@ async function decide(
         .where(eq(channelDeliveries.id, delivery.id));
     answer = decided.answer;
   }
+  event.answer?.(answer);
   const [now] = await db
     .select()
     .from(channelDeliveries)
@@ -409,6 +458,7 @@ export async function deliver(input: {
   readonly threadId: string;
   /** The answer as stored; unset, a turn that failed before it had one. */
   readonly messageId?: string;
+  readonly replyTo?: string;
 }): Promise<void> {
   const found = channelById(input.channel);
   const link = found && (await linkOf(found.id));
@@ -423,23 +473,33 @@ export async function deliver(input: {
   // Its chat was deleted before it went out: there is nothing left to send.
   if (input.messageId && !answer) return;
   const segments = replySegments(answer?.parts ?? []);
-  if (segments.length === 0 && (!answer || answer.metadata.failed))
-    segments.push({ kind: "text", text: "Something went wrong before I could answer. Try again." });
+  if (
+    !segments.some((segment) => segment.kind !== "text" || segment.text) &&
+    (!answer || answer.metadata.failed)
+  )
+    segments.push({ kind: "text", text: "I couldn't finish my reply. Try asking again." });
   for (const segment of segments) {
     if (segment.kind === "text")
       await recordSent(
         found,
         input.threadId,
-        await found.channel.send(link.chat, { text: segment.text }),
+        await found.channel.send(link.chat, segment, input.replyTo),
         {},
       );
     else if (segment.kind === "card")
-      await sendCard(found, link.chat, input.threadId, segment.card);
+      await sendCard(
+        found,
+        link.chat,
+        input.threadId,
+        segment.card,
+        input.messageId,
+        input.replyTo,
+      );
     else
       await recordSent(
         found,
         input.threadId,
-        await found.channel.send(link.chat, drawQuestion(segment.question)),
+        await found.channel.send(link.chat, drawQuestion(segment.question), input.replyTo),
         { question: segment.question, open: true },
       );
   }

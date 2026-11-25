@@ -1,12 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
+import { hostname } from "node:os";
 
-import type { CardWire } from "@auni/shared";
+import { DEPOSIT_WAIT_MS, type CardWire, type DepositCardWire } from "@auni/shared";
 import { and, asc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
 
 import { db } from "../db/client.ts";
+import { threadById } from "../conversation/threads.ts";
 import {
   actions,
   channelDeliveries,
+  messages,
   type ActionRow,
   type ChannelDeliveryRow,
 } from "../db/schema.ts";
@@ -15,13 +18,23 @@ import type { Channel } from "../apps/contract.ts";
 import { channels, offered } from "../apps/registry.ts";
 import { SETTLED } from "../money/life.ts";
 import { needsStepUp } from "../money/step-up.ts";
-import { drawCard, drawLink, fitsHere, shownKey, waitingOn, type CardView } from "./draw.ts";
+import { walletAddresses } from "../money/wallets.ts";
+import {
+  drawCard,
+  drawNotice,
+  fitsHere,
+  replySegments,
+  shownKey,
+  waitingOn,
+  type CardView,
+} from "./draw.ts";
 
 // Each card the hub sends is one message it keeps in step with the card's moves: it shows
 // Allow and Decline while they wait, then running, sent and landed, and where they were decided.
 // A card waiting for a tap carries a grant on its buttons (see channelDeliveries in schema.ts).
 
 const GRANT_TTL_MS = 24 * 60 * 60_000;
+const DEPOSIT_EXPIRED = "deposit-expired";
 
 /** The money a card is about: its one move, or every leg of its proposal. */
 type CardTarget = { readonly actionId: string } | { readonly proposalId: string };
@@ -91,10 +104,16 @@ function targetOf(delivery: ChannelDeliveryRow): CardTarget | null {
   return null;
 }
 
-/** The web page a thread is on, where every card can also be decided. */
-export function threadLink(threadId: string): Promise<string> {
-  return Promise.resolve(`${env.WEB_ORIGIN}/app/chat/${threadId}`);
+/** Auni serves this computer alone unless its Tailscale door is configured. */
+export function appDestination(path: string) {
+  const origin = new URL(env.WEB_ORIGIN);
+  const onPhone =
+    env.TAILSCALE_OWNER && origin.protocol === "https:" && origin.hostname.endsWith(".ts.net");
+  return { link: onPhone ? new URL(path, origin).href : null, machine: hostname().split(".")[0] };
 }
+
+const threadPath = (threadId: string | null) =>
+  threadId ? `/app/chat/${threadId}` : "/app/activity";
 
 /** A card asking for a secret, which is typed into its field in the app and never into a chat. */
 const asksForSecret = (leg: Pick<ActionRow, "tool">) => leg.tool === "request_secret";
@@ -105,21 +124,26 @@ async function viewOf(
   target: CardTarget,
 ): Promise<CardView> {
   const waiting = waitingOn(legs);
-  const thread = await threadLink(delivery?.threadId ?? legs[0]?.threadId ?? "");
+  const threadId = delivery?.threadId ?? legs[0]?.threadId ?? null;
+  const thread = threadId ? await threadById(threadId) : null;
   const [secret] = legs.filter(asksForSecret);
+  const fits = fitsHere(legs);
+  const proof =
+    waiting &&
+    fits &&
+    !secret &&
+    (await Promise.all(legs.map((leg) => needsStepUp(leg)))).some(Boolean);
   return {
     legs,
     // A plan's one Allow carries no proof (see allowProposal), so one that takes the owner's is the
     // app's; so is a card asking for a secret, whose field is drawn only there.
-    inTheApp:
-      waiting &&
-      (!fitsHere(legs) ||
-        secret !== undefined ||
-        (await Promise.all(legs.map((leg) => needsStepUp(leg)))).some((takes) => takes)),
+    inTheApp: waiting && (!fits || secret !== undefined || proof),
+    proof,
     secret: secret !== undefined,
     decidedIn: waiting || !delivery?.cardDigest ? null : await whereDecided(target, delivery.id),
     // A secret's card links to itself, where its field waits with the cursor in it.
-    link: secret ? `${thread}?card=${secret.id}` : thread,
+    ...appDestination(`${threadPath(threadId)}${secret ? `?card=${secret.id}` : ""}`),
+    threadName: thread?.title,
   };
 }
 
@@ -172,15 +196,33 @@ export async function sendCard(
   chat: string,
   threadId: string,
   card: CardWire,
+  messageId?: string,
+  replyTo?: string,
 ): Promise<void> {
   const target = cardTarget(card);
   const legs = target ? await legsOf(target) : [];
   if (!target || legs.length === 0) {
-    const message = drawLink(card.title, await threadLink(threadId));
-    return recordSent(app, threadId, await app.channel.send(chat, message), {});
+    if (card.kind === "deposit") {
+      const expired = depositExpired(card);
+      const message = await depositMessage(card, threadId, expired, readWallet);
+      return recordSent(
+        app,
+        threadId,
+        await app.channel.send(chat, message, replyTo),
+        messageId && !card.landed
+          ? {
+              open: true,
+              deposit: { messageId, cardId: card.id },
+              shown: expired ? DEPOSIT_EXPIRED : hashOf(JSON.stringify(message)),
+            }
+          : {},
+      );
+    }
+    const message = drawNotice(card, appDestination(threadPath(threadId)));
+    return recordSent(app, threadId, await app.channel.send(chat, message, replyTo), {});
   }
   const { message, row } = await drawn(null, legs, target);
-  await recordSent(app, threadId, await app.channel.send(chat, message), {
+  await recordSent(app, threadId, await app.channel.send(chat, message, replyTo), {
     ...("actionId" in target ? { actionId: target.actionId } : { proposalId: target.proposalId }),
     ...row,
   });
@@ -208,10 +250,15 @@ export async function recordSent(
  * Redraws one card message when what it shows has changed, or its grant is spent or old while it
  * still waits for a tap, which then gets a fresh grant; one whose moves have all settled is done.
  */
-export async function syncDelivery(delivery: ChannelDeliveryRow): Promise<void> {
+export async function syncDelivery(
+  delivery: ChannelDeliveryRow,
+  depositWallet = readWallet,
+): Promise<void> {
   const target = targetOf(delivery);
   const app = channels(offered()).find(({ about }) => about.id === delivery.channel);
-  if (!target || !app?.channel.configured()) return;
+  if (!app?.channel.configured()) return;
+  if (delivery.deposit) return syncDeposit(app.channel, delivery, delivery.deposit, depositWallet);
+  if (!target) return;
   const legs = await legsOf(target);
   if (legs.length === 0) {
     await db
@@ -240,6 +287,73 @@ export async function syncDelivery(delivery: ChannelDeliveryRow): Promise<void> 
     .where(eq(channelDeliveries.id, delivery.id));
 }
 
+function depositExpired(card: DepositCardWire): boolean {
+  return Date.now() >= Date.parse(card.updatedAt) + DEPOSIT_WAIT_MS;
+}
+
+const readWallet = () => walletAddresses().catch(() => undefined);
+
+async function depositMessage(
+  card: DepositCardWire,
+  threadId: string,
+  expired: boolean,
+  depositWallet: typeof readWallet,
+) {
+  const wallet = !card.landed && !expired && card.network ? await depositWallet() : undefined;
+  return drawNotice(card, appDestination(threadPath(threadId)), wallet, expired);
+}
+
+async function syncDeposit(
+  channel: Channel,
+  delivery: ChannelDeliveryRow,
+  deposit: NonNullable<ChannelDeliveryRow["deposit"]>,
+  depositWallet: typeof readWallet,
+): Promise<void> {
+  const [answer] = await db
+    .select({ parts: messages.parts })
+    .from(messages)
+    .where(and(eq(messages.id, deposit.messageId), eq(messages.threadId, delivery.threadId)));
+  const segment = replySegments(answer?.parts ?? []).find(
+    (part) => part.kind === "card" && part.card.id === deposit.cardId,
+  );
+  const card = segment?.kind === "card" ? segment.card : undefined;
+  if (card?.kind === "deposit") {
+    const expired = depositExpired(card);
+    const message = await depositMessage(card, delivery.threadId, expired, depositWallet);
+    const shown = expired ? DEPOSIT_EXPIRED : hashOf(JSON.stringify(message));
+    if (!card.landed && delivery.shown === shown) return;
+    const edited = await channel.edit(delivery.ref, message);
+    if (edited && !card.landed) {
+      await db
+        .update(channelDeliveries)
+        .set({ shown })
+        .where(eq(channelDeliveries.id, delivery.id));
+      return;
+    }
+  }
+  await db
+    .update(channelDeliveries)
+    .set({ open: false })
+    .where(eq(channelDeliveries.id, delivery.id));
+}
+
+/** An expired watch can still land if the sweep learns later that money came before its deadline. */
+const depositToSync = and(
+  isNotNull(channelDeliveries.deposit),
+  or(
+    sql`${channelDeliveries.shown} is distinct from ${DEPOSIT_EXPIRED}`,
+    sql`exists (
+    select 1 from ${messages}
+    where ${messages.id} = (${channelDeliveries.deposit}->>'messageId')::uuid
+      and jsonb_path_exists(
+        ${messages.parts},
+        '$[*] ? (@.type == "data-cards").data.cards[*] ? (@.id == $card && @.kind == "deposit" && @.landed != null)',
+        jsonb_build_object('card', ${channelDeliveries.deposit}->>'cardId')
+      )
+  )`,
+  ),
+);
+
 /** Brings every card message still in play up to date with its moves. */
 export async function syncCards(): Promise<void> {
   const open = await db
@@ -248,12 +362,17 @@ export async function syncCards(): Promise<void> {
     .where(
       and(
         eq(channelDeliveries.open, true),
-        or(isNotNull(channelDeliveries.actionId), isNotNull(channelDeliveries.proposalId)),
+        or(
+          isNotNull(channelDeliveries.actionId),
+          isNotNull(channelDeliveries.proposalId),
+          depositToSync,
+        ),
       ),
     );
+  let wallet: ReturnType<typeof readWallet> | undefined;
   for (const delivery of open) {
     try {
-      await syncDelivery(delivery);
+      await syncDelivery(delivery, () => (wallet ??= readWallet()));
     } catch (error) {
       console.error(`channel card ${delivery.id} couldn't be redrawn`, error);
     }

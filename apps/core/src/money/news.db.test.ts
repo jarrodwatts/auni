@@ -303,9 +303,7 @@ async function waitWithCard(
 ) {
   const thread = threadId ?? (await insertThread()).id;
   const began = new Date();
-  const tool = moneyTools({ threadId: thread }).find(
-    ({ name }) => name === "wait_for_deposit",
-  );
+  const tool = moneyTools({ threadId: thread }).find(({ name }) => name === "wait_for_deposit");
   const outcome = await tool!.handler(input);
   const card = (outcome.structuredContent as { card?: CardWire } | undefined)?.card;
   await during?.();
@@ -404,6 +402,24 @@ describe("waiting on a deposit", () => {
       expect.objectContaining({ kind: "arrival", title: "$210.60 arrived" }),
     ]);
     expect(await depositCard(thread.id)).toMatchObject({ landed: { usdValue: "5.00" } });
+  });
+
+  it("does not land an expired card when a newer watch on the same thread gets a deposit", async () => {
+    const { thread, card } = await waitWithCard({ network: "arbitrum" });
+    const old = { ...card, updatedAt: minutesAgo(2 * 24 * 60).toISOString() };
+    await db
+      .update(messages)
+      .set({ parts: [{ type: "data-cards", data: { cards: [old] } }] })
+      .where(eq(messages.threadId, thread.id));
+    await waitWithCard({ network: "base" }, { in: thread.id });
+    await hint("0xnew-watch", [usdc()]);
+    expect(await depositCards(thread.id)).toEqual([
+      expect.objectContaining({ network: "arbitrum", landed: null }),
+      expect.objectContaining({
+        network: "base",
+        landed: expect.objectContaining({ usdValue: "5.00" }),
+      }),
+    ]);
   });
 
   it("waits a day: later money is news in their main chat, never a wake of a chat left days ago", async () => {

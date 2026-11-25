@@ -85,7 +85,7 @@ export function PlaceHeader({
               paneOpen && "xl:hidden",
             )}
           >
-            <span className="sr-only">Show take details: </span>
+            <span className="sr-only">Show details: </span>
             {money}
           </button>
         ) : money ? (

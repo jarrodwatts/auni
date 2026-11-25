@@ -98,6 +98,12 @@ export function PaneNotes({ notes }: { readonly notes: string | null }) {
   );
 }
 
+/** A move's line under its title, less the take's name: here, the take is what's open. */
+function withoutTake(subtitle: string, title: string): string {
+  const prefix = `${title}, `;
+  return subtitle.startsWith(prefix) ? subtitle.slice(prefix.length) : subtitle;
+}
+
 /** The take's recent moves, with a link to all of them in Money. */
 export function PaneRecord({ thread }: { readonly thread: Thread }) {
   const activity = useActivity(thread.id).data;
@@ -110,7 +116,9 @@ export function PaneRecord({ thread }: { readonly thread: Thread }) {
           <li key={item.id} className="flex items-center gap-3 py-2.5">
             <span className="min-w-0 flex-1">
               <span className="block truncate text-ui text-ink">{item.title}</span>
-              <span className="mt-0.5 block truncate text-caption text-faint">{item.subtitle}</span>
+              <span className="mt-0.5 block truncate text-caption text-faint">
+                {withoutTake(item.subtitle, thread.title)}
+              </span>
             </span>
             {item.amount ? (
               <span

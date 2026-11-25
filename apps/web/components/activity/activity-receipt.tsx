@@ -159,7 +159,7 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
 
 function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
   return (
-    <ol className="mt-5 rounded-card bg-surface px-4 py-1.5">
+    <ol className="mt-5 rounded-card border border-border bg-surface px-4 py-1.5">
       {levels.map(({ label, price, kind }) => (
         <li
           key={label}
@@ -265,7 +265,7 @@ function Side({
   readonly tone?: keyof typeof TONE_CLASS_NAME;
 }) {
   return (
-    <div className="min-w-0 flex-1 rounded-card bg-surface px-3 py-3 text-center">
+    <div className="min-w-0 flex-1 rounded-card border border-border bg-surface px-3 py-3 text-center">
       <p className="text-caption font-medium text-faint">{label}</p>
       <p
         className={cn(
@@ -298,7 +298,7 @@ function WhatArrived({
   ];
   if (receipt.counterparty) facts.push([out ? "To" : "From", receipt.counterparty]);
   return (
-    <dl className="rounded-card bg-surface px-4 py-1">
+    <dl className="rounded-card border border-border bg-surface px-4 py-1">
       {facts.map(([label, value]) => (
         <div
           key={label}

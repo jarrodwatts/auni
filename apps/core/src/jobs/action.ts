@@ -67,7 +67,7 @@ export const proposalJob = defineJob({
     const patient = Date.now() - job.createdAt.getTime() < PATIENT_MS;
     const advanced = await advanceProposal(proposalId, patient);
     if (advanced.wake) {
-      await wakeThread(advanced.wake.threadId, advanced.wake.reason.slice(0, 2_000), {
+      await wakeThread(advanced.wake.threadId, advanced.wake.reason, {
         key: advanced.wake.id,
       });
     }
@@ -154,7 +154,7 @@ async function tellSettled(executor: Executor, row: ActionRow): Promise<void> {
   if (!row.threadId) return;
   const settled = await settledOutcome(row);
   if (!settled) return;
-  await wakeThread(row.threadId, settled.reason.slice(0, 2_000), {
+  await wakeThread(row.threadId, settled.reason, {
     key: settled.id,
     tx: executor,
   });

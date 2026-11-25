@@ -466,7 +466,7 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
   const [first] = stopped;
   const told = first?.threadId ? await settledOutcome(first, tx) : null;
   if (first?.threadId && told)
-    await wakeThread(first.threadId, told.reason.slice(0, 2_000), { key: told.id, tx });
+    await wakeThread(first.threadId, told.reason, { key: told.id, tx });
   return null;
 }
 
@@ -714,12 +714,35 @@ export async function startProposal(executor: Executor, rows: readonly ActionRow
 /** How much of each leg's error the agent reads when its plan settles: Auni's own words fit whole. */
 export const LEG_SAID = 160;
 
+/** The most one settled wake says: a plan's grouped list of what didn't go through always fits. */
+export const SETTLED_SAID = 2_000;
+
+/**
+ * What the agent does about a leg that didn't go through, which groups it with the rest of its
+ * plan's that need the same. Every one but a paused leg is as its error says.
+ */
+function outcomeGroup(leg: Pick<ActionRow, "status" | "failureKind">): string {
+  if (leg.status === "failed")
+    return leg.failureKind === "unshown"
+      ? "Paused (put each up again on a fresh card)"
+      : leg.failureKind === "stopped"
+        ? "Skipped"
+        : "Failed";
+  if (leg.status === "retracted") return "Taken back";
+  if (leg.status === "cancelled") return "Declined";
+  return "Replaced by a newer card";
+}
+
 /**
  * What to tell the agent once an action finishes: a lone action reports alone, a
  * proposal's leg only once every leg has settled (one wake for the whole
  * card). Null while it (its result not yet recorded) or other legs are still
  * waiting or running. `id` names the wake, so two legs settling at once wake
  * once, and each run of a step tried again wakes anew.
+ *
+ * A plan's starts with every leg that didn't go through, by id, grouped by what to do, with the
+ * reason a group shares said once, so it fits the cut whatever the plan's size; each leg's
+ * summary, its own reason, and what a done one did come after, as far as the cut allows.
  */
 export async function settledOutcome(
   action: ActionRow,
@@ -727,21 +750,36 @@ export async function settledOutcome(
 ): Promise<{ readonly reason: string; readonly id: string } | null> {
   if (!SETTLED.includes(action.status)) return null;
   if (!action.proposalId)
-    return { reason: actionOutcome(action), id: `action-settled-${action.id}-a${action.attempts}` };
+    return {
+      reason: actionOutcome(action).slice(0, SETTLED_SAID),
+      id: `action-settled-${action.id}-a${action.attempts}`,
+    };
   const legs = await proposalActions(action.proposalId, executor);
   if (!legs.every((leg) => SETTLED.includes(leg.status))) return null;
-  // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
-  const told = [
-    ...legs.filter((leg) => leg.status !== "done"),
-    ...legs.filter((leg) => leg.status === "done"),
-  ];
+  const notDone = legs.filter((leg) => leg.status !== "done");
+  const cut = (leg: ActionRow) => leg.error?.slice(0, LEG_SAID) ?? null;
+  // The legs whose reason their group's line said, once for them all.
+  const said = new Set<string>();
+  const list = [...Map.groupBy(notDone, outcomeGroup)].map(([what, members]) => {
+    const [reason, ...others] = new Set(members.map(cut));
+    const shared = others.length === 0 && reason;
+    if (shared) for (const { id } of members) said.add(id);
+    return `${what}: ${members.map(({ id }) => id).join(", ")}.${shared ? ` Why: ${reason}` : ""}`;
+  });
+  const heading = `Every leg of proposal ${action.proposalId} has settled`;
   return {
     reason: [
-      `Every leg of proposal ${action.proposalId} has settled:`,
-      ...told.map(
-        (leg) => `- ${actionOutcome({ ...leg, error: leg.error?.slice(0, LEG_SAID) ?? null })}`,
+      notDone.length === 0
+        ? `${heading}:`
+        : `${heading}; ${String(notDone.length)} of ${String(legs.length)} didn't go through:`,
+      ...list,
+      // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
+      ...[...notDone, ...legs.filter((leg) => leg.status === "done")].map(
+        (leg) => `- ${actionOutcome({ ...leg, error: said.has(leg.id) ? null : cut(leg) })}`,
       ),
-    ].join("\n"),
+    ]
+      .join("\n")
+      .slice(0, SETTLED_SAID),
     id: `proposal-settled-${action.proposalId}-a${cardRuns(legs)}`,
   };
 }

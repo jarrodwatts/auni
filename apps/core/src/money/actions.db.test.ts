@@ -21,10 +21,12 @@ import {
   prepareLeg,
   proposeAction,
   recordActions,
+  SETTLED_SAID,
 } from "./actions.ts";
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
 import { MayHaveSent, NothingMoved, type Recipe } from "./recipe.ts";
+import { PLAN_LEGS } from "./tools.ts";
 import { parseUnits } from "./usd.ts";
 import type { SignerOptions } from "./wallets.ts";
 
@@ -299,11 +301,81 @@ describe("executeAction", () => {
       const [reason, ...more] = await wakes();
       expect(more).toEqual([]);
       const wake = String(reason);
+      expect(wake).toContain(
+        `Paused (put each up again on a fresh card): ${picks.map(({ id }) => id).join(", ")}. Why: ${pausedSaid("polygon", false)}`,
+      );
       for (const [index, { id }] of picks.entries()) {
-        const told = `Action ${id} (Polymarket pick ${index + 1}) finished as failed: ${pausedSaid("polygon", false)}`;
+        const told = `Action ${id} (Polymarket pick ${index + 1}) finished as failed`;
         expect(wake).toContain(told);
         expect(wake.indexOf(told)).toBeLessThan(wake.indexOf("finished as done"));
       }
+    });
+
+    // Found in review: at the biggest plan, one bridge done and eleven picks paused, the wake ran
+    // out of room after six of them, so the agent never heard of the other five.
+    it("names every leg that didn't go through, and what to do, at the biggest plan", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id, createdAt: new Date(2026, 0, 1) });
+      const picks = await Promise.all(
+        Array.from({ length: PLAN_LEGS - 1 }, (_, index) =>
+          old({
+            threadId: thread.id,
+            proposalId: PLAN,
+            amountUsd: "25",
+            summary: `Buy $25 of Yes on “Will the Federal Reserve cut interest rates by 25 basis points at its December 2026 meeting? (${index + 1})”`,
+            createdAt: new Date(2026, 1, index + 1),
+          }),
+        ),
+      );
+      lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
+      try {
+        await Promise.all(picks.map(({ id }) => executeAction(id)));
+      } finally {
+        lookup.recipe = buy;
+      }
+      expect(executions).toBe(0);
+      const [reason, ...more] = await wakes();
+      expect(more).toEqual([]);
+      const wake = String(reason);
+      expect(wake.length).toBeLessThanOrEqual(SETTLED_SAID);
+      // Every one, its instruction, and where its cash is, said once for them all.
+      expect(wake).toContain(
+        `${PLAN_LEGS - 1} of ${PLAN_LEGS} didn't go through:\nPaused (put each up again on a fresh card): ${picks.map(({ id }) => id).join(", ")}. Why: ${pausedSaid("polygon", false)}\n`,
+      );
+      expect(wake.split(pausedSaid("polygon", false))).toHaveLength(2);
+    });
+
+    it("says each leg's own reason in its line when its group's legs don't share one", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id, createdAt: new Date(2026, 0, 1) });
+      const picks = await Promise.all(
+        ["polygon", "base"].map((place, index) =>
+          old({
+            threadId: thread.id,
+            proposalId: PLAN,
+            input: { usd: "10", place },
+            summary: `Pick on ${place}`,
+            createdAt: new Date(2026, 1, index + 1),
+          }),
+        ),
+      );
+      lookup.recipe = {
+        ...buy,
+        fundedFrom: ({ input }) => String(input.place),
+      } satisfies Recipe;
+      try {
+        await Promise.all(picks.map(({ id }) => executeAction(id)));
+      } finally {
+        lookup.recipe = buy;
+      }
+      const wake = String((await wakes())[0]);
+      expect(wake).toContain(
+        `Paused (put each up again on a fresh card): ${picks.map(({ id }) => id).join(", ")}.\n`,
+      );
+      for (const [index, place] of ["polygon", "base"].entries())
+        expect(wake).toContain(
+          `Action ${picks[index]!.id} (Pick on ${place}) finished as failed: ${pausedSaid(place, false)}`,
+        );
     });
 
     // The agent reads each leg's first LEG_SAID characters (settledOutcome): what stopped it, where

@@ -172,7 +172,8 @@ export async function receive(channelId: string, event: ChannelEvent): Promise<s
   if (!found) return;
   const link = await linkOf(channelId);
   if (event.kind === "press") {
-    if (!fromOwner(link, event)) return "Only Auni's owner can do that, in their own chat with it.";
+    if (!fromOwner(link, event))
+      return "Only Auni's owner can tap this, in their direct chat with Auni.";
     await usedChannel(db, channelId);
     return pressed(found, event);
   }
@@ -191,16 +192,19 @@ export async function receive(channelId: string, event: ChannelEvent): Promise<s
   if (event.command === "pending") return pending(found, event.chat);
   if (event.command === "portfolio") {
     const { link, machine } = appDestination("/app");
-    await found.channel.send(event.chat, drawLink("Your portfolio", link, machine));
+    await found.channel.send(
+      event.chat,
+      drawLink("Your portfolio", link, machine, "view your portfolio"),
+    );
     return;
   }
   await found.channel.send(event.chat, { text: STILL_PAIRED });
 }
 
 const PAIRED =
-  "**You're now paired with Auni.**\n\nTell me a take, like “AI power demand keeps climbing.” Use /pending to see what's waiting on you.";
+  "**You're paired with Auni.**\n\nTell me a take, like “AI power demand keeps climbing.” Use /pending to see cards waiting on you.";
 const STILL_PAIRED =
-  "**Talk to Auni here**\n\nSend a take, or reply to a message to pick up its chat.\n\n/pending shows what's waiting on you. /portfolio opens your portfolio.";
+  "**Talk to Auni here**\n\nSend a take, or reply to any message to continue that chat.\n\n/pending lists cards waiting on you. /portfolio opens your portfolio.";
 
 async function pending(found: Found, chat: string): Promise<void> {
   const rows = await db
@@ -210,17 +214,18 @@ async function pending(found: Found, chat: string): Promise<void> {
     .orderBy(actions.createdAt);
   const pending = cardsOf(rows);
   if (!pending.length) {
-    await found.channel.send(chat, { text: "You're caught up. No cards need your tap." });
+    await found.channel.send(chat, { text: "You're caught up. No cards are waiting on you." });
     return;
   }
   const { link, machine } = appDestination("/app/activity");
   const overview = drawLink(
-    `${pending.length} ${pending.length === 1 ? "card needs" : "cards need"} your tap`,
+    `${pending.length} ${pending.length === 1 ? "card" : "cards"} waiting on you`,
     link,
     machine,
+    pending.length === 1 ? "review it" : "review them",
   );
   const list = pending.slice(0, 4).map(({ asks }) => `> ${literal(asks.slice(0, 180))}`);
-  if (pending.length > list.length) list.push(`> And ${pending.length - list.length} more`);
+  if (pending.length > list.length) list.push(`> ${pending.length - list.length} more`);
   const [title, ...directions] = overview.text.split("\n\n");
   await found.channel.send(chat, {
     ...overview,
@@ -315,7 +320,7 @@ async function pressed(found: Found, event: ChannelEvent & { kind: "press" }): P
   if (verb === "reply") return answered(found, event, Number(token));
   if (verb === "allow" || verb === "decline")
     return oneAtATime(() => decide(found, event, verb, token));
-  return "That button does nothing.";
+  return "That button isn't active.";
 }
 
 async function answered(
@@ -323,7 +328,7 @@ async function answered(
   event: ChannelEvent & { kind: "press" },
   index: number,
 ): Promise<string> {
-  if (!Number.isInteger(index) || index < 0) return "That button does nothing.";
+  if (!Number.isInteger(index) || index < 0) return "That button isn't active.";
   // Closed as it is answered, so a second press sends nothing more.
   const [delivery] = await db
     .update(channelDeliveries)
@@ -338,9 +343,9 @@ async function answered(
     )
     .returning();
   const label = delivery?.question?.options[index];
-  if (!delivery?.question || label === undefined) return "That was answered already.";
+  if (!delivery?.question || label === undefined) return "Already answered.";
   const thread = await threadById(delivery.threadId);
-  if (!thread) return "That conversation is gone.";
+  if (!thread) return "That chat is gone.";
   await sendMessage(thread, {
     id: messageIdFrom(`${found.id}:answer:${delivery.id}`),
     text: label,
@@ -365,7 +370,7 @@ async function decide(
   grant: string,
 ): Promise<string> {
   const delivery = await spendGrant(found.id, event.message, grant);
-  if (!delivery) return "This button has expired. Open the card in the app to decide it.";
+  if (!delivery) return "This button expired. Nothing moved. Open Auni to decide this card.";
   const target = delivery.actionId
     ? { actionId: delivery.actionId }
     : delivery.proposalId
@@ -373,11 +378,11 @@ async function decide(
       : null;
   const legs = target ? await legsOf(target) : [];
   let answer: string;
-  if (!target || legs.length === 0) answer = "That card is gone.";
+  if (!target || legs.length === 0) answer = "That card is gone. Nothing moved.";
   else if (legsDigest(legs) !== delivery.cardDigest)
-    answer = "This card changed since it was sent, so nothing was done. Look again before you tap.";
-  else if (!waitingOn(legs)) answer = "That was decided already.";
-  else if (!showsFullReview(delivery.shown)) answer = "Look over the updated card before you tap.";
+    answer = "This card changed, so nothing moved. Review the updated card first.";
+  else if (!waitingOn(legs)) answer = "Already decided.";
+  else if (!showsFullReview(delivery.shown)) answer = "Review the updated card first.";
   else {
     const decided = verb === "allow" ? await allowed(target, legs) : await declined(target);
     if (decided.won)
@@ -397,10 +402,10 @@ async function decide(
 }
 
 type Decided = { readonly won: boolean; readonly answer: string };
-const NOT_WAITING: Decided = { won: false, answer: "That was decided already." };
+const NOT_WAITING: Decided = { won: false, answer: "Already decided." };
 const TAKES_PROOF: Decided = {
   won: false,
-  answer: "This one checks it's you, so allow it in the app.",
+  answer: "Confirm it's you in Auni to allow this.",
 };
 
 async function allowed(
@@ -413,7 +418,7 @@ async function allowed(
     if (outcome.kind === "refused") return TAKES_PROOF;
     if (outcome.kind === "not_waiting") return NOT_WAITING;
     if (outcome.kind === "in_its_field")
-      return { won: false, answer: "Paste it in the app, never in a chat." };
+      return { won: false, answer: "Enter this in Auni's private field, never in chat." };
     return { won: true, answer: "Allowed." };
   }
   const waiting = legs.filter((leg) => leg.status === "awaiting_permission");
@@ -423,7 +428,7 @@ async function allowed(
   if (funding)
     return {
       won: false,
-      answer: `Add ${dollars(funding.needUsd)} to your wallet first, then tap Allow again.`,
+      answer: `Add ${dollars(funding.needUsd)} to your wallet first, then try again.`,
     };
   const rows = await allowProposal(target.proposalId);
   return rows.length > 0 ? { won: true, answer: "Allowed." } : NOT_WAITING;
@@ -477,7 +482,7 @@ export async function deliver(input: {
     !segments.some((segment) => segment.kind !== "text" || segment.text) &&
     (!answer || answer.metadata.failed)
   )
-    segments.push({ kind: "text", text: "I couldn't finish my reply. Try asking again." });
+    segments.push({ kind: "text", text: "I couldn't finish that reply. Try asking again." });
   for (const segment of segments) {
     if (segment.kind === "text")
       await recordSent(

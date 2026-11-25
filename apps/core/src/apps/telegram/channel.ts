@@ -177,10 +177,10 @@ export function telegramChannel(options: Options): Channel {
  */
 const COMMAND = /^\/(start|help|pending|portfolio)(?:@\w+)?(?:\s+(.*))?$/su;
 const COMMANDS = [
-  { command: "pending", description: "See what needs your tap" },
+  { command: "pending", description: "Cards waiting on you" },
   { command: "portfolio", description: "Open your portfolio" },
   { command: "help", description: "How to talk to Auni here" },
-  { command: "start", description: "Open your chat with Auni" },
+  { command: "start", description: "Get started with Auni" },
 ];
 
 /** One update as the hub reads it; a press is answered with what the hub said. */

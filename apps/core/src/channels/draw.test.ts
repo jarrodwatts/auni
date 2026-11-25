@@ -73,7 +73,7 @@ describe("drawCard", () => {
     expect(fitsHere([leg()])).toBe(true);
     const drawn = drawCard(view([long], { inTheApp: true }), null);
     expect(drawn.text).toBe(
-      "**Save a routine: check-rates**\nWaiting on you\n\nSee the full card in Auni before you decide.",
+      "**Save a routine: check-rates**\nWaiting on you\n\nThis card is too long to show in full here.",
     );
     expect(drawn.buttons).toEqual([
       [{ label: "Open in Auni", url: "https://auni.example/app/chat/t" }],
@@ -153,7 +153,7 @@ describe("drawCard", () => {
       view([leg()], { proof: true, inTheApp: true, link: null, machine: "evo-t1" }),
       "g",
     );
-    expect(drawn.text).toContain("Confirm it's you in Auni.");
+    expect(drawn.text).toContain("Confirm it's you first.");
     expect(drawn.text).toContain("Open Auni on evo-t1 to review this card.");
     expect(drawn.buttons).toBeUndefined();
   });

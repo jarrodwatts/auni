@@ -205,7 +205,7 @@ describe("pairing", () => {
     expect(fake.sent("sendMessage")).toEqual([
       expect.objectContaining({
         chat_id: String(OWNER),
-        text: expect.stringContaining("now paired"),
+        text: expect.stringContaining("paired with Auni"),
       }),
     ]);
   });
@@ -228,7 +228,7 @@ describe("pairing", () => {
       Array.from({ length: 4 }, () =>
         expect.objectContaining({
           chat_id: String(OWNER),
-          text: expect.stringContaining("Send a take, or reply to a message"),
+          text: expect.stringContaining("Send a take, or reply to any message"),
         }),
       ),
     );
@@ -259,7 +259,7 @@ describe("pairing", () => {
     fake.message({ from: OWNER }, `/start ${pairing!.code}`);
     await fake.handled();
     expect(await db.select().from(messages)).toEqual([]);
-    expect(fake.sent("sendMessage").at(-1)?.text).toContain("now paired");
+    expect(fake.sent("sendMessage").at(-1)?.text).toContain("paired with Auni");
   });
 
   it("shows pending cards only to the paired owner, without granting a tap from the list", async () => {
@@ -272,7 +272,7 @@ describe("pairing", () => {
     expect(fake.sent("sendMessage")).toMatchObject([
       {
         chat_id: String(OWNER),
-        text: expect.stringContaining("1 card needs your tap"),
+        text: expect.stringContaining("1 card waiting on you"),
       },
     ]);
     expect(fake.sent("sendMessage")[0]?.text).toContain(action.summary);
@@ -389,7 +389,7 @@ describe("questions", () => {
     const [question] = await db.select().from(channelDeliveries);
     const messageId = Number(question!.ref.split(":").at(-1));
     expect(await press({ from: OWNER }, messageId, "reply:1")).toBe("Sent.");
-    expect(await press({ from: OWNER }, messageId, "reply:0")).toBe("That was answered already.");
+    expect(await press({ from: OWNER }, messageId, "reply:0")).toBe("Already answered.");
     const said = await db
       .select()
       .from(messages)
@@ -408,7 +408,7 @@ describe("questions", () => {
     const [asked] = await db.select().from(messages).where(eq(messages.role, "user"));
     // The turn's deliver job, queued with no answer to send.
     await deliver({ channel: "telegram", threadId: asked!.threadId });
-    expect(fake.sent("sendMessage").at(-1)?.text).toContain("couldn't finish my reply");
+    expect(fake.sent("sendMessage").at(-1)?.text).toContain("couldn't finish that reply");
   });
 });
 
@@ -423,7 +423,7 @@ describe("approving a card", () => {
       .where(eq(channelDeliveries.actionId, action.id));
     const id = await messageIdOf(action.id);
     expect(await press({ from: OWNER }, id, `allow:${oldGrant}`)).toBe(
-      "Look over the updated card before you tap.",
+      "Review the updated card first.",
     );
     expect(await statusOf(action.id)).toBe("awaiting_permission");
     expect(signer.calls).toBe(0);
@@ -523,8 +523,8 @@ describe("approving a card", () => {
     });
     await deliverCard(ask);
     const sent = fake.sent("sendMessage").at(-1)!;
-    expect(String(sent.text)).toContain("Never paste a key in this chat.");
-    expect(String(sent.text)).toContain("to enter the key.");
+    expect(String(sent.text)).toContain("Saved only on this computer. Never paste it in chat.");
+    expect(String(sent.text)).toContain("to enter it in a private field.");
     expect(sent.reply_markup).toBeUndefined();
     expect(JSON.stringify(fake.sent("sendMessage"))).not.toContain("allow:");
     expect(await deliveryOf(ask.id)).toMatchObject({ grantHash: null });
@@ -581,7 +581,7 @@ describe("approving a card", () => {
     expect((await allowAction(action.id)).kind).toBe("allowed");
     await runQueued();
     expect(await press({ from: OWNER }, await messageIdOf(action.id), `allow:${grant}`)).toBe(
-      "That was decided already.",
+      "Already decided.",
     );
     await syncCards();
     expect(String(fake.sent("editMessageText").at(-1)!.text)).toMatch(/Allowed in the app\.$/u);
@@ -700,7 +700,7 @@ describe.each([
     expect(await press({ from: OWNER }, messageId, "allow:AAAAAAAAAAAAAAAAAAAAAA")).toMatch(
       /expired/u,
     );
-    expect(await press({ from: OWNER }, messageId, "approve")).toBe("That button does nothing.");
+    expect(await press({ from: OWNER }, messageId, "approve")).toBe("That button isn't active.");
   });
 
   it("a grant past its day is pressed", async () => {
@@ -773,7 +773,7 @@ describe.each([
       })
       .where(eq(channelDeliveries.actionId, leaving.id));
     expect(await press({ from: OWNER }, leavingId, "allow:forged-grant")).toBe(
-      "This one checks it's you, so allow it in the app.",
+      "Confirm it's you in Auni to allow this.",
     );
     expect(await statusOf(leaving.id)).toBe("awaiting_permission");
   });
@@ -839,7 +839,7 @@ describe("approving a plan", () => {
       })
       .where(eq(channelDeliveries.proposalId, PLAN));
     expect(await press({ from: OWNER }, await planMessage(), "allow:forged-grant")).toMatch(
-      /checks it's you/u,
+      /Confirm it's you/u,
     );
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
       "awaiting_permission",

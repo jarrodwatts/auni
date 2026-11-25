@@ -48,8 +48,13 @@ function viaApp(where: AppDestination, label: string, task: string): ChannelMess
 }
 
 /** A card about no money, as a channel shows it: its title, and the way to it in the app. */
-export function drawLink(title: string, link: string | null, machine?: string): ChannelMessage {
-  const { text, buttons } = viaApp({ link, machine }, "Open in Auni", "see more");
+export function drawLink(
+  title: string,
+  link: string | null,
+  machine?: string,
+  task = "view this",
+): ChannelMessage {
+  const { text, buttons } = viaApp({ link, machine }, "Open in Auni", task);
   return {
     text: `**${literal(title)}**\n\n${link ? "" : text}`.trimEnd(),
     ...(buttons && { buttons }),
@@ -212,7 +217,15 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   const whole = fitsHere(legs);
   const held = legs.some((leg) => leg.phase === "needs_owner");
   const appOnly = waiting && (view.inTheApp || !whole);
-  const task = held ? "check this move" : view.secret ? "enter the key" : "review this card";
+  const task = held
+    ? "check status"
+    : view.secret
+      ? "enter it in a private field"
+      : !whole
+        ? waiting
+          ? "review the full card"
+          : "see the full card"
+        : "review this card";
   const destination =
     appOnly || held || !whole ? viaApp(view, held ? "Check status" : "Open in Auni", task) : null;
   const label = waiting && grant && !appOnly ? actionLabel(legs) : null;
@@ -227,11 +240,11 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
       : transactionButtons(legs));
   const note = appOnly
     ? view.secret
-      ? "Never paste a key in this chat."
+      ? "Saved only on this computer. Never paste it in chat."
       : view.proof
-        ? "Confirm it's you in Auni."
+        ? "Confirm it's you first."
         : !whole
-          ? "See the full card in Auni before you decide."
+          ? "This card is too long to show in full here."
           : null
     : null;
   const where = decisionLine(legs, view.decidedIn);
@@ -349,7 +362,10 @@ export function drawNotice(
           ...(buttons && { buttons }),
         };
       }
-      if (expired) return { text: `${title}\n\nThis card stopped watching for a deposit.` };
+      if (expired)
+        return {
+          text: `${title}\n\nStopped watching for this deposit. Anything you send to your wallet still arrives normally.`,
+        };
       const network = card.network && NETWORKS[card.network];
       const address = card.network === "solana" ? wallet?.solana : wallet?.evm;
       if (!network || !address) return drawLink(card.title, where.link, where.machine);

@@ -304,7 +304,7 @@ describe("deliver", () => {
     await syncCards();
     expect(fake.sent("editMessageText")).toMatchObject([
       {
-        text: expect.stringContaining("stopped watching"),
+        text: expect.stringContaining("Stopped watching"),
         reply_markup: { inline_keyboard: [] },
       },
     ]);

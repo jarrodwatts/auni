@@ -77,7 +77,9 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
             threadTitle={thread.title}
             onChange={(next) =>
               void changeThread(thread.id, next).catch(() =>
-                toast.error("That change couldn't be saved. Nothing else changed. Try again."),
+                toast.error(
+                  "Couldn't save your spending setting. Your current setting is unchanged. Try again.",
+                ),
               )
             }
           />
@@ -146,7 +148,12 @@ function SpendingLine({
         <p className="mt-3 flex items-start gap-2 text-meta text-muted-foreground">
           <Laptop aria-hidden className="mt-0.5 size-3.5 flex-none" />
           <span>
-            {auto ? "Auto and watches pause" : "Watches pause"} while {me.reach.machine} sleeps.{" "}
+            {auto && thread.watchCount > 0
+              ? "Auto and watches pause"
+              : auto
+                ? "Auto pauses"
+                : "Watches pause"}{" "}
+            while {me.reach.machine} sleeps.{" "}
             <button
               type="button"
               onClick={() => openSettings("remote")}

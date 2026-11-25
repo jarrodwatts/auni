@@ -34,15 +34,19 @@ function heldBy(thread: Thread): { archive: boolean; delete: boolean; why: strin
     return {
       archive: true,
       delete: true,
-      why: "A card here waits for your tap. Once you allow or decline it, this chat can go.",
+      why: "A card here still needs you. Handle it first to archive or delete this chat.",
     };
   if (thread.state === "running")
-    return { archive: false, delete: true, why: "Auni is answering here. Delete it once it has." };
+    return {
+      archive: false,
+      delete: true,
+      why: "Auni is still replying here. Wait for it to finish before deleting.",
+    };
   if (moneyProgress(thread.moving)?.status === "now")
     return {
       archive: false,
       delete: true,
-      why: "A move made here is still landing. Delete it once it has.",
+      why: "A move here is still landing. Wait for it to finish before deleting.",
     };
   return null;
 }
@@ -122,7 +126,7 @@ export function ChatMenu({
             <DropdownMenuItem
               className={ITEM}
               disabled={held?.archive}
-              onSelect={() => tidy.archive(refuse("Not archived yet"))}
+              onSelect={() => tidy.archive(refuse("Couldn't archive chat"))}
             >
               <Archive aria-hidden className="size-4" />
               Archive
@@ -152,11 +156,11 @@ export function ChatMenu({
       />
       <ConfirmDialog
         title="Delete this chat?"
-        body={`“${thread.title}” and everything said in it are deleted. Money moved here stays where it is, and its moves stay in Money.`}
+        body={`Deletes “${thread.title}”, its messages, and any watches set here. Your money is untouched, and past moves stay in Money.`}
         verb="Delete"
         open={asking === "delete"}
         onOpenChange={(next) => (next ? setAsking("delete") : close())}
-        onConfirm={() => tidy.remove(refuse("Not deleted yet"))}
+        onConfirm={() => tidy.remove(refuse("Couldn't delete chat"))}
       />
       <NoticeDialog
         title={typeof asking === "object" && asking ? asking.refused : ""}
@@ -179,17 +183,17 @@ export function useTidyChat(thread: Thread) {
   const restore = () =>
     void changeThread(thread.id, { archived: false }).then(
       () => toast.success("Chat restored"),
-      () => toast.error("That chat couldn’t be restored. Try again."),
+      () => toast.error("Couldn't restore this chat. Try again."),
     );
 
   return {
     pin: (pinned: boolean) =>
       void changeThread(thread.id, { pinned }).catch(() =>
-        toast.error("That change couldn’t be saved. Try again."),
+        toast.error("Couldn't update pin. Try again."),
       ),
     rename: (title: string, refused: (why: string) => void = (why) => toast.error(why)) =>
       changeThread(thread.id, { title }).catch(
-        said(refused, "That name couldn’t be saved. Try again."),
+        said(refused, "Couldn't rename this chat. Try again."),
       ),
     restore,
     archive: (refused: (why: string) => void) =>
@@ -199,7 +203,7 @@ export function useTidyChat(thread: Thread) {
             description: "Search still finds it.",
             action: { label: "Undo", onClick: restore },
           }),
-        said(refused, "That chat couldn’t be archived. Try again."),
+        said(refused, "Couldn't archive this chat. Try again."),
       ),
     remove: (refused: (why: string) => void) =>
       void deleteThread(thread.id).then(
@@ -207,7 +211,7 @@ export function useTidyChat(thread: Thread) {
           if (route.kind === "chat" && route.id === thread.id) router.replace("/app/new");
           toast.success("Chat deleted");
         },
-        said(refused, "That chat couldn’t be deleted. Try again."),
+        said(refused, "Couldn't delete this chat. Try again."),
       ),
   };
 }
@@ -246,7 +250,7 @@ function RenameForm({ thread, onDone }: { readonly thread: Thread; readonly onDo
       <div className="px-6 pt-6 pb-5">
         <DialogTitle className={auniDialogTitleClass}>Rename chat</DialogTitle>
         <DialogDescription className="mt-1.5 text-ui text-muted-foreground">
-          The name it goes by in your sidebar and search.
+          Shown in your sidebar and search.
         </DialogDescription>
       </div>
       <div className="px-6 pb-1">

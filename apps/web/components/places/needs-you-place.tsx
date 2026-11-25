@@ -28,7 +28,7 @@ export function NeedsYouPlace() {
               <Mascot alt="" size={56} state="listening" />
               <p className="mt-4 text-body font-semibold text-ink">Nothing needs you</p>
               <p className="mt-1 max-w-[320px] text-ui text-muted-foreground">
-                When Auni puts up a card for your tap, it waits here.
+                Cards and questions waiting on you will appear here.
               </p>
             </div>
           ) : (

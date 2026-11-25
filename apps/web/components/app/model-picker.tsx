@@ -189,7 +189,7 @@ export function ModelPicker({
                       resting ? "text-muted-foreground" : "text-faint",
                     )}
                   >
-                    {resting ? "Rate limited" : brain.login}
+                    {resting ? "Limit reached" : brain.login}
                   </span>
                 </div>
                 <div className="flex flex-col gap-0.5">

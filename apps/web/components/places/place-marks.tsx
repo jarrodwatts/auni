@@ -26,9 +26,11 @@ const MONEY_LABEL: Record<
   MoneyProgress["status"],
   (count: { readonly done: number; readonly total: number }) => string
 > = {
-  now: ({ done, total }) => `Moving your money, ${done} of ${total} through`,
+  now: ({ done, total }) =>
+    total === 1 ? "Moving your money" : `Moving your money, ${done} of ${total} done`,
   done: () => "Your money went through",
-  failed: ({ done, total }) => `${done} of ${total} went through`,
+  failed: ({ done, total }) =>
+    done === 0 ? "Move didn't go through" : `${done} of ${total} moves went through`,
 };
 
 /**

@@ -362,7 +362,7 @@ export function ThreadPane({
                 value={thread?.modelSelection}
                 onChange={(modelSelection) =>
                   void changeThread(threadId, { modelSelection }).catch(() =>
-                    toast.error("That model choice couldn't be saved. Try again."),
+                    toast.error("Couldn't save that model choice. Try again."),
                   )
                 }
                 disabled={!historyReady || historyFailed}

@@ -45,7 +45,7 @@ export function ChatsPlace() {
             >
               {chats.length === 0 ? (
                 <p className="px-3 pt-10 text-center text-ui text-muted-foreground">
-                  Your takes and chats will appear here. Start with a take you have.
+                  Your takes and chats will appear here. Tap New take to start one.
                 </p>
               ) : (
                 <PlaceList nav={false} />

@@ -139,7 +139,7 @@ export function AutonomyPicker({
             <span className="min-w-0 flex-1">
               <span className="block text-ui font-medium text-ink">Ask first</span>
               <span className="mt-0.5 block text-caption leading-[1.4] text-muted-foreground">
-                Every move waits for your tap on a card.
+                Every move waits for your tap.
               </span>
             </span>
             {actMode === "ask_first" ? (
@@ -179,7 +179,7 @@ export function AutonomyPicker({
               </label>
               {auto && freeBudgetUsd != null ? (
                 <span className="text-caption text-muted-foreground tabular-nums">
-                  {formatBudget(freeBudgetUsd)} left of {formatBudget(budgetUsd)}
+                  {formatBudget(freeBudgetUsd)} of {formatBudget(budgetUsd)} left
                 </span>
               ) : null}
             </div>

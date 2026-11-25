@@ -12,7 +12,7 @@ import {
 
 import type { ActionRow } from "../db/schema.ts";
 import type { AppLogo } from "./app-logo.ts";
-import { letsSaid, sentTo, type Effect } from "./effect.ts";
+import { letsSaid, sentTo, unpinnedGrant, type Effect } from "./effect.ts";
 import { lostSaid } from "./gone-for-good.ts";
 import { moneyOf, type ActionPreview } from "./recipe.ts";
 import { parseUnits } from "./usd.ts";
@@ -433,18 +433,21 @@ type OldCard = Pick<ActionRow, "lines" | "card" | "cardFormat" | "tool" | "propo
 
 /**
  * Whether a card drawn before cards said all they say now (CARD_FORMAT) left out a lasting
- * permission one of its moves leaves, as its recorded Lets line names them, so the owner allowed
- * it unseen: a plan's card drew no move's Lets line, and a lone move's card showed it whole only
- * when core drew its face from its lines and the line fit (LINE_MOST, where a figure was cut), or
- * the move's own words warned of it whole, as the card drew them: after what it sends for good,
- * and cut where a warning was (withLoss in action-card.ts). An old row doesn't
- * mark which of what it lets is an order its face showed among its terms (Grant.order), so each
- * counts as a permission.
+ * permission one of its moves leaves, so the owner allowed it unseen. A card from format 2 on
+ * said every permission, but until format 3 named one over the main wallet by its short words
+ * alone, which another can share (see unpinnedGrant). One before format 2 is judged by its
+ * recorded Lets line: a plan's card drew no move's Lets line, and a lone move's card showed it
+ * whole only when core drew its face from its lines and the line fit (LINE_MOST, where a figure
+ * was cut), or the move's own words warned of it whole, as the card drew them: after what it
+ * sends for good, and cut where a warning was (withLoss in action-card.ts). Such an old row
+ * doesn't mark which of what it lets is an order its face showed among its terms (Grant.order),
+ * so each counts as a permission.
  */
 export function leftOutPermission(legs: readonly OldCard[]): boolean {
   return legs.some((leg) => {
     const lets = leg.lines.find(({ label }) => label === LETS_LINE)?.value;
     if (!lets || leg.cardFormat >= CARD_FORMAT || isAsk(leg.tool)) return false;
+    if (leg.cardFormat >= 2) return unpinnedGrant(leg.details);
     if (leg.proposalId !== null) return true;
     if (leg.card === null) return lets.length > LINE_MOST;
     return !warnedFirst(lostSaid(leg), leg.card.warning)?.includes(lets);

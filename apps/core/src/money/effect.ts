@@ -128,6 +128,12 @@ function samePermission(left: TokenGrant, right: TokenGrant): boolean {
   );
 }
 
+/** Whether an action pinned a power over the main wallet by its words alone, not exactly. */
+export function unpinnedGrant(details: Record<string, string>): boolean {
+  const words = details.needsStepUp?.split("; ").some((reason) => reason.startsWith("lets "));
+  return words === true && details[GRANTS_EXACTLY] === undefined;
+}
+
 /**
  * The first power over the main wallet `fresh` leaves that its card didn't show, by what it is
  * exactly, never its words; null when it shows them all. A card pinned before these were kept

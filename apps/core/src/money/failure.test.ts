@@ -149,10 +149,26 @@ describe("retryRefusal", () => {
     expect(retryRefusal({ ...failed, status: "done" })).toBe("not_failed");
   });
 
+  // Found in review: a card from before format 3 named a spender by its first and last four
+  // digits, which another address can share, and pinned only those words.
+  it("never runs again a format-2 card that vouched for a power over the wallet by its words alone", () => {
+    const lets = { label: "Lets", value: "0xAbCd…1234 spend your USDC" };
+    const shortly = { needsStepUp: `lets ${lets.value}` };
+    const two = { ...failed, cardFormat: 2, lines: [lets], card: FACE, details: shortly };
+    expect(retryRefusal(two)).toBe("not_retryable");
+    // An order or a venue's permission a format-2 card showed among its terms isn't one.
+    const order = { label: "Lets", value: "Hyperliquid close the whole position at $90" };
+    expect(retryRefusal({ ...two, lines: [order], details: {} })).toBeNull();
+    // One pinned exactly runs again, with the owner's proof as any power over the wallet takes.
+    const exactly = { ...shortly, grantsExactly: "spend:0x1:0x2" };
+    expect(retryRefusal({ ...two, details: exactly })).toBe("needs_proof");
+    expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT })).toBe("needs_proof");
+  });
+
   // Its run may grant what that card never showed, such as a first sale's lasting permission.
   it("never runs again a card drawn before cards said all they say now that left a permission out", () => {
     const lets = { label: "Lets", value: "Polymarket's exchanges trade your shares" };
-    const old = { ...failed, cardFormat: CARD_FORMAT - 1, lines: [lets], card: FACE };
+    const old = { ...failed, cardFormat: 1, lines: [lets], card: FACE };
     expect(retryRefusal(old)).toBe("not_retryable");
     expect(retryRefusal({ ...old, proposalId: "plan" })).toBe("not_retryable");
     // Found in review: one that leaves nothing, or showed what it leaves, can still finish its plan.

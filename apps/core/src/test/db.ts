@@ -5,6 +5,7 @@ import { db } from "../db/client.ts";
 import {
   actions,
   arrivalCursors,
+  CARD_FORMAT,
   arrivals,
   automations,
   channelLinks,
@@ -92,6 +93,8 @@ export async function insertAction(fields: Partial<typeof actions.$inferInsert> 
       tool: "stock_trade",
       input: {},
       endedAt: ended,
+      // As a money tool records it now (see recordActions).
+      cardFormat: CARD_FORMAT,
       ...fields,
       status,
       phase: status === "running" ? phase : null,

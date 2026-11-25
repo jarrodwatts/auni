@@ -25,6 +25,16 @@ const actionResponseSchema = z.object({ action: actionWireSchema });
 export const NOT_REACHED =
   "Auni couldn't confirm that went through. Trying again won't send it twice.";
 
+/**
+ * What a card says when its tap didn't go: core's own words when it refused a card drawn before
+ * cards said all they say now (`out_of_date`, which allowed nothing), else NOT_REACHED.
+ */
+export function tapFailed(caught: unknown): string {
+  return caught instanceof CoreApiError && caught.code === "out_of_date" && caught.detail
+    ? caught.detail
+    : NOT_REACHED;
+}
+
 export async function readAction(
   actionReference: ActionRecordId,
   signal?: AbortSignal,

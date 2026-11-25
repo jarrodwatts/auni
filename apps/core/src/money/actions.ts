@@ -7,7 +7,7 @@ import { appById, closedHere } from "../apps/registry.ts";
 import { applyAsk, isAsk } from "../asks.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
-import { actions, threads, type ActionRow } from "../db/schema.ts";
+import { actions, CARD_FORMAT, threads, type ActionRow } from "../db/schema.ts";
 import { actionKind, wakeThread } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";
@@ -295,6 +295,7 @@ export async function recordActions(
           card: leg.preview.card
             ? fitted(withPermissions(leg.preview.card, leg.preview.effect))
             : null,
+          cardFormat: CARD_FORMAT,
         })),
       )
       .returning();

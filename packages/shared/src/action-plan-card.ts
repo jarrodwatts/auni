@@ -24,6 +24,8 @@ const planMoveSchema = z.strictObject({
     .max(64)
     .optional(),
   status: actionStatusSchema,
+  /** What it leaves able to act on the money, as its Lets line says it; absent when nothing. */
+  lets: z.string().min(1).max(500).optional(),
 });
 export type PlanMove = z.infer<typeof planMoveSchema>;
 
@@ -89,7 +91,11 @@ const actionPlanLegSchema = actionCardSchema
       })
       .optional(),
     verbs: z
-      .strictObject({ now: z.string().max(40), done: z.string().max(40), failed: z.string().max(40) })
+      .strictObject({
+        now: z.string().max(40),
+        done: z.string().max(40),
+        failed: z.string().max(40),
+      })
       .optional(),
   });
 export type ActionPlanLeg = z.infer<typeof actionPlanLegSchema>;

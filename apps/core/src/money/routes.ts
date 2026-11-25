@@ -21,7 +21,13 @@ import { markActivitySeen, readActivity } from "./activity.ts";
 import { depositWire, recentDeposits } from "./arrivals.ts";
 import { listOtherTokens } from "./buckets.ts";
 import { actionById, actionsForThread, actionWire, proposalActions } from "./actions.ts";
-import { allowAction, allowProposal, declineAction, declineProposal } from "./decide.ts";
+import {
+  allowAction,
+  allowProposal,
+  declineAction,
+  declineProposal,
+  OUT_OF_DATE,
+} from "./decide.ts";
 import { checkHeld, closeHeld } from "./held.ts";
 import { proposalFunding } from "./funding.ts";
 import { pickDetail } from "./pick-detail.ts";
@@ -86,6 +92,8 @@ actionsRouter.post("/:id/allow", async (req, res) => {
       return void (await answerNotWaiting(id.data, res));
     case "in_its_field":
       return void res.status(409).json({ error: "in_its_field" });
+    case "out_of_date":
+      return void res.status(409).json({ error: "out_of_date", message: OUT_OF_DATE });
     case "allowed":
       return void res.json({ action: actionWire(allowed.action) });
   }
@@ -196,7 +204,8 @@ proposalsRouter.get("/:id", async (req, res) => {
 proposalsRouter.post("/:id/allow", async (req, res) => {
   const id = uuid.safeParse(req.params.id);
   if (!id.success) return void res.status(404).json({ error: "proposal_not_found" });
-  await allowProposal(id.data);
+  if ((await allowProposal(id.data)) === "out_of_date")
+    return void res.status(409).json({ error: "out_of_date", message: OUT_OF_DATE });
   await answerProposal(id.data, req, res);
 });
 

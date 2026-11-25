@@ -20,7 +20,13 @@ import { deliverKind } from "../jobs/kinds.ts";
 import { defineJob, jobKind } from "../jobs/queue.ts";
 import type { Channel, ChannelEvent } from "../apps/contract.ts";
 import { channels, offered } from "../apps/registry.ts";
-import { allowAction, allowProposal, declineAction, declineProposal } from "../money/decide.ts";
+import {
+  allowAction,
+  allowProposal,
+  declineAction,
+  declineProposal,
+  OUT_OF_DATE,
+} from "../money/decide.ts";
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
@@ -349,6 +355,7 @@ async function decide(
 
 type Decided = { readonly won: boolean; readonly answer: string };
 const NOT_WAITING: Decided = { won: false, answer: "That was decided already." };
+const OUT_OF_DATE_DECIDED: Decided = { won: false, answer: OUT_OF_DATE };
 const TAKES_PROOF: Decided = {
   won: false,
   answer: "This one checks it's you, so allow it in the app.",
@@ -365,6 +372,7 @@ async function allowed(
     if (outcome.kind === "not_waiting") return NOT_WAITING;
     if (outcome.kind === "in_its_field")
       return { won: false, answer: "Paste it in the app, never in a chat." };
+    if (outcome.kind === "out_of_date") return OUT_OF_DATE_DECIDED;
     return { won: true, answer: "Allowed." };
   }
   const waiting = legs.filter((leg) => leg.status === "awaiting_permission");
@@ -377,6 +385,7 @@ async function allowed(
       answer: `Add ${dollars(funding.needUsd)} to your wallet first, then tap Allow again.`,
     };
   const rows = await allowProposal(target.proposalId);
+  if (rows === "out_of_date") return OUT_OF_DATE_DECIDED;
   return rows.length > 0 ? { won: true, answer: "Allowed." } : NOT_WAITING;
 }
 

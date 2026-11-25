@@ -198,6 +198,13 @@ export interface PreviousError {
   readonly at: string;
 }
 
+/**
+ * How a money card recorded now is drawn, which recordActions stamps on its row. Raise it whenever
+ * cards start saying something they didn't: a card still waiting from before is refused Allow,
+ * as it was shown (money/decide.ts). 2 says every permission a move leaves.
+ */
+export const CARD_FORMAT = 2;
+
 export const actions = pgTable(
   "actions",
   {
@@ -224,6 +231,9 @@ export const actions = pgTable(
     run: jsonb("run").$type<MoveRun>().default({}).notNull(),
     // What the card says, in the move's own words; null for a move core's plain face says.
     card: jsonb("card").$type<CardFace>(),
+    // How its card was drawn when recorded (see CARD_FORMAT); 1 for a row nothing stamped, so
+    // one an older Auni records, even after this column is added, never reads as current.
+    cardFormat: integer("card_format").default(1).notNull(),
     // A send is kept by its wallet's own id for it (walletTxId), or a venue's relayer's, until
     // its hash comes back, and by both when the wallet can answer for a hash the chain can't yet.
     txs: jsonb("txs")

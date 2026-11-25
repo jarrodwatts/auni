@@ -100,16 +100,21 @@ export function figureWidth(
 
 /**
  * What each of a plan's moves leaves able to act on the owner's money, one sentence a move, under
- * its name, since one tap grants it all. Read from each move's own recorded line, which says every
- * permission and standing order it leaves, whether its face says them (a stop-loss among its
- * terms) or it has no face of its own.
+ * its name, since one tap grants it all: the moves that bring its cash first, as they run, then
+ * its legs. Read from each move's own recorded line, which says every permission and standing
+ * order it leaves, whether its face says them (a stop-loss among its terms) or it has no face.
  */
-export function planPermissions(
-  legs: readonly Pick<ActionPlanCardWire["legs"][number], "summary" | "lines">[],
-): string[] {
-  return legs.flatMap(({ summary, lines }) =>
-    lines
-      .filter(({ label }) => label === LETS_LINE)
-      .map(({ value }) => `${summary}: ${permissionsSaid([value])}`),
-  );
+export function planPermissions(plan: {
+  readonly legs: readonly Pick<ActionPlanCardWire["legs"][number], "summary" | "lines">[];
+  readonly moves: readonly Pick<ActionPlanCardWire["moves"][number], "name" | "lets">[];
+}): string[] {
+  const named = [
+    ...plan.moves,
+    ...plan.legs.flatMap(({ summary, lines }) =>
+      lines
+        .filter(({ label }) => label === LETS_LINE)
+        .map(({ value }) => ({ name: summary, lets: value })),
+    ),
+  ];
+  return named.flatMap(({ name, lets }) => (lets ? [`${name}: ${permissionsSaid([lets])}`] : []));
 }

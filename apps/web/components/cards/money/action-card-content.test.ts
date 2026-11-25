@@ -160,12 +160,15 @@ describe("planPermissions", () => {
   // One tap allows every move, so the plan says what each leaves before it, whoever wrote its face.
   it("says what each move leaves able to act on the money, under its own name", () => {
     expect(
-      planPermissions([
-        leg("Move $50 to Arbitrum"),
-        leg("Send it", "0x1a2b…9f8e spend your USDC"),
-        leg("Place a limit order to go long BTC", resting),
-        leg("Place a limit order to go long ETH", resting),
-      ]),
+      planPermissions({
+        legs: [
+          leg("Move $50 to Arbitrum"),
+          leg("Send it", "0x1a2b…9f8e spend your USDC"),
+          leg("Place a limit order to go long BTC", resting),
+          leg("Place a limit order to go long ETH", resting),
+        ],
+        moves: [],
+      }),
     ).toEqual([
       "Send it: From now on, it lets 0x1a2b…9f8e spend your USDC.",
       `Place a limit order to go long BTC: From now on, it lets ${resting}.`,
@@ -173,7 +176,25 @@ describe("planPermissions", () => {
     ]);
   });
 
+  // Telegram draws every row's permissions; the web drew only its legs', never a cash move's.
+  it("says what a move that brings the plan's cash leaves too, first, as it runs first", () => {
+    expect(
+      planPermissions({
+        legs: [leg("Buy $5 of NVIDIA")],
+        moves: [
+          { name: "Move $5 from Base to Monad", lets: "0x1a2b…9f8e spend your USDC" },
+          { name: "Take $3 out of savings" },
+        ],
+      }),
+    ).toEqual(["Move $5 from Base to Monad: From now on, it lets 0x1a2b…9f8e spend your USDC."]);
+  });
+
   it("says nothing for a plan that leaves none", () => {
-    expect(planPermissions([leg("Move $50 to Arbitrum"), { summary: "x", lines: [] }])).toEqual([]);
+    expect(
+      planPermissions({
+        legs: [leg("Move $50 to Arbitrum"), { summary: "x", lines: [] }],
+        moves: [{ name: "Take $3 out of savings" }],
+      }),
+    ).toEqual([]);
   });
 });

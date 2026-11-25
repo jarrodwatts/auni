@@ -1,4 +1,4 @@
-import { LETS_LINE, type ActionLine } from "@auni/shared";
+import { LETS_LINE, listed, type ActionLine } from "@auni/shared";
 
 import { feeLabel, shortAddress, usdLabel } from "./format.ts";
 
@@ -222,9 +222,17 @@ export function effectLines(effect: Effect): ActionLine[] {
     ...(to ? [[to.label, to.value] as [string, string]] : []),
     [LINES.gets, got.join(", ") || null],
     [LINES.costs, costsLabel(effect.costs ?? [])],
-    [LINES.lets, grants.map(({ lets }) => lets).join(" and ") || null],
+    [LINES.lets, letsSaid(grants)],
   ];
   return lines.flatMap(([label, value]) => (value ? [{ label, value }] : []));
+}
+
+/**
+ * A move's Lets line: every lasting power it leaves, orders it places included, as each card and
+ * plan draws it, and as the fit check measures it (see tooMuchToWarn); null when it leaves none.
+ */
+export function letsSaid(grants: readonly Grant[]): string | null {
+  return grants.length > 0 ? listed(grants.map(({ lets }) => lets)) : null;
 }
 
 /** What several moves cost, each kind summed across them, in the order each first comes. */

@@ -8,7 +8,7 @@ import {
 } from "@auni/shared";
 
 import type { AppLogo } from "./app-logo.ts";
-import { sentTo, type Effect } from "./effect.ts";
+import { letsSaid, sentTo, type Effect } from "./effect.ts";
 import { moneyOf, type ActionPreview } from "./recipe.ts";
 import { parseUnits } from "./usd.ts";
 
@@ -376,32 +376,50 @@ function appWords(terms: AppTerms, said: Said): CardFace {
   };
 }
 
+/** The most a card's warning says, and a line's value (see cardFaceSchema). */
+const WARNING_MOST = 500;
+export const LINE_MOST = 500;
+
 /**
- * A face that says, first among its warnings, each lasting permission the move leaves behind, in
- * core's words from its effect, whoever wrote it: a face says the move's terms, and the
- * permissions it grants can't depend on its writer remembering them. An order the owner places
- * (a stop-loss) is one of those terms, which the face says itself (see Grant.order).
+ * A card's warning that says `first` whole, then `rest` as far as a card takes: what core must
+ * say (a permission, money gone for good) goes first, so a cut only ever reaches the rest.
  */
-export function withPermissions(face: CardFace, effect: Pick<Effect, "grants">): CardFace {
-  const lets = effect.grants.filter(({ order }) => !order).map(({ lets }) => lets);
-  if (lets.length === 0) return face;
-  return { ...face, warning: [permissionsSaid(lets), face.warning].filter(Boolean).join(" ") };
+export function warnedFirst(first: string | null, rest: string | null | undefined): string | null {
+  return sentence(first, rest ?? null)?.slice(0, WARNING_MOST) ?? null;
 }
 
-/** The most a card's warning says (see cardFaceSchema). */
-const WARNING_MOST = 500;
+/**
+ * What a card's warning says of the lasting permissions a move leaves, in core's words from its
+ * effect, or null when it leaves none. An order the owner places (a stop-loss) is one of the
+ * move's terms, which its face says itself (see Grant.order), so it is left out here.
+ */
+function permissionsWarned(effect: Pick<Effect, "grants">): string | null {
+  const lets = effect.grants.filter(({ order }) => !order).map(({ lets }) => lets);
+  return lets.length > 0 ? permissionsSaid(lets) : null;
+}
 
 /**
- * Why a move gets no card, or null: its warning must say whole both where it sends money for
- * good (`lost`, which a card says first) and every permission and order it leaves, which its
- * Lets line, read by a plan, says too. A card says all a move grants, or there is no card.
+ * A face that says, first among its warnings, each lasting permission the move leaves behind,
+ * whoever wrote it: the permissions a move grants can't depend on its writer remembering them.
+ */
+export function withPermissions(face: CardFace, effect: Pick<Effect, "grants">): CardFace {
+  const said = permissionsWarned(effect);
+  return said ? { ...face, warning: warnedFirst(said, face.warning) } : face;
+}
+
+/**
+ * Why a move gets no card, or null. It measures exactly what a card draws of what the move
+ * leaves, each where a card would cut it: the Lets line (every permission and order, which a
+ * plain face and a plan show), and the start of the warning, where money it sends for good
+ * (`lost`) comes before its permissions (see withLoss in action-card.ts). A card says all a move
+ * grants, or there is no card.
  */
 export function tooMuchToWarn(effect: Pick<Effect, "grants">, lost: string | null): string | null {
-  const lets = effect.grants.map(({ lets }) => lets);
-  if (lets.length === 0) return null;
-  const said = [lost, permissionsSaid(lets)].filter(Boolean).join(" ");
-  return said.length > WARNING_MOST
-    ? `It leaves ${lets.length} permissions${lost ? " and sends money where it is gone for good" : ""}, more than one card can show whole, so no card was made. Each transaction can leave fewer.`
+  const line = letsSaid(effect.grants);
+  if (!line) return null;
+  const warned = sentence(lost, permissionsWarned(effect)) ?? "";
+  return line.length > LINE_MOST || warned.length > WARNING_MOST
+    ? `It leaves ${effect.grants.length} permissions${lost ? " and sends money where it is gone for good" : ""}, more than one card can show whole, so no card was made. Each transaction can leave fewer.`
     : null;
 }
 
@@ -464,7 +482,7 @@ export function fitted(face: CardFace): CardFace {
     context: cutOr(face.context, 500),
     figures: face.figures.map((figure) => ({
       label: cut(figure.label, 60),
-      value: cut(figure.value, 500),
+      value: cut(figure.value, LINE_MOST),
       ...(figure.note === undefined ? {} : { note: cutOr(figure.note, 40) }),
     })),
     ...(scene

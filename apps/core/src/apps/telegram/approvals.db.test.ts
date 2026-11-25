@@ -21,7 +21,7 @@ import {
   type ThreadRow,
 } from "../../db/schema.ts";
 import { executeAction } from "../../money/actions.ts";
-import { allowAction } from "../../money/decide.ts";
+import { allowAction, OUT_OF_DATE } from "../../money/decide.ts";
 import { insertAction, insertThread, wipe } from "../../test/db.ts";
 import { queued } from "../../test/jobs.ts";
 import { FACE, stubRecipe } from "../../test/recipe.ts";
@@ -410,6 +410,17 @@ describe("approving a card", () => {
     expect(String(edits.at(-1)!.text)).toMatch(/Done\nAllowed here\.$/u);
   });
 
+  // A card recorded before cards said every permission, still waiting as Auni updated.
+  it("refuses a card drawn before cards said all they say now, and sends nothing", async () => {
+    const action = await waiting({ cardFormat: 1 });
+    await deliverCard(action);
+    expect(
+      await press({ from: OWNER }, await messageIdOf(action.id), `allow:${grantOnCard()}`),
+    ).toBe(OUT_OF_DATE);
+    expect(await statusOf(action.id)).toBe("awaiting_permission");
+    expect(signer.calls).toBe(0);
+  });
+
   it("applies an ask on the owner's press, through the same path, with nothing to sign", async () => {
     const ask = await waitingAsk();
     await deliverCard(ask);
@@ -743,6 +754,20 @@ describe("approving a plan", () => {
       "Allowed.",
     );
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual(["done", "done"]);
+  });
+
+  // An old plan's message, sent without each leg's permissions, pressed before it is redrawn.
+  it("refuses a plan with a leg drawn before cards said all they say now", async () => {
+    const legs = await planLegs({ cardFormat: 1 });
+    await deliverPlan(PLAN);
+    expect(await press({ from: OWNER }, await planMessage(), `allow:${grantOnCard()}`)).toBe(
+      OUT_OF_DATE,
+    );
+    expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
+      "awaiting_permission",
+      "awaiting_permission",
+    ]);
+    expect(signer.calls).toBe(0);
   });
 
   // The grant rides in a button a channel can deliver twice; a press that decided nothing spends

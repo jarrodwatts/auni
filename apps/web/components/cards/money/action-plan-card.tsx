@@ -59,7 +59,7 @@ export function ActionPlanCard({
   );
 
   const mixed = sum(card.legs, "in") > 0n && sum(card.legs, "back") > 0n;
-  const permissions = planPermissions(card.legs);
+  const permissions = planPermissions(card);
   const legs: readonly Leg[] = card.legs.map((leg) =>
     withLive({ ...planLeg(leg), ...(mixed ? { verb: pickVerb(leg) } : {}) }, live.data?.legs),
   );

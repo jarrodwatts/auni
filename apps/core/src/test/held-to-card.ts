@@ -14,7 +14,7 @@ import { decodeFunctionData, erc20Abi, getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { ActionRow } from "../db/schema.ts";
+import { CARD_FORMAT, type ActionRow } from "../db/schema.ts";
 import { approvedDetails } from "../money/actions.ts";
 import {
   APPROVED_PRICE_AT_LEAST,
@@ -124,6 +124,7 @@ function cardOf(
     details: approvedDetails(preview),
     run: {},
     card: preview.card ? fitted(preview.card) : null,
+    cardFormat: CARD_FORMAT,
     txs: [],
     error: null,
     failureKind: null,

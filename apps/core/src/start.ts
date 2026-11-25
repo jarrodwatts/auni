@@ -158,7 +158,7 @@ export async function start(
           ),
       });
       // Before any tab can see one: a card from before this version doesn't wait looking allowable.
-      await retractStale(db);
+      await db.transaction(retractStale);
       // A handover to another machine stops the runner while it hands Auni over (handover/).
       lendToHandover({
         stopJobs: async () => {

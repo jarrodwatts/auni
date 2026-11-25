@@ -115,16 +115,17 @@ export function replacedNote(replaced: readonly WaitingCard[]): string | null {
  * the owner asks again; its thread isn't woken, since nothing happened there. And a money card
  * drawn before cards said all they say now (CARD_FORMAT), which Allow would refuse: it says it is
  * out of date, and its thread is woken, so the agent can put the move up again. Either way its
- * sealed card is left as it was shown. Returns the threads whose cards it took back.
+ * sealed card is left as it was shown. In one transaction, so no card is taken back without the
+ * wake that tells its thread. Returns the threads whose cards it took back.
  */
-export async function retractStale(executor: Pick<Tx, "update" | "execute">): Promise<string[]> {
+export async function retractStale(tx: Tx): Promise<string[]> {
   const stale = await retract(
-    executor,
+    tx,
     lt(actions.createdAt, sql`now() - make_interval(secs => ${CARD_WAITS_MS / 1_000})`),
     "stale",
   );
   const old = await retract(
-    executor,
+    tx,
     and(lt(actions.cardFormat, CARD_FORMAT), notInArray(actions.tool, [...ASK_TOOL_NAMES])),
     "outOfDate",
   );
@@ -132,7 +133,7 @@ export async function retractStale(executor: Pick<Tx, "update" | "execute">): Pr
     await wakeThread(
       threadId,
       `Auni updated, and its cards now say more about each move, so it took back the cards still waiting here from before, which the owner can no longer allow: ${cards.map((card) => `"${card.asks}" (card ${card.id})`).join(", ")}. Nothing moved, and each can be put up again as a fresh card.`,
-      { tx: executor },
+      { tx },
     );
   return [...new Set([...stale, ...old].flatMap((row) => row.threadId ?? []))];
 }

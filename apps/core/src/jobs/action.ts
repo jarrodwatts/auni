@@ -104,7 +104,7 @@ export const staleCardsJob = defineJob({
   kind: jobKind("stale-cards", z.object({})),
   every: 10 * 60_000,
   run: async () => {
-    for (const threadId of await retractStale(db)) await publishThread(threadId);
+    for (const threadId of await db.transaction(retractStale)) await publishThread(threadId);
   },
 });
 

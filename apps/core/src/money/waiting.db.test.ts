@@ -208,7 +208,7 @@ describe("a card drawn before cards said all they say now", () => {
       cardFormat: CARD_FORMAT - 1,
     });
     const done = await insertAction({ status: "done", cardFormat: CARD_FORMAT - 1 });
-    expect(await retractStale(db)).toEqual([thread.id]);
+    expect(await db.transaction(retractStale)).toEqual([thread.id]);
     expect(await statusOf(old.id)).toMatchObject({
       status: "retracted",
       error: RETRACTED.outOfDate,

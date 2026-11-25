@@ -96,7 +96,7 @@ export function SpareKey() {
     try {
       await save.mutateAsync({ path: "setup/backup/later" });
     } catch {
-      setError("That didn't reach Auni, so try again.");
+      setError("Couldn't reach Auni. Nothing changed. Try again.");
     }
   };
 
@@ -113,7 +113,7 @@ export function SpareKey() {
         // So the tab the pairing link opens comes back to this chat (lib/terminal-trip.ts).
         noteTerminalTrip(window.location.pathname + window.location.search);
         setStage({ kind: "pair-again" });
-      } else setError("That didn't reach Auni. Nothing was shown, so try again.");
+      } else setError("Couldn't reach Auni. No keys were shown. Try again.");
     } finally {
       setRevealing(false);
     }
@@ -148,7 +148,7 @@ export function SpareKey() {
       await save.mutateAsync({ path: "setup/backup" });
       setStage({ kind: "saved" });
     } catch {
-      setError("That didn't reach Auni. Your key is still here, so try again.");
+      setError("Couldn't reach Auni. Your keys are still shown here. Try again.");
     }
   };
 
@@ -156,7 +156,7 @@ export function SpareKey() {
     return (
       <p className={styles.keySaved} role="status">
         <Check aria-hidden className="size-4" />
-        Saved. You can see it again in Settings.
+        Backup saved. You can view your keys anytime in Settings.
       </p>
     );
 
@@ -164,7 +164,7 @@ export function SpareKey() {
     <section
       ref={card}
       className={styles.key}
-      aria-label="Your spare key"
+      aria-label="Back up your wallet"
       data-showing={showing || undefined}
     >
       <NotLooking
@@ -177,17 +177,17 @@ export function SpareKey() {
       <div className={styles.keyWords}>
         <h2 ref={title} tabIndex={-1} className={styles.keyTitle}>
           {showing
-            ? "Your spare key"
+            ? "Your wallet keys"
             : stage.kind === "pair-again"
-              ? "First, show me it's you"
-              : "Now there's money worth keeping"}
+              ? "Confirm it's you"
+              : "Back up your wallet"}
         </h2>
         <p className={styles.keyLine}>
           {showing
-            ? "Keep it with your passwords. Anyone with it can take everything."
+            ? "Store these in your password manager. Anyone with them can move all your funds."
             : stage.kind === "pair-again"
-              ? "Run this in my terminal and open the link it prints. I'll pick up right here."
-              : "I cut you a spare key. If this computer is ever lost, it gets your money back."}
+              ? "Run this in your terminal and open the link it prints. Your keys will appear right here."
+              : "Save your wallet keys now. If you lose this computer, they're the only way to recover your funds."}
         </p>
         {showing ? (
           <>
@@ -199,7 +199,7 @@ export function SpareKey() {
               aria-busy={save.isPending}
               onClick={() => void keep()}
             >
-              {save.isPending ? "Saving" : "I saved it"}
+              {save.isPending ? "Saving" : "I've saved them"}
             </Button>
           </>
         ) : stage.kind === "pair-again" ? (
@@ -224,7 +224,7 @@ export function SpareKey() {
               aria-busy={revealing}
               onClick={() => void show()}
             >
-              {revealing ? "Checking it's you" : "Save it"}
+              {revealing ? "Checking it's you" : "Show keys"}
             </Button>
           </div>
         )}

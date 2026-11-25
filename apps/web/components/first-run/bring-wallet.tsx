@@ -36,10 +36,10 @@ export function BringWallet({
       <ManageDialogContent onOpenAutoFocus={focusDialogTitle} className="px-5 pt-6 pb-5 sm:px-7">
         <NotLooking away={typing} size={88} className="mx-auto" />
         <DialogTitle className="mt-3 text-center text-ink">
-          Use a wallet you already have
+          Bring an existing wallet
         </DialogTitle>
         <DialogDescription className="mt-1.5 text-center text-pretty">
-          Paste its private key: a Monad, Base or Ethereum key (0x…), a Solana key, or both.
+          Paste a private key: a Monad, Base, or Ethereum key (0x…), a Solana key, or both.
         </DialogDescription>
         <div
           className="mt-5"
@@ -130,7 +130,7 @@ function BringKeys({
         <SecretInput
           label="Your Solana key"
           value={solana}
-          placeholder="About 88 letters and numbers"
+          placeholder="Paste your Solana private key"
           disabled={bringing}
           onChange={(value) => {
             setSolana(value);
@@ -174,7 +174,7 @@ function BringKeys({
         aria-busy={bringing}
         onClick={() => void bring()}
       >
-        {bringing ? "Bringing it in" : "Use this wallet"}
+        {bringing ? "Saving wallet" : "Use this wallet"}
       </Button>
     </div>
   );

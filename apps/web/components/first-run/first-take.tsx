@@ -82,7 +82,7 @@ function Ready() {
         <AppMark id={ready.id} size={16} />
         <span>
           {ready.name} is ready.{" "}
-          {wallet.addresses ? "So is your wallet." : "Your wallet is made with your first take."}
+          {wallet.addresses ? "So is your wallet." : "Your wallet is created with your first take."}
         </span>
       </span>
       {bring ? (
@@ -92,7 +92,7 @@ function Ready() {
             onClick={() => setBringing(true)}
             className="font-medium text-ink-soft underline decoration-foreground/20 underline-offset-[3px] transition-colors hover:text-ink hover:decoration-current"
           >
-            Use a wallet I already have
+            Bring an existing wallet
           </button>
           <BringWallet field={bring} open={bringing} onOpenChange={setBringing} />
         </>

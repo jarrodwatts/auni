@@ -17,7 +17,7 @@ type Item = BrainsWire["rows"][number];
 const NOT_READY: Record<"not-installed" | "signed-out" | "expired" | "broken", string> = {
   "not-installed": "Not installed",
   "signed-out": "Not signed in",
-  expired: "Sign-in has expired",
+  expired: "Sign-in expired",
   broken: "Can't start",
 };
 
@@ -52,7 +52,7 @@ export function BrainRow({
     setAsking(true);
     setError(null);
     ask({ id: row.id, kind })
-      .catch(() => setError("That didn't reach Auni. Try again."))
+      .catch(() => setError("Couldn't reach Auni. Try again."))
       .finally(() => setAsking(false));
   };
 
@@ -69,15 +69,15 @@ export function BrainRow({
         ? `Signed in as ${row.signedInAs}`
         : `Ready on ${row.login}`
       : row.state === "resting"
-        ? `Resting until ${time(row.until)}`
+        ? `Limit resets at ${time(row.until)}`
         : NOT_READY[row.state];
   const under =
     task?.kind === "installing"
-      ? `Into Auni's own tools on ${machine}`
+      ? `On ${machine}`
       : row.state === "ready" && row.signedInAs
         ? asStart(row.login)
         : row.state === "resting"
-          ? `Then ready on ${row.login}`
+          ? asStart(row.login)
           : null;
   // The one thing to do, by the row's right edge: never while Auni is already doing something.
   const action =
@@ -155,7 +155,7 @@ export function BrainRow({
                 aria-hidden
                 className="size-3.5 animate-spin motion-reduce:animate-none"
               />
-              Starting {row.name}&apos;s own sign-in on {machine}
+              Starting {row.name} sign-in on {machine}
             </p>
           ) : task.view.kind === "code" ? (
             <CodeSteps view={task.view} />
@@ -224,7 +224,7 @@ function CodeSteps({ view }: { readonly view: Extract<SignInView, { kind: "code"
       <li className="flex items-start gap-3 rounded-control bg-surface py-2.5 pr-2 pl-3.5">
         <Step n={2} />
         <span className="min-w-0 flex-1">
-          <span className="block text-ui font-medium text-ink">Enter this code there</span>
+          <span className="block text-ui font-medium text-ink">Enter this code</span>
           <CopyLine
             value={view.code}
             className="mt-1.5 [&_code]:text-reading [&_code]:tracking-[0.12em] [&>div]:bg-card"
@@ -272,7 +272,7 @@ function SignInPrompt({
     setError(null);
     typeIntoSignIn(view.field, line)
       .then(() => setLine(""))
-      .catch(() => setError(`That didn't reach ${name}'s sign-in. Try again.`))
+      .catch(() => setError(`Couldn't send the code to ${name}. Try again.`))
       .finally(() => setSending(false));
   };
 
@@ -291,7 +291,7 @@ function SignInPrompt({
       ) : (
         <p className="flex h-11 items-center justify-center gap-2 text-meta text-muted-foreground">
           <LoaderCircle aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
-          Opening {name}&apos;s sign-in
+          Opening {name} sign-in
         </p>
       )}
       <form
@@ -305,7 +305,7 @@ function SignInPrompt({
         <input
           type="password"
           value={line}
-          aria-label={`The code from ${name}'s sign-in`}
+          aria-label={`Code from ${name} sign-in`}
           placeholder="Paste the code"
           disabled={sending}
           autoComplete="off"

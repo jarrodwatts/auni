@@ -34,12 +34,12 @@ export function Waking({ step = "opening" }: { readonly step?: "opening" | "star
       title={`Starting Auni${on}`}
       body={
         slow
-          ? "This is taking longer than a start should."
-          : "This page opens by itself when it's ready. A first start takes about a minute."
+          ? "This is taking longer than usual."
+          : "This page opens automatically when Auni is ready. A first start takes about a minute."
       }
     >
       {slow ? (
-        <DoctorSteps machine={machine} then="Auni opens here by itself once it's up." />
+        <DoctorSteps machine={machine} then="Auni opens automatically once it's running." />
       ) : null}
     </GateScreen>
   );

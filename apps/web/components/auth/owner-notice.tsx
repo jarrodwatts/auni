@@ -18,9 +18,9 @@ export function OwnerNotice({ reason }: { readonly reason: Reason }) {
           pose="listening"
           waiting
           title="Pair this browser"
-          body="Auni opens only in browsers you pair from its terminal."
+          body="Auni only opens in browsers paired from your terminal."
         >
-          <PairSteps machine={machine} then="This page opens Auni by itself once you have." />
+          <PairSteps machine={machine} then="This page opens automatically once paired." />
         </GateScreen>
       );
     case "link-used":
@@ -29,9 +29,9 @@ export function OwnerNotice({ reason }: { readonly reason: Reason }) {
           pose="sad"
           waiting
           title="This link no longer works"
-          body="A pairing link works once, within 15 minutes."
+          body="Pairing links work once and expire after 15 minutes."
         >
-          <PairSteps machine={machine} then="This page opens Auni by itself once you have." />
+          <PairSteps machine={machine} then="This page opens automatically once paired." />
         </GateScreen>
       );
     case "tailscale-only":
@@ -39,7 +39,7 @@ export function OwnerNotice({ reason }: { readonly reason: Reason }) {
         <GateScreen
           pose="listening"
           title="Open Auni through Tailscale"
-          body={`${machine ? `Auni on ${machine}` : "This Auni"} opens only for its owner's Tailscale login, from your phone or another computer.`}
+          body={`${machine ? `Auni on ${machine}` : "This Auni"} only opens with your Tailscale login, from your phone or another computer.`}
         />
       );
     case "database":
@@ -48,9 +48,12 @@ export function OwnerNotice({ reason }: { readonly reason: Reason }) {
           pose="sad"
           waiting
           title="Auni can't reach its database"
-          body="Nothing can move while it's down, and your wallet isn't touched."
+          body="Your wallet is untouched, and no moves can run while it's down."
         >
-          <DoctorSteps machine={machine} then="Auni opens here by itself once it's back." />
+          <DoctorSteps
+            machine={machine}
+            then="Auni opens automatically once the database is back."
+          />
         </GateScreen>
       );
   }
@@ -71,7 +74,7 @@ export function HandedOverNotice({
     <GateScreen
       pose="color"
       title={`Auni runs on ${machine} now`}
-      body="It moved there so it keeps going while this computer sleeps. Nothing runs here, and nothing was removed: this copy stays until you run auni uninstall."
+      body="Auni moved there so it stays online while this computer sleeps. Nothing runs here anymore, and this local copy stays until you run auni uninstall."
     >
       {to ? (
         <Button size="lg" className="w-full" onClick={() => window.location.assign(to)}>

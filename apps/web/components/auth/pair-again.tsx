@@ -46,7 +46,7 @@ export function PairAgain({
     >
       <p className="text-ui font-medium text-ink">Confirm it&apos;s you</p>
       <p className="mt-1 text-meta text-pretty text-muted-foreground">
-        This browser paired a while ago, so pair it again first.
+        This browser paired over 15 minutes ago. Pair it again to continue.
       </p>
       <PairSteps machine={machine} then={then} className="mt-4" />
     </div>

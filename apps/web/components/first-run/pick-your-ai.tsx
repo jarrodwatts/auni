@@ -26,7 +26,7 @@ export function PickYourAi({
       <Mascot alt="" priority size={80} state="listening" className="auni-onb-mascot" />
       <h1 className="mt-4 text-center text-title text-ink">Pick your AI</h1>
       <p className="mt-2 max-w-[400px] text-center text-body text-pretty text-muted-foreground">
-        Auni thinks with your existing Claude or ChatGPT login, with nothing extra to pay.
+        Auni uses your existing Claude or ChatGPT login, with nothing extra to pay.
       </p>
       <LoginStaysHere ids={brains.rows.map(({ row }) => row.id)} machine={machine} />
       {brains.blocked ? (

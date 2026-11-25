@@ -72,7 +72,7 @@ export function PairSteps({
     <ol className={cn("flex flex-col", className)}>
       <Step
         icon={<TerminalSquare />}
-        title={`Run this ${machine ? `on ${machine}` : "in a terminal"}`}
+        title={`Run this ${machine ? `on ${machine}` : "in your terminal"}`}
       >
         <CopyLine value="auni pair" command className="mt-2" />
       </Step>
@@ -132,7 +132,7 @@ export function DoctorSteps({
     <ol className="flex flex-col">
       <Step
         icon={<TerminalSquare />}
-        title={`See why ${machine ? `on ${machine}` : "in a terminal"}`}
+        title={`Check status ${machine ? `on ${machine}` : "in your terminal"}`}
       >
         <CopyLine value="auni doctor" command className="mt-2" />
       </Step>

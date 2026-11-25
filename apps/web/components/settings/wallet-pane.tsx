@@ -111,7 +111,7 @@ export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: 
 
         {!wallets?.evm && !wallets?.solana ? (
           <div className="px-4 py-4 text-meta text-muted-foreground sm:px-5">
-            No wallet yet. Auni makes one on this computer as you send your first take.
+            No wallet yet. Auni creates one on this computer when you send your first take.
           </div>
         ) : null}
       </SettingsSection>

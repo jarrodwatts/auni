@@ -70,7 +70,7 @@ export function ActivityRow({
       </span>
       <span
         className={cn(
-          "min-w-0 flex-1",
+          "min-w-0 flex-[1_1_auto]",
           open ? "break-words whitespace-pre-wrap" : !swap && "truncate",
         )}
         ref={textRef}
@@ -96,7 +96,8 @@ export function ActivityRow({
         )}
       </span>
       {result === undefined ? null : (
-        <span className="flex max-w-[52%] min-w-0 flex-none items-center text-meta text-muted-foreground/80 tabular-nums">
+        // What it found gives way before what it did: on a phone the step's words stay whole.
+        <span className="flex max-w-[52%] min-w-0 flex-[0_100_auto] items-center text-meta text-muted-foreground/80 tabular-nums">
           <TextSwap align="end" text={result ?? ""} />
         </span>
       )}

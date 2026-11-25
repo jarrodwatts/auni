@@ -982,7 +982,7 @@ const SCENES: readonly Scene[] = [
       yield* think(
         "The price I can read myself. What people are saying about it is Elfa's to read, and Elfa has no key here, so I'll answer from the price and offer it.",
       );
-      yield* call("find_instruments", { query: "Solana" });
+      yield* call("hyperliquid_markets", { query: "SOL" });
       yield* call("get_portfolio", {});
       yield* say(
         "From the price alone: Solana has drifted a little lower this week, with no single day doing the damage. That usually means people losing interest more than anyone selling in a hurry.",

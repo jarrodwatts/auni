@@ -122,7 +122,8 @@ export function TurnSteps({
             </span>
           ))}
         </span>
-        <span className="min-w-0 truncate">{stepsSummary(steps.map(({ title }) => title))}</span>
+        {/* Wraps rather than cut off: on a phone the line is the only word of what was done. */}
+        <span className="min-w-0 text-pretty">{stepsSummary(steps.map(({ title }) => title))}</span>
         <ChevronDown
           aria-hidden
           className={cn(

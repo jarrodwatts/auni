@@ -26,6 +26,8 @@ export type { WithdrawNetwork };
 export type WithdrawDestination = NonNullable<WithdrawalWire["review"]["destination"]>;
 export type Withdrawal = WithdrawalWire;
 type WithdrawCash = WithdrawCashWire;
+/** A place the owner's money went before, which Withdraw offers again. */
+export type RecentPlace = WithdrawCashWire["recent"][number];
 
 /**
  * What a withdrawal's confirm step and receipt say beside its card, as the withdraw recipe
@@ -52,18 +54,15 @@ export function addressFits(network: WithdrawNetwork, value: string): boolean {
 }
 
 /**
- * What Withdraw says of the owner's cash: all of it, as the portfolio's Cash says, then, where
- * an app keeps some, how much is in their wallet to send and where the rest is.
+ * What Withdraw says of the owner's cash under the amount: what's in their wallet to send, and,
+ * where an app keeps some, how much and where, which comes home by asking Auni first.
  */
-export function cashWords({ cashUsd, walletUsd, elsewhere }: WithdrawCash): string {
-  const ask = "Holdings sell to cash first: ask Auni.";
-  if (elsewhere.length === 0) return `You have ${formatUsd(cashUsd)} in cash. ${ask}`;
+export function cashWords({ walletUsd, elsewhere }: WithdrawCash): string {
+  const inWallet = `${formatUsd(walletUsd)} cash in your wallet.`;
+  if (elsewhere.length === 0) return `${inWallet} To send holdings, ask Auni to sell them first.`;
   const at = elsewhere.map(({ name, usdValue }) => `${formatUsd(usdValue)} at ${name}`);
   const rest = at.length === 1 ? at[0] : `${at.slice(0, -1).join(", ")} and ${at.at(-1)}`;
-  return (
-    `You have ${formatUsd(cashUsd)} in cash: ${formatUsd(walletUsd)} in your wallet to send, ` +
-    `and ${rest}. Ask Auni to bring that home, or to sell holdings to cash.`
-  );
+  return `${inWallet} ${rest}: ask Auni to bring it home first.`;
 }
 
 const TIME = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
@@ -77,10 +76,17 @@ export function sentWords(
   { review }: Pick<Withdrawal, "review">,
   now: Pick<ActionWire, "status" | "amountUsd" | "details" | "error" | "updatedAt">,
 ): { readonly title: string; readonly lede: string } {
+  const amount = formatUsd(now.amountUsd);
   if (now.status === "failed")
-    return { title: "It didn’t go through", lede: now.error ?? "Try again in a moment." };
+    return {
+      title: "Withdrawal didn't go through",
+      lede: now.error ?? "Your money stayed in your wallet. Try again in a moment.",
+    };
   if (now.status !== "done")
-    return { title: "On its way", lede: `${withdrawalDetails(now).arrives ?? "Soon"}.` };
+    return {
+      title: `${amount} on its way`,
+      lede: `${withdrawalDetails(now).arrives ?? "Soon"}.`,
+    };
   const network = WITHDRAW_NETWORKS.find((entry) => entry.id === review.network)?.name;
   const to = review.destination ? `your ${review.destination}` : "that address";
   // "4:04pm", as Activity says a time.
@@ -89,8 +95,8 @@ export function sentWords(
     (_, half: string) => `${half.toLowerCase()}m`,
   );
   return {
-    title: "It arrived",
-    lede: `${formatUsd(now.amountUsd)} reached ${to}${network ? ` on ${network}` : ""} at ${at}.`,
+    title: `${amount} arrived`,
+    lede: `It reached ${to}${network ? ` on ${network}` : ""} at ${at}.`,
   };
 }
 
@@ -104,7 +110,7 @@ export async function proposeWithdrawal(request: {
   readonly amountUsd: string;
   readonly network: WithdrawNetwork;
   readonly address: string;
-  readonly destination: WithdrawDestination;
+  readonly destination: WithdrawDestination | null;
 }): Promise<Withdrawal> {
   return withdrawalWireSchema.parse(
     await requestCore("withdrawals", {
@@ -113,7 +119,8 @@ export async function proposeWithdrawal(request: {
         amount_usd: request.amountUsd,
         network: request.network,
         address: request.address.trim(),
-        destination: request.destination,
+        // Left out when the owner didn't say whose it is.
+        destination: request.destination ?? undefined,
       }),
     }),
   );

@@ -33,6 +33,8 @@ const LOOKS = (["light", "dark"] as const).filter(
 if (LOOKS.length === 0) throw new Error(`"${process.argv[3]}" is no look: light or dark.`);
 /** Its own port, unless `SHOTS_PORT` names another, so two runs on one machine can go side by side. */
 const PORT = Number(process.env.SHOTS_PORT ?? 3941);
+/** Only the screens whose names match `SHOTS_ONLY` (a regular expression), when it's set. */
+const ONLY = process.env.SHOTS_ONLY ? new RegExp(process.env.SHOTS_ONLY, "u") : null;
 /** The moment every picture is taken at, and the time zone its dates are read in. */
 const AT = "2026-11-11T12:00:00Z";
 const TIME_ZONE = "UTC";
@@ -132,6 +134,7 @@ async function take(
   first?: Opener,
   { only, once = false }: { only?: (typeof WIDTHS)[number]["name"]; once?: boolean } = {},
 ): Promise<void> {
+  if (ONLY && !ONLY.test(name)) return;
   for (const { name: size, width, height } of WIDTHS.filter((w) => !only || w.name === only)) {
     await page.picture(width, height);
     await page.open(url);
@@ -293,6 +296,35 @@ const SEND_UNCONFIRMED: Opener = {
 };
 
 /**
+ * Money landing while Add money is open: every read of the money from here on carries one more
+ * deposit, as if it had just been sent from an exchange, and the picture waits for the next read
+ * (every 10 seconds while Add money watches) and the landing it plays.
+ */
+const LAND = `new Promise((landed) => {
+  const real = window.fetch;
+  window.fetch = async (input, init) => {
+    const response = await real(input, init);
+    if (!/\\/core\\/portfolio(\\?|$)/u.test(String(input instanceof Request ? input.url : input))) return response;
+    const body = await response.json();
+    body.deposits = [{ id: "shot-landed", symbol: "USDC", amount: "250", network: "Base", usdValue: "250" }, ...body.deposits];
+    return new Response(JSON.stringify(body), { status: response.status, headers: response.headers });
+  };
+  setTimeout(() => landed(true), 15_000);
+})`;
+
+/** Types `value` into the field named `name`, as a person would, so the page's own state hears it. */
+const FILL = (name: string, value: string) => `(() => {
+  const field = document.querySelector(${JSON.stringify(`[name="${name}"]`)});
+  if (!field) return false;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(field, ${JSON.stringify(value)});
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  return true;
+})()`;
+
+/** Waits a moment, as a page does between a person's taps. */
+const PAUSE = (ms: number) => `new Promise((done) => setTimeout(() => done(true), ${ms}))`;
+
+/**
  * Every screen, into `out`, as an owner whose system is set to `look` sees it. Each look gets a
  * demo and a browser of its own, since looking changes what a screen shows next (a row that
  * was new, a chat that was unread): both looks picture the same owner at the same moment.
@@ -449,6 +481,55 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const looked = threads.find((thread) => /story with sol/iu.test(thread.title ?? ""));
     if (looked)
       await take(page, out, "work-open", `${origin}/app/chat/${looked.id}`, "end", OPEN_WORK);
+    // Money in and out: Add money, for a card and as money lands, Withdraw and its review, and
+    // the wallet's keys, asked for and shown.
+    const once = { once: true } as const;
+    await take(page, out, "add-money", `${origin}/app?fund=open`, "top", undefined, once);
+    await take(
+      page,
+      out,
+      "add-money-solana",
+      `${origin}/app?fund=open`,
+      "top",
+      PRESS("Solana"),
+      once,
+    );
+    await take(page, out, "add-money-for-a-card", `${origin}/app?fund=50`, "top", undefined, once);
+    await take(page, out, "add-money-landed", `${origin}/app?fund=open`, "top", LAND, once);
+    await take(page, out, "withdraw", `${origin}/app`, "top", PRESS("Withdraw"), once);
+    await take(
+      page,
+      out,
+      "withdraw-review",
+      `${origin}/app`,
+      "top",
+      `(async () => {
+        ${PRESS("Withdraw")};
+        await ${PAUSE(800)};
+        ${FILL("amount", "120")};
+        ${PRESS("Monad")};
+        ${FILL("address", "0x8ba1f109551bD432803012645Ac136ddd64DBA72")};
+        await ${PAUSE(300)};
+        ${PRESS("Review")};
+        await ${PAUSE(2_500)};
+        return true;
+      })()`,
+      once,
+    );
+    const KEYS = `(async () => { ${PRESS("Show wallet keys")}; await ${PAUSE(800)}; return true; })()`;
+    await take(page, out, "wallet-keys", `${origin}/app?settings=wallet`, "top", KEYS, once);
+    const SHOWN = `(async () => { await ${KEYS}; ${PRESS("Show keys")}; await ${PAUSE(1_500)}; return true; })()`;
+    const wallet = `${origin}/app?settings=wallet`;
+    await take(page, out, "wallet-keys-shown", wallet, "top", SHOWN, once);
+    await take(
+      page,
+      out,
+      "wallet-keys-revealed",
+      wallet,
+      "top",
+      `(async () => { await ${SHOWN}; ${PRESS("Show the Monad")}; return true; })()`,
+      once,
+    );
     if (busiest) {
       const chat = `${origin}/app/chat/${busiest.id}`;
       // Last, as the pane stays open once opened (on this device) for every thread after it.
@@ -516,6 +597,6 @@ rmSync(OUT, { recursive: true, force: true });
 for (const look of LOOKS) {
   const out = look === "light" ? OUT : join(OUT, look);
   await shoot(look, out);
-  await shootFirstRun(look, out);
+  if (!ONLY || ONLY.test("first-run")) await shootFirstRun(look, out);
 }
 console.log(`\nThe demo's screens are in ${OUT}`);

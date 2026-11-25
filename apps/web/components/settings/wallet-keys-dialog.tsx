@@ -1,38 +1,31 @@
 "use client";
 
-import { Check, Copy, LoaderCircle } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy, Eye, EyeOff, LoaderCircle, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
+import { MoneySheet } from "@/components/money/money-sheet";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  AuniDialogMascot,
-  auniDialogCardClass,
-  auniDialogDescriptionClass,
   auniDialogDestructiveButtonClass,
   auniDialogOutlineButtonClass,
-  auniDialogOverlayClass,
-  auniDialogTitleClass,
 } from "@/components/ui/auni-dialog";
+import { Button } from "@/components/ui/button";
+import { DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { revealWalletKeys } from "@/lib/data/me";
-import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
 import { useClipboardCopy } from "@/lib/use-clipboard-copy";
 import { cn } from "@/lib/utils";
 
 type WalletKeys = Awaited<ReturnType<typeof revealWalletKeys>>;
 
+/** How long a key shows once revealed before it's hidden again. */
+const SHOWN_FOR_MS = 60_000;
+
 /**
  * Hands over the wallet's keys, so the money is the owner's whatever happens to Auni. Core shows
  * them only to a request that proves the owner is there, so someone at a browser paired long ago,
- * say an unlocked laptop, can't read the keys off this button alone. The keys live only in this
- * dialog's state, which goes when it closes.
+ * say an unlocked laptop, can't read the keys off this button alone. Even then each key stays
+ * hidden until it's asked for, and hides again a minute on. The keys live only in this sheet's
+ * state, which goes when it closes; a tap outside doesn't close it by accident.
  */
 export function WalletKeysDialog({
   open,
@@ -42,18 +35,29 @@ export function WalletKeysDialog({
   readonly onOpenChange: (open: boolean) => void;
 }) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent
-        className={cn(auniDialogCardClass, "max-w-[calc(100%-2rem)]")}
-        overlayClassName={auniDialogOverlayClass}
-      >
-        <ShowKeys />
-      </AlertDialogContent>
-    </AlertDialog>
+    <MoneySheet held open={open} onOpenChange={onOpenChange}>
+      <DialogClose asChild>
+        <Button
+          aria-label="Close"
+          className="absolute top-5 right-5 z-10"
+          size="icon-sm"
+          variant="ghost"
+        >
+          <X aria-hidden />
+        </Button>
+      </DialogClose>
+      <ShowKeys />
+    </MoneySheet>
   );
 }
 
-/** The dialog's inside, drawn afresh each time it opens, so no key carries over. */
+const RISKS = [
+  "Anyone with them can move everything in your wallet, with no card to tap and no way to undo it.",
+  "Auni will never ask for them. Anyone who does isn't Auni.",
+  "Your wallet keeps working here exactly as before.",
+] as const;
+
+/** The sheet's inside, drawn afresh each time it opens, so no key carries over. */
 function ShowKeys() {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,82 +78,70 @@ function ShowKeys() {
     }
   };
 
-  if (keys) return <ShownKeys keys={keys} />;
+  if (keys)
+    return (
+      <>
+        <DialogTitle className="pr-10 text-title text-ink">Your keys</DialogTitle>
+        <DialogDescription className="mt-1.5 text-body text-muted-foreground">
+          Save them somewhere only you can reach, like a password manager. They leave this screen
+          when you close it.
+        </DialogDescription>
+        <WalletKeyList className="mt-6" keys={keys} />
+        <DialogClose asChild>
+          <Button className={cn(auniDialogOutlineButtonClass, "mt-6")} variant="secondary">
+            Done
+          </Button>
+        </DialogClose>
+      </>
+    );
   return (
     <>
-      <AuniDialogMascot state="listening" />
-      <AlertDialogHeader className="mt-4 gap-0">
-        <AlertDialogTitle className={auniDialogTitleClass}>Show your keys?</AlertDialogTitle>
-        <AlertDialogDescription asChild>
-          <div className={cn(auniDialogDescriptionClass, "space-y-2.5 text-left")}>
-            <p>
-              A wallet key is the master password for your money. Anyone who gets it can take
-              everything in that wallet right away: no approval, no waiting period, and no way to
-              undo it.
-            </p>
-            <p>
-              None of Auni’s protections follow the key. Auni will never ask you for it, and anyone
-              who does is not from Auni.
-            </p>
-            <p>
-              Your wallet keeps working here exactly as before. Showing the keys does not switch
-              anything off.
-            </p>
-          </div>
-        </AlertDialogDescription>
-      </AlertDialogHeader>
+      <DialogTitle className="pr-10 text-title text-ink">Show your keys?</DialogTitle>
+      <DialogDescription className="mt-1.5 text-body text-ink">
+        Your wallet keys are the master key to your money.
+      </DialogDescription>
+      <ul className="mt-4 flex flex-col gap-2.5 text-ui text-muted-foreground">
+        {RISKS.map((risk) => (
+          <li key={risk} className="flex gap-3">
+            <span aria-hidden className="mt-2 size-1.5 flex-none rounded-full bg-faint" />
+            {risk}
+          </li>
+        ))}
+      </ul>
       {pairAgain ? (
-        <PairAgain className="mt-4" then="Then show your keys here again." />
+        <PairAgain className="mt-5" then="Then show your keys here again." />
       ) : (
-        <p className="mt-3 text-left text-meta leading-[1.5] text-muted-foreground">
-          Auni checks it’s you before they show.
-        </p>
+        <p className="mt-5 text-meta text-muted-foreground">Auni checks it&apos;s you first.</p>
       )}
       {error ? (
-        <p role="alert" className="mt-3 text-meta text-destructive">
+        <p role="alert" className="mt-3 text-meta text-negative">
           {error}
         </p>
       ) : null}
-      <div className="mt-7 grid grid-cols-2 gap-3">
-        <AlertDialogCancel className={auniDialogOutlineButtonClass}>Cancel</AlertDialogCancel>
-        <AlertDialogAction
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <DialogClose asChild>
+          <Button className={auniDialogOutlineButtonClass} variant="secondary">
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button
           className={auniDialogDestructiveButtonClass}
           disabled={checking}
           variant="destructive"
-          onClick={(event) => {
-            event.preventDefault();
-            void showKeys();
-          }}
+          onClick={() => void showKeys()}
         >
           {checking ? <LoaderCircle aria-hidden className="animate-spin" /> : null}
-          Show my keys
-        </AlertDialogAction>
+          Show keys
+        </Button>
       </div>
     </>
   );
 }
 
-/** Each key the wallet holds, with a button that copies it. */
-function ShownKeys({ keys }: { readonly keys: WalletKeys }) {
-  return (
-    <>
-      <AlertDialogHeader className="gap-0">
-        <AlertDialogTitle className={auniDialogTitleClass}>Your keys</AlertDialogTitle>
-        <AlertDialogDescription className={cn(auniDialogDescriptionClass, "text-left")}>
-          Keep them somewhere only you can reach. They go from this screen when you close it.
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <WalletKeyList className="mt-5" keys={keys} />
-      <div className="mt-7">
-        <AlertDialogCancel className={cn(auniDialogOutlineButtonClass, "w-full")}>
-          Done
-        </AlertDialogCancel>
-      </div>
-    </>
-  );
-}
-
-/** The keys, each with a button that copies it: here, and in first run's backup step. */
+/**
+ * The keys, each hidden until its eye is pressed and hidden again a minute on, with Copy beside
+ * it, which copies whether it shows or not: here, and in first run's backup step.
+ */
 export function WalletKeyList({
   keys,
   className,
@@ -158,35 +150,72 @@ export function WalletKeyList({
   readonly className?: string;
 }) {
   const clipboard = useClipboardCopy();
-  const shown = [
-    { label: "EVM key (every EVM network)", value: keys.evm },
-    { label: "Solana key", value: keys.solana },
+  const [shown, setShown] = useState<string | null>(null);
+  const [copiedOnce, setCopiedOnce] = useState(false);
+  useEffect(() => {
+    if (!shown) return;
+    const hide = window.setTimeout(() => setShown(null), SHOWN_FOR_MS);
+    return () => window.clearTimeout(hide);
+  }, [shown]);
+  const list = [
+    { label: "Monad, Base and more", value: keys.evm },
+    { label: "Solana", value: keys.solana },
   ].flatMap(({ label, value }) => (value ? [{ label, value }] : []));
   return (
-    <div className={cn("space-y-3", className)}>
-      {shown.map(({ label, value }) => (
-        <div key={label} className="rounded-card border border-foreground/[0.1] p-3 text-left">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-meta font-semibold text-ink">{label}</span>
-            <button
-              type="button"
-              onClick={() => clipboard.copy(value)}
-              className="flex items-center gap-1.5 rounded-full px-2 py-1 text-meta text-muted-foreground transition-colors hover:bg-foreground/[0.05]"
-            >
-              {clipboard.copiedValue === value ? (
-                <Check aria-hidden className="size-3.5" />
-              ) : (
-                <Copy aria-hidden className="size-3.5" />
+    <div className={cn("flex flex-col gap-3", className)}>
+      {list.map(({ label, value }) => {
+        const on = shown === value;
+        const copied = clipboard.copiedValue === value;
+        return (
+          <div key={label} className="rounded-card border border-border p-3 text-left">
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-meta font-semibold text-ink">
+                {label}
+              </span>
+              <Button
+                aria-label={on ? `Hide the ${label} key` : `Show the ${label} key`}
+                aria-pressed={on}
+                onClick={() => setShown(on ? null : value)}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                {on ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+              </Button>
+              <Button
+                aria-label={copied ? "Copied" : `Copy the ${label} key`}
+                onClick={() => {
+                  clipboard.copy(value);
+                  setCopiedOnce(true);
+                }}
+                size="sm"
+                type="button"
+                variant="secondary"
+              >
+                {copied ? <Check aria-hidden className="text-positive" /> : <Copy aria-hidden />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+            <p
+              className={cn(
+                "mt-2 font-mono text-meta break-all",
+                on ? "text-ink select-all" : "text-faint select-none",
               )}
-              {clipboard.copiedValue === value ? "Copied" : "Copy"}
-            </button>
+            >
+              {/* Hidden, it's dots as long as the key, so nothing of it can be read or selected. */}
+              {on ? value : "•".repeat(value.length)}
+            </p>
           </div>
-          <p className="mt-2 font-mono text-caption break-all text-ink select-all">{value}</p>
-        </div>
-      ))}
+        );
+      })}
       {clipboard.blocked ? (
         <p className="text-meta text-muted-foreground">
-          This browser blocked copying: select a key to copy it by hand.
+          This browser blocked copying. Show a key and select it to copy it by hand.
+        </p>
+      ) : copiedOnce ? (
+        <p className="text-meta text-muted-foreground">
+          Paste it into your password manager, then copy something else so it isn&apos;t left on
+          your clipboard.
         </p>
       ) : null}
     </div>

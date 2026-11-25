@@ -1,7 +1,7 @@
 "use client";
 
-import type { ActionStatus } from "@auni/shared";
-import { LoaderCircle } from "lucide-react";
+import { NETWORKS, type ActionStatus } from "@auni/shared";
+import { ArrowRight, LoaderCircle, WalletMinimal } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -13,10 +13,13 @@ import { CoreApiError } from "@/lib/core";
 import { decideAction, NOT_REACHED, readAction } from "@/lib/data/actions";
 import { WITHDRAW_NETWORKS, withdrawalDetails, type Withdrawal } from "@/lib/data/withdrawals";
 import { formatUsd } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
 import { FullAddress } from "@/components/cards/money/full-address";
 import { ProofNote } from "@/components/cards/money/proof-note";
+import { shortAddress } from "@/components/money/portal/deposit-addresses";
+import { NetworkMark } from "@/components/money/portal/network-mark";
 
 // An Allow that went through: the withdrawal is on its way or already settled.
 const SENT: ReadonlySet<ActionStatus> = new Set(["running", "done", "failed"]);
@@ -29,17 +32,20 @@ function refusal(error: unknown): string {
 }
 
 /**
- * The confirm step every withdrawal passes, from Settings or from chat: the
- * full address with the parts people check in bold, a plain warning when it
- * looks like an address they used before, and the proof a new address
- * takes, that the owner is at the computer, before the tap can send.
+ * The confirm step every withdrawal passes, from Withdraw or from chat: the route as a scene
+ * (their wallet, the amount, where it lands), the full address with the parts people check in
+ * bold, a plain warning when it looks like an address they used before, what it costs and when
+ * it lands, and the proof a new address takes, that the owner is at the computer, before the tap
+ * can send. What the tap sends is the action core recorded; this only shows it.
  */
 export function WithdrawReview({
   withdrawal,
   onSent,
   onBack,
   backLabel = "Back",
+  className,
 }: {
+  readonly className?: string;
   readonly withdrawal: Withdrawal;
   readonly onSent: (action: Withdrawal["action"]) => void;
   readonly onBack: () => void;
@@ -79,36 +85,56 @@ export function WithdrawReview({
   };
 
   return (
-    <div className="flex flex-col">
-      <div className="text-center">
-        <p className="text-card-money text-ink">{amount}</p>
-        <p className="mt-1 text-ui text-muted-foreground">
-          {review.destination ? `to your ${review.destination}` : "to this address"} on {network}
-        </p>
+    <div className={cn("flex flex-col", className)}>
+      {/* The route, as a scene: from the owner's wallet, the amount, to where it lands. */}
+      <div className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-col items-center gap-1.5">
+          <span className="grid size-10 place-items-center rounded-full bg-foreground/[0.06] text-ink">
+            <WalletMinimal aria-hidden className="size-[18px]" />
+          </span>
+          <span className="text-meta text-muted-foreground">Your wallet</span>
+        </span>
+        <span className="relative flex min-w-0 flex-1 flex-col items-center pb-6">
+          <span className="text-card-money text-ink tabular-nums">{amount}</span>
+          <span aria-hidden className="absolute bottom-3 left-0 h-px w-full bg-border" />
+          <ArrowRight
+            aria-hidden
+            className="absolute right-0 bottom-[5px] size-4 translate-x-1 text-muted-foreground"
+          />
+        </span>
+        <span className="flex min-w-0 flex-col items-center gap-1.5">
+          <NetworkMark
+            network={{ key: review.network, logo: NETWORKS[review.network].logo }}
+            size={40}
+          />
+          <span className="text-meta whitespace-nowrap text-muted-foreground">
+            {review.destination ? `Your ${review.destination}` : "This address"}
+          </span>
+        </span>
       </div>
 
       {/* Two even lines, so a phone never wraps it mid-way; the start and end people check stand out. */}
-      <p className="mt-5 rounded-control border border-foreground/[0.1] bg-surface px-3 py-3 text-center text-ui leading-[1.6]">
+      <p className="mt-5 rounded-control bg-surface px-3 py-3 text-center text-ui leading-6">
         <FullAddress address={review.address} />
       </p>
 
       {review.lookalike ? (
         <p
           role="alert"
-          className="mt-3 rounded-control bg-destructive/[0.07] px-3.5 py-3 text-meta leading-[1.5] text-destructive"
+          className="mt-3 rounded-control border border-negative/30 px-3.5 py-3 text-meta text-negative"
         >
-          This looks like {review.lookalike.slice(0, 6)}…{review.lookalike.slice(-4)}, an address
-          you sent to before, but the middle is different. Scammers plant addresses like this. Check
-          every character before you send.
+          This looks like {shortAddress(review.lookalike)}, an address you sent to before, but the
+          middle is different. Scammers plant addresses like this. Check every character before you
+          send.
         </p>
       ) : review.destination === "exchange" ? (
-        <p className="mt-3 text-meta leading-[1.5] text-muted-foreground">
-          Check that your exchange takes USDC on {network}. Money sent on a network it doesn’t
+        <p className="mt-3 text-meta text-muted-foreground">
+          Check that your exchange takes USDC on {network}. Money sent on a network it doesn&apos;t
           support can be lost.
         </p>
       ) : null}
 
-      <dl className="mt-4 divide-y divide-foreground/[0.06] text-ui">
+      <dl className="mt-4 divide-y divide-border text-ui">
         {[
           ["Network", network],
           ["Arrives", pinned.arrives],
@@ -116,7 +142,7 @@ export function WithdrawReview({
           ["SOL for fees", pinned.solForFees],
         ].map(([label, value]) =>
           value ? (
-            <div key={label} className="flex items-center justify-between py-2">
+            <div key={label} className="flex items-center justify-between py-2.5">
               <dt className="text-muted-foreground">{label}</dt>
               <dd className="font-medium text-ink tabular-nums">{value}</dd>
             </div>
@@ -128,23 +154,23 @@ export function WithdrawReview({
         <PairAgain className="mt-3" then="Then tap Withdraw again. Nothing was sent." />
       ) : takesProof ? (
         <ProofNote className="mt-3">
-          First time sending here, so Auni checks it&apos;s you.
+          This is a new address, so Auni checks it&apos;s you first.
         </ProofNote>
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 text-meta text-destructive">
+        <p role="alert" className="mt-3 text-meta text-negative">
           {error}
         </p>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className="mt-6 grid grid-cols-[auto_1fr] gap-3">
         <Button
-          className={auniDialogOutlineButtonClass}
+          className={cn(auniDialogOutlineButtonClass, "px-6")}
           disabled={busy}
           onClick={onBack}
           type="button"
-          variant="outline"
+          variant="secondary"
         >
           {backLabel}
         </Button>

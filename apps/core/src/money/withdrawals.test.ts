@@ -6,6 +6,7 @@ import {
   destinationAddress,
   lookalikeOf,
   maxWithdrawal,
+  recentPlaces,
   refuseTokenDestination,
   withdrawalSource,
 } from "./withdrawals.ts";
@@ -165,5 +166,43 @@ describe("refuseTokenDestination", () => {
   it("refuses a destination it couldn't check, rather than paying it unchecked", async () => {
     vi.spyOn(publicClient("base"), "getCode").mockRejectedValue(new Error("rpc down"));
     await expect(refuseTokenDestination("base", someone)).rejects.toThrow("couldn't be checked");
+  });
+});
+
+describe("recentPlaces", () => {
+  const at = (day: number) => new Date(Date.UTC(2026, 10, day));
+  const sent = (
+    network: string,
+    leavesTo: string | undefined,
+    day: number,
+    destination?: string,
+  ) => ({
+    input: { amount_usd: "10", network, address: leavesTo ?? "", destination },
+    details: (leavesTo ? { leavesTo } : {}) as Record<string, string>,
+    at: at(day),
+  });
+
+  it("lists each place once, newest first, with what the owner called it", () => {
+    expect(
+      recentPlaces([
+        sent("base", EXCHANGE, 9, "exchange"),
+        sent("solana", SOLANA_WALLET, 8, "wallet"),
+        sent("base", EXCHANGE, 7, "exchange"),
+        sent("arbitrum", EXCHANGE, 6),
+      ]),
+    ).toEqual([
+      { address: EXCHANGE, network: "base", destination: "exchange", at: at(9) },
+      { address: SOLANA_WALLET, network: "solana", destination: "wallet", at: at(8) },
+      { address: EXCHANGE, network: "arbitrum", destination: null, at: at(6) },
+    ]);
+  });
+
+  it("leaves out a record that doesn't say where it went, and stops at four", () => {
+    const many = ["0x1", "0x2", "0x3", "0x4", "0x5"].map((to, day) => sent("base", to, 20 - day));
+    expect(
+      recentPlaces([sent("base", undefined, 21), sent("ethereum", "0x9", 21), ...many]).map(
+        ({ address }) => address,
+      ),
+    ).toEqual(["0x1", "0x2", "0x3", "0x4"]);
   });
 });

@@ -1,35 +1,44 @@
 import type { DepositWire } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { watchRead, type DepositWatch } from "./deposit-watch";
+import { landedTotal, NOT_WATCHED, stillNeeded, watchRead } from "./deposit-watch";
 
-function deposit(id: string): DepositWire {
-  return { id, symbol: "ETH", amount: "0.081", network: "Base", usdValue: "210.60" };
+function deposit(id: string, usdValue = "210.60"): DepositWire {
+  return { id, symbol: "USDC", amount: usdValue, network: "Base", usdValue };
 }
 
 describe("watchRead", () => {
-  const fresh: DepositWatch = { seen: null, landed: null };
-
   it("takes what's there at the first read as old news", () => {
-    const watch = watchRead(fresh, [deposit("earlier")]);
-    expect(watch).toEqual({ seen: new Set(["earlier"]), landed: null });
+    const watch = watchRead(NOT_WATCHED, [deposit("earlier")]);
+    expect(watch).toEqual({ seen: new Set(["earlier"]), landed: [] });
     expect(watchRead(watch, [deposit("earlier")])).toBe(watch);
   });
 
-  it("lands on the newest deposit not seen before", () => {
-    const watch = watchRead(fresh, [deposit("earlier")]);
+  it("lands every deposit not seen before, newest first", () => {
+    const watch = watchRead(NOT_WATCHED, [deposit("earlier")]);
     const read = [deposit("newest"), deposit("next"), deposit("earlier")];
-    expect(watchRead(watch, read).landed?.id).toBe("newest");
+    expect(watchRead(watch, read).landed.map(({ id }) => id)).toEqual(["newest", "next"]);
   });
 
-  it("lets a later landing take the place of the one before, as a test send's", () => {
-    const test = watchRead(watchRead(fresh, []), [deposit("test")]);
-    expect(watchRead(test, [deposit("test")])).toBe(test);
-    expect(watchRead(test, [deposit("real"), deposit("test")]).landed?.id).toBe("real");
+  it("counts a test send and the real one after it", () => {
+    const test = watchRead(watchRead(NOT_WATCHED, []), [deposit("test", "1")]);
+    expect(watchRead(test, [deposit("test", "1")])).toBe(test);
+    const both = watchRead(test, [deposit("real", "49"), deposit("test", "1")]);
+    expect(both.landed.map(({ id }) => id)).toEqual(["real", "test"]);
+    expect(landedTotal(both.landed)).toBe(50_000_000n);
   });
 
   it("keeps what landed once it's no longer listed", () => {
-    const landed = watchRead(watchRead(fresh, []), [deposit("first")]);
+    const landed = watchRead(watchRead(NOT_WATCHED, []), [deposit("first")]);
     expect(watchRead(landed, [])).toBe(landed);
+  });
+});
+
+describe("stillNeeded", () => {
+  it("is what a card still waits for, and nothing once it's covered", () => {
+    expect(stillNeeded("50", 10_000_000n)).toBe(40_000_000n);
+    expect(stillNeeded("50", 50_000_000n)).toBe(0n);
+    expect(stillNeeded("50", 75_250_000n)).toBe(0n);
+    expect(stillNeeded(null, 0n)).toBe(0n);
   });
 });

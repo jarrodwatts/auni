@@ -16,8 +16,8 @@ export type WithdrawNetwork = (typeof WITHDRAW_NETWORKS)[number];
 
 /**
  * `GET /withdrawals/cash`: the owner's cash as the portfolio's Cash counts it, the part in their
- * own wallet that a withdrawal sends, where the rest is, and the most one withdrawal sends to
- * each network.
+ * own wallet that a withdrawal sends, where the rest is, the most one withdrawal sends to each
+ * network, and the places their last few withdrawals went, newest first, to pick again.
  */
 export const withdrawCashWireSchema = z.object({
   cashUsd: dollarsSchema,
@@ -25,6 +25,14 @@ export const withdrawCashWireSchema = z.object({
   /** Cash kept at an app (savings, a venue's own cash), by the app's name, largest first. */
   elsewhere: z.array(z.object({ name: z.string(), usdValue: dollarsSchema })),
   maxUsd: z.record(z.enum(WITHDRAW_NETWORKS), dollarsSchema),
+  recent: z.array(
+    z.object({
+      address: z.string(),
+      network: z.enum(WITHDRAW_NETWORKS),
+      destination: z.enum(["exchange", "wallet"]).nullable(),
+      at: z.iso.datetime(),
+    }),
+  ),
 });
 export type WithdrawCashWire = z.infer<typeof withdrawCashWireSchema>;
 

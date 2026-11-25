@@ -20,12 +20,13 @@ import {
   lookalikeOf,
   maxWithdrawal,
   pastDestinations,
+  recentWithdrawals,
   usdcToUsd,
   WITHDRAW_TOOL,
 } from "./withdrawals.ts";
 
 /**
- * Settings' Withdraw: the cash it can send, the proposal (recorded like any
+ * Withdraw: the cash it can send and where it went lately, the proposal (recorded like any
  * action the agent proposes, so the same Allow runs it), what the confirm step
  * must show, and whether a new address takes the owner's proof.
  */
@@ -38,7 +39,7 @@ withdrawalsRouter.use(express.json({ limit: "4kb" }));
  * each app, which comes home by that app's own move first.
  */
 withdrawalsRouter.get("/cash", async (_req, res) => {
-  const { cash } = await portfolioNow();
+  const [{ cash }, recent] = await Promise.all([portfolioNow(), recentWithdrawals()]);
   const inWallet = cash.holdings.filter(({ venue }) => venue === "wallet");
   const balances = new Map(
     inWallet.map(({ chain, quantity, decimals }) => [
@@ -66,6 +67,7 @@ withdrawalsRouter.get("/cash", async (_req, res) => {
     maxUsd: Object.fromEntries(
       WITHDRAW_NETWORKS.map((network) => [network, usdcToUsd(maxWithdrawal(network, balances))]),
     ) as Record<WithdrawNetwork, string>,
+    recent: recent.map((place) => ({ ...place, at: place.at.toISOString() })),
   } satisfies z.input<typeof withdrawCashWireSchema>);
 });
 

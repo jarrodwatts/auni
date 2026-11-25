@@ -1,8 +1,9 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
+import { promisify } from "node:util";
 
 import postgres from "postgres";
 import { afterEach, describe, expect, it } from "vitest";
@@ -58,6 +59,16 @@ describe("the running Auni", { timeout: 90_000 }, () => {
   it("is the service's when its recipe says so", async () => {
     const { pid } = await startRunner("sleep", { AUNI_RUNS_AS: "service" });
     expect(await runningAuni()).toEqual({ as: "service", pid, here: true });
+  });
+
+  it("prints the checkout command to restart after auni stop", async () => {
+    await startRunner("sleep");
+    const { stdout } = await promisify(execFile)(process.execPath, ["bin/auni.mjs", "stop"], {
+      cwd: CORE,
+      env: { ...process.env, DATABASE_URL: env.DATABASE_URL },
+      timeout: 30_000,
+    });
+    expect(stdout).toContain("Auni is stopped. Run pnpm auni to start it again.\n");
   });
 
   it("says it still runs when it outlasts the wait, having asked once", async () => {

@@ -4,6 +4,7 @@ import { platform } from "node:os";
 import type { AppAbout, BrainModelWire } from "@auni/shared";
 import { readUIMessageStream, type UIMessage, type UIMessageChunk } from "ai";
 
+import { settingsFile } from "../data-dir.ts";
 import { databaseFiles } from "../db/client.ts";
 import { env } from "../env.ts";
 import { onSettingsChange } from "../settings.ts";
@@ -244,7 +245,7 @@ export function brainsBlocked(): string | null {
   if (platform() === "win32") return ON_WINDOWS;
   const preferred = preferredBrainId();
   if (preferred && !brains().some(({ about }) => about.id === preferred))
-    return `BRAIN=${preferred} names no brain app: change it in ~/.auni/.env, or remove it.`;
+    return `BRAIN=${preferred} names no brain app: change it in ${settingsFile()}, or remove it.`;
   return null;
 }
 
@@ -396,7 +397,7 @@ export function terminalBrainLine(
 ): string {
   if (blocked === ON_WINDOWS) return "Auni needs Linux on Windows. Run: wsl --install";
   if (blocked)
-    return "Auni can't use the AI named in its settings file. Pick an installed AI there and try again.";
+    return `Auni can't use the AI named in ${settingsFile()}. Pick an installed AI there and try again.`;
   if (!row) return `Couldn't check your AI. Run: ${auni} doctor --verbose`;
   const name = terminalName(row);
   switch (row.state) {

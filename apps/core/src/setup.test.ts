@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { userInfo } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -203,9 +204,30 @@ describe("nextStep", () => {
     }
     // Only with no screen here does it say how a browser on another computer reaches this one.
     expect(up("no-screen").say).toContain("no screen");
-    expect(up("no-screen").say).toContain("`ssh -L 3000:127.0.0.1:3000 <this computer>`");
     expect(up("not-opened").say).not.toContain("ssh");
   });
+
+  it.each([undefined, "2001:db8::1 43210 2001:db8::2 2222"])(
+    "gives headless JSON the same shell command as human setup (SSH_CONNECTION=%s)",
+    (connection) => {
+      vi.stubEnv("SSH_CONNECTION", connection);
+      const facts: SetupFacts = {
+        ...thinking,
+        running: { running: true, webAnswers: true, browser: "no-screen" },
+      };
+      const { say, ...rest } = nextStep(facts);
+      expect(rest).toEqual({
+        step: "start",
+        next: "tell",
+        waitSeconds: 15,
+        done: ["tools", "install", "brain"],
+      });
+      const command = say.match(/ssh -L [^\n`]+/u)?.[0];
+      expect(command).toBeDefined();
+      expect(() => execFileSync("sh", ["-n", "-c", command!])).not.toThrow();
+      expect(command).toBe(said(facts).match(/ssh -L [^\n]+/u)?.[0]);
+    },
+  );
 
   it("speaks to the owner in every answer, leaving what the agent must never do to the skill", () => {
     const answers = [
@@ -256,7 +278,8 @@ describe("nextStep", () => {
   it("uses the SSH server's IPv6 address and custom port when known", () => {
     vi.stubEnv("SSH_CONNECTION", "2001:db8::1 43210 2001:db8::2 2222");
     expect(tunnelHint()).toContain(
-      `ssh -L 3000:127.0.0.1:3000 -p 2222 ${userInfo().username}@2001:db8::2\n`,
+      `ssh -L 3000:127.0.0.1:3000 -p 2222 ${userInfo().username}@2001:db8::2\n` +
+        "If that address doesn't work from your computer, add -L as shown to your usual SSH command.\n",
     );
   });
 

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { AppAbout } from "@auni/shared";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { dataDir } from "../data-dir.ts";
+import { dataDir, settingsFile } from "../data-dir.ts";
 import { env } from "../env.ts";
 import type { Brain, BrainCheck, BrainEvent, BrainTurn } from "../apps/contract.ts";
 
@@ -100,7 +100,7 @@ describe("pickBrain", () => {
     expect(await pickBrain()).toMatchObject({ about: { id: "a" } });
     env.BRAIN = "z";
     expect(await pickBrain()).toEqual({
-      fixes: ["BRAIN=z names no brain app: change it in ~/.auni/.env, or remove it."],
+      fixes: [`BRAIN=z names no brain app: change it in ${settingsFile()}, or remove it.`],
       blocked: true,
     });
   });

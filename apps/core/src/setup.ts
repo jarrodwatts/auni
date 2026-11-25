@@ -359,12 +359,8 @@ function pairSay(browser: NonNullable<RunningFact["browser"]>, auni: string): st
     return `The link Auni opened in your browser as it started has run out: ${pair}`;
   if (browser === "not-opened") return `Auni couldn't open your browser. To sign in, ${pair}`;
   // No screen here: the browser is on another computer, which reaches this one's web app through ssh.
-  // Keep the setup JSON wording stable. The terminal prints the ready-to-use command.
-  const ports = tunnelPorts();
-  const tunnel = ports
-    ? ` If you reach this computer over ssh, connect with \`ssh -L ${ports} <this computer>\` first, then open the link in the browser on yours.`
-    : "";
-  return `Auni found no screen on this computer to open a browser on. To sign in, ${pair}${tunnel}`;
+  const tunnel = tunnelHint();
+  return `Auni found no screen on this computer to open a browser on.${tunnel ? `\n\n${tunnel}` : " "}To sign in, ${pair}`;
 }
 
 function tunnelPorts(): string | null {
@@ -390,7 +386,7 @@ export function tunnelHint(): string {
     "If your browser is on another computer, run this there first:\n" +
     `  ssh -L ${ports}${sshPort} ${knownHost ? login : "ssh-host"}\n` +
     (knownHost
-      ? ""
+      ? "If that address doesn't work from your computer, add -L as shown to your usual SSH command.\n"
       : "Replace ssh-host with the address or user@host you use to reach this computer.\n") +
     "Leave that SSH session open while you use Auni.\n\n"
   );

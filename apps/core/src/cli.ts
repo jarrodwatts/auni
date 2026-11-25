@@ -324,18 +324,20 @@ switch (command) {
         process.exitCode = 1;
         return;
       }
+      const { auniCommand } = await import("./setup.ts");
+      const auni = auniCommand();
       console.log(`Stopping Auni (${where(running)}). Moves in progress will finish first.`);
       if (!(await stopAuni(running))) {
         console.error(
-          "Auni is still finishing work in progress after 2.5 minutes. Run auni stop again to keep waiting.",
+          `Auni is still finishing work in progress after 2.5 minutes. Run ${auni} stop again to keep waiting.`,
         );
         process.exitCode = 1;
         return;
       }
       console.log(
         running.as === "service"
-          ? "Auni is stopped. Its background service will start it again on next sign-in, or run auni service install to start it now."
-          : "Auni is stopped. Run auni to start it again.",
+          ? `Auni is stopped. Its background service will start it again on next sign-in, or run ${auni} service install to start it now.`
+          : `Auni is stopped. Run ${auni} to start it again.`,
       );
     });
     break;

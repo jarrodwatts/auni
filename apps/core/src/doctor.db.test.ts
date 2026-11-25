@@ -115,6 +115,23 @@ afterEach(() => {
 });
 
 describe("auni doctor", () => {
+  it("names the custom settings file when the configured AI is blocked", async () => {
+    vi.stubEnv("AUNI_HOME", "/custom/auni");
+    const brain = env.BRAIN;
+    env.BRAIN = "unknown-ai";
+    try {
+      const findings = await doctor();
+      expect(of(findings, "brain")).toEqual([
+        "fix  brain: BRAIN=unknown-ai names no brain app: change it in /custom/auni/.env, or remove it.",
+      ]);
+      expect(doctorSummary(findings, "pnpm auni")).toContain(
+        "Auni can't use the AI named in /custom/auni/.env.",
+      );
+    } finally {
+      env.BRAIN = brain;
+    }
+  });
+
   it("says what works and what to fix, naming the setting that fixes a chain", async () => {
     const findings = await doctor();
     expect(of(findings, "version")).toEqual([`ok   version: v${version}, from a source checkout`]);

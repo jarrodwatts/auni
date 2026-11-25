@@ -534,8 +534,7 @@ const checkWeb: Check = async () => {
       check: "web",
       status: "fix",
       [terminalDetail]: {
-        problem:
-          "The web app isn't answering. Check auni.log and the web address in Auni's settings file.",
+        problem: `The web app isn't answering. Check auni.log and the web address in ${settingsFile()}.`,
       },
       says: `nothing answers at ${env.WEB_ORIGIN}/core/health (${why}): is Auni running, and is WEB_ORIGIN where the browser opens it?`,
     },

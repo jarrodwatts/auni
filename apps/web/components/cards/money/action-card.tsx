@@ -346,7 +346,8 @@ export function ActionCard({
         </p>
       ) : null}
       {content.warning ? (
-        <p className="mt-3 text-[12.5px] leading-[1.45] font-medium text-destructive">
+        // A token's name is its maker's, unbroken at any length: it wraps, never runs off the card.
+        <p className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive">
           {content.warning}
         </p>
       ) : null}

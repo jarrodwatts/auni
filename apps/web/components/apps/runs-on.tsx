@@ -31,6 +31,27 @@ function inOrder(a: AppWire, b: AppWire): number {
 }
 
 /**
+ * The services Auni uses on its own, each once: under the first of its jobs shown, with the
+ * others it does (`also`, by app id), so one that both routes trades and prices tokens is one row.
+ */
+export function byJob(apps: readonly AppWire[]): readonly {
+  readonly job: AppJob;
+  readonly apps: readonly AppWire[];
+  readonly also: Readonly<Record<string, readonly AppJob[]>>;
+}[] {
+  const behind = apps.filter(({ canSwitch }) => !canSwitch);
+  const jobsOf = (app: AppWire) => SHOWN.filter((job) => app.jobs.includes(job));
+  return SHOWN.map((job) => {
+    const here = behind.filter((app) => jobsOf(app)[0] === job).toSorted(inOrder);
+    return {
+      job,
+      apps: here,
+      also: Object.fromEntries(here.map((app) => [app.id, jobsOf(app).slice(1)])),
+    };
+  }).filter((group) => group.apps.length > 0);
+}
+
+/**
  * The services Auni uses on its own, by the job each does: routing a trade, moving cash across
  * chains, pricing a token, watching the clock and the market. None has a switch, since turning
  * one off would quietly break what depends on it. Any of them opens its sheet, which shows the
@@ -43,10 +64,7 @@ export function BehindTheScenes({
   readonly apps: readonly AppWire[];
   readonly onOpen: (id: string) => void;
 }) {
-  const groups = SHOWN.map((job) => ({
-    job,
-    apps: apps.filter(({ canSwitch, jobs }) => !canSwitch && jobs.includes(job)).toSorted(inOrder),
-  })).filter((group) => group.apps.length > 0);
+  const groups = byJob(apps);
   if (groups.length === 0) return null;
   return (
     <Section
@@ -60,7 +78,7 @@ export function BehindTheScenes({
             <ul className="grid gap-x-6 sm:grid-cols-2">
               {group.apps.map((app) => (
                 <li key={app.id}>
-                  <Plumbing app={app} onOpen={() => onOpen(app.id)} />
+                  <Plumbing app={app} also={group.also[app.id]!} onOpen={() => onOpen(app.id)} />
                 </li>
               ))}
             </ul>
@@ -71,8 +89,19 @@ export function BehindTheScenes({
   );
 }
 
-/** One service Auni uses: its logo, its name, and what it needs, if anything. */
-function Plumbing({ app, onOpen }: { readonly app: AppWire; readonly onOpen: () => void }) {
+/**
+ * One service Auni uses: its logo, its name, the other jobs it does, and what it needs, if
+ * anything.
+ */
+function Plumbing({
+  app,
+  also,
+  onOpen,
+}: {
+  readonly app: AppWire;
+  readonly also: readonly AppJob[];
+  readonly onOpen: () => void;
+}) {
   const need = needOf(app);
   return (
     <Row
@@ -87,6 +116,7 @@ function Plumbing({ app, onOpen }: { readonly app: AppWire; readonly onOpen: () 
         </span>
       }
       title={app.name}
+      meta={also.length > 0 ? `Also ${also.map((job) => JOBS[job].does).join(" and ")}` : undefined}
       end={need ? <Badge tone="waiting">{need}</Badge> : null}
     >
       <button type="button" onClick={onOpen} />

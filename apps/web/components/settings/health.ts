@@ -1,5 +1,7 @@
 import type { DoctorFindingWire } from "@auni/shared";
 
+import { chatHref } from "@/lib/app-links";
+
 /** Each part Auni checks, by the name the owner knows it by. */
 const PARTS: Readonly<Record<string, string>> = {
   version: "Auni",
@@ -33,4 +35,17 @@ export function healthOf(findings: readonly DoctorFindingWire[]): {
           : `${needs.length} things need you`,
     needs,
   };
+}
+
+/**
+ * A link to each chat holding a card the finding is about, where the owner acts on it: a lone
+ * one is just "Open chat", several are named so the owner can tell which is which.
+ */
+export function chatLinks(
+  chats: DoctorFindingWire["chats"],
+): readonly { readonly href: string; readonly label: string }[] {
+  return chats.map(({ id, title }) => ({
+    href: chatHref(id),
+    label: chats.length === 1 ? "Open chat" : `Open ${title ?? "untitled chat"}`,
+  }));
 }

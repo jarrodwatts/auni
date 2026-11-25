@@ -7,12 +7,11 @@ import { useState } from "react";
 
 import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
 import { CopyLine } from "@/components/ui/copy-line";
-import { heldMovesHref } from "@/lib/app-links";
 import { CoreApiError } from "@/lib/core";
 import { useAbout, useCheckUpdate, useDiagnostics, useLogs, useRunRepair } from "@/lib/data/system";
 import { cn } from "@/lib/utils";
 
-import { healthOf, partName } from "./health";
+import { chatLinks, healthOf, partName } from "./health";
 import { Networks } from "./networks";
 import {
   Disclosure,
@@ -136,12 +135,13 @@ function Checks() {
       {needs.length > 0 ? (
         <div className="divide-y divide-border overflow-hidden rounded-card border border-border bg-card">
           {needs.map((finding, index) => {
-            const chat = heldMovesHref(finding.thread);
+            const chats = chatLinks(finding.chats);
             return (
               <Setting
                 key={`${finding.check}-${index}`}
                 label={partName(finding.check)}
                 hint={sentence(finding.says)}
+                stacked={chats.length > 1}
               >
                 {finding.repair ? (
                   <button
@@ -156,10 +156,18 @@ function Checks() {
                     ) : null}
                     Fix it
                   </button>
-                ) : chat ? (
-                  <Link href={chat} className={SETTINGS_PRIMARY_BUTTON}>
-                    Open chat
-                  </Link>
+                ) : chats.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {chats.map(({ href, label }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        className={cn(SETTINGS_PRIMARY_BUTTON, "max-w-full")}
+                      >
+                        <span className="truncate">{label}</span>
+                      </Link>
+                    ))}
+                  </div>
                 ) : null}
               </Setting>
             );

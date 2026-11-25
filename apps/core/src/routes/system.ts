@@ -74,7 +74,7 @@ async function diagnosticsWire(): Promise<DiagnosticsWire> {
             recommended: f.repair.recommended,
           }
         : null,
-      thread: f.thread ?? null,
+      chats: [...(f.chats ?? [])],
     })),
     ranAt: new Date().toISOString(),
   };

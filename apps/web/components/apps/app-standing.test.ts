@@ -1,7 +1,7 @@
 import type { AppWire } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { appStanding, keysNeeded, needOf } from "./app-standing";
+import { appStanding, keysNeeded, needOf, waysToTry } from "./app-standing";
 import { turningOff } from "./turning-off";
 
 const KEY = {
@@ -116,6 +116,36 @@ describe("appStanding", () => {
     expect(
       keysNeeded(app({ needs: ["Needs an app ID", "Needs an API key"], settings: [file, KEY] })),
     ).toEqual([KEY]);
+  });
+});
+
+describe("waysToTry", () => {
+  const read = { title: "What are people betting on?" };
+  const bet = { title: "Bet $20 on something I believe", moves: true } as const;
+  const titles = ({ now, waiting }: ReturnType<typeof waysToTry<{ readonly title: string }>>) => ({
+    now: now.map(({ title }) => title),
+    waiting: waiting.map(({ title }) => title),
+  });
+
+  it("offers every way once nothing is missing", () => {
+    expect(titles(waysToTry(app(), [read, bet]))).toEqual({
+      now: [read.title, bet.title],
+      waiting: [],
+    });
+  });
+
+  // Polymarket with $408.58 and no keys offered "Bet $20" and "Take money out", neither of
+  // which can work until its keys are in (2026-11-25).
+  it("keeps a way that moves money waiting for the keys, even with money there", () => {
+    const needsKeys = { needs: ["Needs an API key"], settings: [KEY] };
+    expect(
+      titles(waysToTry(app({ ...needsKeys, account: account("408.58") }), [read, bet])),
+    ).toEqual({ now: [read.title], waiting: [bet.title] });
+    // With no money there, there's nothing to read yet either.
+    expect(titles(waysToTry(app(needsKeys), [read, bet]))).toEqual({
+      now: [],
+      waiting: [read.title, bet.title],
+    });
   });
 });
 

@@ -16,7 +16,7 @@ import {
   reportDialogHref,
   reportSubject,
   settingsDialogHref,
-  settingsSection,
+  settingsAsked,
   type FundingNeed,
   type ReportSubject,
   type SettingsLink,
@@ -57,7 +57,7 @@ export function AppDialogs() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
-  const section = settingsSection(searchParams.get(SETTINGS_DIALOG_PARAM));
+  const settings = settingsAsked(searchParams.get(SETTINGS_DIALOG_PARAM));
 
   const close = (param: string) =>
     router.replace(dialogClosedHref(pathname, search, param), { scroll: false });
@@ -65,8 +65,9 @@ export function AppDialogs() {
   return (
     <>
       <SettingsDialog
-        open={section !== undefined}
-        section={section ?? null}
+        open={settings !== undefined}
+        section={settings?.section ?? null}
+        landing={settings?.target ?? null}
         onSectionChange={(next, step) =>
           step === "back"
             ? router.back()

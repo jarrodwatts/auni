@@ -8,6 +8,7 @@ export default {
     {
       title: "Long BTC with $50",
       prompt: "Open a long on BTC with $50 on Hyperliquid.",
+      moves: true,
     },
     {
       title: "What is funding costing me?",
@@ -16,6 +17,7 @@ export default {
     {
       title: "Close everything",
       prompt: "Close every position I have open on Hyperliquid.",
+      moves: true,
     },
   ],
   // Each market's own logo.

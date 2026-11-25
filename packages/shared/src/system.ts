@@ -123,8 +123,8 @@ export const doctorFindingWireSchema = z.object({
       recommended: z.boolean(),
     })
     .nullable(),
-  /** The chat holding the card the finding is about (a held move's), where the owner acts on it. */
-  thread: z.string().nullable(),
+  /** The chats holding the cards the finding is about (held moves'), where the owner acts on them. */
+  chats: z.array(z.object({ id: z.string(), title: z.string().nullable() })),
 });
 export type DoctorFindingWire = z.infer<typeof doctorFindingWireSchema>;
 

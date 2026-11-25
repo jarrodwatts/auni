@@ -473,6 +473,8 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     });
     for (const section of ["you", "ai", "wallet", "devices", "health"])
       await take(page, out, `settings-${section}`, `${origin}/app?settings=${section}`, "top");
+    // A link from before the panes were folded lands on the setting it named, opened up.
+    await take(page, out, "settings-old-network-link", `${origin}/app?settings=network`, "top");
     for (const thread of threads.toReversed()) {
       const name = slug(thread.title ?? thread.id);
       await take(page, out, `chat-${name}`, `${origin}/app/chat/${thread.id}`, "end");

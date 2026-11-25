@@ -37,6 +37,8 @@ export const JOBS: Record<
   AppJob,
   {
     readonly label: string;
+    /** The job said after "Also", for an app shown under another of its jobs: "prices tokens". */
+    readonly does: string;
     readonly icon: LucideIcon;
     /** When the scene plays, as its heading: "When you trade". */
     readonly when: string;
@@ -47,6 +49,7 @@ export const JOBS: Record<
 > = {
   thinks: {
     label: "Thinks with",
+    does: "thinks",
     icon: Sparkles,
     when: "When you talk to Auni",
     scene: (name) => [
@@ -58,6 +61,7 @@ export const JOBS: Record<
   },
   keys: {
     label: "Keeps your keys with",
+    does: "keeps your keys",
     icon: KeyRound,
     when: "When you allow a move",
     scene: (name) => [
@@ -69,6 +73,7 @@ export const JOBS: Record<
   },
   trades: {
     label: "Trades through",
+    does: "routes trades",
     icon: ArrowLeftRight,
     when: "When you trade",
     scene: (name) => [
@@ -80,6 +85,7 @@ export const JOBS: Record<
   },
   moves: {
     label: "Moves cash with",
+    does: "moves cash",
     icon: Waypoints,
     when: "When cash moves between networks",
     scene: (name) => [
@@ -91,6 +97,7 @@ export const JOBS: Record<
   },
   prices: {
     label: "Prices tokens with",
+    does: "prices tokens",
     icon: Tag,
     when: "When Auni reads what you hold",
     scene: (name) => [
@@ -102,6 +109,7 @@ export const JOBS: Record<
   },
   watches: {
     label: "Watches with",
+    does: "watches the market",
     icon: Eye,
     when: "While you're away",
     scene: (name) => [

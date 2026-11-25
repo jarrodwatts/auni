@@ -1,14 +1,14 @@
 import type { DoctorFindingWire } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { healthOf, partName } from "./health";
+import { chatLinks, healthOf, partName } from "./health";
 
 const finding = (check: string, status: DoctorFindingWire["status"]): DoctorFindingWire => ({
   check,
   status,
   says: `${check} ${status}`,
   repair: null,
-  thread: null,
+  chats: [],
 });
 
 describe("Health, as the owner reads it", () => {
@@ -27,5 +27,22 @@ describe("Health, as the owner reads it", () => {
     expect(partName("rpc")).toBe("Networks");
     expect(partName("brain")).toBe("Your AI");
     expect(partName("something-new")).toBe("something-new");
+  });
+
+  // With held moves in two chats, Health linked only the first (2026-11-25).
+  it("links every chat holding a card the owner needs to check", () => {
+    expect(chatLinks([])).toEqual([]);
+    expect(chatLinks([{ id: "t1", title: "Fed bet" }])).toEqual([
+      { href: "/app/chat/t1", label: "Open chat" },
+    ]);
+    expect(
+      chatLinks([
+        { id: "t1", title: "Take a little off my Fed bet" },
+        { id: "t2", title: null },
+      ]),
+    ).toEqual([
+      { href: "/app/chat/t1", label: "Open Take a little off my Fed bet" },
+      { href: "/app/chat/t2", label: "Open untitled chat" },
+    ]);
   });
 });

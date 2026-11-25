@@ -29,6 +29,19 @@ export function keysNeeded(app: AppWire): readonly AppSettingWire[] {
 }
 
 /**
+ * Which of an app's ways to try it work now, and which wait for what it still needs. With
+ * nothing missing, all work. With something missing, none do, but for money already there:
+ * Auni can read that, though a way that moves money still waits.
+ */
+export function waysToTry<Way extends { readonly title: string; readonly moves?: true }>(
+  app: AppWire,
+  ways: readonly Way[],
+): { readonly now: readonly Way[]; readonly waiting: readonly Way[] } {
+  const works = (way: Way) => app.needs.length === 0 || (app.account !== null && !way.moves);
+  return { now: ways.filter(works), waiting: ways.filter((way) => !works(way)) };
+}
+
+/**
  * What it waits on, short enough for a tile: "Needs a key", "Needs 3 keys", "Not paired yet", or
  * what keeps going wrong for it now, "Out of credits".
  */

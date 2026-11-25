@@ -4,7 +4,7 @@ import { TransactionReceiptNotFoundError, type Address, type Hash } from "viem";
 
 import { publishThread } from "../conversation/threads.ts";
 import { db } from "../db/client.ts";
-import { actions, fills, type ActionRow } from "../db/schema.ts";
+import { actions, fills, threads, type ActionRow } from "../db/schema.ts";
 import { wakeThread } from "../jobs/kinds.ts";
 import { accountOf, ledgerAt, appById, theWallet } from "../apps/registry.ts";
 import { showedAssetsMoving } from "./approved.ts";
@@ -67,15 +67,22 @@ export async function reconcileStuckActions(): Promise<ActionRow[]> {
 
 /**
  * Up to 50 held moves, each waiting on the owner's Check again or Close (see hold), with the
- * chat its card is in, the oldest first.
+ * chat its card is in (none for one started outside a chat), the oldest first.
  */
-export async function heldMoves(): Promise<{ id: string; threadId: string | null }[]> {
-  return db
-    .select({ id: actions.id, threadId: actions.threadId })
+export async function heldMoves(): Promise<
+  { id: string; chat: { id: string; title: string | null } | null }[]
+> {
+  const rows = await db
+    .select({ id: actions.id, threadId: threads.id, title: threads.title })
     .from(actions)
+    .leftJoin(threads, eq(threads.id, actions.threadId))
     .where(eq(actions.phase, "needs_owner"))
     .orderBy(asc(actions.createdAt))
     .limit(50);
+  return rows.map(({ id, threadId, title }) => ({
+    id,
+    chat: threadId === null ? null : { id: threadId, title },
+  }));
 }
 
 /** What an action's transactions say about it, read in the order they were sent. */

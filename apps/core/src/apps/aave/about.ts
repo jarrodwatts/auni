@@ -8,6 +8,7 @@ export default {
     {
       title: "Put my idle cash to work",
       prompt: "Put my idle cash into Aave so it earns.",
+      moves: true,
     },
     {
       title: "What does it pay now?",
@@ -16,6 +17,7 @@ export default {
     {
       title: "Take it all back out",
       prompt: "Take everything I have in Aave back out to cash.",
+      moves: true,
     },
   ],
   mark: {

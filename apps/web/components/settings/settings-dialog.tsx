@@ -44,12 +44,15 @@ const PANES: Record<SettingsSection, () => React.JSX.Element> = {
 export function SettingsDialog({
   open,
   section,
+  landing,
   onSectionChange,
   onOpenChange,
 }: {
   readonly open: boolean;
   /** The pane open, or null for the list (where there's room, that shows the first pane). */
   readonly section: SettingsSection | null;
+  /** The setting the link that opened it names (an old pane's, as `?settings=network`). */
+  readonly landing: string | null;
   readonly onSectionChange: (section: SettingsSection | null, step: SettingsStep) => void;
   readonly onOpenChange: (open: boolean) => void;
 }) {
@@ -60,6 +63,13 @@ export function SettingsDialog({
   // A pane the phone's list opened is a step the back arrow takes back out.
   const steppedIn = useRef(false);
   const shown = section ?? (wide ? "you" : null);
+
+  // A link naming a setting lands on it as a search does (n 0, as a search's are 1 and up).
+  const [linked, setLinked] = useState<string | null>(null);
+  if (landing !== linked) {
+    setLinked(landing);
+    if (landing !== null) setJumped({ n: 0, target: landing, lit: true });
+  }
 
   useEffect(() => {
     if (open) refreshMe();

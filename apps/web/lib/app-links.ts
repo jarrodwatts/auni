@@ -12,22 +12,26 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 /**
  * Names Settings' panes had before they were folded into five, which links already written
- * (old messages, the agent's own links) still open: each to the pane that holds it now.
+ * (old messages, the agent's own links) still open: each at the pane that holds it now, landing
+ * on the setting it named (opening the disclosure it sits in) as a search does, where that isn't
+ * simply the pane's top.
  */
 const FOLDED_SECTIONS = {
-  general: "you",
-  profile: "you",
-  appearance: "you",
-  personalization: "you",
-  brains: "ai",
-  channels: "devices",
-  remote: "devices",
-  machine: "devices",
-  network: "health",
-  diagnostics: "health",
-  help: "health",
-  about: "health",
-} as const satisfies Readonly<Record<string, SettingsSection>>;
+  general: { section: "you", target: null },
+  profile: { section: "you", target: "setting-name" },
+  appearance: { section: "you", target: "setting-look" },
+  personalization: { section: "you", target: "setting-known" },
+  brains: { section: "ai", target: null },
+  channels: { section: "devices", target: "setting-telegram" },
+  remote: { section: "devices", target: "setting-phone" },
+  machine: { section: "devices", target: "setting-running" },
+  network: { section: "health", target: "setting-networks" },
+  diagnostics: { section: "health", target: null },
+  help: { section: "health", target: "setting-help" },
+  about: { section: "health", target: "setting-version" },
+} as const satisfies Readonly<
+  Record<string, { readonly section: SettingsSection; readonly target: string | null }>
+>;
 
 /** Any name a Settings link may carry: a pane's, or one it was folded from. */
 export type SettingsLink = SettingsSection | keyof typeof FOLDED_SECTIONS;
@@ -60,37 +64,31 @@ export function fundingAsked(value: string | null): { readonly need: FundingNeed
   return usd && chain && isCash(chain) ? { need: { usd, chain } } : null;
 }
 
-/** Settings, open on one pane, or with none named on its list. */
+/**
+ * Settings, open on one pane, or with none named on its list. A folded name stays in the link,
+ * so it lands on the setting it names.
+ */
 export function settingsDialogHref(
   pathname: string,
   search?: string,
   section?: SettingsLink,
 ): string {
-  return withParam(
-    pathname,
-    search,
-    SETTINGS_DIALOG_PARAM,
-    section ? paneOf(section) : SETTINGS_INDEX,
-  );
-}
-
-/** The pane a Settings link opens. */
-function paneOf(link: SettingsLink): SettingsSection {
-  return link in FOLDED_SECTIONS
-    ? FOLDED_SECTIONS[link as keyof typeof FOLDED_SECTIONS]
-    : (link as SettingsSection);
+  return withParam(pathname, search, SETTINGS_DIALOG_PARAM, section ?? SETTINGS_INDEX);
 }
 
 /**
- * What `?settings=` says: closed (undefined), open on its list (null), or open on a pane, by its
- * own name or one it was folded from.
+ * What `?settings=` says: closed (undefined), or open on its list (`section` null) or on a pane,
+ * by its own name or one it was folded from, with the id of the setting a folded name lands on.
  */
-export function settingsSection(value: string | null): SettingsSection | null | undefined {
-  if (value === SETTINGS_INDEX) return null;
-  const link = [...SETTINGS_SECTIONS, ...Object.keys(FOLDED_SECTIONS)].find(
-    (name) => name === value,
-  );
-  return link ? paneOf(link as SettingsLink) : undefined;
+export function settingsAsked(
+  value: string | null,
+): { readonly section: SettingsSection | null; readonly target: string | null } | undefined {
+  if (value === SETTINGS_INDEX) return { section: null, target: null };
+  if (SETTINGS_SECTIONS.some((section) => section === value))
+    return { section: value as SettingsSection, target: null };
+  return Object.hasOwn(FOLDED_SECTIONS, value ?? "")
+    ? FOLDED_SECTIONS[value as keyof typeof FOLDED_SECTIONS]
+    : undefined;
 }
 
 /** Report a problem opens the same way, naming what it is about: `action:<id>` or `app:<id>`. */
@@ -142,11 +140,3 @@ export const NEEDS_YOU_HREF = "/app/needs-you";
 
 /** A phone's list of takes and chats; on desktop the sidebar holds it. */
 export const CHATS_HREF = "/app/chats";
-
-/**
- * Where the owner goes to act on a move that needs checking, from Health: the chat its card is
- * in (`thread`), or nowhere when it's in none. The one place every such link is made.
- */
-export function heldMovesHref(thread: string | null): string | null {
-  return thread ? chatHref(thread) : null;
-}

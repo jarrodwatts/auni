@@ -62,8 +62,8 @@ export interface Finding {
     | "migrates-on-start"
     | "restart-to-update";
   readonly repair?: { readonly id: RepairId; readonly recommended: boolean };
-  /** The chat holding the card this is about, where the owner acts on it. */
-  readonly thread?: string;
+  /** The chats holding the cards this is about, where the owner acts on them, oldest first. */
+  readonly chats?: readonly { readonly id: string; readonly title: string | null }[];
 }
 
 const by = (id: RepairId, recommended = true): Finding["repair"] => ({ id, recommended });
@@ -262,7 +262,8 @@ const checkRunner: Check = async () => {
       status: "fix",
       says: `${overdue.jobs} jobs are over 5 minutes late: Auni's output says what holds them up`,
     });
-  const heldIn = held.find(({ threadId }) => threadId !== null)?.threadId;
+  const heldIn = new Map<string, { id: string; title: string | null }>();
+  for (const { chat } of held) if (chat) heldIn.set(chat.id, chat);
   if (held.length > 0)
     findings.push({
       check: "runner",
@@ -277,7 +278,7 @@ const checkRunner: Check = async () => {
         held.length === 1
           ? "1 move needs checking. Open its card in chat for details"
           : `${held.length} moves need checking. Open their cards in chat for details`,
-      ...(heldIn ? { thread: heldIn } : {}),
+      ...(heldIn.size > 0 ? { chats: [...heldIn.values()] } : {}),
     });
   for (const { kind, jobs: many, error } of failed)
     findings.push({

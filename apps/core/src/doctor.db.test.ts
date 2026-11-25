@@ -412,10 +412,36 @@ describe("auni doctor", () => {
     try {
       // One withdrawal from Settings, in no chat, and one buy in a chat.
       await insertAction({ phase: "needs_owner", startedAt: new Date() });
-      const { id } = await insertThread();
+      const { id } = await insertThread({ title: "Fed bet" });
       await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
       const held = (await doctor()).filter(({ says }) => says.includes("need checking"));
-      expect(held).toEqual([expect.objectContaining({ status: "fix", thread: id })]);
+      expect(held).toEqual([
+        expect.objectContaining({ status: "fix", chats: [{ id, title: "Fed bet" }] }),
+      ]);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  // With held moves in two chats, Health linked only the first (2026-11-25).
+  it("names every chat holding a move that needs checking, each once", async () => {
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      const a = await insertThread({ title: "Fed bet" });
+      const b = await insertThread();
+      for (const threadId of [a.id, b.id, a.id])
+        await insertAction({ threadId, phase: "needs_owner", startedAt: new Date() });
+      const held = (await doctor()).filter(({ says }) => says.includes("need checking"));
+      expect(held).toEqual([
+        expect.objectContaining({
+          says: "3 moves need checking. Open their cards in chat for details",
+          chats: [
+            { id: a.id, title: "Fed bet" },
+            { id: b.id, title: null },
+          ],
+        }),
+      ]);
     } finally {
       await auni.end();
     }

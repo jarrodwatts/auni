@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SETTINGS_SECTIONS, settingsDialogHref, settingsSection } from "@/lib/app-links";
+import { SETTINGS_SECTIONS, settingsAsked, settingsDialogHref } from "@/lib/app-links";
 
 import { SETTINGS_PANES, SETTINGS_SEARCH_ITEMS, searchSettings } from "./settings-search";
 
@@ -10,23 +10,38 @@ describe("Settings' panes and its search", () => {
   });
 
   it("opens links written before the panes were folded at the pane that holds them now", () => {
-    expect(settingsSection("general")).toBe("you");
-    expect(settingsSection("appearance")).toBe("you");
-    expect(settingsSection("personalization")).toBe("you");
-    expect(settingsSection("brains")).toBe("ai");
-    expect(settingsSection("remote")).toBe("devices");
-    expect(settingsSection("channels")).toBe("devices");
-    expect(settingsSection("network")).toBe("health");
-    expect(settingsSection("about")).toBe("health");
-    expect(settingsSection("wallet")).toBe("wallet");
+    const pane = (value: string) => settingsAsked(value)?.section;
+    expect(pane("general")).toBe("you");
+    expect(pane("appearance")).toBe("you");
+    expect(pane("personalization")).toBe("you");
+    expect(pane("brains")).toBe("ai");
+    expect(pane("remote")).toBe("devices");
+    expect(pane("channels")).toBe("devices");
+    expect(pane("network")).toBe("health");
+    expect(pane("about")).toBe("health");
+    expect(settingsAsked("wallet")).toEqual({ section: "wallet", target: null });
+  });
+
+  // An old ?settings=network link opened Health with Networks folded away (2026-11-25).
+  it("lands an old link on the setting it named, which the search finds in that pane", () => {
+    expect(settingsAsked("network")).toEqual({ section: "health", target: "setting-networks" });
+    expect(settingsAsked("remote")?.target).toBe("setting-phone");
+    const lands = ["general", "profile", "appearance", "personalization", "brains", "channels"]
+      .concat(["remote", "machine", "network", "diagnostics", "help", "about"])
+      .map((name) => settingsAsked(name)!)
+      .filter(({ target }) => target !== null);
+    expect(lands.length).toBeGreaterThan(5);
+    for (const { section, target } of lands)
+      expect(SETTINGS_SEARCH_ITEMS).toContainEqual(expect.objectContaining({ section, target }));
   });
 
   it("tells the list apart from a pane and from closed", () => {
-    expect(settingsSection("open")).toBeNull();
-    expect(settingsSection(null)).toBeUndefined();
-    expect(settingsSection("nothing")).toBeUndefined();
+    expect(settingsAsked("open")).toEqual({ section: null, target: null });
+    expect(settingsAsked(null)).toBeUndefined();
+    expect(settingsAsked("nothing")).toBeUndefined();
+    expect(settingsAsked("toString")).toBeUndefined();
     expect(settingsDialogHref("/app", "")).toBe("/app?settings=open");
-    expect(settingsDialogHref("/app", "x=1", "remote")).toBe("/app?x=1&settings=devices");
+    expect(settingsDialogHref("/app", "x=1", "remote")).toBe("/app?x=1&settings=remote");
   });
 
   it("finds a setting by the words an owner would use", () => {

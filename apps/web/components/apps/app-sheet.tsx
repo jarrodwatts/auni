@@ -20,7 +20,7 @@ import { AppJobs } from "./app-jobs";
 import { AppKeysNeeded, AppSettings, KeysSaved } from "./app-keys";
 import { AppMark } from "./app-mark";
 import { AppPairing } from "./app-pairing";
-import { keysNeeded } from "./app-standing";
+import { keysNeeded, waysToTry } from "./app-standing";
 import { AppSwitch } from "./app-switch";
 import { Section } from "./sheet-section";
 
@@ -52,7 +52,8 @@ export function AppSheet({
   readonly onOpen: (id: string) => void;
 }) {
   const wide = useMediaQuery("(min-width: 640px)");
-  const starts = appListing(app.id)?.starts ?? [];
+  // Ways to try it show only while it's on.
+  const ways = waysToTry(app, app.on ? (appListing(app.id)?.starts ?? []) : []);
   const { name } = app;
   const holds = Number(app.account?.usd ?? 0) >= 0.01;
   // An app that only waits for a key opens with the cursor in its field, where there is a
@@ -62,8 +63,8 @@ export function AppSheet({
   const asksKey = neededKeys > 0;
   // The moment its last key went in, said once, while this sheet stays open.
   const [connected, setConnected] = useState(false);
-  // What the owner could do with it is live once nothing is missing, or money is there already.
-  const ready = Boolean(app.account) || app.needs.length === 0;
+  // Money moves there only while it's on and nothing is missing, as its ways that move money do.
+  const movesMoney = app.on && app.needs.length === 0;
   const { busy, start } = useStartConversation();
   const { openReport } = useAppDialogs();
   // The chat a tap starts takes the place of this page, and the sheet goes with it.
@@ -114,7 +115,7 @@ export function AppSheet({
           <AutoHeight>
             {connected && !asksKey ? <KeysSaved app={app} /> : null}
             {/* What the key is for comes before the key: the same chips, waiting. */}
-            {app.on && starts.length > 0 && !ready ? (
+            {ways.waiting.length > 0 ? (
               <Section
                 title={
                   asksKey
@@ -125,7 +126,7 @@ export function AppSheet({
                 }
               >
                 <ul className="flex flex-wrap gap-2">
-                  {starts.map((way) => (
+                  {ways.waiting.map((way) => (
                     <li key={way.title} className="max-w-full">
                       <Button variant="secondary" disabled className="max-w-full">
                         <span className="truncate">{way.title}</span>
@@ -144,10 +145,10 @@ export function AppSheet({
           </AutoHeight>
           {app.pairing ? <AppPairing app={app} name={name} /> : null}
           {app.account && !holds ? <Holdings app={app} /> : null}
-          {app.on && starts.length > 0 && ready ? (
+          {ways.now.length > 0 ? (
             <Section title="Try it">
               <ul className={cn("flex flex-wrap gap-2", connected && "auni-stagger-in")}>
-                {starts.map((way) => (
+                {ways.now.map((way) => (
                   <li key={way.title} className="max-w-full">
                     <Button
                       variant="outline"
@@ -177,7 +178,7 @@ export function AppSheet({
               >
                 <Way
                   words={app.account.moneyIn}
-                  off={!app.on}
+                  off={!movesMoney}
                   busy={busy}
                   icon={<ArrowDownLeft aria-hidden className="size-4" strokeWidth={2.2} />}
                   label="Put money in"
@@ -185,16 +186,20 @@ export function AppSheet({
                 />
                 <Way
                   words={app.account.moneyOut}
-                  off={!app.on}
+                  off={!movesMoney}
                   busy={busy}
                   icon={<ArrowUpRight aria-hidden className="size-4" strokeWidth={2.2} />}
                   label="Take money out"
                   onAsk={() => ask(`I want to take money out of ${name}.`)}
                 />
               </div>
-              {app.on || (app.account.moneyIn && app.account.moneyOut) ? null : (
+              {movesMoney || (app.account.moneyIn && app.account.moneyOut) ? null : (
                 <p className="mt-2.5 text-meta text-muted-foreground">
-                  Turn {name} on to move money here.
+                  {!app.on
+                    ? `Turn ${name} on to move money here.`
+                    : asksKey
+                      ? `Add your ${neededKeys === 1 ? "key" : "keys"} above to move money here.`
+                      : `Auni can move money here once ${name} is set up.`}
                 </p>
               )}
             </Section>

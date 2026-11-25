@@ -74,7 +74,7 @@ const STOPS: readonly Stop[] = [
     title: "The plan card",
     follows: true,
     does:
-      "I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money. Before answering I looked both stocks up and read your cash. Scroll up and tap the line that says so to see each step.\n\n" +
+      "I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money. Before answering I looked both stocks up and read your cash. Scroll up and tap the line above my reply to see each step.\n\n" +
       "Tap a row to see why it is there. Then tap **Buy both for $1,350** and watch each buy land.",
     beats: [
       {

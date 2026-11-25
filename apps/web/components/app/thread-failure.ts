@@ -29,26 +29,25 @@ export const FAILURE_ACTIONS: Record<NonNullable<ThreadFailure["action"]>, strin
 export const SEND_FAILURES: Record<SendFailure, ThreadFailure> = {
   unsent: {
     message: "Your message didn't reach Auni.",
-    money: "Nothing moved. Your words are back in the box below.",
+    money: "Nothing was sent, and your message is back in the box below.",
     returnsDraft: true,
   },
   unconfirmed: {
     message: "Auni may not have heard your message.",
-    money: "Money only moves on a card in this chat. Sending again won't send it twice.",
+    money: "If Auni did get it, any move shows up as a card here. Sending again won't run it twice.",
     action: "resend",
   },
   // The turn may have moved money before it failed; the cards above show what it did.
   turn: {
     message: "Auni stopped before finishing this answer.",
-    money: "Money only moves on a card, so anything it did is in a card above.",
+    money: "If anything moved before it stopped, you'll see its card above.",
     action: "ask_again",
   },
 };
 
 export const HISTORY_FAILURE: ThreadFailure = {
-  message: "This chat didn't load.",
-  money: "Your money isn't affected.",
+  message: "Couldn't load this chat.",
   action: "reload",
 };
 
-export const START_FAILURE = "This chat couldn't start, so nothing was sent. Try sending it again.";
+export const START_FAILURE = "Couldn't start this chat, so nothing was sent. Try again.";

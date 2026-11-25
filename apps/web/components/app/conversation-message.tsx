@@ -217,7 +217,7 @@ export function ConversationMessage({
               <MessageActionsRow align="start">
                 <CopyMessageAction text={text} />
                 {onRegenerate ? (
-                  <MessageRowAction label="Regenerate answer" onClick={onRegenerate}>
+                  <MessageRowAction label="Ask again" onClick={onRegenerate}>
                     <RefreshCw aria-hidden />
                   </MessageRowAction>
                 ) : null}

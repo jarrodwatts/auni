@@ -129,11 +129,11 @@ const SCENES: readonly Scene[] = [
     hears: /\) is held\. /u,
     async *play({ think, say, call }) {
       yield* think(
-        "The order went to Polymarket and no answer came back, so I can't say whether it filled. I won't send it again. Their portfolio reads their shares from Polymarket itself, so I'll look there before I say anything.",
+        "No reply came back from Polymarket, so I can't tell if it filled. I won't send it again. I'll check their live Polymarket shares before saying anything.",
       );
       yield* call("get_portfolio", {});
       yield* say(
-        "Your portfolio reads your shares from Polymarket itself, and it still shows all of your Yes shares, so that order most likely never went in. If you still want to sell, close that card and I'll put the sale up again.",
+        "Polymarket still shows all of your Yes shares, so that order most likely never went in. If you still want to sell, close that card and I'll put the sale up again.",
       );
     },
   },
@@ -157,7 +157,7 @@ const SCENES: readonly Scene[] = [
     async *play({ heard, say }) {
       if (!/finished as failed/u.test(heard)) return;
       yield* say(
-        "The market for it turned the trade down when I ran it first, which usually passes quickly. Try again in a minute, or say the word and I'll look for another route.",
+        "That route turned the trade down, which usually clears quickly. Tap Try again in a minute, or say the word and I'll look for another route.",
       );
     },
   },
@@ -320,7 +320,7 @@ const SCENES: readonly Scene[] = [
         repeat: "once",
       });
       yield* say(
-        "I've noted your Solana thesis here and set a watch if it dips below $140. Everything stays in this thread.",
+        "I've saved your Solana take in the notes and set a watch if it dips below $140.",
       );
     },
   },
@@ -407,7 +407,7 @@ const SCENES: readonly Scene[] = [
     async *play({ say, call }) {
       yield* call("hyperliquid_deposit", { amountUsd: 500 });
       yield* say(
-        "That moves $500 from your wallet on Arbitrum into your Hyperliquid account. Say another amount and I'll change it.",
+        "That gives your Hyperliquid account more cushion for new trades or margin. Say another amount if you'd like to move more or less.",
       );
     },
   },
@@ -492,7 +492,9 @@ const SCENES: readonly Scene[] = [
     hears: /put .*into (savings|aave)/iu,
     async *play({ say, call }) {
       yield* call("aave_supply", { chain: "monad", amount_usd: "500" });
-      yield* say("That puts $500 into Aave on Monad, where your savings already earn.");
+      yield* say(
+        "That adds to your Aave savings on Monad so it earns while it waits. Say another amount if you'd like.",
+      );
     },
   },
   {
@@ -502,7 +504,7 @@ const SCENES: readonly Scene[] = [
     async *play({ say, call }) {
       yield* call("aave_withdraw", { chain: "monad", amount_usd: "1000" });
       yield* say(
-        "That brings $1,000 of your savings back to your wallet on Monad as cash. Say another amount and I'll change it.",
+        "Ready to pull back to cash whenever you tap. Say another amount if you need more or less.",
       );
     },
   },
@@ -848,7 +850,7 @@ const SCENES: readonly Scene[] = [
     async *play({ say, call }) {
       yield* call("set_thread_autonomy", { act_mode: "within_limits", budget_usd: 4_000 });
       yield* say(
-        "That lets this thread buy and sell inside its $4,000 budget without asking each time. It still asks for perps, bridges, and withdrawals.",
+        "With that on, I can buy and sell here inside your $4,000 budget without asking each time. I'll still ask for perps, bridges, and withdrawals.",
       );
     },
   },
@@ -1071,7 +1073,7 @@ const SCENES: readonly Scene[] = [
     async *play({ say, call }) {
       yield* call("send_feedback", {
         kind: "idea",
-        says: "A weekly email that summarizes how my portfolio and active threads did.",
+        says: "A weekly email that summarizes how my portfolio and active takes did.",
       });
       yield* say("That one is worth passing on. Here it is, ready for you to post.");
     },
@@ -1098,7 +1100,7 @@ const SCENES: readonly Scene[] = [
       yield* call("get_portfolio", {});
       await sleep(200);
       yield* say(
-        "You're in good shape. Most of your money is working: Nvidia and Tesla from your AI buildout thread, your idle cash earning in Aave, and a bitcoin long open on Hyperliquid.",
+        "You're in good shape. Most of your money is working: Nvidia and Tesla from your AI buildout take, your idle cash earning in Aave, and a bitcoin long open on Hyperliquid.",
       );
       yield* say(
         "Nothing needs you right now. The one thing I'd keep an eye on is the long: it's 3x, so a bad week matters more there than anywhere else.",
@@ -1113,7 +1115,7 @@ const plain: Play = async function* ({ heard, think, say }) {
     console.log(`The demo's brain has no scene for this event: ${heard.slice(0, 300)}`);
   yield* think("This is the demo, so I look for a scene I know how to play.");
   yield* say(
-    "This is a demo of Auni, so I answer from a script and no money here is real. For a guided walk through everything, start a new chat and tap Take the 10 minute tour. Or type one of these to see it:\n\n" +
+    "This is a demo of Auni, so I answer from a script and no money here is real. For a guided walk through everything, start a new chat and tap Take the tour. Or type one of these to see it:\n\n" +
       SCENES.flatMap(({ name, shows }) => (shows ? [`- \`demo: ${name}\` for ${shows}`] : [])).join(
         "\n",
       ),

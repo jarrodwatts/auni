@@ -536,9 +536,7 @@ function Look() {
               aria-checked={entry.id === active}
               aria-label={entry.name}
               onClick={() => pick(entry.id)}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-control p-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35",
-              )}
+              className={cn("flex flex-col items-center gap-1.5 rounded-control p-1 focus-ring")}
             >
               {/* The look itself in miniature, in its own colours whatever the page wears. */}
               <span

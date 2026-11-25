@@ -8,7 +8,7 @@ import { ChoicePills } from "@/components/ui/choice-pills";
 import { CoreApiError } from "@/lib/core";
 import { useBrains, useSetPreferredBrain } from "@/lib/data/brains";
 
-import { Refusal, Setting, SettingsGroup } from "./settings-layout";
+import { Refusal, Setting, SettingsGroup, useJumpTarget } from "./settings-layout";
 
 /**
  * Your AI: each brain Auni can think with on the owner's own login, made ready from here as
@@ -20,6 +20,7 @@ export function AiPane() {
   const preferred = useSetPreferredBrain();
   const rows = brains.data?.rows ?? [];
   const machine = brains.data?.machine ?? me.reach.machine;
+  const { ref } = useJumpTarget<HTMLElement>("setting-brains");
 
   return (
     <>
@@ -31,7 +32,7 @@ export function AiPane() {
           {brains.data.blocked}
         </p>
       ) : null}
-      <section id="setting-brains" aria-label="Your AI" className="scroll-mt-6">
+      <section ref={ref} id="setting-brains" aria-label="Your AI" className="scroll-mt-6">
         {brains.isPending && rows.length === 0 ? (
           <div className="flex items-center justify-center gap-2 py-10 text-meta text-muted-foreground">
             <LoaderCircle aria-hidden className="size-4 animate-spin" />

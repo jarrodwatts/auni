@@ -74,6 +74,7 @@ async function diagnosticsWire(): Promise<DiagnosticsWire> {
             recommended: f.repair.recommended,
           }
         : null,
+      thread: f.thread ?? null,
     })),
     ranAt: new Date().toISOString(),
   };

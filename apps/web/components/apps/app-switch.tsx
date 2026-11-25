@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { CoreApiError } from "@/lib/core";
 import { useSwitchApp } from "@/lib/data/apps";
 
-import { keysNeeded, waitingFor } from "./app-standing";
+import { waitingFor } from "./app-standing";
 import { turningOff } from "./turning-off";
 
 /**
@@ -38,11 +38,9 @@ export function AppSwitch({
   const [refusal, setRefusal] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const off = turningOff(app, name);
-  // On with something still missing is said as that, never as ready.
+  // On with something still missing, its keys too, is said as that, never as ready; and it can
+  // still be turned off, money there or not, without giving the keys first.
   const waits = app.on ? waitingFor(app) : null;
-
-  // On but still waiting for its keys, its key fields are its switch: it works once they're in.
-  if (app.on && keysNeeded(app).length > 0) return null;
 
   const turn = async (on: boolean) => {
     setPending(true);

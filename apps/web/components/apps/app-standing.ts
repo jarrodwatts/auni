@@ -39,12 +39,17 @@ export function needOf(app: AppWire): string | null {
 }
 
 /**
- * What an app that is on still waits for before Auni can use it, other than its keys (whose own
- * fields say so, in place of its switch): "On, but waiting to be paired". Null when it waits for
- * nothing more.
+ * What an app that is on still waits for before Auni can use it, said beside its switch: its
+ * keys (whose fields sit above), or to be paired. Null when it waits for nothing more.
  */
 export function waitingFor(app: AppWire): { readonly says: string; readonly under: string } | null {
-  if (keysNeeded(app).length > 0) return null;
+  const keys = keysNeeded(app).length;
+  if (keys > 0)
+    return {
+      says: keys === 1 ? "Waiting for your key" : "Waiting for your keys",
+      // One with an account there is in use already: its keys add what it can do.
+      under: `Auni ${app.account ? "can do more on" : "starts using"} ${app.name} once ${keys === 1 ? "it's" : "they're"} saved.`,
+    };
   if (app.pairing === "ready")
     return {
       says: "Waiting to pair",

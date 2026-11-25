@@ -3,6 +3,7 @@
 import { Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { inputClass } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import { paneOf, searchSettings, type SettingsSearchItem } from "./settings-search";
@@ -86,8 +87,9 @@ export function SettingsSearch({
             }
           }}
           className={cn(
-            "w-full rounded-control border border-border bg-background pr-8 pl-9 text-ink outline-none transition-[border-color,box-shadow] placeholder:text-faint focus-visible:border-foreground/20 focus-visible:ring-[3px] focus-visible:ring-ring/25 [&::-webkit-search-cancel-button]:hidden",
-            phone ? "h-10 text-body" : "h-8 text-meta",
+            inputClass,
+            "pr-8 pl-9 [&::-webkit-search-cancel-button]:hidden",
+            phone ? "text-body" : "h-8 text-meta",
           )}
         />
         {searching ? (
@@ -98,7 +100,7 @@ export function SettingsSearch({
               setQuery("");
               input.current?.focus();
             }}
-            className="absolute right-1.5 grid size-6 place-items-center rounded-control text-faint hover:text-ink"
+            className="absolute right-1.5 grid size-6 place-items-center rounded-control text-faint focus-ring hover:text-ink"
           >
             <X className="size-3.5" />
           </button>
@@ -123,7 +125,7 @@ export function SettingsSearch({
                 onClick={() => pick(item)}
                 onMouseEnter={() => setCursor(index)}
                 className={cn(
-                  "flex w-full items-baseline justify-between gap-3 rounded-control px-2.5 text-left transition-colors",
+                  "flex w-full items-baseline justify-between gap-3 rounded-control px-2.5 text-left transition-colors focus-ring",
                   phone ? "py-3" : "py-2",
                   index === at ? "bg-foreground/[0.07]" : "hover:bg-foreground/[0.04]",
                 )}

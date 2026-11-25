@@ -6,7 +6,6 @@ import { useRef, useState, type ReactNode } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { useStartConversation } from "@/components/app/use-start-conversation";
-import { Mascot } from "@/components/brand/mascot";
 import { AutoHeight } from "@/components/motion/auto-height";
 import { BrainRow } from "@/components/brains/brain-row";
 import { AssetLogo } from "@/components/brand/marks";
@@ -18,7 +17,7 @@ import { useMediaQuery } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
 
 import { AppJobs } from "./app-jobs";
-import { AppKeysNeeded, AppSettings } from "./app-keys";
+import { AppKeysNeeded, AppSettings, KeysSaved } from "./app-keys";
 import { AppMark } from "./app-mark";
 import { AppPairing } from "./app-pairing";
 import { keysNeeded } from "./app-standing";
@@ -113,17 +112,7 @@ export function AppSheet({
           {/* The owner's money comes first; with none there, what the app still needs does. */}
           {holds ? <Holdings app={app} /> : null}
           <AutoHeight>
-            {connected && !asksKey ? (
-              <div className="mt-8 flex items-center gap-3.5" data-testid="app-connected">
-                <Mascot className="auni-onb-mascot flex-none" size={44} state="celebrating" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-ui font-semibold text-ink">{name} is connected</span>
-                  <span className="mt-0.5 block text-meta text-muted-foreground">
-                    Auni can use it right away.
-                  </span>
-                </span>
-              </div>
-            ) : null}
+            {connected && !asksKey ? <KeysSaved app={app} /> : null}
             {/* What the key is for comes before the key: the same chips, waiting. */}
             {app.on && starts.length > 0 && !ready ? (
               <Section
@@ -251,9 +240,7 @@ function Holdings({ app }: { readonly app: AppWire }) {
   if (account.holdings.length === 0)
     return (
       <Section title="You have">
-        <p className="text-ui font-normal text-muted-foreground">
-          No balance on {app.name} yet.
-        </p>
+        <p className="text-ui font-normal text-muted-foreground">No balance on {app.name} yet.</p>
       </Section>
     );
   const own = appListing(app.id)?.logo;

@@ -2,10 +2,12 @@
 
 import type { DoctorFindingWire } from "@auni/shared";
 import { ArrowUpRight, Check, CircleAlert, LoaderCircle } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
 import { CopyLine } from "@/components/ui/copy-line";
+import { heldMovesHref } from "@/lib/app-links";
 import { CoreApiError } from "@/lib/core";
 import { useAbout, useCheckUpdate, useDiagnostics, useLogs, useRunRepair } from "@/lib/data/system";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,7 @@ import {
   SETTINGS_BUTTON,
   SETTINGS_PRIMARY_BUTTON,
   SettingsGroup,
+  useJumpTarget,
 } from "./settings-layout";
 
 const REPO = "https://github.com/jarrodwatts/auni";
@@ -59,6 +62,7 @@ function Checks() {
   const [pairAgain, setPairAgain] = useState(false);
   const findings = diagnostics.data?.findings ?? [];
   const { headline, needs } = healthOf(findings);
+  const { ref } = useJumpTarget<HTMLElement>("setting-checks");
 
   const fix = async (id: string) => {
     setFixing(id);
@@ -87,7 +91,7 @@ function Checks() {
   };
 
   return (
-    <section id="setting-checks" className="flex scroll-mt-6 flex-col gap-3">
+    <section ref={ref} id="setting-checks" className="flex scroll-mt-6 flex-col gap-3">
       <div className="flex items-center gap-3.5 rounded-card border border-border bg-card px-4 py-4 sm:px-5">
         <span
           className={cn(
@@ -131,28 +135,35 @@ function Checks() {
 
       {needs.length > 0 ? (
         <div className="divide-y divide-border overflow-hidden rounded-card border border-border bg-card">
-          {needs.map((finding, index) => (
-            <Setting
-              key={`${finding.check}-${index}`}
-              label={partName(finding.check)}
-              hint={sentence(finding.says)}
-            >
-              {finding.repair ? (
-                <button
-                  type="button"
-                  title={finding.repair.does}
-                  disabled={fixing !== null}
-                  onClick={() => void fix(finding.repair!.id)}
-                  className={SETTINGS_PRIMARY_BUTTON}
-                >
-                  {fixing === finding.repair.id ? (
-                    <LoaderCircle aria-hidden className="size-3.5 animate-spin" />
-                  ) : null}
-                  Fix it
-                </button>
-              ) : null}
-            </Setting>
-          ))}
+          {needs.map((finding, index) => {
+            const chat = heldMovesHref(finding.thread);
+            return (
+              <Setting
+                key={`${finding.check}-${index}`}
+                label={partName(finding.check)}
+                hint={sentence(finding.says)}
+              >
+                {finding.repair ? (
+                  <button
+                    type="button"
+                    title={finding.repair.does}
+                    disabled={fixing !== null}
+                    onClick={() => void fix(finding.repair!.id)}
+                    className={SETTINGS_PRIMARY_BUTTON}
+                  >
+                    {fixing === finding.repair.id ? (
+                      <LoaderCircle aria-hidden className="size-3.5 animate-spin" />
+                    ) : null}
+                    Fix it
+                  </button>
+                ) : chat ? (
+                  <Link href={chat} className={SETTINGS_PRIMARY_BUTTON}>
+                    Open chat
+                  </Link>
+                ) : null}
+              </Setting>
+            );
+          })}
         </div>
       ) : null}
       {result ? (
@@ -269,7 +280,7 @@ function Help() {
           href={link.href}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center justify-between gap-3 px-4 py-3.5 text-ui font-medium text-ink transition-colors hover:bg-foreground/[0.03] sm:px-5"
+          className="flex items-center justify-between gap-3 px-4 py-3.5 text-ui font-medium text-ink transition-colors focus-ring-inset hover:bg-foreground/[0.03] sm:px-5"
         >
           {link.label}
           <ArrowUpRight aria-hidden className="size-4 text-faint" />

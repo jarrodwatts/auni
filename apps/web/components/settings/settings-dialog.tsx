@@ -15,11 +15,14 @@ import { cn } from "@/lib/utils";
 import { AiPane } from "./ai-pane";
 import { DevicesPane } from "./devices-pane";
 import { HealthPane } from "./health-pane";
-import { JumpedTo } from "./settings-layout";
+import { JumpedTo, type Jump } from "./settings-layout";
 import { SettingsSearch } from "./settings-nav";
 import { paneOf, SETTINGS_PANES, type SettingsSearchItem } from "./settings-search";
 import { WalletPane } from "./wallet-pane";
 import { YouPane } from "./you-pane";
+
+/** How long where a search landed flashes. */
+const FLASH_MS = 2_400;
 
 /** How Settings moves between its list and a pane: a step the browser's Back undoes, or not. */
 export type SettingsStep = "push" | "replace" | "back";
@@ -52,7 +55,8 @@ export function SettingsDialog({
 }) {
   const wide = useMediaQuery("(min-width: 768px)");
   const refreshMe = useRefreshMe();
-  const [jumped, setJumped] = useState<string | null>(null);
+  const [jumped, setJumped] = useState<Jump | null>(null);
+  const jumps = useRef(0);
   // A pane the phone's list opened is a step the back arrow takes back out.
   const steppedIn = useRef(false);
   const shown = section ?? (wide ? "you" : null);
@@ -61,18 +65,12 @@ export function SettingsDialog({
     if (open) refreshMe();
   }, [open, refreshMe]);
 
-  // A search lands on a setting: it scrolls into view and flashes, once its pane has drawn.
+  // Where a search landed flashes for a moment (the setting scrolls itself into view once drawn).
   useEffect(() => {
-    if (!jumped) return undefined;
-    const frame = window.requestAnimationFrame(() =>
-      document.getElementById(jumped)?.scrollIntoView({ behavior: "smooth", block: "center" }),
-    );
-    const done = window.setTimeout(() => setJumped(null), 2_400);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(done);
-    };
-  }, [jumped, shown]);
+    if (!jumped?.lit) return undefined;
+    const done = window.setTimeout(() => setJumped({ ...jumped, lit: false }), FLASH_MS);
+    return () => window.clearTimeout(done);
+  }, [jumped]);
 
   const go = (next: SettingsSection) => {
     setJumped(null);
@@ -88,7 +86,8 @@ export function SettingsDialog({
   };
   const jump = (item: SettingsSearchItem) => {
     go(item.section);
-    setJumped(item.target);
+    jumps.current += 1;
+    setJumped({ n: jumps.current, target: item.target, lit: true });
   };
   const close = () => {
     setJumped(null);
@@ -102,7 +101,7 @@ export function SettingsDialog({
       type="button"
       aria-label="Close settings"
       onClick={close}
-      className="grid size-9 flex-none place-items-center rounded-control text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/35 focus-visible:outline-none"
+      className="grid size-9 flex-none place-items-center rounded-control text-muted-foreground transition-colors focus-ring hover:bg-foreground/[0.06] hover:text-ink"
     >
       <X className="size-4" />
     </button>
@@ -147,7 +146,7 @@ export function SettingsDialog({
                         aria-current={current ? "page" : undefined}
                         onClick={() => go(pane.id)}
                         className={cn(
-                          "flex h-9 items-center gap-2.5 rounded-control px-2.5 text-left text-ui transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35",
+                          "flex h-9 items-center gap-2.5 rounded-control px-2.5 text-left text-ui transition-colors duration-150 focus-ring",
                           current
                             ? "bg-foreground/[0.07] font-medium text-ink"
                             : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-ink",
@@ -189,7 +188,7 @@ export function SettingsDialog({
                       <button
                         type="button"
                         onClick={() => go(pane.id)}
-                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left outline-none active:bg-foreground/[0.04]"
+                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left focus-ring-inset active:bg-foreground/[0.04]"
                       >
                         <span className="flex size-9 flex-none items-center justify-center rounded-control bg-surface text-ink-soft">
                           <pane.icon aria-hidden className="size-[18px]" strokeWidth={1.9} />
@@ -214,7 +213,7 @@ export function SettingsDialog({
               <button
                 type="button"
                 onClick={back}
-                className="flex h-9 items-center gap-0.5 rounded-control pr-3 pl-1 text-ui font-medium text-ink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
+                className="flex h-9 items-center gap-0.5 rounded-control pr-3 pl-1 text-ui font-medium text-ink focus-ring"
               >
                 <ChevronLeft aria-hidden className="size-5" />
                 Settings

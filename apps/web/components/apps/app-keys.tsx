@@ -4,6 +4,7 @@ import type { AppSettingWire, AppWire } from "@auni/shared";
 import { Check } from "lucide-react";
 import { useState, type Ref } from "react";
 
+import { Mascot } from "@/components/brand/mascot";
 import { MoneyButton } from "@/components/cards/money/money-card-parts";
 import { buttonVariants } from "@/components/ui/button";
 import { AutoHeight } from "@/components/motion/auto-height";
@@ -35,9 +36,7 @@ export function AppKeysNeeded({
   if (needed.length === 0) return null;
   const keys = needed.length === 1 ? "key" : "keys";
   return (
-    <Section
-      title={holding ? `Add your ${keys} to trade` : `Add your ${keys} to turn ${app.name} on`}
-    >
+    <Section title={holding ? `Add your ${keys} to trade` : `Add your ${keys} to use ${app.name}`}>
       {holding ? (
         <p className="mb-3 text-ui leading-[1.5] text-ink">
           Your {holding} is safe. Add your {app.name} {keys} to let Auni place orders.
@@ -45,6 +44,32 @@ export function AppKeysNeeded({
       ) : null}
       <KeyForm settings={needed} focusRef={focusRef} onSaved={onSaved} />
     </Section>
+  );
+}
+
+/**
+ * The moment an app's last key went in, as it now stands: connected only when it's on, since a
+ * key saved never turns on an app the owner turned off.
+ */
+export function KeysSaved({ app }: { readonly app: AppWire }) {
+  const many =
+    app.settings.filter(({ kind, required }) => kind === "secret" && required).length > 1;
+  return (
+    <div className="mt-8 flex items-center gap-3.5" data-testid="app-keys-saved">
+      {app.on ? (
+        <Mascot className="auni-onb-mascot flex-none" size={44} state="celebrating" />
+      ) : null}
+      <span className="min-w-0 flex-1">
+        <span className="block text-ui font-semibold text-ink">
+          {app.on ? `${app.name} is connected` : many ? "Keys saved" : "Key saved"}
+        </span>
+        <span className="mt-0.5 block text-meta text-muted-foreground">
+          {app.on
+            ? "Auni can use it right away."
+            : `${app.name} is off, so Auni won't use it until you turn it on below.`}
+        </span>
+      </span>
+    </div>
   );
 }
 
@@ -148,7 +173,7 @@ function KeyFields({
           <Linked text={line} />
         </p>
       ))}
-      <div className="divide-y divide-foreground/[0.07] overflow-hidden rounded-card border border-foreground/[0.12] bg-background transition-[border-color,box-shadow] focus-within:border-foreground/25 focus-within:ring-[3px] focus-within:ring-ring/25">
+      <div className="divide-y divide-foreground/[0.07] overflow-hidden rounded-card border border-foreground/[0.12] bg-background transition-[border-color] focus-within:border-foreground/25">
         {settings.map((setting, index) => field(setting, index, true))}
       </div>
       {refusal}

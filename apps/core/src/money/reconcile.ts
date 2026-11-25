@@ -1,5 +1,5 @@
 import { HELD, RAW_TRANSACTION_TOOLS, type HeldWhy } from "@auni/shared";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, sql } from "drizzle-orm";
 import { TransactionReceiptNotFoundError, type Address, type Hash } from "viem";
 
 import { publishThread } from "../conversation/threads.ts";
@@ -65,14 +65,17 @@ export async function reconcileStuckActions(): Promise<ActionRow[]> {
   return settled;
 }
 
-/** Up to 50 held moves, each waiting on the owner's Check again or Close (see hold). */
-export async function heldMoves(): Promise<string[]> {
-  const rows = await db
-    .select({ id: actions.id })
+/**
+ * Up to 50 held moves, each waiting on the owner's Check again or Close (see hold), with the
+ * chat its card is in, the oldest first.
+ */
+export async function heldMoves(): Promise<{ id: string; threadId: string | null }[]> {
+  return db
+    .select({ id: actions.id, threadId: actions.threadId })
     .from(actions)
     .where(eq(actions.phase, "needs_owner"))
+    .orderBy(asc(actions.createdAt))
     .limit(50);
-  return rows.map(({ id }) => id);
 }
 
 /** What an action's transactions say about it, read in the order they were sent. */

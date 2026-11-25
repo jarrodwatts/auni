@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronRight } from "lucide-react";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { badgeClass } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,16 +13,34 @@ import { cn } from "@/lib/utils";
  * Settings is built from three things: a group (a quiet heading over one card of rows), a
  * setting (one row: what it is, a line on what it does, and its control), and a disclosure (a
  * row that opens to show what most owners never need, such as the developer's detail). A
- * search result lands on a group, a setting or a disclosure by its id, which flashes and, for a
- * disclosure, opens.
+ * search result lands on a group, a setting or a disclosure by its id: it scrolls into view and
+ * flashes, and a disclosure it lands on or in opens, and stays open until the owner closes it.
  */
 
-/** The id a search jumped to, for the one setting, group or disclosure that has it. */
-export const JumpedTo = createContext<string | null>(null);
+/**
+ * Where a search landed: the id it went to, and whether its flash still shows. Each search is a
+ * new landing (`n`), so the flash fading never closes or scrolls anything again.
+ */
+export interface Jump {
+  readonly n: number;
+  readonly target: string;
+  readonly lit: boolean;
+}
 
-function useJumped(id: string | undefined): boolean {
-  const jumped = useContext(JumpedTo);
-  return id !== undefined && jumped === id;
+export const JumpedTo = createContext<Jump | null>(null);
+
+/**
+ * For whatever has the id a search went to: it scrolls into view once it's drawn (a pane may
+ * draw it only once its data is in), and whether it's still flashing.
+ */
+export function useJumpTarget<T extends HTMLElement>(id: string | undefined) {
+  const jump = useContext(JumpedTo);
+  const ref = useRef<T>(null);
+  const landing = jump !== null && id !== undefined && jump.target === id ? jump.n : null;
+  useEffect(() => {
+    if (landing !== null) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [landing]);
+  return { ref, lit: landing !== null && jump!.lit };
 }
 
 /** A group of settings: a quiet heading (or none), one card of rows, and a line under it. */
@@ -38,9 +56,9 @@ export function SettingsGroup({
   readonly note?: ReactNode;
   readonly children: ReactNode;
 }) {
-  const jumped = useJumped(id);
+  const { ref, lit } = useJumpTarget<HTMLElement>(id);
   return (
-    <section id={id} aria-label={title} className="scroll-mt-6">
+    <section ref={ref} id={id} aria-label={title} className="scroll-mt-6">
       {title ? (
         <h3 className="mb-2 px-1 text-meta font-medium text-muted-foreground">{title}</h3>
       ) : null}
@@ -48,7 +66,7 @@ export function SettingsGroup({
         className={cn(
           cardClass,
           "divide-y divide-border transition-[box-shadow] duration-500",
-          jumped && "ring-[3px] ring-ring/25",
+          lit && "ring-[3px] ring-ring/25",
         )}
       >
         {children}
@@ -80,15 +98,16 @@ export function Setting({
   readonly inline?: boolean;
   readonly children?: ReactNode;
 }) {
-  const jumped = useJumped(id);
+  const { ref, lit } = useJumpTarget<HTMLDivElement>(id);
   return (
     <div
+      ref={ref}
       id={id}
       className={cn(
         "flex scroll-mt-6 flex-col gap-3 px-4 py-3.5 transition-colors duration-500 sm:px-5",
         !stacked && "sm:flex-row sm:items-center sm:justify-between sm:gap-5",
         inline && "flex-row items-center justify-between gap-5",
-        jumped && "bg-primary/[0.06]",
+        lit && "bg-primary/[0.06]",
       )}
     >
       <div className="min-w-0 flex-1">
@@ -125,7 +144,7 @@ export function SettingLink({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-150 outline-none hover:bg-foreground/[0.03] focus-visible:bg-foreground/[0.04] disabled:cursor-not-allowed disabled:opacity-50 sm:px-5"
+      className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-150 focus-ring-inset hover:bg-foreground/[0.03] disabled:cursor-not-allowed disabled:opacity-50 sm:px-5"
     >
       <span className="flex size-8 flex-none items-center justify-center rounded-control bg-surface text-ink-soft [&_svg]:size-4">
         {icon}
@@ -157,16 +176,24 @@ export function Disclosure({
   readonly holds?: readonly string[];
   readonly children: ReactNode;
 }) {
-  const jumped = useContext(JumpedTo);
-  const [open, setOpen] = useState(false);
-  const shown = open || (jumped !== null && (jumped === id || holds.includes(jumped)));
+  const jump = useContext(JumpedTo);
+  const { ref } = useJumpTarget<HTMLElement>(id);
+  // A search that lands on it or inside opens it, once: what's typed inside outlives the flash.
+  const landing =
+    jump !== null && (jump.target === id || holds.includes(jump.target)) ? jump.n : null;
+  const [shown, setShown] = useState(landing !== null);
+  const [landed, setLanded] = useState(landing);
+  if (landing !== landed) {
+    setLanded(landing);
+    if (landing !== null) setShown(true);
+  }
   return (
-    <section id={id} className="scroll-mt-6">
+    <section ref={ref} id={id} className="scroll-mt-6">
       <button
         type="button"
         aria-expanded={shown}
-        onClick={() => setOpen(!shown)}
-        className="group flex w-full items-center gap-2 rounded-control px-1 py-1.5 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
+        onClick={() => setShown(!shown)}
+        className="group flex w-full items-center gap-2 rounded-control px-1 py-1.5 text-left focus-ring"
       >
         <ChevronRight
           aria-hidden
@@ -188,7 +215,10 @@ export function Disclosure({
 /** "Saved", for a moment, beside what was just saved. */
 export function Saved({ children = "Saved" }: { readonly children?: string }) {
   return (
-    <span role="status" className="inline-flex items-center gap-1 text-caption text-muted-foreground">
+    <span
+      role="status"
+      className="inline-flex items-center gap-1 text-caption text-muted-foreground"
+    >
       <Check aria-hidden className="size-3.5" />
       {children}
     </span>

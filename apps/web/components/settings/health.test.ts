@@ -8,6 +8,7 @@ const finding = (check: string, status: DoctorFindingWire["status"]): DoctorFind
   status,
   says: `${check} ${status}`,
   repair: null,
+  thread: null,
 });
 
 describe("Health, as the owner reads it", () => {

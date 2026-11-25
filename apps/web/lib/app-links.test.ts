@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FUNDING_DIALOG_PARAM, fundingAsked, fundingDialogHref } from "./app-links";
+import { FUNDING_DIALOG_PARAM, fundingAsked, fundingDialogHref, heldMovesHref } from "./app-links";
 
 describe("Add money's link", () => {
   it("opens for anything, or for the dollars a card is short of and the network it's short on", () => {
@@ -17,4 +17,10 @@ describe("Add money's link", () => {
     for (const value of [null, "", "50", "0-base", "-5-base", "12.5-base", "fifty", "50-ethereum"])
       expect(fundingAsked(value)).toBeNull();
   });
+});
+
+// Health said "1 move needs checking" with no way to its card (2026-11-25).
+it("takes a move that needs checking to the chat its card is in", () => {
+  expect(heldMovesHref("t1")).toBe("/app/chat/t1");
+  expect(heldMovesHref(null)).toBeNull();
 });

@@ -142,3 +142,11 @@ export const NEEDS_YOU_HREF = "/app/needs-you";
 
 /** A phone's list of takes and chats; on desktop the sidebar holds it. */
 export const CHATS_HREF = "/app/chats";
+
+/**
+ * Where the owner goes to act on a move that needs checking, from Health: the chat its card is
+ * in (`thread`), or nowhere when it's in none. The one place every such link is made.
+ */
+export function heldMovesHref(thread: string | null): string | null {
+  return thread ? chatHref(thread) : null;
+}

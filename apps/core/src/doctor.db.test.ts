@@ -15,7 +15,7 @@ import { checkRelease } from "./release/check.ts";
 import { runningVersion, versionLine } from "./release/layout.ts";
 import { holderName } from "./running.ts";
 import { ownCommand } from "./service.ts";
-import { wipe } from "./test/db.ts";
+import { insertAction, insertThread, wipe } from "./test/db.ts";
 
 vi.mock("./agent/brain.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -398,6 +398,24 @@ describe("auni doctor", () => {
           /^ok {3}wallet: .*EVM 0xabc, its keys in the OS keychain, as "wallet-keys:\/me\/.auni" under "auni"$/u,
         ),
       ]);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  // Health said "1 move needs checking. Open its card in chat" with no way to that chat
+  // (2026-11-25).
+  it("names the chat holding a move that needs checking", async () => {
+    // Another process holds the runner's lock, as a running Auni does.
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      // One withdrawal from Settings, in no chat, and one buy in a chat.
+      await insertAction({ phase: "needs_owner", startedAt: new Date() });
+      const { id } = await insertThread();
+      await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
+      const held = (await doctor()).filter(({ says }) => says.includes("need checking"));
+      expect(held).toEqual([expect.objectContaining({ status: "fix", thread: id })]);
     } finally {
       await auni.end();
     }

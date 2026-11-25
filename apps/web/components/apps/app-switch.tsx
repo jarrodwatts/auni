@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { CoreApiError } from "@/lib/core";
 import { useSwitchApp } from "@/lib/data/apps";
 
-import { waitingFor } from "./app-standing";
+import { keysNeeded, waitingFor } from "./app-standing";
 import { turningOff } from "./turning-off";
 
 /**
@@ -40,6 +40,9 @@ export function AppSwitch({
   const off = turningOff(app, name);
   // On with something still missing is said as that, never as ready.
   const waits = app.on ? waitingFor(app) : null;
+
+  // On but still waiting for its keys, its key fields are its switch: it works once they're in.
+  if (app.on && keysNeeded(app).length > 0) return null;
 
   const turn = async (on: boolean) => {
     setPending(true);
@@ -73,7 +76,7 @@ export function AppSwitch({
         <div className="rounded-card bg-surface p-5" data-testid="app-switch-refused">
           <h3 className="text-ui font-semibold text-ink">{refused.title}</h3>
           <p className="mt-1.5 text-meta leading-[1.55] text-muted-foreground">{refused.why}</p>
-          <div className="mt-4 grid grid-cols-[1fr_1.6fr] gap-2">
+          <div className="mt-4 flex flex-col-reverse gap-2">
             <MoneyButton
               tone="quiet"
               onClick={() => {
@@ -85,7 +88,7 @@ export function AppSwitch({
             </MoneyButton>
             {refused.fix ? (
               <MoneyButton tone="primary" disabled={busy} onClick={() => onAsk(refused.fix)}>
-                Close what&apos;s open
+                Review a plan to close positions
               </MoneyButton>
             ) : (
               <MoneyButton tone="primary" busy={pending} onClick={() => void turn(false)}>

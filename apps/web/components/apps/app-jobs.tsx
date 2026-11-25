@@ -18,6 +18,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+
 import { AppMark } from "./app-mark";
 import { Section } from "./sheet-section";
 
@@ -193,15 +195,16 @@ export function AppJobs({
           <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 pl-[46px]">
             <span className="text-meta text-faint">{JOBS[job].also}</span>
             {others.map((other) => (
-              <button
+              <Button
                 key={other.id}
-                type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => onOpen(other.id)}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-surface pr-2.5 pl-1 text-meta font-medium text-ink transition-colors duration-150 outline-none hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="pl-1.5"
               >
                 <AppMark id={other.id} name={other.name} size={20} />
                 {other.name}
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}

@@ -7,7 +7,6 @@ import { useCallback } from "react";
 import {
   addMissingKey,
   addWatchedWallet,
-  refreshOwnerSignals,
   removeWatchedWallet,
   updateMe,
 } from "@/lib/data/me";
@@ -60,15 +59,6 @@ export function useRemoveWatchedWallet() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (address: string) => removeWatchedWallet(address),
-    onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
-  });
-}
-
-/** Triggers a fresh background read of X handle and watch-only wallet holdings. */
-export function useRefreshSignals() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: refreshOwnerSignals,
     onSuccess: (me: Me) => queryClient.setQueryData(ME_KEY, me),
   });
 }

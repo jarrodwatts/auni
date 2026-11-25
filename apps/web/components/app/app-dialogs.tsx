@@ -19,7 +19,7 @@ import {
   settingsSection,
   type FundingNeed,
   type ReportSubject,
-  type SettingsSection,
+  type SettingsLink,
 } from "@/lib/app-links";
 
 /** Links and openers for the popups, each returning to whatever page it opened over. */
@@ -30,7 +30,7 @@ export function useAppDialogs() {
 
   const addMoneyHref = fundingDialogHref(pathname, search);
   const settingsHref = useCallback(
-    (section?: SettingsSection) => settingsDialogHref(pathname, search, section),
+    (section?: SettingsLink) => settingsDialogHref(pathname, search, section),
     [pathname, search],
   );
 
@@ -41,7 +41,7 @@ export function useAppDialogs() {
       /** Opens Add money; from a card, for what it's short of. */
       openAddMoney: (need?: FundingNeed) =>
         router.push(fundingDialogHref(pathname, search, need), { scroll: false }),
-      openSettings: (section?: SettingsSection) =>
+      openSettings: (section?: SettingsLink) =>
         router.push(settingsHref(section), { scroll: false }),
       /** Opens Report a problem about a move that failed, or about an app. */
       openReport: (about: ReportSubject) =>
@@ -65,10 +65,14 @@ export function AppDialogs() {
   return (
     <>
       <SettingsDialog
-        open={section !== null}
-        section={section ?? "general"}
-        onSectionChange={(next) =>
-          router.replace(settingsDialogHref(pathname, search, next), { scroll: false })
+        open={section !== undefined}
+        section={section ?? null}
+        onSectionChange={(next, step) =>
+          step === "back"
+            ? router.back()
+            : router[step](settingsDialogHref(pathname, search, next ?? undefined), {
+                scroll: false,
+              })
         }
         onOpenChange={(open) => (open ? undefined : close(SETTINGS_DIALOG_PARAM))}
       />

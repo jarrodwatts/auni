@@ -467,19 +467,11 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
         "top",
       );
     await take(page, out, "new-chat", `${origin}/app/new`, "top");
-    // Settings, each of its panes.
-    for (const section of [
-      "general",
-      "appearance",
-      "personalization",
-      "brains",
-      "wallet",
-      "channels",
-      "remote",
-      "network",
-      "diagnostics",
-      "about",
-    ])
+    // Settings: a phone's list of its panes, then each pane.
+    await take(page, out, "settings", `${origin}/app?settings=open`, "top", undefined, {
+      only: "phone",
+    });
+    for (const section of ["you", "ai", "wallet", "devices", "health"])
       await take(page, out, `settings-${section}`, `${origin}/app?settings=${section}`, "top");
     for (const thread of threads.toReversed()) {
       const name = slug(thread.title ?? thread.id);

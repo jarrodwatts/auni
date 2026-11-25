@@ -86,8 +86,3 @@ export async function removeWatchedWallet(address: string): Promise<Me> {
     await requestCore(`me/watched-wallets/${encodeURIComponent(address)}`, { method: "DELETE" }),
   );
 }
-
-/** Asks core to re-read watched wallets and public X handle and rebuild profile signals. */
-export async function refreshOwnerSignals(): Promise<Me> {
-  return meSchema.parse(await requestCore("me/signals/refresh", { method: "POST", body: "{}" }));
-}

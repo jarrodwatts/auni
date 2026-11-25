@@ -10,6 +10,7 @@ import { Mascot } from "@/components/brand/mascot";
 import { AutoHeight } from "@/components/motion/auto-height";
 import { BrainRow } from "@/components/brains/brain-row";
 import { AssetLogo } from "@/components/brand/marks";
+import { Button } from "@/components/ui/button";
 import { AuniSheet } from "@/components/ui/auni-sheet";
 import { useBrains } from "@/lib/data/brains";
 import { formatUsd } from "@/lib/money";
@@ -23,10 +24,6 @@ import { AppPairing } from "./app-pairing";
 import { keysNeeded } from "./app-standing";
 import { AppSwitch } from "./app-switch";
 import { Section } from "./sheet-section";
-
-/** A way to try an app, as a pill; one that can't be tapped yet is the same pill, pale. */
-const CHIP =
-  "flex h-10 max-w-full items-center rounded-full border px-4 text-ui font-medium tracking-[-0.01em]";
 
 /**
  * One app, opened from the Apps list: the keys it still needs, what the owner has there, ways
@@ -131,17 +128,21 @@ export function AppSheet({
               <Section title={asksKey ? "With a key, Auni can" : "Once it is set up, Auni can"}>
                 <ul className="flex flex-wrap gap-2">
                   {starts.map((way) => (
-                    <li
-                      key={way.title}
-                      className={cn(CHIP, "border-transparent bg-surface text-muted-foreground")}
-                    >
-                      <span className="truncate">{way.title}</span>
+                    <li key={way.title} className="max-w-full">
+                      <Button variant="secondary" disabled className="max-w-full">
+                        <span className="truncate">{way.title}</span>
+                      </Button>
                     </li>
                   ))}
                 </ul>
               </Section>
             ) : null}
-            <AppKeysNeeded app={app} focusRef={firstKey} onSaved={() => setConnected(true)} />
+            <AppKeysNeeded
+              app={app}
+              focusRef={firstKey}
+              holding={holds ? formatUsd(app.account!.usd!) : null}
+              onSaved={() => setConnected(true)}
+            />
           </AutoHeight>
           {app.pairing ? <AppPairing app={app} name={name} /> : null}
           {app.account && !holds ? <Holdings app={app} /> : null}
@@ -150,17 +151,14 @@ export function AppSheet({
               <ul className={cn("flex flex-wrap gap-2", connected && "auni-stagger-in")}>
                 {starts.map((way) => (
                   <li key={way.title} className="max-w-full">
-                    <button
-                      type="button"
+                    <Button
+                      variant="outline"
                       disabled={busy}
                       onClick={() => ask(way.prompt)}
-                      className={cn(
-                        CHIP,
-                        "border-foreground/[0.08] bg-card text-ink transition-[transform,box-shadow,border-color] duration-200 ease-settle hover:-translate-y-px hover:border-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
-                      )}
+                      className="max-w-full"
                     >
                       <span className="truncate">{way.title}</span>
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -209,12 +207,12 @@ export function AppSheet({
           ) : (
             <p className="mt-9 text-meta leading-[1.5] text-muted-foreground">
               {app.inUse
-                ? "Auni's own work runs on this, so it has no switch."
-                : "It has no switch: it does nothing until Auni's settings file names it."}
+                ? `Auni uses ${name} by itself, so it has no switch.`
+                : `${name} isn't in use. Auni's settings file picks which one does this.`}
             </p>
           )}
           <p className="mt-6 text-meta leading-[1.5] text-muted-foreground">
-            Something wrong with it?{" "}
+            Something wrong with {name}?{" "}
             <button
               type="button"
               onClick={() => openReport({ app: app.id })}
@@ -251,7 +249,7 @@ function Holdings({ app }: { readonly app: AppWire }) {
   return (
     <section aria-label="You have" className="mt-8">
       <p className="text-hero-money text-ink">{formatUsd(account.usd)}</p>
-      <p className="mt-1.5 text-meta text-muted-foreground">there now</p>
+      <p className="mt-1.5 text-meta text-muted-foreground">Yours at {app.name}</p>
       <ul className="mt-4 flex flex-col">
         {account.holdings.map((holding) => (
           <li key={holding.id} className="flex min-h-[60px] items-center gap-3">
@@ -310,17 +308,10 @@ function Way({
       </p>
     );
   return (
-    <button
-      type="button"
-      disabled={busy || off}
-      onClick={onAsk}
-      className={cn(
-        "flex h-11 min-w-0 items-center justify-center gap-2 rounded-full bg-foreground/[0.05] px-4 text-body font-semibold text-ink transition-[background-color,scale] duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.985] disabled:pointer-events-none disabled:opacity-55",
-      )}
-    >
+    <Button variant="secondary" disabled={busy || off} onClick={onAsk} className="min-w-0">
       {icon}
       {label}
-    </button>
+    </Button>
   );
 }
 

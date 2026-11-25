@@ -270,7 +270,10 @@ const checkRunner: Check = async () => {
             ? "1 move needs checking. Open its card in Auni to check its status."
             : `${held.length} moves need checking. Open their cards in Auni to check their status.`,
       },
-      says: `${held.length} moves are held, waiting on you (${held.join(", ")}): each card says why, with Check status and Dismiss card`,
+      says:
+        held.length === 1
+          ? "1 move is waiting on you to check it: its card in the chat says why"
+          : `${held.length} moves are waiting on you to check them: each card in the chat says why`,
     });
   for (const { kind, jobs: many, error } of failed)
     findings.push({

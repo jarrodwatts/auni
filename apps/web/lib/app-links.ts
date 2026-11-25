@@ -6,26 +6,34 @@ export const SETTINGS_DIALOG_PARAM = "settings";
 
 const DIALOG_OPEN_VALUE = "open";
 
-export const SETTINGS_SECTIONS = [
-  "general",
-  "appearance",
-  "personalization",
-  "brains",
-  "wallet",
-  "channels",
-  "remote",
-  "network",
-  "diagnostics",
-  "about",
-] as const;
+/** Settings' panes, in the order its list shows them. */
+export const SETTINGS_SECTIONS = ["you", "ai", "wallet", "devices", "health"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
-/** Legacy Settings query aliases kept working for old bookmarks and messages. */
-const LEGACY_SECTIONS: Readonly<Record<string, SettingsSection>> = {
-  profile: "general",
-  machine: "remote",
-  help: "diagnostics",
-};
+/**
+ * Names Settings' panes had before they were folded into five, which links already written
+ * (old messages, the agent's own links) still open: each to the pane that holds it now.
+ */
+const FOLDED_SECTIONS = {
+  general: "you",
+  profile: "you",
+  appearance: "you",
+  personalization: "you",
+  brains: "ai",
+  channels: "devices",
+  remote: "devices",
+  machine: "devices",
+  network: "health",
+  diagnostics: "health",
+  help: "health",
+  about: "health",
+} as const satisfies Readonly<Record<string, SettingsSection>>;
+
+/** Any name a Settings link may carry: a pane's, or one it was folded from. */
+export type SettingsLink = SettingsSection | keyof typeof FOLDED_SECTIONS;
+
+/** What `?settings=` holds with Settings open on its list of panes (on a phone, the list itself). */
+const SETTINGS_INDEX = "open";
 
 function withParam(pathname: string, search: string | undefined, param: string, value: string) {
   const params = new URLSearchParams(search);
@@ -52,18 +60,37 @@ export function fundingAsked(value: string | null): { readonly need: FundingNeed
   return usd && chain && isCash(chain) ? { need: { usd, chain } } : null;
 }
 
+/** Settings, open on one pane, or with none named on its list. */
 export function settingsDialogHref(
   pathname: string,
   search?: string,
-  section: SettingsSection = "general",
+  section?: SettingsLink,
 ): string {
-  return withParam(pathname, search, SETTINGS_DIALOG_PARAM, section);
+  return withParam(
+    pathname,
+    search,
+    SETTINGS_DIALOG_PARAM,
+    section ? paneOf(section) : SETTINGS_INDEX,
+  );
 }
 
-export function settingsSection(value: string | null): SettingsSection | null {
-  if (!value) return null;
-  if (value in LEGACY_SECTIONS) return LEGACY_SECTIONS[value]!;
-  return SETTINGS_SECTIONS.find((section) => section === value) ?? null;
+/** The pane a Settings link opens. */
+function paneOf(link: SettingsLink): SettingsSection {
+  return link in FOLDED_SECTIONS
+    ? FOLDED_SECTIONS[link as keyof typeof FOLDED_SECTIONS]
+    : (link as SettingsSection);
+}
+
+/**
+ * What `?settings=` says: closed (undefined), open on its list (null), or open on a pane, by its
+ * own name or one it was folded from.
+ */
+export function settingsSection(value: string | null): SettingsSection | null | undefined {
+  if (value === SETTINGS_INDEX) return null;
+  const link = [...SETTINGS_SECTIONS, ...Object.keys(FOLDED_SECTIONS)].find(
+    (name) => name === value,
+  );
+  return link ? paneOf(link as SettingsLink) : undefined;
 }
 
 /** Report a problem opens the same way, naming what it is about: `action:<id>` or `app:<id>`. */

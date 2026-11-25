@@ -7,6 +7,7 @@ import { useEffect } from "react";
 
 import { MoneyButton } from "@/components/cards/money/money-card-parts";
 import { useRefreshMe } from "@/components/personalization/use-me";
+import { buttonVariants } from "@/components/ui/button";
 import { CopyLine } from "@/components/ui/copy-line";
 import { useRefreshApps } from "@/lib/data/apps";
 import { pairChannel } from "@/lib/data/channels";
@@ -52,7 +53,7 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
           <CopyLine value={pairing.data.code} label="Your code" />
           {link ? (
             <a
-              className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-foreground px-5 text-body font-semibold text-background transition-colors duration-200 ease-settle hover:bg-foreground/85"
+              className={buttonVariants({ variant: "primary", size: "lg" })}
               href={link}
               rel="noreferrer"
               target="_blank"
@@ -67,7 +68,7 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
           <p className="flex min-w-0 flex-1 items-center gap-2 text-ui font-normal text-ink">
             {paired ? (
               <>
-                <Check aria-hidden className="size-4 flex-none text-positive" strokeWidth={2.6} />
+                <Check aria-hidden className="size-4 flex-none text-ink" strokeWidth={2.6} />
                 Paired with your chat
               </>
             ) : (

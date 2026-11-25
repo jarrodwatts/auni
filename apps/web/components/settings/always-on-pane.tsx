@@ -42,23 +42,20 @@ const ENDED: Record<
 };
 
 /**
- * Keep Auni running when the laptop sleeps, under "Where Auni runs" on this computer alone: the
- * owner's machines on Tailscale, one picked, and the command to run there, which installs Auni,
- * takes everything over from this laptop and sets it up always on. The command is shown once, as
- * it's made; the handover's progress is read from core as it goes.
+ * Moving Auni to another of the owner's computers that stays on: their machines on Tailscale,
+ * one picked, and the command to run there, which installs Auni, takes everything over from this
+ * one and keeps it running. The command is shown once, as it's made; the move's progress is read
+ * from core as it goes.
  */
 export function KeepRunning() {
   return (
-    <section aria-labelledby="keep-running" className="mt-5">
-      <p id="keep-running" className="px-1 text-ui font-medium text-ink">
-        Keep Auni running when your laptop sleeps
-      </p>
-      <p className="mt-0.5 mb-2.5 px-1 text-meta leading-[1.5] text-muted-foreground">
-        Hand it over to one of your machines on Tailscale that stays on, and open it there from any
-        of your devices.
+    <div>
+      <p className="mb-3 px-1 text-meta leading-[1.5] text-muted-foreground">
+        Pick a computer of yours on Tailscale that stays on. Your wallet, chats and settings move
+        there once, and you open Auni there from any device.
       </p>
       <HandOver />
-    </section>
+    </div>
   );
 }
 

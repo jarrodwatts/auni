@@ -1,46 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { SETTINGS_SECTIONS, settingsSection } from "@/lib/app-links";
+import { SETTINGS_SECTIONS, settingsDialogHref, settingsSection } from "@/lib/app-links";
 
-import { SETTINGS_SEARCH_ITEMS, SETTINGS_SECTIONS_META, searchSettings } from "./settings-search";
+import { SETTINGS_PANES, SETTINGS_SEARCH_ITEMS, searchSettings } from "./settings-search";
 
-describe("settings search and navigation", () => {
-  it("covers every settings section in sidebar metadata", () => {
-    expect(SETTINGS_SECTIONS_META.map((s) => s.id)).toEqual([...SETTINGS_SECTIONS]);
+describe("Settings' panes and its search", () => {
+  it("lists every pane, in order", () => {
+    expect(SETTINGS_PANES.map(({ id }) => id)).toEqual([...SETTINGS_SECTIONS]);
   });
 
-  it("maps legacy Settings URLs to their new sections", () => {
-    expect(settingsSection("profile")).toBe("general");
-    expect(settingsSection("machine")).toBe("remote");
-    expect(settingsSection("help")).toBe("diagnostics");
-    expect(settingsSection("remote")).toBe("remote");
-    expect(settingsSection("unknown")).toBeNull();
-    expect(settingsSection(null)).toBeNull();
+  it("opens links written before the panes were folded at the pane that holds them now", () => {
+    expect(settingsSection("general")).toBe("you");
+    expect(settingsSection("appearance")).toBe("you");
+    expect(settingsSection("personalization")).toBe("you");
+    expect(settingsSection("brains")).toBe("ai");
+    expect(settingsSection("remote")).toBe("devices");
+    expect(settingsSection("channels")).toBe("devices");
+    expect(settingsSection("network")).toBe("health");
+    expect(settingsSection("about")).toBe("health");
+    expect(settingsSection("wallet")).toBe("wallet");
   });
 
-  it("matches multi-token queries across titles, descriptions, and keywords", () => {
-    const tailscale = searchSettings("tailscale qr");
-    expect(tailscale[0]?.section).toBe("remote");
-    expect(tailscale[0]?.targetId).toBe("setting-tailscale");
+  it("tells the list apart from a pane and from closed", () => {
+    expect(settingsSection("open")).toBeNull();
+    expect(settingsSection(null)).toBeUndefined();
+    expect(settingsSection("nothing")).toBeUndefined();
+    expect(settingsDialogHref("/app", "")).toBe("/app?settings=open");
+    expect(settingsDialogHref("/app", "x=1", "remote")).toBe("/app?x=1&settings=devices");
+  });
 
-    const dark = searchSettings("dark mode");
-    expect(dark[0]?.section).toBe("appearance");
-
-    const rpc = searchSettings("alchemy rpc");
-    expect(rpc[0]?.section).toBe("network");
-
-    const doctor = searchSettings("doctor fix");
-    expect(doctor[0]?.section).toBe("diagnostics");
-
+  it("finds a setting by the words an owner would use", () => {
+    expect(searchSettings("tailscale")[0]?.target).toBe("setting-phone");
+    expect(searchSettings("dark")[0]?.target).toBe("setting-look");
+    expect(searchSettings("rpc")[0]?.target).toBe("setting-networks");
+    expect(searchSettings("private key")[0]?.target).toBe("setting-keys");
+    expect(searchSettings("telegram")[0]?.section).toBe("devices");
+    expect(searchSettings("claude")[0]?.section).toBe("ai");
+    expect(searchSettings("doctor")[0]?.target).toBe("setting-checks");
     expect(searchSettings("")).toEqual([]);
-    expect(searchSettings("zzzznotasetting")).toEqual([]);
+    expect(searchSettings("zzzz")).toEqual([]);
   });
 
-  it("points every search item at a valid settings section", () => {
-    const valid = new Set<string>(SETTINGS_SECTIONS);
-    for (const item of SETTINGS_SEARCH_ITEMS) {
-      expect(valid.has(item.section)).toBe(true);
-      expect(item.targetId.length).toBeGreaterThan(0);
-    }
+  it("lands each result on its own place", () => {
+    const targets = SETTINGS_SEARCH_ITEMS.map(({ target }) => target);
+    expect(new Set(targets).size).toBe(targets.length);
   });
 });

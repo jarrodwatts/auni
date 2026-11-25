@@ -154,8 +154,8 @@ describe("auni doctor", () => {
     expect(of(findings, "brain")).toEqual([
       "note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready. You can also pick a model right in any thread.",
       // Each made ready from the web app, on any device; the command stays for this machine.
-      "fix  brain: Claude Code: sign it in from Settings → AI Brains, on any of your devices (or run `claude auth login` where Auni runs)",
-      "fix  brain: Codex: install it from Settings → AI Brains, on any of your devices (or run `npm install -g @openai/codex` where Auni runs)",
+      "fix  brain: Claude Code: sign it in from Settings → Your AI, on any of your devices (or run `claude auth login` where Auni runs)",
+      "fix  brain: Codex: install it from Settings → Your AI, on any of your devices (or run `npm install -g @openai/codex` where Auni runs)",
     ]);
     expect(of(findings, "wallet")).toEqual([
       expect.stringMatching(/^ok {3}wallet: .*no wallet yet: the owner makes or brings one/u),
@@ -374,7 +374,7 @@ describe("auni doctor", () => {
         /^note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready\. You can also pick a model right in any thread\.$/u,
       ),
       "ok   brain: Claude Code, on your Claude Max plan",
-      "note brain: Codex's sign-in has expired: sign it in from Settings → AI Brains, on any of your devices (or run `codex login --device-auth` where Auni runs)",
+      "note brain: Codex's sign-in has expired: sign it in from Settings → Your AI, on any of your devices (or run `codex login --device-auth` where Auni runs)",
     ]);
   });
 

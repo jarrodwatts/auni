@@ -1,5 +1,5 @@
-import { CARD_FORMAT, RAW_TRANSACTION_TOOLS, type actionWireSchema } from "@auni/shared";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { CARD_FORMAT, RAW_TRANSACTION_TOOLS, RETRACTED, type actionWireSchema } from "@auni/shared";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { toolInput } from "../agent/tool.ts";
@@ -41,7 +41,7 @@ import {
 } from "./recipe.ts";
 import { recipeForTool, toolRecipe } from "./recipes/index.ts";
 import { Refused } from "./refused.ts";
-import { replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
+import { leftOutPermission, replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
 import { errorWords } from "../safe-words.ts";
 import { settleFromReceipts } from "./reconcile.ts";
 import {
@@ -329,7 +329,7 @@ export function approvedDetails(preview: ActionPreview): Record<string, string> 
  * from that statement once it shows there (see recordOwnFills).
  */
 export async function executeAction(actionId: string): Promise<ActionRow> {
-  const [claimed] = await step(db, "claim", eq(actions.id, actionId));
+  const claimed = await db.transaction((tx) => startRun(tx, actionId));
   if (!claimed) return requireAction(actionId);
 
   let result: ExecuteResult;
@@ -412,6 +412,51 @@ export async function executeAction(actionId: string): Promise<ActionRow> {
     console.error(`action ${actionId} finished but couldn't be marked done`, error);
     return claimed;
   }
+}
+
+/** Nothing of it has started: never claimed, never run before, nothing sent or kept to send. */
+const unstarted = (leg: ActionRow): boolean =>
+  leg.phase === "queued" && leg.startedAt === null && leg.attempts === 1 && leg.txs.length === 0;
+
+/**
+ * The one place a run starts: claims a queued move, with every leg of its plan locked, so no two
+ * legs start, or are stopped, at once. A move the owner allowed on a card drawn before cards said
+ * all they say now, which didn't show a permission it leaves (leftOutPermission), is taken back
+ * instead, with every leg of its plan, while none has started; its thread is woken in the same
+ * write, so Auni can put it up again. Once any leg has started, the plan runs on, so no money is
+ * left halfway. Null when it isn't queued, or was taken back.
+ */
+async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
+  const [row] = await tx
+    .select({ proposalId: actions.proposalId })
+    .from(actions)
+    .where(eq(actions.id, actionId));
+  if (!row) return null;
+  // Every leg in one lock, in one order, so two legs starting at once never wait on each other.
+  const card = await tx
+    .select()
+    .from(actions)
+    .where(row.proposalId ? eq(actions.proposalId, row.proposalId) : eq(actions.id, actionId))
+    .orderBy(actions.id)
+    .for("update");
+  if (card.every(unstarted) && leftOutPermission(card)) {
+    const [first] = await step(
+      tx,
+      "recall",
+      inArray(
+        actions.id,
+        card.map(({ id }) => id),
+      ),
+      { error: RETRACTED.unshown },
+    );
+    // Keyed as its run's end tells it (tellSettled), so the thread hears once.
+    const told = first?.threadId ? await settledOutcome(first, tx) : null;
+    if (first?.threadId && told)
+      await wakeThread(first.threadId, told.reason.slice(0, 2_000), { key: told.id, tx });
+    return null;
+  }
+  const [claimed] = await step(tx, "claim", eq(actions.id, actionId));
+  return claimed ?? null;
 }
 
 export async function actionById(actionId: string): Promise<ActionRow | null> {
@@ -616,6 +661,7 @@ async function recordLater(tx: Tx, action: ActionRow, later: readonly Later[] = 
         input: move.input,
         // The move whose card showed it, and whose tap allowed it.
         details: { after: action.id },
+        cardFormat: action.cardFormat,
       })
       .returning();
     await queueExecution(tx, rows, move.at);
@@ -645,11 +691,12 @@ export async function startProposal(executor: Executor, rows: readonly ActionRow
  */
 export async function settledOutcome(
   action: ActionRow,
+  executor: Pick<typeof db, "select"> = db,
 ): Promise<{ readonly reason: string; readonly id: string } | null> {
   if (!SETTLED.includes(action.status)) return null;
   if (!action.proposalId)
     return { reason: actionOutcome(action), id: `action-settled-${action.id}-a${action.attempts}` };
-  const legs = await proposalActions(action.proposalId);
+  const legs = await proposalActions(action.proposalId, executor);
   if (!legs.every((leg) => SETTLED.includes(leg.status))) return null;
   return {
     reason: [

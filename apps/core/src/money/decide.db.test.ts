@@ -1,3 +1,4 @@
+import { CARD_FORMAT, RETRACTED } from "@auni/shared";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -9,8 +10,8 @@ import { allowAction, allowProposal, declineAction, declineProposal } from "./de
 
 beforeEach(() => wipe(threads, actions, jobs));
 
-const statusOf = async (id: string) =>
-  (await db.select().from(actions).where(eq(actions.id, id)))[0]!.status;
+const rowOf = async (id: string) => (await db.select().from(actions).where(eq(actions.id, id)))[0]!;
+const statusOf = async (id: string) => (await rowOf(id)).status;
 
 // Found in review: a card recorded before cards said every permission a move leaves, still
 // waiting as Auni updated, could be allowed as the owner saw it, without them. Every surface
@@ -18,24 +19,46 @@ const statusOf = async (id: string) =>
 describe("a card drawn before cards said all they say now", () => {
   const PLAN = "00000000-0000-4000-8000-0000000000a2";
 
-  it("allows nothing on a lone move's tap, which a card drawn now allows", async () => {
-    const old = await insertAction({ status: "awaiting_permission", cardFormat: 1 });
+  // Found in review: the refused tap left it waiting, so a reload showed Allow on it again until
+  // the cron took it back. The tap takes it back, and its thread hears, at once.
+  it("allows nothing on a lone move's tap, and takes it back then, which a card drawn now allows", async () => {
+    const thread = await insertThread();
+    const old = await insertAction({
+      threadId: thread.id,
+      status: "awaiting_permission",
+      cardFormat: 1,
+    });
     expect(await allowAction(old.id, true)).toEqual({ kind: "out_of_date" });
-    expect(await statusOf(old.id)).toBe("awaiting_permission");
+    expect(await rowOf(old.id)).toMatchObject({ status: "retracted", error: RETRACTED.outOfDate });
+    expect((await queued("turn")).map(({ data }) => data.reason)).toEqual([
+      expect.stringContaining(`card ${old.id}`),
+    ]);
+    expect(await queued("action")).toEqual([]);
     const now = await insertAction({ status: "awaiting_permission" });
     expect((await allowAction(now.id, true)).kind).toBe("allowed");
   });
 
-  it("allows no leg of a plan with one such leg", async () => {
-    const legs = await Promise.all([
-      insertAction({ status: "awaiting_permission", proposalId: PLAN }),
-      insertAction({ status: "awaiting_permission", proposalId: PLAN, cardFormat: 1 }),
-    ]);
+  it("allows no leg of a plan with one such leg, takes every leg back then, and wakes its thread once", async () => {
+    const thread = await insertThread();
+    const legs = await Promise.all(
+      [CARD_FORMAT, 1].map((cardFormat) =>
+        insertAction({
+          threadId: thread.id,
+          status: "awaiting_permission",
+          proposalId: PLAN,
+          cardFormat,
+        }),
+      ),
+    );
     expect(await allowProposal(PLAN)).toBe("out_of_date");
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
-      "awaiting_permission",
-      "awaiting_permission",
+      "retracted",
+      "retracted",
     ]);
+    expect((await queued("turn")).map(({ data }) => data.reason)).toEqual([
+      expect.stringContaining(`card ${PLAN}`),
+    ]);
+    expect(await queued("action")).toEqual([]);
   });
 
   // Found in review: the tap took such a card back first, so the agent heard it could put the

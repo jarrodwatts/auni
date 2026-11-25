@@ -12,7 +12,8 @@ import {
 
 /**
  * Where a money action is. Cancelled: the owner declined it. Replaced: a newer card took its
- * place. Retracted: Auni took it back before any tap, for the reason RETRACTED names.
+ * place. Retracted: Auni took it back, for the reason RETRACTED names: before any tap, or allowed
+ * on a card that showed less than it grants, before anything of it started.
  */
 export const actionStatusSchema = z.enum([
   "awaiting_permission",
@@ -103,6 +104,8 @@ export const RETRACTED = {
   agent: "Taken back by Auni: it no longer fits.",
   outOfDate:
     "Out of date: Auni's cards now say more about each move. Auni will put it up again fresh if it still fits.",
+  unshown:
+    "Stopped before anything was sent: Auni's cards now say more about each move, and this card didn't show a permission it leaves. Auni will put it up again fresh if it still fits.",
 } as const;
 
 /** How a held move the owner closed reads afterwards: when its money had moved, and when nothing showed it had. */

@@ -13,9 +13,9 @@ describe("tapFailed", () => {
       message: "Core request failed with status 409",
       status: 409,
       code: "out_of_date",
-      detail: "This card is out of date. Ask Auni to put it up again.",
+      detail: "This card is out of date, so Auni took it back. Auni will put it up again fresh if it still fits.",
     });
-    expect(tapFailed(outOfDate)).toBe("This card is out of date. Ask Auni to put it up again.");
+    expect(tapFailed(outOfDate)).toBe("This card is out of date, so Auni took it back. Auni will put it up again fresh if it still fits.");
     expect(tapFailed(new CoreApiError({ message: "x", status: 502 }))).toBe(NOT_REACHED);
     expect(tapFailed(new TypeError("Failed to fetch"))).toBe(NOT_REACHED);
   });

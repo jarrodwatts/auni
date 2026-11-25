@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { actionWireSchema, HELD } from "@auni/shared";
+import { actionWireSchema, CARD_FORMAT, HELD, RETRACTED } from "@auni/shared";
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -120,6 +120,8 @@ describe("executeAction", () => {
         amountUsd: "0.00",
         input: { account: "acct" },
         details: { after: id },
+        // Its card is the one that showed it.
+        cardFormat: CARD_FORMAT,
       }),
     ]);
     // Its own job, due then, not before.
@@ -128,6 +130,79 @@ describe("executeAction", () => {
       .from(jobs)
       .where(sql`${jobs.data}->>'actionId' = ${later[0]!.id}`);
     expect(job?.runAt.getTime()).toBe(at.getTime());
+  });
+
+  // Found in review: a move the owner allowed on a card from before cards said every permission,
+  // still queued as Auni updated, ran and left a permission that card never showed.
+  describe("allowed on a card drawn before cards said all they say now", () => {
+    const LETS = {
+      label: "Lets",
+      value: "Polymarket's exchanges trade the shares in your Polymarket wallet",
+    };
+    const PLAN = "00000000-0000-4000-8000-0000000000b1";
+    // The face its app wrote, which left the permission out, as a Polymarket sale's did.
+    const old = (fields: Parameters<typeof insertAction>[0] = {}) =>
+      insertAction({ input: { usd: "10" }, cardFormat: 1, lines: [LETS], card: FACE, ...fields });
+    const wakes = async () => (await queued("turn")).map(({ data }) => data.reason);
+    beforeEach(async () => {
+      signing.options = undefined;
+      await wipe(jobs);
+    });
+
+    it("is taken back before anything is signed, and its thread is woken to put it up again", async () => {
+      const thread = await insertThread();
+      const { id } = await old({ threadId: thread.id });
+      const row = await executeAction(id);
+      expect(row).toMatchObject({ status: "retracted", error: RETRACTED.unshown, startedAt: null });
+      expect(executions).toBe(0);
+      expect(signing.options).toBeUndefined();
+      expect(await wakes()).toEqual([expect.stringContaining(RETRACTED.unshown)]);
+      // A second delivery of its job changes nothing and wakes no one again.
+      await executeAction(id);
+      expect(executions).toBe(0);
+      expect(await wakes()).toHaveLength(1);
+    });
+
+    it("runs when its card showed every permission it leaves, or leaves none, or is drawn now", async () => {
+      const shown = await old({
+        card: { ...FACE, warning: `It lets ${LETS.value} afterwards.` },
+      });
+      const plain = await old({ card: null });
+      const none = await old({ lines: [] });
+      const now = await old({ cardFormat: CARD_FORMAT });
+      for (const { id } of [shown, plain, none, now]) await executeAction(id);
+      expect(executions).toBe(4);
+    });
+
+    it("takes back the whole plan while none of it has started, waking its thread once", async () => {
+      const thread = await insertThread();
+      const legs = [
+        await old({ threadId: thread.id, proposalId: PLAN, lines: [] }),
+        await old({ threadId: thread.id, proposalId: PLAN }),
+      ];
+      // The first stage's leg grants nothing itself; the plan's card still left the sale's out.
+      await Promise.all(legs.map(({ id }) => executeAction(id)));
+      expect(executions).toBe(0);
+      for (const { id } of legs)
+        expect(await actionRow(id)).toMatchObject({
+          status: "retracted",
+          error: RETRACTED.unshown,
+        });
+      expect(await wakes()).toEqual([expect.stringContaining(`Every leg of proposal ${PLAN}`)]);
+    });
+
+    it("runs on once any leg of its plan has started, so no money is left halfway", async () => {
+      await old({
+        proposalId: PLAN,
+        lines: [],
+        status: "done",
+        startedAt: new Date(),
+        txs: [{ chain: "polygon", hash: "0xbridge" }],
+      });
+      const sale = await old({ proposalId: PLAN });
+      expect(await executeAction(sale.id)).toMatchObject({ status: "done" });
+      expect(executions).toBe(1);
+    });
   });
 
   // A done move reads as money moved everywhere (a specialist's moves, the activity).
@@ -406,10 +481,7 @@ describe("recordActions", () => {
       lookup.recipe = buy;
     }
     expect(
-      await db
-        .select({ threadId: fills.threadId })
-        .from(fills)
-        .where(eq(fills.actionId, id)),
+      await db.select({ threadId: fills.threadId }).from(fills).where(eq(fills.actionId, id)),
     ).toEqual([{ threadId: ai.id }]);
     const [after] = await db.select().from(threads).where(eq(threads.id, ai.id));
     expect(after?.budgetUsd).toBe("60.00");

@@ -135,6 +135,32 @@ describe("drawCard", () => {
     );
   });
 
+  it("says once why a plan was taken back, even one too long to show whole, and offers no tap", () => {
+    const why = "Out of date: Auni's cards now say more about each move.";
+    const plan = (length: number) =>
+      Array.from({ length }, (_, index) =>
+        leg({
+          id: `a${index}`,
+          summary: `Sell ${index + 1} Yes shares`,
+          lines: [{ label: "Lets", value: "Polymarket's exchanges trade your shares. ".repeat(4) }],
+        }),
+      );
+    const takenBack = (legs: ActionRow[]) =>
+      legs.map((each) => ({ ...each, status: "retracted" as const, error: why }));
+    // Twelve fit while they wait, and still do taken back, saying why once.
+    expect(fitsHere(plan(12))).toBe(true);
+    const twelve = drawCard(view(takenBack(plan(12))), null);
+    expect(twelve.text).toMatch(
+      new RegExp(`^\\*\\*A plan of 12 moves\\*\\*\\n${why}\\n1\\. Sell 1 Yes shares\\n`, "u"),
+    );
+    expect(twelve.text.split(why)).toHaveLength(2);
+    expect(twelve.buttons).toBeUndefined();
+    // Too long to show whole, it still says why.
+    expect(drawCard(view(takenBack(plan(30))), null)).toEqual({
+      text: `**A plan of 30 moves**\n${why}`,
+    });
+  });
+
   it("says, while a plan waits, that a trade behind its money moves is priced again then", () => {
     const bridge = leg({
       id: "a1",

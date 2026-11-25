@@ -31,6 +31,7 @@ import {
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
+import { takeBackStale } from "../money/waiting.ts";
 import {
   hashOf,
   legsDigest,
@@ -255,7 +256,7 @@ const TYPING_MOST_MS = 3 * 60_000;
  * next message from the chat app is read meanwhile.
  */
 async function typingWhileAnswering(found: Found, chat: string, threadId: string): Promise<void> {
-  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until; ) {
+  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until;) {
     await found.channel.typing(chat).catch(() => undefined);
     await sleep(TYPING_SHOWS_MS);
     const thread = await threadById(threadId).catch(() => undefined);
@@ -377,7 +378,10 @@ async function allowed(
     return { won: true, answer: "Allowed." };
   }
   // Said before asking for money a plan that can never run would need.
-  if (outOfDate(legs)) return OUT_OF_DATE_DECIDED;
+  if (outOfDate(legs)) {
+    await takeBackStale();
+    return OUT_OF_DATE_DECIDED;
+  }
   const waiting = legs.filter((leg) => leg.status === "awaiting_permission");
   if ((await Promise.all(waiting.map((leg) => needsStepUp(leg)))).some(Boolean)) return TAKES_PROOF;
   // As the web app's card does, a plan short of cash asks for it before it runs.

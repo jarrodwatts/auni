@@ -417,7 +417,8 @@ describe("approving a card", () => {
     expect(
       await press({ from: OWNER }, await messageIdOf(action.id), `allow:${grantOnCard()}`),
     ).toBe(OUT_OF_DATE);
-    expect(await statusOf(action.id)).toBe("awaiting_permission");
+    // Taken back in the same press, so no surface shows it waiting to be allowed again.
+    expect(await statusOf(action.id)).toBe("retracted");
     expect(signer.calls).toBe(0);
   });
 
@@ -778,9 +779,10 @@ describe("approving a plan", () => {
     expect(await press({ from: OWNER }, await planMessage(), `allow:${grantOnCard()}`)).toBe(
       OUT_OF_DATE,
     );
+    // Taken back in the same press, so no surface shows it waiting to be allowed again.
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
-      "awaiting_permission",
-      "awaiting_permission",
+      "retracted",
+      "retracted",
     ]);
     expect(signer.calls).toBe(0);
   });

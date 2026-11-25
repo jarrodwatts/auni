@@ -29,6 +29,9 @@ import { actions, type ActionRow } from "../db/schema.ts";
  *          |- skip --> failed      the proposal job, for a leg whose money never came; an
  *          |                       allowed ask that no longer applies
  *          |- apply -> done        the Allow that decides an ask, in its own transaction
+ *          |- recall -> retracted  the action job, in place of its claim: allowed on a card from
+ *          |                       before (CARD_FORMAT) that didn't show a permission it leaves,
+ *          |                       with every leg of its plan, while none has started (startRun)
  *          '- claim -> sending     the action job, once (executeAction)
  *               |- finish -> done        the run
  *               |- fail ---> failed      the run, when nothing moved
@@ -80,6 +83,7 @@ export const STEPS = {
   decline: { from: ["awaiting_permission"], to: "cancelled" },
   replace: { from: ["awaiting_permission"], to: "replaced" },
   retract: { from: ["awaiting_permission"], to: "retracted" },
+  recall: { from: ["queued"], to: "retracted" },
   claim: { from: ["queued"], to: "sending", also: { startedAt: now } },
   skip: { from: ["queued"], to: "failed" },
   apply: { from: ["queued"], to: "done" },

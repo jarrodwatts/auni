@@ -87,11 +87,12 @@ function wholeCard(legs: readonly ActionRow[]): string[] {
     ];
   // A trade waiting on the plan's money moves is priced again when its turn comes, said before the tap.
   const later = waiting.length > 0 ? pricedLater(legs) : null;
+  const together = planHead(legs).length > 1;
   return [
-    `**A plan of ${legs.length} moves, one tap for all of them**`,
+    ...planHead(legs),
     // Each leg's permissions too, as a lone move's lines say them, since Allow here grants them.
     ...legs.flatMap((leg, index) => [
-      `${index + 1}. ${literal(leg.summary)}: ${legStatus(leg)}`,
+      `${index + 1}. ${literal(leg.summary)}${together ? "" : `: ${legStatus(leg)}`}`,
       ...leg.lines
         .filter(({ label }) => label === LINES.lets)
         .map((line) => `${literal(line.label)}: ${literal(line.value)}`),
@@ -99,6 +100,18 @@ function wholeCard(legs: readonly ActionRow[]): string[] {
     ...said,
     ...(later ? [literal(later)] : []),
   ];
+}
+
+/**
+ * What says what a plan is and where it stands, which one too long to show whole keeps: one tap
+ * for all of its moves while it waits, and after, where every move stands when all stand alike
+ * (taken back together, say), said once rather than on each.
+ */
+function planHead(legs: readonly ActionRow[]): string[] {
+  if (waitingOn(legs)) return [`**A plan of ${legs.length} moves, one tap for all of them**`];
+  const [first, ...rest] = legs.map(legStatus);
+  const alike = first !== undefined && rest.every((status) => status === first);
+  return [`**A plan of ${legs.length} moves**`, ...(alike ? [first] : [])];
 }
 
 /** Whether every word of the card fits its one message; one that doesn't is decided in the app. */
@@ -116,7 +129,11 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   const full = wholeCard(legs);
   const whole = fitsHere(legs);
   // Too long, it keeps what says what the card is and where it stands.
-  const body = whole ? full : legs.length === 1 && only ? [full[0]!, legStatus(only)] : [full[0]!];
+  const body = whole
+    ? full
+    : legs.length === 1 && only
+      ? [full[0]!, legStatus(only)]
+      : planHead(legs);
   const said = waiting
     ? view.inTheApp
       ? [

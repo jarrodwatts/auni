@@ -9,7 +9,7 @@ import { PICKS, stagedLeg } from "../money/proposal-order.ts";
 import { advanceProposal, stalledProposals } from "../money/proposal-run.ts";
 import { markCrashed, requireAction, settleLanding } from "../money/record.ts";
 import { reconcileStuckActions } from "../money/reconcile.ts";
-import { retractStale } from "../money/waiting.ts";
+import { takeBackStale } from "../money/waiting.ts";
 import { actionKind, landingKind, proposalKind, wakeThread } from "./kinds.ts";
 import { defineJob, jobKind, type Executor } from "./queue.ts";
 
@@ -104,7 +104,7 @@ export const staleCardsJob = defineJob({
   kind: jobKind("stale-cards", z.object({})),
   every: 10 * 60_000,
   run: async () => {
-    for (const threadId of await db.transaction(retractStale)) await publishThread(threadId);
+    await takeBackStale();
   },
 });
 

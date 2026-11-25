@@ -6,6 +6,7 @@ import { db } from "../db/client.ts";
 import { actions, type ActionRow } from "../db/schema.ts";
 import { actionById, decideActions, proposalActions } from "./actions.ts";
 import { stepUpRefusal } from "./step-up.ts";
+import { takeBackStale } from "./waiting.ts";
 
 // The owner's Allow and Decline, whichever app their tap came from: the web app's routes
 // (money/routes.ts) and every channel (channels/hub.ts) decide a card only through here, so one
@@ -14,13 +15,15 @@ import { stepUpRefusal } from "./step-up.ts";
 // transaction that decides it.
 
 /** What the owner is told of a card drawn before cards said all they say now. */
-export const OUT_OF_DATE = "This card is out of date. Ask Auni to put it up again.";
+export const OUT_OF_DATE =
+  "This card is out of date, so Auni took it back. Auni will put it up again fresh if it still fits.";
 
 /**
  * Whether any waiting money card here was drawn before cards said all they say now (see
  * CARD_FORMAT): the owner saw less than a card says today, so a tap on it allows nothing. An ask's
  * card says what it changes in Auni, which no format has changed. Such a plan asks for no money
- * either, since it can never run.
+ * either, since it can never run. The tap takes it back, with every card that can no longer be
+ * allowed as shown (takeBackStale), so its thread is woken and a reload never shows it waiting.
  */
 export function outOfDate(rows: readonly ActionRow[]): boolean {
   return rows.some(
@@ -47,7 +50,10 @@ type Allowed =
 export async function allowAction(actionId: string, ownerHere = false): Promise<Allowed> {
   const waiting = await actionById(actionId);
   if (waiting?.tool === "request_secret") return { kind: "in_its_field" };
-  if (waiting && outOfDate([waiting])) return { kind: "out_of_date" };
+  if (waiting && outOfDate([waiting])) {
+    await takeBackStale();
+    return { kind: "out_of_date" };
+  }
   if (waiting?.status === "awaiting_permission") {
     const refusal = await stepUpRefusal(waiting, ownerHere);
     if (refusal) return { kind: "refused", reason: refusal };
@@ -67,7 +73,10 @@ export async function declineAction(actionId: string): Promise<ActionRow | null>
  * "out_of_date" for a card drawn before cards said all they say now, which allows none.
  */
 export async function allowProposal(proposalId: string): Promise<ActionRow[] | "out_of_date"> {
-  if (outOfDate(await proposalActions(proposalId))) return "out_of_date";
+  if (outOfDate(await proposalActions(proposalId))) {
+    await takeBackStale();
+    return "out_of_date";
+  }
   return decideActions({ proposalId }, "allow");
 }
 

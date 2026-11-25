@@ -9,7 +9,8 @@ import { useConversationLaunch } from "@/components/app/conversation-launch-cont
 import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
 import { useThreads } from "@/components/app/use-threads";
 import { START_FAILURE } from "@/components/app/thread-failure";
-import { useFinishFirstRun } from "@/components/first-run/finish";
+import { startInOrder } from "@/components/app/start-in-order";
+import { useFirstTake } from "@/components/first-run/finish";
 import { isModifiedClick } from "@/components/places/open-place";
 import { startChat, threadHref, type StartChatOptions } from "@/lib/data/places";
 import { threadSession } from "@/lib/data/thread-session";
@@ -28,7 +29,7 @@ export function useStartConversation() {
   const { begin, cancel, continueToThread, launch } = useConversationLaunch();
   const [error, setError] = useState<string | null>(null);
   const [, startNavigation] = useTransition();
-  const finishFirstRun = useFinishFirstRun();
+  const { finish: finishFirstRun, welcome } = useFirstTake();
   const start = useCallback(
     async (prompt: string, carried?: CarriedTake, options?: StartChatOptions): Promise<void> => {
       const content = prompt.trim();
@@ -43,38 +44,54 @@ export function useStartConversation() {
       const started = begin(content, carried, composerFromTop);
       if (!started) return;
 
-      try {
+      await startInOrder({
         // The owner's first take finishes first run as it goes (core makes their wallet).
-        await finishFirstRun();
-        const thread = await startChat(content, options);
-        rememberThread(thread);
-        continueToThread(started.id, thread);
-        // The tab's session sends it, so navigating can't cut it off.
-        void threadSession(thread.id, { isNew: true }).send(content, {
-          id: started.messageId,
-          sentAt: started.startedAt,
-        });
-        const href = threadHref(thread);
-        router.prefetch(href);
-        await carried?.landed;
-        // The blank thread this started from becomes the conversation, so Back skips it;
-        // started from anywhere else, Back returns there.
-        startNavigation(() => (pathname === "/app/new" ? router.replace(href) : router.push(href)));
-      } catch {
-        await carried?.landed;
-        cancel(started.id);
-        // Asked in the new thread's own box: the reason shows under it.
-        if (pathname === "/app/new") {
-          setError(START_FAILURE);
-          return;
-        }
-        // Asked from elsewhere (search), so the words go into the new thread's box with the reason.
-        toast.error(START_FAILURE);
-        if (pathname !== "/app/new") router.push("/app/new");
-        requestComposerFocus("new", content);
-      }
+        finishFirstRun,
+        createChat: () => startChat(content, options),
+        welcome,
+        open: async (thread) => {
+          rememberThread(thread);
+          continueToThread(started.id, thread);
+          // The tab's session sends it, so navigating can't cut it off.
+          void threadSession(thread.id, { isNew: true }).send(content, {
+            id: started.messageId,
+            sentAt: started.startedAt,
+          });
+          const href = threadHref(thread);
+          router.prefetch(href);
+          await carried?.landed;
+          // The blank thread this started from becomes the conversation, so Back skips it;
+          // started from anywhere else, Back returns there.
+          startNavigation(() =>
+            pathname === "/app/new" ? router.replace(href) : router.push(href),
+          );
+        },
+        giveBack: async () => {
+          await carried?.landed;
+          cancel(started.id);
+          // Asked in a new chat's own box, the reason shows under it; asked from elsewhere
+          // (search), it goes to a new chat's box, and the reason with it.
+          if (pathname === "/app/new") setError(START_FAILURE);
+          else {
+            toast.error(START_FAILURE);
+            router.push("/app/new");
+          }
+          // Either way the words are back in that box, never lost to a failed start.
+          requestComposerFocus("new", content);
+        },
+      });
     },
-    [begin, cancel, continueToThread, finishFirstRun, launch, pathname, rememberThread, router],
+    [
+      begin,
+      cancel,
+      continueToThread,
+      finishFirstRun,
+      launch,
+      pathname,
+      rememberThread,
+      router,
+      welcome,
+    ],
   );
 
   return { busy: launch !== null, error, start } as const;

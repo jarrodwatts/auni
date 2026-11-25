@@ -192,10 +192,13 @@ const OPEN_RECEIPT: Opener = {
 };
 
 /** What core answers a browser that isn't let in, by the picture it makes: null is no answer. */
-const CORE_ANSWERS: Record<string, { status: number; error: string } | null> = {
+const CORE_ANSWERS: Record<string, { status: number; body: Record<string, string> } | null> = {
   "gate-starting": null,
-  "gate-database": { status: 503, error: "database_unreachable" },
-  "gate-tailscale-only": { status: 401, error: "tailscale_owner_only" },
+  "gate-database": { status: 503, body: { error: "database_unreachable" } },
+  "gate-tailscale-only": {
+    status: 401,
+    body: { error: "tailscale_owner_only", at: "https://evo-t1.tailnet-example.ts.net" },
+  },
 };
 
 /** A page whose every request to core gets `answer`, or never reaches it. */
@@ -206,7 +209,7 @@ const answerCore = (answer: (typeof CORE_ANSWERS)[string]) => `(() => {
     if (!new URL(url, location.href).pathname.startsWith("/core/")) return real(input, init);
     const answer = ${JSON.stringify(answer)};
     if (!answer) return Promise.reject(new TypeError("Failed to fetch"));
-    return Promise.resolve(new Response(JSON.stringify({ error: answer.error }), {
+    return Promise.resolve(new Response(JSON.stringify(answer.body), {
       status: answer.status,
       headers: { "content-type": "application/json" },
     }));

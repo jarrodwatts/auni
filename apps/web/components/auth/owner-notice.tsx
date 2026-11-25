@@ -3,15 +3,19 @@
 import { Button } from "@/components/ui/button";
 import { useRemoteMachine } from "@/lib/where-auni-runs";
 
-import { DoctorSteps, GateScreen, PairSteps } from "./gate-screen";
+import type { OwnerState } from "./owner-provider";
+import { DoctorSteps, GateScreen, PairSteps, TailnetSteps } from "./gate-screen";
 
 /** Why core won't open the app to this browser, or can't yet; each re-read by itself. */
-type Reason = "unpaired" | "link-used" | "tailscale-only" | "database";
+type Refusal = Extract<
+  OwnerState,
+  { readonly status: "unpaired" | "link-used" | "tailscale-only" | "database" }
+>;
 
 /** What a browser sees when it isn't the owner's, or Auni can't answer, and the way on. */
-export function OwnerNotice({ reason }: { readonly reason: Reason }) {
+export function OwnerNotice({ refusal }: { readonly refusal: Refusal }) {
   const machine = useRemoteMachine();
-  switch (reason) {
+  switch (refusal.status) {
     case "unpaired":
       return (
         <GateScreen
@@ -39,8 +43,10 @@ export function OwnerNotice({ reason }: { readonly reason: Reason }) {
         <GateScreen
           pose="listening"
           title="Open Auni through Tailscale"
-          body={`${machine ? `Auni on ${machine}` : "This Auni"} only opens with your Tailscale login, from your phone or another computer.`}
-        />
+          body={`${machine ? `Auni on ${machine}` : "This Auni"} stays on for you, and opens only at its Tailscale address.`}
+        >
+          <TailnetSteps at={refusal.at} />
+        </GateScreen>
       );
     case "database":
       return (
@@ -48,7 +54,7 @@ export function OwnerNotice({ reason }: { readonly reason: Reason }) {
           pose="sad"
           waiting
           title="Auni can't reach its database"
-          body="Your wallet is untouched, and no moves can run while it's down."
+          body="Auni can't start any move while it's down. Orders already waiting in your apps, like a stop-loss, can still fill there."
         >
           <DoctorSteps
             machine={machine}

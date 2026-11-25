@@ -21,6 +21,6 @@ export function OwnerGate({ children }: { readonly children: (owner: Me) => Reac
     case "handed-over":
       return <HandedOverNotice to={state.to} machine={state.machine} />;
     default:
-      return <OwnerNotice reason={state.status} />;
+      return <OwnerNotice refusal={state} />;
   }
 }

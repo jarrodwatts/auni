@@ -51,4 +51,4 @@ export const HISTORY_FAILURE: ThreadFailure = {
   action: "reload",
 };
 
-export const START_FAILURE = "Couldn't start this chat, so nothing was sent. Try again.";
+export const START_FAILURE = "Auni couldn't start this chat. Your words are back in the box to send again.";

@@ -29,8 +29,11 @@ export type OwnerState =
   | { readonly status: "paired"; readonly owner: Me }
   /** No session, and no link brought one. */
   | { readonly status: "unpaired" }
-  /** Always on: core opens only to its owner's Tailscale login, and this request wasn't that. */
-  | { readonly status: "tailscale-only" }
+  /**
+   * Always on: core opens only to its owner's Tailscale login, and this request wasn't that.
+   * `at` is the tailnet address it opens at, as core said.
+   */
+  | { readonly status: "tailscale-only"; readonly at: string | null }
   /** The link's code was refused: used already, or past its 15 minutes. */
   | { readonly status: "link-used" }
   /** No core answers yet; read again every few seconds. */
@@ -99,7 +102,7 @@ export function OwnerProvider({ children }: { readonly children: ReactNode }) {
       } catch (error) {
         if (!current) return;
         const refused = refusedAs(error, spent === "refused");
-        if (refused) return setState({ status: refused });
+        if (refused) return setState(refused);
         if (error instanceof CoreApiError && error.code === "handed_over") {
           const went = await handedOverTo();
           if (current && went)

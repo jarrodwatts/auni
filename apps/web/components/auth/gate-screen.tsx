@@ -1,4 +1,4 @@
-import { Link2, RefreshCw, TerminalSquare } from "lucide-react";
+import { Link2, RefreshCw, Smartphone, TerminalSquare, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Mascot, type MascotState } from "@/components/brand/mascot";
@@ -124,12 +124,14 @@ function Step({
 export function DoctorSteps({
   machine,
   then,
+  className,
 }: {
   readonly machine: string | null;
   readonly then: string;
+  readonly className?: string;
 }) {
   return (
-    <ol className="flex flex-col">
+    <ol className={cn("flex flex-col", className)}>
       <Step
         icon={<TerminalSquare />}
         title={`Check status ${machine ? `on ${machine}` : "in your terminal"}`}
@@ -138,6 +140,25 @@ export function DoctorSteps({
       </Step>
       <Step icon={<RefreshCw />} title="Leave this page open" last>
         <p className="mt-0.5 text-meta text-muted-foreground">{then}</p>
+      </Step>
+    </ol>
+  );
+}
+
+/**
+ * Always on, Auni opens only at its tailnet address (`at`, as core said it), to the owner's
+ * Tailscale login, from another of their devices: never from the machine it runs on.
+ */
+export function TailnetSteps({ at }: { readonly at: string | null }) {
+  return (
+    <ol className="flex flex-col">
+      <Step icon={<Smartphone />} title="Open it on your phone or another computer">
+        {at ? <CopyLine value={at} className="mt-2" /> : null}
+      </Step>
+      <Step icon={<UserRound />} title="Signed in to your Tailscale account" last>
+        <p className="mt-0.5 text-meta text-muted-foreground">
+          That login is how Auni knows it&apos;s you, so there&apos;s nothing to pair.
+        </p>
       </Step>
     </ol>
   );

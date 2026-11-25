@@ -1,6 +1,9 @@
 "use client";
 
+import { LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import { LiveElapsed } from "@/components/conversation/live-elapsed";
 
 import { useRemoteMachine } from "@/lib/where-auni-runs";
 
@@ -18,6 +21,8 @@ const SLOW_MS = 75_000;
 export function Waking({ step = "opening" }: { readonly step?: "opening" | "starting" }) {
   const machine = useRemoteMachine();
   const on = machine ? ` on ${machine}` : "";
+  // From the first wait: the page asking who this is becomes the start's own wait in place.
+  const [since] = useState(() => new Date().toISOString());
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     if (step !== "starting") return undefined;
@@ -38,8 +43,18 @@ export function Waking({ step = "opening" }: { readonly step?: "opening" | "star
           : "This page opens automatically when Auni is ready. A first start takes about a minute."
       }
     >
+      {/* What the page waits on, and for how long, so a slow start never looks frozen. */}
+      <p className="flex items-center justify-center gap-2 text-meta text-muted-foreground">
+        <LoaderCircle aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
+        <span>Waiting for Auni to answer</span>
+        <LiveElapsed startedAt={since} className="text-ink-soft" />
+      </p>
       {slow ? (
-        <DoctorSteps machine={machine} then="Auni opens automatically once it's running." />
+        <DoctorSteps
+          machine={machine}
+          then="Auni opens automatically once it's running."
+          className="mt-6"
+        />
       ) : null}
     </GateScreen>
   );

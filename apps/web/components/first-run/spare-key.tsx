@@ -96,7 +96,7 @@ export function SpareKey() {
     try {
       await save.mutateAsync({ path: "setup/backup/later" });
     } catch {
-      setError("Couldn't reach Auni. Nothing changed. Try again.");
+      setError("That didn't reach me. Nothing changed, so try again.");
     }
   };
 
@@ -113,7 +113,7 @@ export function SpareKey() {
         // So the tab the pairing link opens comes back to this chat (lib/terminal-trip.ts).
         noteTerminalTrip(window.location.pathname + window.location.search);
         setStage({ kind: "pair-again" });
-      } else setError("Couldn't reach Auni. No keys were shown. Try again.");
+      } else setError("That didn't reach me. No keys were shown, so try again.");
     } finally {
       setRevealing(false);
     }
@@ -148,7 +148,7 @@ export function SpareKey() {
       await save.mutateAsync({ path: "setup/backup" });
       setStage({ kind: "saved" });
     } catch {
-      setError("Couldn't reach Auni. Your keys are still shown here. Try again.");
+      setError("That didn't reach me. Your keys are still here, so try again.");
     }
   };
 
@@ -156,7 +156,7 @@ export function SpareKey() {
     return (
       <p className={styles.keySaved} role="status">
         <Check aria-hidden className="size-4" />
-        Backup saved. You can view your keys anytime in Settings.
+        Saved. You can see your keys again any time in Settings.
       </p>
     );
 
@@ -164,7 +164,7 @@ export function SpareKey() {
     <section
       ref={card}
       className={styles.key}
-      aria-label="Back up your wallet"
+      aria-label="Your spare key"
       data-showing={showing || undefined}
     >
       <NotLooking
@@ -180,14 +180,14 @@ export function SpareKey() {
             ? "Your wallet keys"
             : stage.kind === "pair-again"
               ? "Confirm it's you"
-              : "Back up your wallet"}
+              : "Your money's worth a spare key"}
         </h2>
         <p className={styles.keyLine}>
           {showing
-            ? "Store these in your password manager. Anyone with them can move all your funds."
+            ? "Keep them with your passwords. Anyone who has them can move all your money."
             : stage.kind === "pair-again"
-              ? "Run this in your terminal and open the link it prints. Your keys will appear right here."
-              : "Save your wallet keys now. If you lose this computer, they're the only way to recover your funds."}
+              ? "Run this in your terminal and open the link it prints. I'll show your keys right here."
+              : "Let me show you your wallet's keys. If this computer is ever lost, they get your money back."}
         </p>
         {showing ? (
           <>

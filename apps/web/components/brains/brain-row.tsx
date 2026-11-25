@@ -199,11 +199,14 @@ function shortUrl(url: string): string {
   return `${host}${pathname === "/" ? "" : pathname}${search ? "…" : ""}`;
 }
 
-/** Codex's device sign-in: the page to open on any device, and the code to enter there. */
+/**
+ * Codex's device sign-in: the page to open on any device, and the code to enter there. Two steps
+ * split by a hairline inside the row's own card, so only the code sits in a box of its own.
+ */
 function CodeSteps({ view }: { readonly view: Extract<SignInView, { kind: "code" }> }) {
   return (
-    <ol className="flex flex-col gap-2.5">
-      <li className="flex items-center gap-3 rounded-control bg-surface py-2 pr-2 pl-3.5">
+    <ol className="divide-y divide-border border-t border-border">
+      <li className="flex items-center gap-3 py-3">
         <Step n={1} />
         <span className="min-w-0 flex-1">
           <span className="block text-ui font-medium text-ink">Open this page</span>
@@ -221,13 +224,13 @@ function CodeSteps({ view }: { readonly view: Extract<SignInView, { kind: "code"
           <ArrowUpRight aria-hidden className="size-3.5" strokeWidth={2.4} />
         </a>
       </li>
-      <li className="flex items-start gap-3 rounded-control bg-surface py-2.5 pr-2 pl-3.5">
+      <li className="flex items-start gap-3 pt-3">
         <Step n={2} />
         <span className="min-w-0 flex-1">
-          <span className="block text-ui font-medium text-ink">Enter this code</span>
+          <span className="block text-ui font-medium text-ink">Enter this code there</span>
           <CopyLine
             value={view.code}
-            className="mt-1.5 [&_code]:text-reading [&_code]:tracking-[0.12em] [&>div]:bg-card"
+            className="mt-1.5 [&_code]:text-reading [&_code]:tracking-[0.12em]"
           />
         </span>
       </li>
@@ -239,7 +242,7 @@ function Step({ n }: { readonly n: number }) {
   return (
     <span
       aria-hidden
-      className="grid size-6 flex-none place-items-center rounded-full bg-card text-caption font-semibold text-muted-foreground"
+      className="grid size-6 flex-none place-items-center rounded-full bg-surface text-caption font-semibold text-muted-foreground tabular-nums"
     >
       {n}
     </span>

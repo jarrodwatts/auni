@@ -1,13 +1,12 @@
 "use client";
 
 import type { BrainsWire } from "@auni/shared";
-import { ArrowRight, Laptop, LockKeyhole } from "lucide-react";
+import { ArrowRight, Laptop, LockKeyhole, MessageSquareText } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { AppMark } from "@/components/apps/app-mark";
 import { BrainRow } from "@/components/brains/brain-row";
 import { Mascot } from "@/components/brand/mascot";
-import { MascotArt } from "@/components/brand/mascot-art";
 
 /**
  * First run when no AI can think yet, the one thing that stops it: what Auni thinks with, a tiny
@@ -83,9 +82,8 @@ function LoginStaysHere({
         </Frame>
         <Arrow at={3} />
         <Frame at={4} label="Auni asks it to think">
-          <span className="block size-11">
-            <MascotArt />
-          </span>
+          {/* Auni is the one above the title: the scene shows it at work, not a second time. */}
+          <MessageSquareText aria-hidden className="size-10 text-ink" strokeWidth={1.4} />
         </Frame>
       </ol>
       <figcaption className="mt-3 text-center text-meta text-muted-foreground">
@@ -112,9 +110,7 @@ function Frame({
       className="auni-stagger-in flex min-w-0 flex-col items-center gap-2 text-center"
       style={{ animationDelay: `${200 + at * STEP_MS}ms` }}
     >
-      <span className="grid h-12 place-items-center">
-        {children}
-      </span>
+      <span className="grid h-12 place-items-center">{children}</span>
       <span className="text-meta text-pretty text-ink-soft">{label}</span>
     </li>
   );

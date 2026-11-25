@@ -1,30 +1,30 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import { useOwner } from "@/components/auth/owner-provider";
-import { ME_KEY } from "@/components/personalization/use-me";
-import { getMe } from "@/lib/data/me";
 import { useSetupStep } from "@/lib/data/setup";
 
-import { useFirstRun } from "./use-first-run";
-
 /**
- * Finishes first run as the owner's first take is sent: core makes the wallet they didn't bring
- * and marks them welcomed, then the app opens around the take as the owner's. Does nothing once
- * first run is over. Throws when core didn't take it, so the take stays in its box to send again.
+ * First run's two parts in sending the owner's first take (see startInOrder). Before its chat
+ * starts, core makes the wallet they didn't bring and marks them welcomed (again on a retry,
+ * which keeps what the first try made). Once the chat is there, the app opens around it as the
+ * owner's. Both do nothing once first run is over.
  */
-export function useFinishFirstRun(): () => Promise<void> {
-  const firstRun = useFirstRun();
+export function useFirstTake(): {
+  readonly finish: () => Promise<void>;
+  readonly welcome: () => void;
+} {
+  const { state, setOwner } = useOwner();
   const { mutateAsync } = useSetupStep();
-  const { setOwner } = useOwner();
-  const queryClient = useQueryClient();
-  return useCallback(async () => {
-    if (!firstRun) return;
-    await mutateAsync({ path: "setup/done" });
-    const owner = await getMe();
-    queryClient.setQueryData(ME_KEY, owner);
-    setOwner(owner);
-  }, [firstRun, mutateAsync, queryClient, setOwner]);
+  const owner = state.status === "paired" && !state.owner.welcomed ? state.owner : null;
+  const finish = useCallback(async () => {
+    if (owner) await mutateAsync({ path: "setup/done" });
+  }, [owner, mutateAsync]);
+  // The rest of what /setup/done changed (the wallet's addresses) reaches the owner's one copy
+  // by the live "me" topic it publishes.
+  const welcome = useCallback(() => {
+    if (owner) setOwner({ ...owner, welcomed: true });
+  }, [owner, setOwner]);
+  return { finish, welcome };
 }

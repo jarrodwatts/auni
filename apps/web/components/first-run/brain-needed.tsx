@@ -68,12 +68,12 @@ export function BrainNeeded({
       </div>
       <div className={styles.brainWords}>
         {ready ? (
-          <h2 className={styles.brainTitle}>{ready.name} is ready</h2>
+          <h2 className={styles.brainTitle}>Now I can think with {ready.name}</h2>
         ) : (
           <>
-            <h2 className={styles.brainTitle}>Pick your AI</h2>
+            <h2 className={styles.brainTitle}>Lend me your AI?</h2>
             <p className={styles.brainLine}>
-              Connect your AI on {machine} and I&apos;ll pick your take right back up.
+              Set one up on {machine} below, and I&apos;ll pick your take right back up.
             </p>
             <ul className={styles.brainRows}>
               {rows.map((item) => (

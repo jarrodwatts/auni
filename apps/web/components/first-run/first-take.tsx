@@ -29,12 +29,19 @@ export function FirstTake() {
   const brains = useBrains();
   const { reach } = useMe();
   const machine = whereAuniRuns(reach);
-  const stopped = brains.data !== undefined && (nothingThinks(brains.data) || brains.data.blocked);
+  // Nothing until the brains are read, so the question never shows and then gives way to
+  // Pick your AI. Brains that can't be read leave the question: the take's chat says why.
+  const page = brains.isPending ? null : brains.data &&
+    (nothingThinks(brains.data) || brains.data.blocked) ? (
+    <PickYourAi brains={brains.data} machine={machine} />
+  ) : (
+    <Question />
+  );
 
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 pt-10 pb-4 sm:justify-center sm:px-8 sm:pb-16">
-        {stopped ? <PickYourAi brains={brains.data!} machine={machine} /> : <Question />}
+        {page}
       </div>
     </section>
   );

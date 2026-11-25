@@ -364,11 +364,13 @@ function createSession(threadId: ThreadId, isNew: boolean) {
     posting = making;
     try {
       const made = await making;
+      posting = null;
       // Kept out for the private key it held, as a send is: history brings Auni's answer.
-      if (made.keyKeptOut) {
-        unsend();
-        void resync();
-      }
+      if (made.keyKeptOut) unsend();
+      // A start asked again under the same ids gets back a chat core already had, whose turn
+      // may have ended before this tab listened: history says whether it still runs.
+      unheard = id;
+      void resync();
       return made;
     } catch (error) {
       unsend();

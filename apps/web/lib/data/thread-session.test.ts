@@ -259,6 +259,39 @@ describe("a new thread's start", () => {
     expect(posts()).toHaveLength(0);
   });
 
+  // Both answers to a start were lost, but core made the chat and answered it; the same words
+  // sent again (the same ids) get that chat back, its turn long over.
+  it("isn't left thinking when core already had the chat and its answer ended", async () => {
+    const thread = newThread();
+    const session = threadSession(thread, { isNew: true });
+    core.history = [
+      {
+        id: PROMPT,
+        role: "user",
+        parts: [{ type: "text", text: "Why did BTC fall?" }],
+        metadata: { origin: "human" },
+      },
+      {
+        id: STORED,
+        role: "assistant",
+        parts: [{ type: "text", text: "Rates rose." }],
+        metadata: { origin: "human", replyToId: PROMPT },
+      },
+    ];
+    await session.start("Why did BTC fall?", { id: PROMPT }, async () => ({ keyKeptOut: false }));
+    await vi.waitFor(() => expect(session.read().turn).toBeNull());
+    expect(textOf(thread, STORED)).toBe("Rates rose.");
+  });
+
+  it("stays thinking while core still runs its first turn", async () => {
+    const thread = newThread();
+    const session = threadSession(thread, { isNew: true });
+    core.running = true;
+    await session.start("Why did BTC fall?", { id: PROMPT }, async () => ({ keyKeptOut: false }));
+    await vi.waitFor(() => expect(reads(thread)).toBeGreaterThan(1));
+    expect(session.read().turn).toMatchObject({ id: PROMPT, sent: true });
+  });
+
   it("draws Auni's answer in place of a message kept out for the private key it held", async () => {
     const thread = newThread();
     const session = threadSession(thread, { isNew: true });

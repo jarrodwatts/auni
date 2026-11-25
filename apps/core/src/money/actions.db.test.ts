@@ -181,6 +181,9 @@ describe("executeAction", () => {
         status: "failed",
         failureKind: "unshown",
         txs: [{ hash: "0xa" }],
+        // What that try sent is on its record; nothing says its cash is where it started.
+        error:
+          "Paused before sending: its card didn't show a permission it leaves. An earlier try sent what its record shows, and nothing more went. Auni will put it up again fresh.",
       });
       expect(executions).toBe(0);
     });

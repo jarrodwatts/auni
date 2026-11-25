@@ -472,16 +472,20 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
 /**
  * What a paused leg's card says, first what stopped it, then where the cash it was to spend sits
  * now, which the moves before it may have brought there, so the agent's cut of it (settledOutcome)
- * keeps both.
+ * keeps both. Of one an earlier try sent from (a fee coin, a swap), only its record says where
+ * that went.
  */
 function pausedSaid(leg: ActionRow): string {
   const { draws } = stagedLeg(leg);
   const place =
     draws && (ledgerAt(draws) ? `${placeName(draws)} account` : `wallet on ${placeName(draws)}`);
   // The moves before it may still be landing it there: a stage starts once patience runs out.
-  const where = place
-    ? `Its ${dollars(leg.amountUsd)} is in, or on its way to, your ${place}.`
-    : "Nothing of it moved.";
+  const where =
+    leg.txs.length > 0
+      ? "An earlier try sent what its record shows, and nothing more went."
+      : place
+        ? `Its ${dollars(leg.amountUsd)} is in, or on its way to, your ${place}.`
+        : "Nothing of it moved.";
   return `Paused before sending: its card didn't show a permission it leaves. ${where} Auni will put it up again fresh.`;
 }
 

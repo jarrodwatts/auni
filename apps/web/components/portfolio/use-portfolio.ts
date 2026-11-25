@@ -13,7 +13,7 @@ import { getThreadState } from "@/lib/data/threads";
  * live read at live prices, re-reading the venues only every 15 minutes or
  * once Auni moves money, so a minute costs a price lookup, not a read of every venue.
  */
-export const MONEY_POLL_MS = 60_000;
+const MONEY_POLL_MS = 60_000;
 
 /**
  * Total account value over a range, read again as often as the money above it

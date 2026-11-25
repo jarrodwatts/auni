@@ -4,7 +4,6 @@ import { ChevronRight, Hand, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 
 import { useMoney } from "@/components/money/money-provider";
-import { Skeleton } from "@/components/ui/skeleton";
 import { APPS_HREF, NEEDS_YOU_HREF, chatHref } from "@/lib/app-links";
 import { formatUsdcBalance } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -44,7 +43,7 @@ export function askOf({ thread }: ChatPlace): string {
 
 /**
  * The places, then every chat in the one place it belongs: Needs you while something in it
- * waits on the person, Your takes while it moved money, and Chats for the rest. On a phone's
+ * waits on the person, Your takes while it holds something, and Chats for the rest. On a phone's
  * Chats page (`nav={false}`) the tab bar holds Money, Needs you and the rest, so only the chats
  * show, under one row that leads to Needs you.
  */
@@ -140,13 +139,7 @@ export function PlaceList({
                 href={chatHref(place.thread.id)}
                 thread={place.thread}
                 status={place.status}
-                detail={
-                  place.take ? (
-                    <TakeFigures take={place.take} />
-                  ) : (
-                    <Skeleton aria-hidden className="my-1 h-3 w-24 rounded-full" />
-                  )
-                }
+                detail={place.take ? <TakeFigures take={place.take} /> : null}
               />
             ))}
           </ul>

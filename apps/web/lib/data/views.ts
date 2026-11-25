@@ -60,8 +60,6 @@ export interface Thread {
   readonly watchCount: number;
   /** Completed money moves opened in this thread. */
   readonly moveCount: number;
-  /** Its own fills still hold something: a take, before its value is read; false once closed. */
-  readonly holds: boolean;
   /** Archived by the person: out of Threads, found by search, back once they or Auni say something new there. */
   readonly archived: boolean;
   readonly createdAt: string;

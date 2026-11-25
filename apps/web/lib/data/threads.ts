@@ -41,7 +41,6 @@ export function toThread(wire: ThreadWire): Thread {
     pinnedAt: wire.pinnedAt,
     watchCount: wire.watchCount,
     moveCount: wire.moveCount,
-    holds: wire.holds,
     archived: wire.archivedAt !== null,
     createdAt: wire.createdAt,
     updatedAt: wire.lastActivityAt,

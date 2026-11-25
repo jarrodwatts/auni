@@ -43,11 +43,6 @@ export const threadWireSchema = z.object({
   watchCount: z.number().int().min(0).default(0),
   /** Number of settled money moves in this thread, so the inspector knows when there is history. */
   moveCount: z.number().int().min(0).default(0),
-  /**
-   * Its own fills, by the books, still hold something: a take, known before its value is read.
-   * False for a chat that never moved money, and for a take that's closed.
-   */
-  holds: z.boolean().default(false),
   /** When the owner pinned this thread to the top of the sidebar; null otherwise. */
   pinnedAt: timestampSchema.nullable().default(null),
   /** When the owner archived it out of the sidebar; null while it is listed. */

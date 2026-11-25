@@ -45,8 +45,8 @@ network on purpose, as a later `-H` wins.
 - Tool names the web knows: `packages/shared/src/tools.ts` (an app's from `apps.generated.ts`).
 - The shell (`components/places/`): on a wide screen the sidebar (`sidebar.tsx`,
   `place-list.tsx`): New take, Money, Apps, then each chat in one place (`use-places.ts`): Needs
-  you while a card or question waits on the owner, Your takes while it holds positions (its value
-  from `use-takes.ts`), and Chats. On a phone a tab bar instead (`tab-bar.tsx`: Chats, Money,
+  you while a card or question waits on the owner, Your takes while core's `GET /takes` lists it, as
+  Money does (`use-takes.ts`), and Chats. On a phone a tab bar instead (`tab-bar.tsx`: Chats, Money,
   Needs you, More), with `/app/chats` and `/app/needs-you` as pages. A chat (`/app/chat/<id>`,
   `chat-place.tsx`) shows its take's value in its header and opens its inspector
   (`thread-inspector-pane.tsx`, `pane-sections.tsx`): positions, watches, spending, notes, moves.

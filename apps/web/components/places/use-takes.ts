@@ -1,12 +1,10 @@
 "use client";
 
 import type { ThreadId } from "@auni/shared";
-import { useQueries } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
-import { MONEY_POLL_MS } from "@/components/portfolio/use-portfolio";
-import { getThreadState } from "@/lib/data/threads";
-import type { Holding, Thread, ThreadState } from "@/lib/data/views";
+import { useTakes } from "@/components/portfolio/use-portfolio";
+import type { Holding } from "@/lib/data/views";
 
 /** What a take holds now, and how that moved over the last day. */
 export interface TakeValue {
@@ -18,8 +16,7 @@ export interface TakeValue {
 
 /**
  * A thread's holdings as one take: their value summed, and their day's change summed only when
- * every holding's is known, as a part of it would understate the move. Null when it holds nothing,
- * which is when Money stops listing it: the take is closed.
+ * every holding's is known, as a part of it would understate the move. Null when it holds nothing.
  */
 export function takeValue(holdings: readonly Holding[]): TakeValue | null {
   let value = 0n;
@@ -35,36 +32,19 @@ export function takeValue(holdings: readonly Holding[]): TakeValue | null {
 }
 
 /**
- * A chat whose own fills still hold something, which the thread list says before any value is
- * read, so a closed take is never placed as a take on load: a take until its read says it holds
- * nothing (sold outside Auni, say).
+ * Each take's worth and its day, by thread, from core's `GET /takes`: Money's one rule for what a
+ * take is, a chat whose own fills still hold something, savings among them. Undefined until it
+ * is first read; empty when that read failed, so every chat still has a place.
  */
-export const isTake = (thread: Thread) => thread.holds;
-
-/**
- * Every take's value, by thread, each from the same read as its inspector: absent until its read
- * lands, null once read when it holds nothing now. (Core's `GET /takes`, once there, answers this
- * in one read.)
- */
-export function useTakes(threads: readonly Thread[]): ReadonlyMap<ThreadId, TakeValue | null> {
-  const moved = useMemo(() => threads.filter(isTake), [threads]);
-  const combine = useCallback(
-    (states: readonly { readonly data?: ThreadState }[]) => {
-      const takes = new Map<ThreadId, TakeValue | null>();
-      moved.forEach((thread, index) => {
-        const holdings = states[index]?.data?.holdings;
-        if (holdings) takes.set(thread.id, takeValue(holdings));
-      });
-      return takes;
-    },
-    [moved],
-  );
-  return useQueries({
-    queries: moved.map((thread) => ({
-      queryKey: ["thread-state", thread.id],
-      queryFn: ({ signal }: { signal: AbortSignal }) => getThreadState(thread.id, signal),
-      refetchInterval: MONEY_POLL_MS,
-    })),
-    combine,
-  });
+export function useTakeValues(): ReadonlyMap<ThreadId, TakeValue> | undefined {
+  const { data, isError } = useTakes();
+  return useMemo(() => {
+    if (!data) return isError ? new Map() : undefined;
+    return new Map(
+      data.takes.map((take) => [
+        take.threadId,
+        { value: take.value, change: takeValue(take.holdings)?.change ?? null },
+      ]),
+    );
+  }, [data, isError]);
 }

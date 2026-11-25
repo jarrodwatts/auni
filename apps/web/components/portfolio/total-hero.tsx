@@ -17,8 +17,9 @@ import { RangePicker } from "./range-picker";
 import { useChartWindow, useLiveEnd } from "./use-chart-window";
 
 /**
- * Your money: the total with the ways in and out beside it, how far it moved
- * over the period with the period picker at its end, and its Dawn line. On a
+ * Account value: the total with the ways in and out beside it, what the holdings
+ * made over the period with the period picker at its end, and the value's Dawn
+ * line. The line rises with money put in; what was made doesn't. On a
  * phone the line runs edge to edge, the actions share a row under the move,
  * and the periods take their own row under the line. Each move over the period is a bead on
  * the line (see moveMoments), so what lifted it can be told from what was made.
@@ -58,8 +59,8 @@ export function TotalHero({
   );
 
   return (
-    <section aria-label="Your money">
-      <p className="text-meta text-muted-foreground">Your money</p>
+    <section aria-label="Account value">
+      <p className="text-meta text-muted-foreground">Account value</p>
       <div className="flex items-center justify-between gap-6">
         {shown === null ? (
           <p className="mt-2 text-ui font-normal text-muted-foreground">
@@ -91,7 +92,7 @@ export function TotalHero({
       <MoneyActions className="mt-4 grid grid-cols-2 sm:hidden" />
       <BalanceChart
         points={chart.points}
-        label="Your money"
+        label="Account value"
         height={140}
         hue={AUNI_HUE}
         onScrub={chart.setScrub}

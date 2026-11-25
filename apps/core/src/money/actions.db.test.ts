@@ -168,13 +168,21 @@ describe("executeAction", () => {
       const { id } = await old({ attempts: 2 });
       expect(await executeAction(id)).toMatchObject({ status: "retracted" });
       expect(executions).toBe(0);
-      // One whose earlier run sent its approval has granted it already, and runs on.
-      const approved = await old({
+    });
+
+    // Found in review: one whose earlier run sent only a swap first ran, granting what its card
+    // left out; what an earlier run sent never says it granted that.
+    it("pauses one tried again whose earlier run sent something", async () => {
+      const { id } = await old({
         attempts: 2,
         txs: [{ chain: "polygon", hash: "0xa", setup: true }],
       });
-      expect(await executeAction(approved.id)).toMatchObject({ status: "done" });
-      expect(executions).toBe(1);
+      expect(await executeAction(id)).toMatchObject({
+        status: "failed",
+        failureKind: "unshown",
+        txs: [{ hash: "0xa" }],
+      });
+      expect(executions).toBe(0);
     });
 
     it("runs when its card showed every permission it leaves, or leaves none, or is drawn now", async () => {
@@ -231,9 +239,10 @@ describe("executeAction", () => {
           startedAt: null,
           txs: [],
           error:
-            "Paused before sending: its card didn't show a permission it leaves. Its $25 is in your wallet on Polygon. Auni will put it up again fresh.",
+            "Paused before sending: its card didn't show a permission it leaves. Its $25 is in, or on its way to, your wallet on Polygon. Auni will put it up again fresh.",
         });
-        expect(row.error!.length).toBeLessThanOrEqual(160);
+        // The agent's cut of each leg (settledOutcome) keeps why and where its cash is.
+        expect(row.error!.indexOf("Polygon.")).toBeLessThan(160);
       } finally {
         lookup.recipe = buy;
       }
@@ -243,7 +252,7 @@ describe("executeAction", () => {
       const [wake, ...more] = await wakes();
       expect(more).toEqual([]);
       expect(wake).toContain(`Every leg of proposal ${PLAN}`);
-      expect(wake).toContain("Its $25 is in your wallet on Polygon");
+      expect(wake).toContain("Its $25 is in, or on its way to, your wallet on Polygon.");
       // Only a fresh card runs it.
       expect(await executeAction(pick.id)).toMatchObject({ status: "failed" });
       expect(executions).toBe(0);

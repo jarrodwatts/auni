@@ -106,7 +106,7 @@ describe("failedStep", () => {
 
   it("says in core's words where a paused step's cash is, and asks nothing, since Auni puts it up again", () => {
     const said =
-      "Paused before sending: its card didn't show a permission it leaves. Its $25 is in your wallet on Polygon. Auni will put it up again fresh.";
+      "Paused before sending: its card didn't show a permission it leaves. Its $25 is in, or on its way to, your wallet on Polygon. Auni will put it up again fresh.";
     const paused = failedStep(failure({ kind: "unshown", said, retryable: false }), null, true);
     expect(paused).toEqual({ reason: said, actions: [] });
     expect(needingYou([paused])).toBe(0);

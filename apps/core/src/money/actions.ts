@@ -425,8 +425,8 @@ const unstarted = (leg: ActionRow): boolean => leg.phase === "queued" && leg.txs
  * legs start, or are stopped, at once. A move the owner allowed on a card drawn before cards said
  * all they say now, which didn't show a permission it leaves (leftOutPermission), never runs:
  * while none of its plan has started, the whole card is taken back, so nothing moves for a pick
- * that won't run; once some has, only that leg is paused, its card saying where its cash now is,
- * and the rest run on. Its thread is woken in the same write once that settles every leg, keyed
+ * that won't run; once some has, that leg is paused while still queued, its card saying where
+ * its cash now is, and the rest run on. Its thread is woken in the same write once that settles every leg, keyed
  * as a run's end tells it (tellSettled), so it hears once. Null when it isn't queued, or wasn't run.
  */
 async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
@@ -444,15 +444,15 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
     .for("update");
   const leg = card.find(({ id }) => id === actionId);
   let stopped: ActionRow[] = [];
-  if (card.every(unstarted)) {
-    if (leftOutPermission(card)) {
-      const legs = inArray(
-        actions.id,
-        card.map(({ id }) => id),
-      );
-      stopped = await step(tx, "recall", legs, { error: RETRACTED.unshown });
-    }
-  } else if (leg && unstarted(leg) && leftOutPermission([leg])) {
+  if (card.every(unstarted) && leftOutPermission(card)) {
+    const legs = inArray(
+      actions.id,
+      card.map(({ id }) => id),
+    );
+    stopped = await step(tx, "recall", legs, { error: RETRACTED.unshown });
+  } else if (leg?.phase === "queued" && leftOutPermission([leg])) {
+    // Even one tried again whose first run sent something: what it sent doesn't say it granted
+    // what its card left out (a swap first, say), and pausing it moves nothing.
     stopped = await step(tx, "skip", eq(actions.id, actionId), {
       error: pausedSaid(leg),
       failureKind: "unshown",
@@ -478,8 +478,9 @@ function pausedSaid(leg: ActionRow): string {
   const { draws } = stagedLeg(leg);
   const place =
     draws && (ledgerAt(draws) ? `${placeName(draws)} account` : `wallet on ${placeName(draws)}`);
+  // The moves before it may still be landing it there: a stage starts once patience runs out.
   const where = place
-    ? `Its ${dollars(leg.amountUsd)} is in your ${place}.`
+    ? `Its ${dollars(leg.amountUsd)} is in, or on its way to, your ${place}.`
     : "Nothing of it moved.";
   return `Paused before sending: its card didn't show a permission it leaves. ${where} Auni will put it up again fresh.`;
 }

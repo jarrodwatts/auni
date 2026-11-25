@@ -629,14 +629,20 @@ async function landCards(
       );
       const [first] = onTime;
       if (!first) return card;
+      const byChain = Map.groupBy(onTime, ({ chain }) => chain);
+      const mixed = byChain.size > 1;
       changed = true;
       return {
         ...card,
         updatedAt,
         landed: {
           usdValue: centsToUsd(onTime.reduce((sum, row) => sum + absCents(row.usdValue!), 0n)),
-          network: chainName(first.chain as NetworkKey),
-          moved: moved(onTime),
+          network: mixed ? "Multiple networks" : chainName(first.chain as NetworkKey),
+          moved: mixed
+            ? [...byChain].flatMap(([chain, rows]) =>
+                moved(rows).map((item) => ({ ...item, network: chainName(chain as NetworkKey) })),
+              )
+            : moved(onTime),
         },
       };
     };

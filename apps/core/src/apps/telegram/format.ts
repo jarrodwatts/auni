@@ -14,7 +14,7 @@ function escape(text: string): string {
 }
 
 /** Markdown, as the agent writes it, in Telegram's HTML. */
-export function toHtml(markdown: string, limit = MESSAGE_CHARS): string {
+export function toHtml(markdown: string, limit = MESSAGE_CHARS, flattenQuotes = false): string {
   let room = limit - markdown.length;
   return markdown
     .split(/(```[\s\S]*?```)/u)
@@ -22,14 +22,14 @@ export function toHtml(markdown: string, limit = MESSAGE_CHARS): string {
       if (index % 2 === 1) return fenced(piece);
       const expanded = mobileTables(piece, room);
       room -= expanded.length - piece.length;
-      return blocks(expanded);
+      return blocks(expanded, flattenQuotes);
     })
     .join("");
 }
 
 /** A fold is one Telegram entity. Flatten any Markdown quotes inside it. */
-export function detailHtml(markdown: string): string {
-  return `<blockquote expandable>${inline(markdown)}</blockquote>`;
+export function detailHtml(markdown: string, limit = MESSAGE_CHARS): string {
+  return `<blockquote expandable>${toHtml(markdown, limit, true)}</blockquote>`;
 }
 
 function mobileTables(text: string, room: number): string {
@@ -63,7 +63,8 @@ function mobileTables(text: string, room: number): string {
   );
 }
 
-function blocks(text: string): string {
+function blocks(text: string, flattenQuotes: boolean): string {
+  if (flattenQuotes) text = text.replace(/^(?:> ?)+/gmu, "");
   return text
     .split(/(^> ?[^\n]*(?:\n> ?[^\n]*)*)/gmu)
     .map((piece, index) =>

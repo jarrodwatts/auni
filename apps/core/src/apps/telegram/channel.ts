@@ -47,6 +47,27 @@ export function telegramChannel(options: Options): Channel {
   let username: Promise<string> | undefined;
   let commandsFor: string | undefined;
 
+  async function editPiece(ref: string, piece: Piece, keyboard: Keyboard): Promise<boolean> {
+    const { bot, ...at } = parseRef(ref);
+    if (bot !== thisBot()) return false;
+    try {
+      await withPlainFallback(piece, (form) =>
+        api("editMessageText", {
+          ...at,
+          ...form,
+          link_preview_options: { is_disabled: true },
+          reply_markup: keyboard ?? { inline_keyboard: [] },
+        }),
+      );
+    } catch (error) {
+      if (!(error instanceof BotApiError)) throw error;
+      if (error.description.includes("message is not modified")) return true;
+      if (GONE.some((reason) => error.description.includes(reason))) return false;
+      throw error;
+    }
+    return true;
+  }
+
   return {
     configured: () => Boolean(options.token()),
 
@@ -94,11 +115,21 @@ export function telegramChannel(options: Options): Channel {
       }
     },
 
-    async send(chat, message, replyTo) {
+    async send(chat, message, replyTo, replace) {
       const { pieces, keyboard } = telegramForm(message);
       const reply = replyTo ? parseRef(replyTo) : null;
       const refs: string[] = [];
       for (const [index, piece] of pieces.entries()) {
+        const markup = index === pieces.length - 1 ? keyboard : null;
+        if (
+          index === 0 &&
+          replace &&
+          parseRef(replace).chat_id === chat &&
+          (await editPiece(replace, piece, markup))
+        ) {
+          refs.push(replace);
+          continue;
+        }
         const sent = await withPlainFallback(piece, (form) =>
           api<Message>("sendMessage", {
             chat_id: chat,
@@ -115,7 +146,7 @@ export function telegramChannel(options: Options): Channel {
                   },
                 }
               : {}),
-            ...(index === pieces.length - 1 && keyboard ? { reply_markup: keyboard } : {}),
+            ...(markup ? { reply_markup: markup } : {}),
           }),
         );
         refs.push(refOf(sent));
@@ -124,30 +155,11 @@ export function telegramChannel(options: Options): Channel {
     },
 
     async edit(ref, message) {
-      const { bot, ...at } = parseRef(ref);
-      // Sent by a bot this token isn't for, so this one can't reach it.
-      if (bot !== thisBot()) return false;
       const { pieces, keyboard } = telegramForm(message);
       const [piece] = pieces;
       if (pieces.length !== 1 || !piece)
         throw new Error("The Telegram edit must fit in one message.");
-      try {
-        await withPlainFallback(piece, (form) =>
-          api("editMessageText", {
-            ...at,
-            ...form,
-            link_preview_options: { is_disabled: true },
-            reply_markup: keyboard ?? { inline_keyboard: [] },
-          }),
-        );
-      } catch (error) {
-        if (!(error instanceof BotApiError)) throw error;
-        // Drawn the same again: it shows this already.
-        if (error.description.includes("message is not modified")) return true;
-        if (GONE.some((reason) => error.description.includes(reason))) return false;
-        throw error;
-      }
-      return true;
+      return editPiece(ref, piece, keyboard);
     },
 
     async typing(chat) {
@@ -175,10 +187,10 @@ export function telegramChannel(options: Options): Channel {
  * Telegram's own commands: /start, which its Start button and a t.me link send (the link's
  * payload after it), and /help. "@<bot>" may follow either, as Telegram's command menu adds it.
  */
-const COMMAND = /^\/(start|help|pending|portfolio)(?:@\w+)?(?:\s+(.*))?$/su;
+const COMMAND = /^\/(start|help|pending|money)(?:@\w+)?(?:\s+(.*))?$/su;
 const COMMANDS = [
   { command: "pending", description: "Cards waiting on you" },
-  { command: "portfolio", description: "Open your portfolio" },
+  { command: "money", description: "Show your cash and takes" },
   { command: "help", description: "How to talk to Auni here" },
   { command: "start", description: "Get started with Auni" },
 ];
@@ -234,7 +246,7 @@ async function handle(
       kind: "hello",
       ...sender,
       code,
-      ...(name === "pending" || name === "portfolio" ? { command: name } : {}),
+      ...(name === "pending" || name === "money" ? { command: name } : {}),
     }));
   }
   await receive({
@@ -276,9 +288,11 @@ async function withPlainFallback<Result>(
  * A message's words and its inline keyboard. Auni names the computer in the message when it
  * has no phone address. Never turn a local-only button into a link in the message.
  */
+type Keyboard = { readonly inline_keyboard: unknown[][] } | null;
+
 function telegramForm(message: ChannelMessage): {
   readonly pieces: Piece[];
-  readonly keyboard: { readonly inline_keyboard: unknown[][] } | null;
+  readonly keyboard: Keyboard;
 } {
   let localOnly = false;
   const rows = (message.buttons ?? [])
@@ -295,22 +309,45 @@ function telegramForm(message: ChannelMessage): {
     .filter((row) => row.length > 0);
   const text = localOnly ? `${message.text}\n\nOpen Auni on your computer.` : message.text;
   const detail = message.detail?.trim();
-  const pieces =
-    detail && text.length + detail.length + 2 <= MESSAGE_CHARS
-      ? [
-          {
-            text: [text, detail].filter(Boolean).join("\n\n"),
-            html: [text ? toHtml(text, MESSAGE_CHARS - detail.length - 2) : "", detailHtml(detail)]
-              .filter(Boolean)
-              .join("\n\n"),
-          },
-        ]
-      : [
-          ...chunks(text).map((piece) => ({ text: piece, html: toHtml(piece) })),
-          ...chunks(detail ?? "").map((piece) => ({ text: piece, html: detailHtml(piece) })),
-        ];
+  const available = MESSAGE_CHARS - text.trim().length - 2;
+  const thinkingRoom = Math.min(1_400, rows.length ? available : Math.max(available, 250));
+  const thinking = detail && thinkingRoom >= 60 ? trimThinking(detail, thinkingRoom) : "";
+  const answerRoom = thinking ? MESSAGE_CHARS - thinkingRoom - 2 : MESSAGE_CHARS;
+  const answer = chunks(text, answerRoom);
+  const pieces = (answer.length ? answer : thinking ? [""] : []).map((piece, index) => {
+    const html = piece ? toHtml(piece, index === 0 ? answerRoom : MESSAGE_CHARS) : "";
+    if (index !== 0 || !thinking) return { text: piece, html };
+    return {
+      text: [thinking, piece].filter(Boolean).join("\n\n"),
+      html: [detailHtml(thinking, thinkingRoom), html].filter(Boolean).join("\n\n"),
+    };
+  });
   return {
     pieces,
     keyboard: rows.length > 0 ? { inline_keyboard: rows } : null,
   };
+}
+
+/** Keep the latest complete Markdown blocks when thinking exceeds its share of the answer. */
+function trimThinking(detail: string, room: number): string {
+  const heading = "**Thinking**";
+  const body = detail.startsWith(heading) ? detail.slice(heading.length).trim() : detail;
+  const full = `${heading}\n\n${body}`;
+  if (full.length <= room) return full;
+  const note = "Full thinking in Auni.";
+  const budget = room - heading.length - note.length - 6;
+  const blocks = body
+    .split(/(```[\s\S]*?```)/u)
+    .flatMap((part, index) => (index % 2 ? [part] : part.split(/\n{2,}/u)))
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const kept: string[] = [];
+  let left = budget;
+  for (const block of blocks.reverse()) {
+    if (block.length > left) break;
+    kept.unshift(block);
+    left -= block.length + 2;
+  }
+  const tail = body.slice(-Math.floor(budget / 2)).replace(/[\\`*_~#[\]()<>]/gu, "\\$&");
+  return [heading, kept.length ? kept.join("\n\n") : `…${tail}`, note].join("\n\n");
 }

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { and, eq, gt, isNotNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { mainChat } from "../conversation/places.ts";
@@ -13,6 +13,7 @@ import {
   channelDeliveries,
   channelLinks,
   messages,
+  threads,
   type ChannelDeliveryRow,
   type ChannelLinkRow,
 } from "../db/schema.ts";
@@ -25,7 +26,8 @@ import { allowAction, allowProposal, declineAction, declineProposal } from "../m
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
-import { cardsOf } from "../money/waiting.ts";
+import { allFills, holdingsOfThread, threadBooks, worthUsd } from "../money/books.ts";
+import { portfolioNow } from "../money/portfolio.ts";
 import {
   appDestination,
   hashOf,
@@ -33,19 +35,14 @@ import {
   legsOf,
   recordSent,
   sendCard,
+  resendPendingCard,
   spendGrant,
   syncCards,
   syncDelivery,
 } from "./cards.ts";
-import {
-  drawLink,
-  drawQuestion,
-  literal,
-  replySegments,
-  showsFullReview,
-  waitingOn,
-} from "./draw.ts";
+import { drawQuestion, literal, replySegments, showsFullReview, waitingOn } from "./draw.ts";
 import { usedChannel } from "./home.ts";
+import { showTurn, takeTurnStatus } from "./progress.ts";
 
 // The owner talks to Auni from channel apps (Telegram) as well as the web app, in one shared
 // conversation. The hub is where a channel's words become the owner's, and so it alone decides:
@@ -157,7 +154,10 @@ async function linkOf(channelId: string): Promise<ChannelLinkRow | undefined> {
 }
 
 /** Whether an event came from the paired owner, in their direct chat with Auni. */
-function fromOwner(link: ChannelLinkRow | undefined, event: ChannelEvent): boolean {
+function fromOwner(
+  link: ChannelLinkRow | undefined,
+  event: Pick<ChannelEvent, "chat" | "direct" | "from">,
+): boolean {
   return Boolean(
     link?.owner && event.direct && event.from === link.owner && event.chat === link.chat,
   );
@@ -190,47 +190,68 @@ export async function receive(channelId: string, event: ChannelEvent): Promise<s
   // The app's own start or help, answered here: it was never words for the agent.
   await usedChannel(db, channelId);
   if (event.command === "pending") return pending(found, event.chat);
-  if (event.command === "portfolio") {
-    const { link, machine } = appDestination("/app");
-    await found.channel.send(
-      event.chat,
-      drawLink("Your portfolio", link, machine, "view your portfolio"),
-    );
-    return;
-  }
+  if (event.command === "money") return money(found, event.chat);
   await found.channel.send(event.chat, { text: STILL_PAIRED });
 }
 
 const PAIRED =
   "**You're paired with Auni.**\n\nTell me a take, like “AI power demand keeps climbing.” Use /pending to see cards waiting on you.";
 const STILL_PAIRED =
-  "**Talk to Auni here**\n\nSend a take, or reply to any message to continue that chat.\n\n/pending lists cards waiting on you. /portfolio opens your portfolio.";
+  "**Talk to Auni here**\n\nSend a take, or reply to any message to continue that chat.\n\n/pending lists cards waiting on you. /money shows your cash and takes.";
 
 async function pending(found: Found, chat: string): Promise<void> {
   const rows = await db
     .select()
     .from(actions)
-    .where(eq(actions.status, "awaiting_permission"))
+    .where(or(eq(actions.status, "awaiting_permission"), eq(actions.phase, "needs_owner")))
     .orderBy(actions.createdAt);
-  const pending = cardsOf(rows);
-  if (!pending.length) {
-    await found.channel.send(chat, { text: "You're caught up. No cards are waiting on you." });
-    return;
+  let sent = false;
+  for (const group of Map.groupBy(rows, (row) => row.proposalId ?? row.id).values()) {
+    const row = group.find(({ phase }) => phase === "needs_owner") ?? group[0]!;
+    if (await resendPendingCard(found, chat, row)) sent = true;
   }
-  const { link, machine } = appDestination("/app/activity");
-  const overview = drawLink(
-    `${pending.length} ${pending.length === 1 ? "card" : "cards"} waiting on you`,
-    link,
-    machine,
-    pending.length === 1 ? "review it" : "review them",
+  if (!sent)
+    await found.channel.send(chat, {
+      text: rows.length
+        ? "No cards are ready to review yet."
+        : "You're caught up. No cards are waiting on you.",
+    });
+}
+
+async function money(found: Found, chat: string): Promise<void> {
+  const link = appDestination("/app").link;
+  const buttons = link ? [[{ label: "Open Money", url: link }]] : undefined;
+  const summary = await readMoney().catch(
+    () => "I couldn't read your balances just now. Try /money again.",
   );
-  const list = pending.slice(0, 4).map(({ asks }) => `> ${literal(asks.slice(0, 180))}`);
-  if (pending.length > list.length) list.push(`> ${pending.length - list.length} more`);
-  const [title, ...directions] = overview.text.split("\n\n");
-  await found.channel.send(chat, {
-    ...overview,
-    text: [title, list.join("\n"), ...directions].join("\n\n"),
+  await found.channel.send(chat, { text: `**Money**\n\n${summary}`, buttons });
+}
+
+async function readMoney(): Promise<string> {
+  const [portfolio, fills] = await Promise.all([portfolioNow(), allFills(db)]);
+  const ids = [...threadBooks(fills).keys()];
+  const takes = ids.length
+    ? await db
+        .select({ id: threads.id, title: threads.title })
+        .from(threads)
+        .where(inArray(threads.id, ids))
+        .orderBy(threads.title, threads.id)
+    : [];
+  const values = takes.flatMap(({ id, title }) => {
+    const holdings = holdingsOfThread(id, portfolio.assets.holdings, fills);
+    if (!holdings.length) return [];
+    const value = holdings.every(({ usdValue }) => usdValue === null)
+      ? "Value unavailable"
+      : dollars(worthUsd(holdings));
+    return [`> ${literal(title || "Untitled take")}: ${value}`];
   });
+  const missing = [...new Set([...portfolio.unavailable, ...portfolio.looking])];
+  return [
+    `> Total: ${dollars(portfolio.totalUsd)}`,
+    `> Cash: ${dollars(portfolio.cash.usdValue)}`,
+    ...values,
+    ...(missing.length ? [`\nStill missing balances from ${literal(missing.join(", "))}.`] : []),
+  ].join("\n");
 }
 
 /** Spends a pairing code sent in a direct chat, making its sender the owner here. */
@@ -277,33 +298,35 @@ async function ownerSaid(found: Found, event: ChannelEvent & { kind: "message" }
     (repliedTo && (await threadById(repliedTo.threadId))) ??
     (await threadById((await mainChat(db)).id));
   if (!thread) throw new Error("The owner's main chat is gone.");
+  const turnId = messageIdFrom(`${found.id}:${event.id}`);
   const sent = await sendMessage(thread, {
-    id: messageIdFrom(`${found.id}:${event.id}`),
+    id: turnId,
     text: event.text,
     channel: found.id,
     channelRef: event.id,
   });
-  if (sent === "sent") void found.channel.acknowledge?.(event.id).catch(() => undefined);
-  void typingWhileAnswering(found, event.chat, thread.id);
+  if (sent === "sent") {
+    void found.channel.acknowledge?.(event.id).catch(() => undefined);
+    showAnswerProgress(found, event, thread.id, turnId, event.id);
+  }
 }
 
-/** How long a chat app shows "typing…" from one call (Telegram's: about five seconds). */
-const TYPING_SHOWS_MS = 4_000;
-/** The longest "typing…" is kept up, so a turn stuck on a tool never types for ever. */
-const TYPING_MOST_MS = 3 * 60_000;
-
-/**
- * Keeps the chat showing "typing…" while the thread's turn runs, as a person writing back would:
- * one call shows it for a few seconds, and an answer can take a minute. Not waited for, so the
- * next message from the chat app is read meanwhile.
- */
-async function typingWhileAnswering(found: Found, chat: string, threadId: string): Promise<void> {
-  for (const until = Date.now() + TYPING_MOST_MS; Date.now() < until;) {
-    await found.channel.typing(chat).catch(() => undefined);
-    await sleep(TYPING_SHOWS_MS);
-    const thread = await threadById(threadId).catch(() => undefined);
-    if (!thread?.turnStartedAt) return;
-  }
+function showAnswerProgress(
+  found: Found,
+  event: Pick<ChannelEvent, "chat" | "direct" | "from">,
+  threadId: string,
+  turnId: string,
+  replyTo: string,
+): void {
+  showTurn({
+    channelId: found.id,
+    channel: found.channel,
+    chat: event.chat,
+    replyTo,
+    threadId,
+    turnId,
+    stillPaired: async () => fromOwner(await linkOf(found.id), event),
+  });
 }
 
 async function deliveryAt(channelId: string, ref: string): Promise<ChannelDeliveryRow | undefined> {
@@ -346,15 +369,16 @@ async function answered(
   if (!delivery?.question || label === undefined) return "Already answered.";
   const thread = await threadById(delivery.threadId);
   if (!thread) return "That chat is gone.";
-  await sendMessage(thread, {
-    id: messageIdFrom(`${found.id}:answer:${delivery.id}`),
+  const turnId = messageIdFrom(`${found.id}:answer:${delivery.id}`);
+  const sent = await sendMessage(thread, {
+    id: turnId,
     text: label,
     channel: found.id,
     channelRef: event.message,
   });
   event.answer?.("Sent.");
   await found.channel.edit(delivery.ref, drawQuestion(delivery.question, label));
-  void typingWhileAnswering(found, event.chat, thread.id);
+  if (sent === "sent") showAnswerProgress(found, event, thread.id, turnId, event.message);
   return "Sent.";
 }
 
@@ -483,12 +507,14 @@ export async function deliver(input: {
     (!answer || answer.metadata.failed)
   )
     segments.push({ kind: "text", text: "I couldn't finish that reply. Try asking again." });
-  for (const segment of segments) {
+  const status = await takeTurnStatus(found.id, link.chat, input.replyTo);
+  for (const [index, segment] of segments.entries()) {
+    const replace = index === 0 ? status : undefined;
     if (segment.kind === "text")
       await recordSent(
         found,
         input.threadId,
-        await found.channel.send(link.chat, segment, input.replyTo),
+        await found.channel.send(link.chat, segment, input.replyTo, replace),
         {},
       );
     else if (segment.kind === "card")
@@ -499,12 +525,18 @@ export async function deliver(input: {
         segment.card,
         input.messageId,
         input.replyTo,
+        replace,
       );
     else
       await recordSent(
         found,
         input.threadId,
-        await found.channel.send(link.chat, drawQuestion(segment.question), input.replyTo),
+        await found.channel.send(
+          link.chat,
+          { ...drawQuestion(segment.question), detail: segment.detail },
+          input.replyTo,
+          replace,
+        ),
         { question: segment.question, open: true },
       );
   }

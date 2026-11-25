@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import {
   AMOUNT,
   ASK_DONE,
+  HELD,
+  HELD_SAFE,
   filledUsd,
   NETWORKS,
   isAsk,
@@ -12,7 +14,7 @@ import {
 
 import type { ActionRow, ChannelQuestion } from "../db/schema.ts";
 import type { ChannelButton, ChannelMessage, WalletAddresses } from "../apps/contract.ts";
-import { planAction, pricedLater } from "../money/action-card.ts";
+import { lossWarning, planAction, pricedLater } from "../money/action-card.ts";
 import { explorerTx } from "../money/chains.ts";
 import { feeCoinsSaid } from "../money/fee-coin-said.ts";
 import { cardMoneys, rowMoney } from "../money/recipes/index.ts";
@@ -77,9 +79,9 @@ export const waitingOn = (legs: readonly Pick<ActionRow, "status">[]): boolean =
 
 /** The buttons' grant stands in by this while working out whether a message changed. */
 const SOME_GRANT = "grant";
-const REVIEW_LAYOUT = "review-v2:";
+const REVIEW_LAYOUT = "review-v3:";
 
-/** Earlier plan messages showed only summaries of the legs. */
+/** Earlier messages could omit a permanent-loss warning. */
 export function showsFullReview(shown: string | null): boolean {
   return shown?.startsWith(REVIEW_LAYOUT) ?? false;
 }
@@ -128,13 +130,31 @@ function actionLabel(legs: readonly ActionRow[]): string {
   const total = dollars(
     sumUsd(money.flatMap((amount) => (amount?.flow === "in" ? [amount.usd] : []))),
   );
-  return singleLine(label.replaceAll(AMOUNT, total));
+  const spend = money.some((amount) => amount?.flow === "in" && Number(amount.usd) > 0);
+  return singleLine(
+    label.includes(AMOUNT)
+      ? label.replaceAll(AMOUNT, total)
+      : spend
+        ? `${label} (${total})`
+        : label,
+  );
+}
+
+/** Very long asset names stay in the card's title, where they can wrap. */
+function compactApproval(label: string): string {
+  if (label.length <= 28) return label;
+  const amount = /\$[\d,.]+/u.exec(label);
+  if (!amount) return "Allow this card";
+  const throughAmount = label.slice(0, amount.index + amount[0].length);
+  if (throughAmount.length <= 28 && !throughAmount.includes("(")) return throughAmount;
+  return `Allow ${amount[0]}`;
 }
 
 function reviewLines(leg: ActionRow): string[] {
   const { card } = leg;
   const lines = leg.lines.map(({ label, value }) => `${literal(label)}: ${literal(value)}`);
-  if (!card) return lines;
+  const warning = lossWarning(leg, card?.warning);
+  if (!card) return warning ? [...lines, literal(warning)] : lines;
   const figures = card.figures.map(
     ({ label, value, note }) =>
       `${literal(label)}: ${literal(faceWords(leg, value))}${note ? ` (${literal(note)})` : ""}`,
@@ -148,7 +168,7 @@ function reviewLines(leg: ActionRow): string[] {
       ...(card.checks ? [literal(card.checks.checked)] : []),
       ...lines,
       ...figures,
-      ...[card.finePrint, card.warning, card.checks?.why].flatMap((line) =>
+      ...[card.finePrint, warning, card.checks?.why].flatMap((line) =>
         line ? [literal(line)] : [],
       ),
     ]),
@@ -159,7 +179,6 @@ function receipt(leg: ActionRow): string | null {
   if (leg.status !== "done" || leg.error || isAsk(leg.tool) || leg.run.settledBy === "owner")
     return null;
   if (leg.run.filled) return leg.run.filled;
-  if (leg.run.lands) return `Landed: ${leg.run.lands}`;
   const face = leg.card?.receipt;
   const actual = filledUsd(leg.run);
   if (!face || !actual) return null;
@@ -183,7 +202,11 @@ function cardText(legs: readonly ActionRow[], whole: boolean): string {
     const [title, ...detail] = filled?.split("\n") ?? [];
     const heading = title ?? (leg.card ? faceWords(leg, leg.card.title) : leg.summary);
     const prefix = one ? "" : `${index + 1}. `;
-    const facts = whole ? (filled ? detail.map(literal) : reviewLines(leg)) : [];
+    const facts = whole
+      ? filled && leg.run.filled
+        ? detail.map(literal)
+        : [...detail.map(literal), ...reviewLines(leg)]
+      : [];
     const state = filled ? "" : legStatus(leg, whole);
     return [
       `**${prefix}${literal(heading.slice(0, whole ? heading.length : 250))}**`,
@@ -230,11 +253,11 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
     appOnly || held || !whole ? viaApp(view, held ? "Check status" : "Open in Auni", task) : null;
   const label = waiting && grant && !appOnly ? actionLabel(legs) : null;
   const decline = { label: "Decline", press: `decline:${grant}` };
-  const approve = label ? { label, press: `allow:${grant}` } : null;
+  const approve = label ? { label: compactApproval(label), press: `allow:${grant}` } : null;
   const buttons: ChannelMessage["buttons"] =
     destination?.buttons ??
-    (approve
-      ? approve.label.length > 24
+    (approve && label
+      ? label.length > 14
         ? [[approve], [decline]]
         : [[approve, decline]]
       : transactionButtons(legs));
@@ -292,14 +315,16 @@ export function shownKey(view: CardView, digest: string): string {
 
 function legStatus(leg: ActionRow, whole: boolean): string {
   const error = whole && leg.error ? ` ${literal(leg.error)}` : "";
-  if (leg.run.settledBy === "owner") return "Closed." + error;
+  if (leg.run.settledBy === "owner") return `Closed.${error || ` ${heldOutcome(leg)}`}`;
   switch (leg.status) {
     case "awaiting_permission":
       return "Waiting on you";
     case "running":
       if (leg.phase === "queued") return "Queued to send";
-      if (leg.phase === "needs_owner") return `Status unknown.${error} Auni won't send this again.`;
-      if (leg.phase === "unsure") return "Checking whether it went through";
+      if (leg.phase === "needs_owner")
+        return `Status unknown. ${heldOutcome(leg)}${leg.run.held ? "" : error} ${HELD_SAFE}`;
+      if (leg.phase === "unsure")
+        return "Checking whether it went through. Auni can't yet tell whether money moved.";
       if (leg.phase === "landing")
         return leg.run.lands && whole
           ? `On its way: ${literal(leg.run.lands)}`
@@ -312,10 +337,15 @@ function legStatus(leg: ActionRow, whole: boolean): string {
     case "done":
       if (isAsk(leg.tool)) return ASK_DONE[leg.tool];
       // A landing can time out as done, with the outcome in its note.
-      if (leg.error) return whole ? literal(leg.error) : "Check the outcome in Auni";
-      return leg.run.lands ? "Landed" : "Done";
+      if (leg.error)
+        return `${whole ? literal(leg.error) : "Check the outcome in Auni."} Money was sent, but its arrival wasn't confirmed.`;
+      return leg.run.lands && whole
+        ? `Landed: ${literal(leg.run.lands)}`
+        : leg.run.lands
+          ? "Landed"
+          : "Done";
     case "failed":
-      return `Didn't go through.${error}`;
+      return `Didn't go through.${error} ${failedOutcome(leg)}`;
     case "cancelled":
       return "Declined";
     case "replaced":
@@ -325,14 +355,43 @@ function legStatus(leg: ActionRow, whole: boolean): string {
   }
 }
 
+function heldOutcome(leg: ActionRow): string {
+  if (leg.run.held === "unrecorded") return "Money moved. Auni couldn't confirm what came back.";
+  if (leg.run.held) return HELD[leg.run.held];
+  return "Auni can't confirm whether money moved.";
+}
+
+/** A status notice for a held move without a sealed card to re-send. */
+export function drawHeldNotice(leg: ActionRow, where: AppDestination): ChannelMessage {
+  const destination = viaApp(where, "Check status", "check status");
+  return {
+    text: [
+      literal(leg.summary),
+      `Status unknown. ${heldOutcome(leg)} ${HELD_SAFE}`,
+      !destination.buttons && destination.text,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+    ...(destination.buttons && { buttons: destination.buttons }),
+  };
+}
+
+function failedOutcome(leg: ActionRow): string {
+  if (isAsk(leg.tool)) return "No money moved.";
+  if (leg.failureKind === "sent" || leg.txs.some((tx) => tx.hash))
+    return "Money may have moved or a fee may have been charged. Check in Auni.";
+  if (leg.failureKind == null && leg.startedAt) return "Auni can't confirm whether money moved.";
+  return "Nothing left your wallet.";
+}
+
 function arrived(
   network: string,
-  moved: readonly { amount: string; symbol: string; to: string | null }[],
+  moved: readonly { amount: string; symbol: string; to: string | null; network?: string }[],
 ): string {
   return quote([
     literal(network),
-    ...moved.map(({ amount, symbol, to }) =>
-      literal(`${amount} ${symbol}${to ? ` to ${to}` : ""}`),
+    ...moved.map(({ amount, symbol, to, network }) =>
+      literal(`${amount} ${symbol}${network ? ` on ${network}` : ""}${to ? ` to ${to}` : ""}`),
     ),
   ]);
 }
@@ -366,24 +425,29 @@ export function drawNotice(
         return {
           text: `${title}\n\nStopped watching for this deposit. Anything you send to your wallet still arrives normally.`,
         };
-      const network = card.network && NETWORKS[card.network];
-      const address = card.network === "solana" ? wallet?.solana : wallet?.evm;
-      if (!network || !address) return drawLink(card.title, where.link, where.machine);
-      const tokenAddresses = card.tokens.flatMap(({ name, address }) =>
-        address
-          ? [
-              `${literal(name)} ${card.network === "solana" ? "mint" : "contract"}: \`${literal(address)}\``,
-            ]
-          : [],
+      const networks = Object.values(NETWORKS);
+      const cards = card.network ? [NETWORKS[card.network]].filter(Boolean) : networks;
+      const addresses = [...Map.groupBy(cards, ({ key }) => key === "solana").entries()].flatMap(
+        ([solana, supported]) => {
+          const address = solana ? wallet?.solana : wallet?.evm;
+          if (!address) return [];
+          const names = supported.map(({ name }) => name);
+          const label =
+            names.length === 1 ? `Copy ${names[0]} wallet address` : "Copy shared wallet address";
+          return [{ names, address, label }];
+        },
       );
+      if (!addresses.length) return drawLink(card.title, where.link, where.machine);
       return {
         text: [
           title,
-          quote([`Send on ${literal(network.name)}`, ...tokenAddresses]),
-          `**Your wallet address**\n\`${literal(address)}\``,
+          ...addresses.map(
+            ({ names, address }) =>
+              `**Your wallet address**\n\`${literal(address)}\`\n${quote([`Use on ${literal(names.join(", "))}`])}`,
+          ),
           "Watching for your deposit",
         ].join("\n\n"),
-        buttons: [[{ label: `Copy ${network.name} wallet address`, copy: address }]],
+        buttons: addresses.map(({ address, label }) => [{ label, copy: address }]),
       };
     }
     default:
@@ -403,9 +467,11 @@ export function drawQuestion(question: ChannelQuestion, answered?: string): Chan
 
 /** An answer as a channel sends it: its words, cards and question, in the order they came. */
 type Segment =
-  | ({ readonly kind: "text" } & ChannelMessage)
+  | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "card"; readonly card: CardWire }
   | { readonly kind: "question"; readonly question: ChannelQuestion };
+
+type ReplySegment = Segment & { readonly detail?: string };
 
 interface Part {
   readonly type: string;
@@ -419,24 +485,18 @@ interface Part {
  * An answer's parts as messages: its text between cards as one message each, every card core
  * sealed (only those reach a stored answer as data-cards), and each question it finished asking.
  */
-export function replySegments(parts: readonly unknown[]): Segment[] {
-  const segments: Segment[] = [];
+export function replySegments(parts: readonly unknown[]): ReplySegment[] {
+  const segments: ReplySegment[] = [];
   // Each text part is a block of its own, as the web app shows it.
   let blocks: string[] = [];
-  let thoughts: string[] = [];
+  const thoughts: string[] = [];
   const flush = () => {
     const text = blocks
       .map((block) => block.trim())
       .filter(Boolean)
       .join("\n\n");
-    if (text || thoughts.length)
-      segments.push({
-        kind: "text",
-        text,
-        ...(thoughts.length && { detail: ["**Thinking**", ...thoughts].join("\n\n") }),
-      });
+    if (text) segments.push({ kind: "text", text });
     blocks = [];
-    thoughts = [];
   };
   for (const part of parts as Part[]) {
     if (part.type === "text" && typeof part.text === "string") blocks.push(part.text);
@@ -462,5 +522,11 @@ export function replySegments(parts: readonly unknown[]): Segment[] {
     }
   }
   flush();
+  const firstText = segments.findIndex(({ kind }) => kind === "text");
+  const index =
+    firstText === -1 ? segments.findIndex(({ kind }) => kind === "question") : firstText;
+  const answer = segments[index];
+  if (answer && thoughts.length)
+    segments[index] = { ...answer, detail: ["**Thinking**", ...thoughts].join("\n\n") };
   return segments;
 }

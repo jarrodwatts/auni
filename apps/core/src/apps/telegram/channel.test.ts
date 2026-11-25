@@ -121,7 +121,7 @@ describe("the Telegram channel", () => {
     const stop = new AbortController();
     const seen: ChannelEvent[] = [];
     fake.message({ from: 7 }, "/pending@auni_test_bot");
-    fake.message({ from: 7 }, "/portfolio");
+    fake.message({ from: 7 }, "/money");
     const listening = fresh.listen(async (event) => {
       seen.push(event);
     }, stop.signal);
@@ -133,13 +133,13 @@ describe("the Telegram channel", () => {
         scope: { type: "all_private_chats" },
         commands: expect.arrayContaining([
           expect.objectContaining({ command: "pending" }),
-          expect.objectContaining({ command: "portfolio" }),
+          expect.objectContaining({ command: "money" }),
         ]),
       },
     ]);
     expect(seen).toMatchObject([
       { kind: "hello", command: "pending" },
-      { kind: "hello", command: "portfolio" },
+      { kind: "hello", command: "money" },
     ]);
   });
 
@@ -168,13 +168,13 @@ describe("the Telegram channel", () => {
       "7",
       {
         text: "**Deposit on Base**",
-        detail: "**Details**\nUse this address.",
+        detail: "**Thinking**\nUse this address.",
         buttons: [[{ label: "Copy address", copy: "0x123" }]],
       },
       "123456:7:55",
     );
     expect(fake.sent("sendMessage")[0]).toMatchObject({
-      text: "<b>Deposit on Base</b>\n\n<blockquote expandable><b>Details</b>\nUse this address.</blockquote>",
+      text: "<blockquote expandable><b>Thinking</b>\n\nUse this address.</blockquote>\n\n<b>Deposit on Base</b>",
       reply_parameters: { message_id: 55, allow_sending_without_reply: true },
       reply_markup: { inline_keyboard: [[{ text: "Copy address", copy_text: { text: "0x123" } }]] },
     });
@@ -186,6 +186,20 @@ describe("the Telegram channel", () => {
         .slice(1)
         .every((message) => !message.reply_parameters),
     ).toBe(true);
+  });
+
+  it("folds long thinking once above the answer, with code, bullets and mobile table rows", async () => {
+    await channel.send("7", {
+      text: "**The answer**",
+      detail:
+        `**Thinking**\n\n${"Earlier research. ".repeat(1_000)}\n\n- Checked Base\n\n` +
+        '```json\n{"fee": 0.03}\n```\n\n| Venue | Fee |\n| --- | --- |\n| Base | $0.03 |',
+    });
+    const sent = fake.sent("sendMessage");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.text).toBe(
+      "<blockquote expandable><b>Thinking</b>\n\n• Checked Base\n\n<pre>{&quot;fee&quot;: 0.03}</pre>\n\nVenue: Base\nFee: $0.03\n\nFull thinking in Auni.</blockquote>\n\n<b>The answer</b>",
+    );
   });
 
   it("sends plain text when Telegram can't parse the tags", async () => {

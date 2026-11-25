@@ -24,6 +24,8 @@ export const arrivalCardSchema = cardBaseSchema.extend({
         symbol: z.string().min(1).max(40),
         /** Where money out went, as "0x1a2b3c…9f8e"; null for money in, or when the chain doesn't say. */
         to: z.string().max(40).nullable(),
+        /** Its own network when a deposit receipt spans several networks. */
+        network: z.string().trim().min(1).max(40).optional(),
       }),
     )
     .min(1)

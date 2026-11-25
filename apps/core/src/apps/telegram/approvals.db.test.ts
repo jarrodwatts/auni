@@ -7,12 +7,14 @@ import { toolsFor } from "../../agent/mcp.ts";
 import { routineBodySchema, routineDescriptionSchema, routinesDir } from "../../agent/routines.ts";
 import { hashOf, legsDigest, syncCards } from "../../channels/cards.ts";
 import { deliver, listenOnChannels, mintChannelPairing, receive } from "../../channels/hub.ts";
+import { publishThreadEvent } from "../../conversation/stream.ts";
 import { mainChat } from "../../conversation/places.ts";
 import { db } from "../../db/client.ts";
 import {
   actions,
   channelDeliveries,
   channelLinks,
+  fills,
   jobs,
   messages,
   ownerSessions,
@@ -20,7 +22,9 @@ import {
   type ActionRow,
   type ThreadRow,
 } from "../../db/schema.ts";
+import { env } from "../../env.ts";
 import { executeAction } from "../../money/actions.ts";
+import { type Holding, portfolioNow } from "../../money/portfolio.ts";
 import { allowAction } from "../../money/decide.ts";
 import { insertAction, insertThread, wipe } from "../../test/db.ts";
 import { queued } from "../../test/jobs.ts";
@@ -49,6 +53,11 @@ vi.mock("../../money/funding.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   proposalFunding: async () =>
     funding.needUsd ? { chain: "base", needUsd: funding.needUsd } : null,
+}));
+
+vi.mock("../../money/portfolio.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  portfolioNow: vi.fn(),
 }));
 
 const buy = stubRecipe({
@@ -262,26 +271,183 @@ describe("pairing", () => {
     expect(fake.sent("sendMessage").at(-1)?.text).toContain("paired with Auni");
   });
 
-  it("shows pending cards only to the paired owner, without granting a tap from the list", async () => {
-    const action = await waiting();
+  it("resends tap cards and held moves only to the owner, with proof kept in the app", async () => {
+    const first = await waiting({ summary: "Buy Nvidia" });
+    const second = await waiting({ summary: "Buy Tesla" });
+    const held = await waiting({
+      summary: "Existing order",
+      status: "running",
+      phase: "needs_owner",
+    });
+    const proof = await waiting({
+      summary: "Withdrawal",
+      tool: "withdraw_usdc",
+      details: { leavesTo: "0x5b7a3f0e2c9d41a8b6e0f7c2d9a4b1e3f6c8d0a2" },
+    });
+    await waiting({ summary: "Unpublished order", status: "running", phase: "needs_owner" });
+    const unpublished = await waiting({ summary: "A card the turn hasn't shown yet" });
+    await db.insert(messages).values({
+      threadId: thread.id,
+      role: "assistant",
+      parts: [
+        {
+          type: "data-cards",
+          data: {
+            cards: [first, second, held, proof].map((action) => ({
+              kind: "action",
+              actionReference: action.id,
+              title: action.summary,
+            })),
+          },
+        },
+      ],
+    });
     fake.calls.length = 0;
     fake.message({ from: STRANGER }, "/pending");
     fake.message({ from: OWNER, chat: GROUP, chatType: "group" }, "/pending");
     fake.message({ from: OWNER }, "/pending");
     await fake.handled();
+    const replies = fake.sent("sendMessage");
+    expect(replies).toHaveLength(5);
+    expect(replies.every(({ chat_id }) => chat_id === String(OWNER))).toBe(true);
+    const firstGrant = (await deliveryOf(first.id)).grantHash;
+    const secondGrant = (await deliveryOf(second.id)).grantHash;
+    expect(firstGrant).toBeTruthy();
+    expect(secondGrant).toBeTruthy();
+    expect(firstGrant).not.toBe(secondGrant);
+    expect(await deliveryOf(held.id)).toMatchObject({ grantHash: null });
+    expect(await deliveryOf(proof.id)).toMatchObject({ grantHash: null });
+    expect(replies.some(({ text }) => String(text).includes("Status unknown"))).toBe(true);
+    expect(replies.some(({ text }) => String(text).includes("Confirm it's you first."))).toBe(true);
+    expect(
+      await db
+        .select()
+        .from(channelDeliveries)
+        .where(eq(channelDeliveries.actionId, unpublished.id)),
+    ).toEqual([]);
+    expect(
+      replies.find(({ text }) => String(text).includes("Unpublished order"))?.reply_markup,
+    ).toBeUndefined();
+    expect(await queued("turn")).toEqual([]);
+    const buyNvidia = replies.find(({ text }) => String(text).includes("Buy Nvidia"));
+    const callback = /allow:[^"]+/u.exec(JSON.stringify(buyNvidia?.reply_markup))?.[0];
+    expect(callback).toBeTruthy();
+    expect(await press({ from: OWNER }, await messageIdOf(first.id), callback!)).toBe("Allowed.");
+    expect(await statusOf(second.id)).toBe("awaiting_permission");
+  });
+
+  it("reads cash and the value of each take for /money without a local-only link", async () => {
+    const position: Holding = {
+      venue: "wallet",
+      chain: "base",
+      instrument: "native",
+      symbol: "ETH",
+      quantity: "2",
+      decimals: 18,
+      usdValue: "200.00",
+      cash: false,
+      priceId: null,
+    };
+    vi.mocked(portfolioNow).mockResolvedValue({
+      totalUsd: "225.00",
+      observedAt: new Date().toISOString(),
+      unavailable: [],
+      looking: [],
+      assets: { usdValue: "200.00", holdings: [position] },
+      cash: { usdValue: "25.00", holdings: [] },
+      onTheWay: { usdValue: "0.00", moves: [] },
+      holdings: [position],
+    });
+    await db.update(threads).set({ title: "ETH take" }).where(eq(threads.id, thread.id));
+    const other = await insertThread({ title: "Other ETH take" });
+    for (const threadId of [thread.id, other.id]) {
+      const action = await waiting({ threadId, status: "done" });
+      await db.insert(fills).values({
+        actionId: action.id,
+        threadId,
+        chain: "base",
+        instrument: "native",
+        side: "buy",
+        quantity: "1",
+        usdValue: "100",
+      });
+    }
+    fake.calls.length = 0;
+    fake.message({ from: STRANGER }, "/money");
+    fake.message({ from: OWNER }, "/money");
+    await fake.handled();
     expect(fake.sent("sendMessage")).toMatchObject([
       {
         chat_id: String(OWNER),
-        text: expect.stringContaining("1 card waiting on you"),
+        text: "<b>Money</b>\n\n<blockquote>Total: $225\nCash: $25\nETH take: $100\nOther ETH take: $100</blockquote>",
       },
     ]);
-    expect(fake.sent("sendMessage")[0]?.text).toContain(action.summary);
-    expect(JSON.stringify(fake.sent("sendMessage"))).not.toContain("callback_data");
+    expect(fake.sent("sendMessage")[0]?.reply_markup).toBeUndefined();
+    expect(portfolioNow).toHaveBeenCalledTimes(1);
     expect(await queued("turn")).toEqual([]);
+
+    const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };
+    try {
+      Object.assign(env, {
+        WEB_ORIGIN: "https://evo-t1.example.ts.net",
+        TAILSCALE_OWNER: "owner@example.com",
+      });
+      fake.message({ from: OWNER }, "/money");
+      await fake.handled();
+      expect(fake.sent("sendMessage").at(-1)?.reply_markup).toEqual({
+        inline_keyboard: [[{ text: "Open Money", url: "https://evo-t1.example.ts.net/app" }]],
+      });
+    } finally {
+      Object.assign(env, saved);
+    }
   });
 });
 
 describe("the owner's messages", () => {
+  it("edits a single long-turn status into the answer", async () => {
+    const incoming = fake.message({ from: OWNER }, "Check Hyperliquid");
+    await fake.handled();
+    const { id: threadId } = await mainChat(db);
+    const [message] = await db.select().from(messages).where(eq(messages.threadId, threadId));
+    const turnId = message!.id;
+    const replyTo = `123456:${OWNER}:${incoming}`;
+    const activity = (toolName: string) =>
+      publishThreadEvent(threadId, {
+        kind: "chunks",
+        turnId,
+        chunks: [{ type: "tool-input-available", toolCallId: toolName, toolName, input: {} }],
+      });
+    fake.calls.length = 0;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      activity("hyperliquid_markets");
+      vi.setSystemTime(Date.now() + 9_000);
+      await expect
+        .poll(() => fake.sent("sendMessage")[0]?.text, { timeout: 6_000 })
+        .toBe("Checking Hyperliquid…");
+      activity("get_portfolio");
+      await expect
+        .poll(() => fake.sent("editMessageText")[0]?.text, { timeout: 6_000 })
+        .toBe("Checking your balances…");
+      publishThreadEvent(threadId, { kind: "turn-end", turnId });
+      const [answer] = await db
+        .insert(messages)
+        .values({
+          threadId,
+          role: "assistant",
+          parts: [{ type: "text", text: "The final answer." }],
+        })
+        .returning({ id: messages.id });
+      await deliver({ channel: "telegram", threadId, replyTo, messageId: answer!.id });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(fake.sent("sendMessage")).toHaveLength(1);
+    expect(fake.sent("sendMessage")[0]?.reply_parameters).toMatchObject({ message_id: incoming });
+    const [update, completed] = fake.sent("editMessageText");
+    expect(completed).toMatchObject({ message_id: update?.message_id, text: "The final answer." });
+  }, 15_000);
+
   it("join their main chat, or the thread of the card they reply to", async () => {
     const incoming = fake.message({ from: OWNER }, "What do I hold?");
     await fake.handled();
@@ -292,7 +458,7 @@ describe("the owner's messages", () => {
     expect(fake.sent("setMessageReaction")).toMatchObject([
       { chat_id: String(OWNER), message_id: incoming },
     ]);
-    expect(fake.sent("sendChatAction")).toHaveLength(1);
+    await expect.poll(() => fake.sent("sendChatAction")).toHaveLength(1);
     // The next one, replying to nothing, joins the same chat: one memory.
     fake.message({ from: OWNER }, "And in cash?");
     await fake.handled();

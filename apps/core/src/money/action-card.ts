@@ -233,11 +233,10 @@ export async function subjectLogo(
  * spend (see gone-for-good.ts), from where its action pinned money leaving and the tokens its card
  * showed it sending. Whoever wrote the face, it can't leave that out.
  */
-function withLoss(row: Pick<ActionRow, "details">, face: CardFace): CardFace {
+export function lossWarning(row: Pick<ActionRow, "details">, warning?: string | null) {
   const to = row.details.leavesTo?.split(",").filter(Boolean) ?? [];
   const lost = goneForGood(to, approvedTokens(row)?.sends);
-  if (!lost) return face;
-  return { ...face, warning: [lost, face.warning].filter(Boolean).join(" ").slice(0, 500) };
+  return lost ? [lost, warning].filter(Boolean).join(" ").slice(0, 500) : warning;
 }
 
 /** The web's `action` card for one money action. */
@@ -263,6 +262,8 @@ export async function actionCard(
     ),
     ...cardMoney(rowMoney(row)),
   };
+  const face = row.card ?? fitted(plainFace(said, row.run.lands));
+  const warning = lossWarning(row, face.warning);
   return {
     id: row.id,
     kind: "action",
@@ -276,11 +277,8 @@ export async function actionCard(
     ...said,
     // The move's own face, or the plain one of a move that wrote none, from the card as it
     // stands; and whoever wrote it, what the card spends on coin for its fees (see
-    // feeCoinsSaid) and where nobody could ever spend what it sends (see withLoss).
-    card: withLoss(row, {
-      ...(row.card ?? fitted(plainFace(said, row.run.lands))),
-      ...(buysFirst && { buysFirst }),
-    }),
+    // feeCoinsSaid) and where nobody could ever spend what it sends.
+    card: { ...face, ...(buysFirst && { buysFirst }), ...(warning && { warning }) },
     ...(proofWhy ? { takesProof: true, proofWhy } : {}),
     status: row.status,
     error: row.error?.slice(0, 500) ?? null,

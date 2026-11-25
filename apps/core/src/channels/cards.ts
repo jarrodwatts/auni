@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 
 import { DEPOSIT_WAIT_MS, type CardWire, type DepositCardWire } from "@auni/shared";
-import { and, asc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
 
 import { db } from "../db/client.ts";
 import { threadById } from "../conversation/threads.ts";
@@ -21,6 +21,7 @@ import { needsStepUp } from "../money/step-up.ts";
 import { walletAddresses } from "../money/wallets.ts";
 import {
   drawCard,
+  drawHeldNotice,
   drawNotice,
   fitsHere,
   replySegments,
@@ -198,6 +199,7 @@ export async function sendCard(
   card: CardWire,
   messageId?: string,
   replyTo?: string,
+  replace?: string,
 ): Promise<void> {
   const target = cardTarget(card);
   const legs = target ? await legsOf(target) : [];
@@ -208,7 +210,7 @@ export async function sendCard(
       return recordSent(
         app,
         threadId,
-        await app.channel.send(chat, message, replyTo),
+        await app.channel.send(chat, message, replyTo, replace),
         messageId && !card.landed
           ? {
               open: true,
@@ -219,13 +221,50 @@ export async function sendCard(
       );
     }
     const message = drawNotice(card, appDestination(threadPath(threadId)));
-    return recordSent(app, threadId, await app.channel.send(chat, message, replyTo), {});
+    return recordSent(app, threadId, await app.channel.send(chat, message, replyTo, replace), {});
   }
   const { message, row } = await drawn(null, legs, target);
-  await recordSent(app, threadId, await app.channel.send(chat, message, replyTo), {
+  await recordSent(app, threadId, await app.channel.send(chat, message, replyTo, replace), {
     ...("actionId" in target ? { actionId: target.actionId } : { proposalId: target.proposalId }),
     ...row,
   });
+}
+
+/** Resends only a card core sealed and stored, with a grant bound to the new message. */
+export async function resendPendingCard(
+  app: { readonly id: string; readonly channel: Channel },
+  chat: string,
+  row: ActionRow,
+): Promise<boolean> {
+  const marker = row.proposalId
+    ? { kind: "action_plan", proposalId: row.proposalId }
+    : { actionReference: row.id };
+  const contains = JSON.stringify([{ type: "data-cards", data: { cards: [marker] } }]);
+  const [source] = await db
+    .select({ threadId: messages.threadId, parts: messages.parts })
+    .from(messages)
+    .where(and(eq(messages.role, "assistant"), sql`${messages.parts} @> ${contains}::jsonb`))
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  const segment = replySegments(source?.parts ?? []).find(
+    (segment) =>
+      segment.kind === "card" &&
+      (row.proposalId
+        ? segment.card.kind === "action_plan" && segment.card.proposalId === row.proposalId
+        : "actionReference" in segment.card && segment.card.actionReference === row.id),
+  );
+  if (source && segment?.kind === "card") {
+    await sendCard(app, chat, source.threadId, segment.card);
+    return true;
+  }
+  // A move can be held before its turn saves a card. It still deserves a status notice.
+  if (row.phase !== "needs_owner") return false;
+  const refs = await app.channel.send(
+    chat,
+    drawHeldNotice(row, appDestination(threadPath(row.threadId))),
+  );
+  if (row.threadId) await recordSent(app, row.threadId, refs, {});
+  return true;
 }
 
 /** Keeps each message a send took, so a reply to any of them joins the thread; `last` has the buttons. */
@@ -299,7 +338,7 @@ async function depositMessage(
   expired: boolean,
   depositWallet: typeof readWallet,
 ) {
-  const wallet = !card.landed && !expired && card.network ? await depositWallet() : undefined;
+  const wallet = !card.landed && !expired ? await depositWallet() : undefined;
   return drawNotice(card, appDestination(threadPath(threadId)), wallet, expired);
 }
 

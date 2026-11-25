@@ -59,7 +59,10 @@ export function ArrivalCard({ card }: { readonly card: ArrivalCardWire }) {
 /** "0.081 ETH on Base", or "40 USDC to 0x1a2b3c…9f8e on Base". */
 export function movedLine(card: Pick<ArrivalCardWire, "moved" | "network">): string {
   const items = card.moved.map(
-    ({ amount, symbol, to }) => `${amount} ${symbol}${to ? ` to ${to}` : ""}`,
+    ({ amount, symbol, to, network }) =>
+      `${amount} ${symbol}${network ? ` on ${network}` : ""}${to ? ` to ${to}` : ""}`,
   );
-  return `${items.join(" and ")} on ${card.network}`;
+  return (
+    items.join(" and ") + (card.moved.some(({ network }) => network) ? "" : ` on ${card.network}`)
+  );
 }

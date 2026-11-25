@@ -514,7 +514,12 @@ async function runBegunTurn(
   await publishThread(threadId);
   // An answer that only asks for an AI is that answer, not a failure for the browser to show.
   const showsFailed = failed && !noBrain;
-  publishThreadEvent(threadId, { kind: "turn-end", turnId, ...(showsFailed ? { failed } : {}) });
+  publishThreadEvent(threadId, {
+    kind: "turn-end",
+    turnId,
+    ...(showsFailed ? { failed } : {}),
+    ...(stopped ? { stopped: true } : {}),
+  });
   return undefined;
 }
 

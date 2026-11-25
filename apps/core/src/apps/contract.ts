@@ -1112,9 +1112,15 @@ export interface Channel {
   /**
    * Sends a message to a chat: the refs of the messages it took, the buttons under the last. A ref,
    * like an event's `id`, is never another message's, even after the owner moves to a new bot or
-   * account, since the hub keys replies and cards by it for good.
+   * account, since the hub keys replies and cards by it for good. `replace` may name a status message
+   * to edit into the first piece.
    */
-  send(chat: string, message: ChannelMessage, replyTo?: string): Promise<readonly string[]>;
+  send(
+    chat: string,
+    message: ChannelMessage,
+    replyTo?: string,
+    replace?: string,
+  ): Promise<readonly string[]>;
   /**
    * Replaces what one sent message shows, with a message that fits in one (the hub draws every
    * card to, see channels/draw.ts): false when it never can again (the owner deleted it, or it was
@@ -1156,7 +1162,7 @@ export type ChannelEvent =
       readonly direct: boolean;
       /** The pairing code the link that opened the chat carried, if it did. */
       readonly code: string | null;
-      readonly command?: "pending" | "portfolio";
+      readonly command?: "pending" | "money";
     }
   | {
       readonly kind: "press";
@@ -1177,7 +1183,7 @@ export interface ChannelMessage {
    * backslash is the mark itself, which is how core draws words from outside (`literal`).
    */
   readonly text: string;
-  /** More Markdown the channel can fold under the message, with a short heading first. */
+  /** More Markdown the channel can fold above the message, with a short heading first. */
   readonly detail?: string;
   /** Rows of buttons under it. */
   readonly buttons?: readonly (readonly ChannelButton[])[];

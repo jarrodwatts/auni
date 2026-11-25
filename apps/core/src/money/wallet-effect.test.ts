@@ -113,19 +113,19 @@ describe("the approval ladder for a raw batch", () => {
     [
       "an allowance left behind takes the owner's proof",
       effect([approval(ROUTER), ...swap]),
-      "proof: lets 0x2222…2222 spend your USDC",
+      "proof: lets 0x2222222222222222222222222222222222222222 spend your USDC",
     ],
     [
       "approving an operator for a whole collection takes the owner's proof",
       effect([
         log(TOKEN, "ApprovalForAll(address,address,bool)", [pad(OWNER), pad(ROUTER)], word(true)),
       ]),
-      "proof: lets 0x2222…2222 move all your PRL",
+      "proof: lets 0x2222222222222222222222222222222222222222 move all your PRL",
     ],
     [
       "authorizing an ERC-777 operator takes the owner's proof",
       effect([erc777(ROUTER, true)]),
-      "proof: lets 0x2222…2222 move all your PRL",
+      "proof: lets 0x2222222222222222222222222222222222222222 move all your PRL",
     ],
     [
       "an ERC-777 operator the batch revokes goes on a tap",
@@ -304,7 +304,7 @@ describe("a raw batch's permissions on its card", () => {
     const fits = rawEffect(spends(TOKEN), long);
     expect(tooMuchToWarn(fits, null)).toBeNull();
     expect(fitted(withPermissions(FACE, fits)).warning).toBe(
-      "From now on, it lets 0x4444…4444 spend your PRL and 0x7777…7777 spend your USDC.",
+      "From now on, it lets 0x4444444444444444444444444444444444444444 spend your PRL and 0x7777777777777777777777777777777777777777 spend your USDC.",
     );
   });
 });
@@ -355,7 +355,7 @@ describe("simulateEffect", () => {
 
   it("counts an approval wider than what the batch spends", async () => {
     expect(await decided([approve(ROUTER, 10_000_000n), { to: ROUTER }])).toBe(
-      "proof: lets 0x2222…2222 spend your USDC",
+      "proof: lets 0x2222222222222222222222222222222222222222 spend your USDC",
     );
   });
 

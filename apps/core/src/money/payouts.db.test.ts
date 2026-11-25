@@ -63,12 +63,7 @@ function paying(paidMicros: bigint, shares: Payout["markets"][number]["shares"])
 }
 
 /** A done buy at the market, filled for `threadId` or loose. */
-async function bought(
-  threadId: string | null,
-  key: FillKey,
-  quantity: string,
-  usdValue: string,
-) {
+async function bought(threadId: string | null, key: FillKey, quantity: string, usdValue: string) {
   const action = await insertAction({
     tool: "fakemarket_order",
     venue: "fakemarket",

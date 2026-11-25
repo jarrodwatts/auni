@@ -341,7 +341,7 @@ describe("send_solana_transaction", () => {
     scene = () => ({ ...swap(), ...delegated });
     expect(effectLines((await describeIt()).effect)).toContainEqual({
       label: "Lets",
-      value: "GZuFT7…Fo5i spend your USDC",
+      value: "GZuFT72jZWfuZk4YC6diVDWJ4LZGQNQnrUNLbsYjFo5i spend your USDC",
     });
   });
 
@@ -361,7 +361,11 @@ describe("send_solana_transaction", () => {
   });
 
   it.each<[string, Partial<Scene>, string]>([
-    ["leaves a delegate able to spend a token", delegated, "lets GZuFT7…Fo5i spend your USDC"],
+    [
+      "leaves a delegate able to spend a token",
+      delegated,
+      "lets GZuFT72jZWfuZk4YC6diVDWJ4LZGQNQnrUNLbsYjFo5i spend your USDC",
+    ],
     [
       "hands one of the wallet's token accounts to someone else",
       {
@@ -370,7 +374,7 @@ describe("send_solana_transaction", () => {
           { account: POOL, mint: BONK, decimals: 5, pre: [OWNER, 0], post: [APP, 0] },
         ],
       },
-      "lets JUP6Lk…TaV4 move all your Bonk",
+      "lets JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 move all your Bonk",
     ],
     [
       "changes an account an app keeps in the wallet's name",

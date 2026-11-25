@@ -518,7 +518,11 @@ describe("withPermissions", () => {
   it("says every permission a move leaves, whoever wrote its face", () => {
     const granted = withPermissions(face, {
       grants: [
-        { lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" },
+        {
+          lets: "0x1a2b…9f8e spend your USDC",
+          reach: "wallet",
+          exact: { kind: "spend", token: "0x1", to: "0x2" },
+        },
         {
           lets: "Polymarket's exchanges trade the shares in your Polymarket wallet",
           reach: "venue",
@@ -534,7 +538,13 @@ describe("withPermissions", () => {
     const warned = { ...face, warning: "0x0000…dEaD is a burn address." };
     expect(
       withPermissions(warned, {
-        grants: [{ lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" }],
+        grants: [
+          {
+            lets: "0x1a2b…9f8e spend your USDC",
+            reach: "wallet",
+            exact: { kind: "spend", token: "0x1", to: "0x2" },
+          },
+        ],
       }).warning,
     ).toBe("From now on, it lets 0x1a2b…9f8e spend your USDC. 0x0000…dEaD is a burn address.");
     expect(withPermissions(face, { grants: [] })).toBe(face);
@@ -556,6 +566,7 @@ describe("tooMuchToWarn", () => {
   const spend = (index: number) => ({
     lets: `0x${String(index).repeat(4)}…${String(index).repeat(4)} spend your USDC`,
     reach: "wallet" as const,
+    exact: { kind: "spend" as const, token: "0x1", to: "0x2" },
   });
   const few = { grants: [spend(1), spend(2), spend(3)] };
 

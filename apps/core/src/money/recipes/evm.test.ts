@@ -145,10 +145,12 @@ describe("send_evm_transaction", () => {
       { chain: "base", calls: [{ to: USDC, data: "0x" }], summary: "Approve" },
       {},
     );
-    expect(effectLines(effect)).toEqual([{ label: "Lets", value: "0x2222…2222 spend your USDC" }]);
+    expect(effectLines(effect)).toEqual([
+      { label: "Lets", value: "0x2222222222222222222222222222222222222222 spend your USDC" },
+    ]);
     expect(approval(effect, [])).toEqual({
       kind: "proof",
-      reason: "lets 0x2222…2222 spend your USDC",
+      reason: "lets 0x2222222222222222222222222222222222222222 spend your USDC",
     });
   });
 
@@ -474,7 +476,7 @@ describe("send_evm_transaction", () => {
       );
       const send = vi.fn();
       await expect(run(action, send)).rejects.toThrow(
-        "This now lets 0x2222…2222 spend your USDC, so nothing was sent.",
+        "This now lets 0x2222222222222222222222222222222222222222 spend your USDC, so nothing was sent.",
       );
       expect(send).not.toHaveBeenCalled();
     });

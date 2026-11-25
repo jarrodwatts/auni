@@ -513,10 +513,14 @@ export function worth(legs: readonly TokenLeg[], names: ReadonlyMap<string, Toke
   }, 0);
 }
 
-/** "0x1a2b3c…9f8e spend your USDC": who holds the permission, and what it lets them do. */
+/**
+ * "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b spend your USDC": who holds the permission, by
+ * their whole address, since anyone can make one that shares a short form's first and last
+ * digits; and what it lets them do.
+ */
 export function grantLabel(grant: TokenGrant, names: ReadonlyMap<string, TokenName>): string {
-  const to = shortAddress(grant.to);
-  if (grant.kind === "ownership") return `${to} own ${shortAddress(grant.token)}`;
+  const to = grant.to;
+  if (grant.kind === "ownership") return `${to} own ${grant.token}`;
   const token = tokenLabel(grant.token, names);
   return grant.kind === "spend" ? `${to} spend your ${token}` : `${to} move all your ${token}`;
 }

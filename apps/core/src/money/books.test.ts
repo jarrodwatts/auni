@@ -176,12 +176,12 @@ describe("saleOwners and sharedFill", () => {
   it("shares what a swap brought in by the same weights, so a swapped holding stays its thread's", () => {
     const owners = saleOwners(units("4"), null, held);
     const bought = fill("buy", "8", "40", "tsla");
-    expect(sharedFill(bought, owners).map(({ threadId, quantity }) => [threadId, quantity])).toEqual(
-      [
-        [null, "2"],
-        ["ai", "6"],
-      ],
-    );
+    expect(
+      sharedFill(bought, owners).map(({ threadId, quantity }) => [threadId, quantity]),
+    ).toEqual([
+      [null, "2"],
+      ["ai", "6"],
+    ]);
   });
 
   it("shares its dollars so the pieces add up to the whole exactly", () => {

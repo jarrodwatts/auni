@@ -466,7 +466,11 @@ describe("actionCard", () => {
   describe("a move the fit check passed", () => {
     const spend = (index: number, symbol: string): Grant => {
       const id = String(index).padStart(4, "0");
-      return { lets: `0x${id}…${id} spend your ${symbol}`, reach: "wallet" };
+      return {
+        lets: `0x${id}…${id} spend your ${symbol}`,
+        reach: "wallet",
+        exact: { kind: "spend", token: "0x1", to: "0x2" },
+      };
     };
     const twelve = (last: string) => [
       ...Array.from({ length: 11 }, (_, index) => spend(index + 1, "TOKEN".padEnd(14, "N"))),

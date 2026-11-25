@@ -215,9 +215,10 @@ export function turnKeys(turns: readonly AuniUiMessage[]): string[] {
 
 /**
  * What a thread shows: each exchange as last asked, without the ones an edit replaced, and
- * without an answer Auni settled quietly about a move (its card already says how it went). Core
- * marks an answer quiet only when it shows no words and no card (conversation/turn.ts). A
- * watch's quiet answer stays, under its rule, as what came of the watch.
+ * without an answer Auni settled quietly about a move (its card already says how it went). Only
+ * an answer with no words and no card hides, whatever its mark says, so a warning or a card is
+ * never lost (core marks quiet on the same terms, conversation/turn.ts). A watch's quiet answer
+ * stays, under its rule, as what came of the watch.
  */
 export function visibleThreadMessages(
   messages: readonly AuniUiMessage[],
@@ -231,8 +232,12 @@ export function visibleThreadMessages(
     message.role === "user"
       ? superseded.has(message.id)
       : superseded.has(message.metadata?.replyToMessageId ?? "") ||
-        (Boolean(message.metadata?.quiet) && !message.metadata?.fires);
+        (Boolean(message.metadata?.quiet) && !message.metadata?.fires && showsNothing(message));
   return messages.some(hidden) ? messages.filter((message) => !hidden(message)) : messages;
+}
+
+function showsNothing(message: AuniUiMessage): boolean {
+  return !messageText(message) && !message.parts.some((part) => part.type === "data-cards");
 }
 
 /** The last exchange a person may regenerate or edit, when there is one. */

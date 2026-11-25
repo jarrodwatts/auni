@@ -31,10 +31,12 @@ import {
 import { defineJob } from "../jobs/queue.ts";
 import type { ArrivalKind } from "./arrivals.ts";
 import { chainName } from "./chains.ts";
-import { coinName } from "./coins.ts";
+import { coinName, isPlainCash } from "./coins.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
+import { spendsCashIn } from "./funding.ts";
 import { formatAmount, priceLabel, shortAddress, usdLabel } from "./format.ts";
 import { howItCame, MOVES, type Move } from "./how-it-came.ts";
+import { stagedLeg } from "./proposal-order.ts";
 import { SETTLING_MS } from "./readings.ts";
 import type { Fill } from "./recipe.ts";
 import type { Exit, Happened } from "./venue-statement.ts";
@@ -134,19 +136,32 @@ export async function tellArrivals(tx: Tx, recorded: readonly ArrivalRow[]): Pro
   if (news.length === 0) return landed;
   const cards = news.map(arrivalCard);
   const place = woken[0] ?? (await mainChat(tx));
-  const forPlan = news.some((one) => one.direction === "in")
-    ? await waitingPlan(tx, place.id)
-    : undefined;
+  const forPlan = await fundedPlan(
+    tx,
+    place.id,
+    news.flatMap((one) => (one.direction === "in" ? one.rows : [])),
+  );
   return [...landed, await post(tx, place, cards, forPlan ? { forPlan } : {})];
 }
 
 /**
- * The plan in this chat still waiting on the owner's tap, which money coming in now may be for:
- * its card tells it above the step it makes possible. One already settled never is, however near.
+ * The plan in this chat this money in is for: still waiting on the owner's tap, and spending
+ * more cash on a chain where cash just came in than its own moves bring there. Its card tells
+ * the money above the step it makes possible. Any other deposit (a coin, cash on another chain,
+ * or money while a plan only sells) is no part of a plan and keeps its own place in the chat, as
+ * does money after a plan settled, however near. The newest such plan, when several are.
  */
-async function waitingPlan(tx: Tx, threadId: string): Promise<string | undefined> {
-  const [plan] = await tx
-    .select({ id: actions.proposalId })
+async function fundedPlan(
+  tx: Tx,
+  threadId: string,
+  deposits: readonly ArrivalRow[],
+): Promise<string | undefined> {
+  const chains = new Set(
+    deposits.flatMap((row) => (isPlainCash(row.chain, row.instrument) ? [row.chain] : [])),
+  );
+  if (chains.size === 0) return undefined;
+  const waiting = await tx
+    .select()
     .from(actions)
     .where(
       and(
@@ -155,9 +170,13 @@ async function waitingPlan(tx: Tx, threadId: string): Promise<string | undefined
         isNotNull(actions.proposalId),
       ),
     )
-    .orderBy(desc(actions.createdAt))
-    .limit(1);
-  return plan?.id ?? undefined;
+    .orderBy(desc(actions.createdAt));
+  const plans = Map.groupBy(waiting, (leg) => leg.proposalId!);
+  for (const [plan, legs] of plans) {
+    const staged = legs.map(stagedLeg);
+    if ([...chains].some((chain) => spendsCashIn(staged, chain))) return plan;
+  }
+  return undefined;
 }
 
 /** A token they held quietly as Other that Auni came to recognise, as told. */

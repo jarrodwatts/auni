@@ -2,28 +2,34 @@ import type { ArrivalCardWire } from "@auni/shared";
 
 import { messageCards, type AuniUiMessage } from "./conversation";
 
+/** The money in each plan's card tells, by its proposal id. */
+export type ArrivalsByPlan = ReadonlyMap<string, readonly ArrivalCardWire[]>;
+
 /**
  * Money that came in while a plan's card waited on the owner, right after the answer holding it,
  * is that card's news: the card tells it in its own place, above the step it made possible
  * (ArrivedLine), and the chat doesn't tell it again under the card. Core names the plan still
  * waiting when it posts the news (`forPlan`, money/news.ts); money in after a plan settled names
  * none, so it keeps its own place and day, never drawn inside an old card. `told` is, by the
- * index of such an answer, the arrivals it tells; `folded` the indices of the messages they came
- * in, which the chat then leaves out. Only news core posted (no words, nothing but money in) is
- * taken; anything else between keeps its place.
+ * index of such an answer, the arrivals each plan in it tells (only the plan named, when an
+ * answer holds two); `folded` the indices of the messages they came in, which the chat then
+ * leaves out. Only news core posted (no words, nothing but money in) is taken; anything else
+ * between keeps its place.
  */
 export function arrivalsForCards(turns: readonly AuniUiMessage[]): {
-  readonly told: ReadonlyMap<number, readonly ArrivalCardWire[]>;
+  readonly told: ReadonlyMap<number, ArrivalsByPlan>;
   readonly folded: ReadonlySet<number>;
 } {
-  const told = new Map<number, ArrivalCardWire[]>();
+  const told = new Map<number, Map<string, ArrivalCardWire[]>>();
   const folded = new Set<number>();
   let card: { readonly index: number; readonly plans: ReadonlySet<string> } | null = null;
   turns.forEach((message, index) => {
     const arrivals = moneyIn(message);
     const plan = message.metadata?.forPlan;
     if (arrivals && card && plan && card.plans.has(plan)) {
-      told.set(card.index, [...(told.get(card.index) ?? []), ...arrivals]);
+      const byPlan = told.get(card.index) ?? new Map<string, ArrivalCardWire[]>();
+      byPlan.set(plan, [...(byPlan.get(plan) ?? []), ...arrivals]);
+      told.set(card.index, byPlan);
       folded.add(index);
       return;
     }

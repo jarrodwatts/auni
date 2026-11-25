@@ -108,6 +108,23 @@ describe("visibleThreadMessages", () => {
     ).toEqual(["prompt", "first"]);
   });
 
+  it("keeps a quiet-marked answer that has words or a card, so a warning or move is never hidden", () => {
+    const warned = {
+      ...quiet("warned"),
+      parts: [
+        { type: "text", text: "The order status is unknown. Check it before trying again." },
+        { type: "tool-settle_quietly", toolCallId: "settle", state: "output-available" },
+      ],
+    } as AuniUiMessage;
+    const carded = {
+      ...quiet("carded"),
+      parts: [{ type: "data-cards", id: "move", data: { cards: [] } }],
+    } as unknown as AuniUiMessage;
+    expect(
+      visibleThreadMessages([prompt, warned, carded, quiet("woken")]).map(({ id }) => id),
+    ).toEqual(["prompt", "warned", "carded"]);
+  });
+
   it("keeps a watch's quiet answer, as what came of the watch", () => {
     const fired = quiet("fired", {
       fires: [

@@ -37,8 +37,18 @@ it("gives money that came in right after a plan, while it waited, to that plan's
     message("in2", "assistant", [arrived()], { posted: true, forPlan: "plan-1" }),
   ];
   const { told, folded } = arrivalsForCards(turns);
-  expect(told.get(1)).toHaveLength(2);
+  expect(told.get(1)?.get("plan-1")).toHaveLength(2);
   expect([...folded]).toEqual([2, 3]);
+});
+
+it("gives it only to the plan it funds when one answer holds two", () => {
+  const turns = [
+    message("answer", "assistant", [plan("plan-1"), plan("plan-2")]),
+    message("in", "assistant", [arrived()], { posted: true, forPlan: "plan-2" }),
+  ];
+  const told = arrivalsForCards(turns).told.get(0);
+  expect(told?.get("plan-1")).toBeUndefined();
+  expect(told?.get("plan-2")).toHaveLength(1);
 });
 
 it("leaves every other arrival where it came", () => {

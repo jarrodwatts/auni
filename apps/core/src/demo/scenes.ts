@@ -112,9 +112,7 @@ const SCENES: readonly Scene[] = [
     shows: null,
     hears: /finished as done[^]*No app for Kintsu yet/u,
     async *play({ say, call }) {
-      yield* say(
-        "That worked, but I had to build it by hand. If you'd like Kintsu to work first time here, this asks for an app for it.",
-      );
+      yield* say("If you'd like Kintsu to work first time here, this asks for an app for it.");
       yield* call("send_feedback", {
         kind: "app",
         about: "Kintsu",

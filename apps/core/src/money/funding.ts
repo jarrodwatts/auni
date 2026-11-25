@@ -175,6 +175,14 @@ function netSpend(legs: readonly CashLeg[], { arrivals = true } = {}): Map<CashP
 }
 
 /**
+ * Whether a plan's waiting moves spend more cash in this place than they bring there, so cash
+ * coming in there is money for them. A plan that only sells, or spends elsewhere, never is.
+ */
+export function spendsCashIn(legs: readonly CashLeg[], place: CashPlace): boolean {
+  return (netSpend(legs).get(place) ?? 0n) > 0n;
+}
+
+/**
  * The first venue account a plan's picks there need more of than it holds and the
  * plan deposits, in dollars; null when they're all covered. Orders need a little
  * over their margin for the fee and price drift; a withdrawal takes exactly

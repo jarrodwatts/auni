@@ -1,23 +1,23 @@
 "use client";
 
-import type { ArrivalCardWire } from "@auni/shared";
 import { ArrowDownLeft } from "lucide-react";
 import { createContext, useContext } from "react";
 
 import { movedLine } from "@/components/cards/arrival-card";
+import type { ArrivalsByPlan } from "@/lib/arrivals-for-cards";
 
-const Arrived = createContext<readonly ArrivalCardWire[]>([]);
+const Arrived = createContext<ArrivalsByPlan>(new Map());
 
-/** The money that came in for the card under it (lib/arrivals-for-cards.ts). */
+/** The money that came in for each plan card under it (lib/arrivals-for-cards.ts). */
 export const ArrivedForCard = Arrived.Provider;
 
 /**
  * Money that came in for this card, told in the card's own place, under its picks and above the
  * step it made possible, rather than under the card where the next step would come before it.
  */
-export function ArrivedLine() {
-  const arrivals = useContext(Arrived);
-  if (arrivals.length === 0) return null;
+export function ArrivedLine({ proposalId }: { readonly proposalId: string }) {
+  const arrivals = useContext(Arrived).get(proposalId);
+  if (!arrivals?.length) return null;
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-foreground/[0.06] pt-4">
       {arrivals.map((arrival) => (

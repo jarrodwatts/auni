@@ -41,7 +41,7 @@ import {
 import { useSustained } from "@/lib/use-sustained";
 import type { StickToBottomContext } from "use-stick-to-bottom";
 
-import { arrivalsForCards } from "@/lib/arrivals-for-cards";
+import { arrivalsForCards, type ArrivalsByPlan } from "@/lib/arrivals-for-cards";
 
 /**
  * A place's one conversation, split by day: the transcript and the reply
@@ -394,4 +394,4 @@ function useReadWhileOpen(
 }
 
 /** No money came in for a card. */
-const NONE_ARRIVED = [] as const;
+const NONE_ARRIVED: ArrivalsByPlan = new Map();

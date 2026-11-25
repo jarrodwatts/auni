@@ -25,7 +25,10 @@ import { TotalHero } from "./total-hero";
 import { usePortfolio, useTakes } from "./use-portfolio";
 import { YourTakes } from "./your-takes";
 
-const READ_FAILURE = { message: "Your money couldn't load.", action: "reload" } as const;
+const READ_FAILURE = {
+  message: "Couldn't load your balances. Your money is untouched.",
+  action: "reload",
+} as const;
 const COLUMN = "mx-auto w-full max-w-[760px] px-4 sm:px-8";
 
 /**
@@ -74,7 +77,7 @@ function Overview({
   const items = activity.data?.items ?? [];
   const titles = new Map([...chats, ...archived].map(({ thread }) => [thread.id, thread.title]));
   const thread = receipt?.threadId
-    ? { id: receipt.threadId, title: titles.get(receipt.threadId) ?? "this take" }
+    ? { id: receipt.threadId, title: titles.get(receipt.threadId) ?? "Untitled take" }
     : undefined;
   const open = (item: ActivityItemWire) => {
     setReceipt(item);
@@ -129,9 +132,10 @@ function NothingYet({ reveal }: { readonly reveal: boolean }) {
         reveal && "auni-stagger-in",
       )}
     >
-      <h2 className="text-title text-ink">Your money will show here</h2>
+      <h2 className="text-title text-ink">No money here yet</h2>
       <p className="mt-2 max-w-[380px] text-ui text-muted-foreground">
-        Tell Auni a take and the positions it builds group under it, with every move as a receipt.
+        Add cash to your wallet or start a take. Your positions will group by take, with every move
+        saved as a receipt.
       </p>
       <div className="mt-6 flex gap-2">
         <Link href="/app/new" onClick={startNew} className={buttonVariants()}>

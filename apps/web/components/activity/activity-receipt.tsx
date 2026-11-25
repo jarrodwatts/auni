@@ -22,7 +22,7 @@ const OUTSIDE_RING = "flex rounded-full ring-2 ring-negative/70 ring-offset-1";
 
 /**
  * What an item is about: its asset's logo, else for a move of cash alone the logo of where the
- * cash went (Hyperliquid's, for cash taken out of it), else a neutral glyph. One a venue did
+ * cash went (the venue's, for cash taken out of it), else a neutral glyph. One a venue did
  * that leaves the owner something to decide wears a ring in the loss colour.
  */
 export function ItemMark({
@@ -61,7 +61,7 @@ export function ActivityReceipt({
       <p className="mt-1 text-center text-meta text-muted-foreground">
         {item.kind === "outside" ? (
           <>
-            by {item.receipt.by}
+            By {item.receipt.by}
             <br />
           </>
         ) : null}
@@ -189,7 +189,7 @@ function Steps({
 }) {
   return (
     <>
-      <h3 className="text-meta font-medium text-faint">How Auni did it</h3>
+      <h3 className="text-meta font-medium text-faint">Steps</h3>
       <ol className="mt-2">
         {steps.map((step, index) => (
           <li
@@ -242,11 +242,11 @@ function WhatHappened({
         ) : null
       ) : thread ? (
         <PrimaryLink href={chatHref(thread.id)} thread={thread}>
-          Ask Auni what now
+          Ask Auni
         </PrimaryLink>
       ) : (
         <PrimaryLink href="/app/new" onClick={startNew}>
-          Ask Auni what now
+          Ask Auni
         </PrimaryLink>
       )}
     </>

@@ -58,7 +58,7 @@ export function CashGroup() {
             <Row
               mark={<AssetLogo holding={portfolio.cash} size={32} />}
               title="Cash"
-              meta={BigInt(portfolio.cash.value.baseUnits) > 0n ? "Ready to use" : "None yet"}
+              meta={BigInt(portfolio.cash.value.baseUnits) > 0n ? "Ready to use" : "None available"}
               end={<span className="font-medium tabular-nums">{worth(portfolio.cash)}</span>}
             />
           </li>
@@ -143,7 +143,7 @@ export function OtherHoldings({ loose }: { readonly loose: readonly Holding[] })
                 <Row
                   mark={<OtherTokensMark size={32} />}
                   title={otherTokensLabel(uncounted)}
-                  meta="Not counted until you add one"
+                  meta="Not counted in your total"
                 />
               </RowButton>
             </li>

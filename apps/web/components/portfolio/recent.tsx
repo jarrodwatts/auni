@@ -57,7 +57,7 @@ export function Recent({
     >
       {activity.isError && !activity.data ? (
         <p className="text-ui text-muted-foreground">
-          Your moves couldn&apos;t be read just now. Your money above is all there.
+          Couldn&apos;t load your recent moves. Your money is untouched. Reload to try again.
         </p>
       ) : !activity.data ? (
         <ul className="auni-appear-late flex flex-col gap-2">
@@ -71,7 +71,7 @@ export function Recent({
             ? "No moves yet. Every trade, deposit, and withdrawal you allow will appear here as a receipt."
             : filter === "trades"
               ? "No trades yet."
-              : "No money in or out yet."}
+              : "No deposits or withdrawals yet."}
         </p>
       ) : (
         <>

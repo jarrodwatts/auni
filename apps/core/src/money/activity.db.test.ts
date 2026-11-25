@@ -196,7 +196,7 @@ describe("GET /activity", () => {
       amount: { usd: "16.50", direction: null, tone: "neutral" },
       receipt: {
         steps: [
-          { text: "Sold 2 things you held loose", amountUsd: "8.80" },
+          { text: "Sold 2 other holdings", amountUsd: "8.80" },
           { text: "Moved cash to Hyperliquid", amountUsd: "17.00" },
           { text: "Opened PRL, 1x long", amountUsd: "16.50" },
         ],
@@ -210,7 +210,7 @@ describe("GET /activity", () => {
         steps: [{ text: "It reached a stop-loss or take-profit price Auni set.", amountUsd: null }],
         story: {
           gave: { label: "Your 1x long", value: "$14.10" },
-          got: { label: "It lost", value: "$2.40", tone: "loss" },
+          got: { label: "Realized loss", value: "$2.40", tone: "loss" },
           levels: [{ label: "Closed at", price: "$0.3439", kind: "price" }],
           facts: [{ label: "Through", value: "Hyperliquid" }],
         },
@@ -520,7 +520,7 @@ describe("GET /activity", () => {
         "Closed your ETH short",
         {
           gave: { label: "Your 3x short", value: "$10.05", place: null, tone: "neutral" },
-          got: { label: "It lost", value: "$0.05", place: null, tone: "loss" },
+          got: { label: "Realized loss", value: "$0.05", place: null, tone: "loss" },
           // A short loses as the price rises: it closed above where it was entered.
           levels: [
             { label: "Closed at", price: "$3,350.00", kind: "price" },

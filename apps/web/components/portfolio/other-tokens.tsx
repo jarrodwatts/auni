@@ -92,11 +92,11 @@ function TokenList() {
   if (!tokens.data)
     return (
       <p role="alert" className="mt-5 text-ui text-destructive">
-        They couldn&apos;t be read just now. Try again in a moment.
+        Couldn&apos;t load other tokens. Your wallet is untouched. Try again in a moment.
       </p>
     );
   if (tokens.data.length === 0)
-    return <p className="mt-5 text-ui text-muted-foreground">None right now.</p>;
+    return <p className="mt-5 text-ui text-muted-foreground">No other tokens found.</p>;
   return (
     <ul className="mt-5 grid gap-2">
       {tokens.data.map((token) => (

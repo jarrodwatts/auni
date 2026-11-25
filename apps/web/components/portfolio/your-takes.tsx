@@ -60,14 +60,13 @@ export function YourTakes({
     >
       {failed ? (
         <p className="text-ui text-muted-foreground">
-          Your takes couldn&apos;t be read just now. Your money above is all there.
+          Couldn&apos;t load your takes. Your money is untouched. Reload to try again.
         </p>
       ) : takes === null ? (
         <Skeleton className="h-[148px] w-full rounded-card" />
       ) : takes.length === 0 ? (
         <p className="text-ui text-muted-foreground">
-          No takes yet. Tell Auni what you think will happen, and the positions it builds group
-          here.
+          No takes yet. Start a take and the positions you allow will group here.
         </p>
       ) : (
         <Card className="divide-y divide-border">
@@ -199,9 +198,7 @@ function TakeInside({
       </ul>
       {shown.length > 0 ? (
         <>
-          <h3 className="mt-4 mb-1 text-caption font-medium text-muted-foreground">
-            How it was built
-          </h3>
+          <h3 className="mt-4 mb-1 text-caption font-medium text-muted-foreground">Moves</h3>
           <ol>
             {shown.map((move, index) => (
               <li key={move.id}>

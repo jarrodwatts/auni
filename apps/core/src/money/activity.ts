@@ -312,9 +312,7 @@ export function stepsOf(legs: readonly Leg[]): Step[] {
       : [
           {
             text:
-              sales.length === 1
-                ? `Sold ${sales[0]!.name} you held loose`
-                : `Sold ${sales.length} things you held loose`,
+              sales.length === 1 ? `Sold ${sales[0]!.name}` : `Sold ${sales.length} other holdings`,
             amountUsd: sumUsd(sales.map((sale) => sale.usd)),
             logoUrl: sales.length === 1 ? (sales[0]!.logo?.src ?? null) : null,
           },
@@ -724,7 +722,10 @@ function tradedPosition(
       made === null
         ? null
         : {
-            ...side(made < 0 ? "It lost" : "It made", dollars(centsToUsd(BigInt(Math.abs(made))))),
+            ...side(
+              made < 0 ? "Realized loss" : "Realized profit",
+              dollars(centsToUsd(BigInt(Math.abs(made)))),
+            ),
             tone: made < 0 ? "loss" : made > 0 ? "gain" : "neutral",
           },
     level: level("Closed at", price, "price"),

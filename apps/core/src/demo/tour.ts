@@ -177,7 +177,7 @@ const STOPS: readonly Stop[] = [
   },
   {
     title: "Your money",
-    does: "Open [Money](/app). One number for everything, then each take with what it holds and what it has made: Eli Lilly and Novo Nordisk sit under the take that bought them, and every move is there as a receipt.",
+    does: "Open [Money](/app). Your total sits at the top, followed by each take with what it holds and what it has made. Eli Lilly and Novo Nordisk sit under the take that bought them, and every move is saved as a receipt.",
     reply: "I found them there",
     looked: true,
   },
@@ -204,7 +204,7 @@ const END =
 const AFTER: readonly { readonly reply: string; readonly says: string }[] = [
   {
     reply: "What is still waiting for me?",
-    says: "Every card still waiting for your tap is under **Needs you**. Open one, read it, and allow it or turn it down: either way you see what a real one does.",
+    says: "Every card still waiting for your tap is under **Needs you**. Open one, read it, and allow or decline it. Either way, you'll see what a real one does.",
   },
   {
     reply: "Show me an Auto thread",

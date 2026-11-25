@@ -106,7 +106,7 @@ describe("folding moves", () => {
       unread: false,
       receipt: {
         steps: [
-          { text: "Sold 4 things you held loose", amountUsd: "18.70", logoUrl: null },
+          { text: "Sold 4 other holdings", amountUsd: "18.70", logoUrl: null },
           // The bridge was only on its way into Hyperliquid, so the move in says it.
           // Wearing the mark of where the cash went.
           {
@@ -147,7 +147,7 @@ describe("folding moves", () => {
       null,
     );
     expect(items.map(({ title, amount }) => [title, amount])).toEqual([
-      ["Sold SOL you held loose", { usd: "3.00", direction: null, tone: "neutral" }],
+      ["Sold SOL", { usd: "3.00", direction: null, tone: "neutral" }],
       // A move between their own wallets says which networks, so a bridge reads as one.
       ["Moved cash from Monad to Arbitrum", { usd: "5.00", direction: null, tone: "neutral" }],
       ["Moved cash to Hyperliquid", { usd: "20.00", direction: null, tone: "neutral" }],
@@ -209,7 +209,7 @@ describe("folding moves", () => {
       ),
     ]);
     expect(steps.map(({ text, amountUsd }) => [text, amountUsd])).toEqual([
-      ["Sold SOL you held loose", "3.00"],
+      ["Sold SOL", "3.00"],
       ["Bought Pearl", "5.00"],
       ["Bought Micron", "5.00"],
       ["2 more moves", "10.00"],

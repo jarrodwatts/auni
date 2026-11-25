@@ -16,7 +16,7 @@ export function TakeChange({
   const down = !up && !amount.startsWith("$");
   return (
     <span
-      title={`${amount} since bought`}
+      title={`${amount} since entry`}
       className={cn(
         "whitespace-nowrap tabular-nums",
         up ? "text-positive" : down ? "text-negative" : "text-muted-foreground",
@@ -24,7 +24,7 @@ export function TakeChange({
       )}
     >
       {amount} ({Math.abs(change.percent).toFixed(1)}%)
-      <span className="sr-only"> since bought</span>
+      <span className="sr-only"> since entry</span>
     </span>
   );
 }

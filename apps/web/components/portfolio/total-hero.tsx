@@ -46,7 +46,7 @@ export function TotalHero() {
       <div className="flex items-center justify-between gap-6">
         {shown === null ? (
           <p className="mt-2 text-ui font-normal text-muted-foreground">
-            Your balance couldn&apos;t load just now.
+            Couldn&apos;t load your balance. Your money is untouched.
           </p>
         ) : (
           <BigMoney value={formatUsdcBalance(shown)} className="mt-1 min-w-0" />
@@ -59,11 +59,11 @@ export function TotalHero() {
           {/* A total missing a source would show a drop that didn't happen. */}
           {partial ? (
             <p className="text-meta text-muted-foreground">
-              Some of your money couldn&apos;t be read just now, so this may be low.
+              Some balances couldn&apos;t load, so this total may be lower than what you hold.
             </p>
           ) : looking ? (
             <p className="text-meta text-muted-foreground">
-              Still looking through your wallet, so more may show up.
+              Checking your wallet for balances. More may appear as it finishes.
             </p>
           ) : move ? (
             <ChartChange move={move} label={chart.label} />

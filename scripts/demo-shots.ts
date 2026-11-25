@@ -232,10 +232,16 @@ const OPEN_WORK: Opener = {
   shows: `document.querySelector('.auni-steps-line[aria-expanded="true"]')`,
 };
 
-/** Starts the AI's own sign-in from first run's ask for one, which shows it under way. */
+/** The AI's sign-in under way, as its Cancel shows. */
+const SIGNING_IN = `[...document.querySelectorAll("button")].some((el) => el.textContent?.trim() === "Cancel")`;
+
+/**
+ * Starts the AI's own sign-in from first run's ask for one; at the next width it's still under
+ * way (core keeps it), so there's nothing to press.
+ */
 const SIGN_IN: Opener = {
-  does: PRESS("Sign in"),
-  shows: `[...document.querySelectorAll("button")].some((el) => el.textContent?.trim() === "Cancel")`,
+  does: `(${SIGNING_IN}) || ${PRESS("Sign in")}`,
+  shows: SIGNING_IN,
 };
 
 /**

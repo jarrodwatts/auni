@@ -81,9 +81,9 @@ export const JOBS: Record<
   moves: {
     label: "Moves cash with",
     icon: Waypoints,
-    when: "When cash changes chains",
+    when: "When cash moves between networks",
     scene: (name) => [
-      { icon: Coins, says: "Your cash is on one chain and is needed on another" },
+      { icon: Coins, says: "Your cash is on one network and needed on another" },
       { icon: "app", says: `${name} carries it across` },
       { icon: Hourglass, says: "Auni waits for it to land, then carries on" },
     ],
@@ -95,19 +95,19 @@ export const JOBS: Record<
     when: "When Auni reads what you hold",
     scene: (name) => [
       { icon: Wallet, says: "Auni finds a token in your wallet" },
-      { icon: "app", says: `It asks ${name} what the token is and what it is worth` },
-      { icon: PieChart, says: "Your portfolio shows it by name, with its value" },
+      { icon: "app", says: `Auni asks ${name} what it is and what it's worth` },
+      { icon: PieChart, says: "You see it by name, with its current value" },
     ],
     also: "Auni also asks",
   },
   watches: {
     label: "Watches with",
     icon: Eye,
-    when: "While you are away",
+    when: "While you're away",
     scene: (name) => [
       { icon: MessageCircle, says: "You ask Auni to keep an eye on something" },
       { icon: "app", says: `${name} keeps watching for it` },
-      { icon: BellRing, says: "When it happens, Auni wakes and tells you" },
+      { icon: BellRing, says: "When it hits, Auni wakes up and tells you" },
     ],
     also: "Also watching",
   },
@@ -143,10 +143,12 @@ export function AppJobs({
     return (
       <Section title="Not in use">
         <p className="text-ui leading-[1.5] font-normal text-muted-foreground">
-          {names.length > 0
-            ? `${listed(names)} does this job now.`
-            : "Another app does this job now."}{" "}
-          {rule ?? "Which one does it is set in Auni's settings file."}
+          {names.length > 1
+            ? `${listed(names)} handle this right now.`
+            : names.length === 1
+              ? `${names[0]} handles this right now.`
+              : "Another service handles this right now."}{" "}
+          {rule ?? "Change which service Auni uses in your settings file."}
         </p>
       </Section>
     );

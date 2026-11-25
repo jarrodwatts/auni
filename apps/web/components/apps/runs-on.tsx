@@ -51,7 +51,7 @@ export function BehindTheScenes({
   return (
     <Section
       heading="Behind the scenes"
-      description="What Auni uses on its own to find prices, route trades and move cash."
+      description="What Auni uses on its own to find prices, route trades, and move cash."
     >
       <div className="mt-5 flex flex-col gap-6">
         {groups.map((group) => (

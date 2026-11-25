@@ -40,7 +40,7 @@ export function AppKeysNeeded({
     >
       {holding ? (
         <p className="mb-3 text-ui leading-[1.5] text-ink">
-          Your {holding} there is safe. With your {app.name} {keys}, Auni can place orders too.
+          Your {holding} is safe. Add your {app.name} {keys} to let Auni place orders.
         </p>
       ) : null}
       <KeyForm settings={needed} focusRef={focusRef} onSaved={onSaved} />
@@ -66,7 +66,7 @@ export function AppSettings({
   );
   if (rest.length === 0) return null;
   return (
-    <Section title={rest.every(({ kind }) => kind === "secret") ? "Its keys" : "Its settings"}>
+    <Section title={rest.every(({ kind }) => kind === "secret") ? "Keys" : "Settings"}>
       <ul className="flex flex-col gap-4">
         {rest.map((setting) => (
           <li key={setting.key}>
@@ -266,9 +266,9 @@ function KeyRow({ setting }: { readonly setting: AppSettingWire }) {
                 <Check aria-hidden className="size-3.5 flex-none text-ink" strokeWidth={2.6} />
               ) : null}
               {setting.set === "environment"
-                ? "Set by this computer"
+                ? "Set on this computer"
                 : setting.set && setting.untried
-                  ? "Saved, not tried yet: the service couldn't be reached"
+                  ? "Saved, not verified yet (couldn't reach the service)"
                   : setting.set
                     ? "Saved"
                     : (setting.help ?? "Not set")}
@@ -319,7 +319,7 @@ function FileRow({
               <Check aria-hidden className="size-3.5 flex-none text-ink" strokeWidth={2.6} />
             ) : null}
             {setting.set === "environment"
-              ? "Set by this computer"
+              ? "Set on this computer"
               : setting.set
                 ? "Set in your settings file"
                 : "Not set yet"}
@@ -338,7 +338,7 @@ function FileRow({
       </div>
       {where ? (
         <p className="mt-1.5 text-meta leading-[1.55] text-muted-foreground">
-          It changes whom Auni trusts, so only your settings file sets it:{" "}
+          This controls what Auni trusts, so set it directly in your settings file:{" "}
           <code className="font-mono text-caption text-ink wrap-anywhere">{setting.env}</code> in{" "}
           <code className="font-mono text-caption text-ink wrap-anywhere">{settingsFile}</code>.
         </p>

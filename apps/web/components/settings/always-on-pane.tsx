@@ -22,7 +22,7 @@ const TAILSCALE = "https://tailscale.com/download";
 const OS_NAMES: Record<string, string> = {
   linux: "Linux",
   macOS: "Mac",
-  windows: "Windows, in WSL",
+  windows: "Windows (WSL)",
   iOS: "iPhone or iPad",
   android: "Android",
 };
@@ -32,13 +32,15 @@ const ENDED: Record<
   NonNullable<NonNullable<HandoverStatus["handover"]>["ended"]>,
   string | null
 > = {
-  expired: "The code ran out before {machine} used it. Pick a machine for a new one.",
-  wrong_code: "Wrong codes were tried, so that handover closed. Pick a machine for a new one.",
+  expired: "The code expired before {machine} used it. Pick a computer for a new one.",
+  wrong_code: "Too many wrong codes, so that transfer closed. Pick a computer for a new one.",
   cancelled: null,
-  cut_short: "The transfer to {machine} was cut off, so Auni carries on here.",
-  no_answer: "{machine} didn't answer in time, so Auni carries on here.",
-  declined: "{machine} couldn't take Auni, and says why there. Auni carries on here.",
-  failed: "Auni couldn't be packed up, so it carries on here. Its terminal says why.",
+  cut_short: "The transfer to {machine} was interrupted, so Auni is still running here.",
+  no_answer: "{machine} didn't respond in time, so Auni is still running here.",
+  declined:
+    "{machine} couldn't complete the move (check its terminal for details). Auni is still running here.",
+  failed:
+    "Couldn't pack up Auni here (check this terminal for details). Auni is still running here.",
 };
 
 /**
@@ -51,8 +53,8 @@ export function KeepRunning() {
   return (
     <div>
       <p className="mb-3 px-1 text-meta leading-[1.5] text-muted-foreground">
-        Pick a computer of yours on Tailscale that stays on. Your wallet, chats and settings move
-        there once, and you open Auni there from any device.
+        Pick a computer on your Tailscale that stays on. Your wallet, chats, and settings move there
+        once, and you can open Auni from any device.
       </p>
       <HandOver />
     </div>
@@ -119,10 +121,10 @@ function HandOver() {
           target="_blank"
         >
           <span className={ROW_TEXT}>
-            <span className={ROW_LABEL}>Get Tailscale, free</span>
+            <span className={ROW_LABEL}>Get Tailscale (free)</span>
             <span className={cn(ROW_HINT, "whitespace-normal")}>
-              Put it on this computer and on the one Auni should run on, signed in to the same
-              account. It&apos;s how your devices reach Auni.
+              Install it on this computer and the one Auni will run on, using the same account.
+              That&apos;s how your devices reach Auni privately.
             </span>
           </span>
           <ArrowUpRight aria-hidden className="size-4 flex-none text-faint" />
@@ -140,7 +142,7 @@ function HandOver() {
         >
           <span className={ROW_TEXT}>
             <span className={ROW_LABEL}>Tailscale isn&apos;t connected</span>
-            <span className={ROW_HINT}>Open it and sign in, then tap here</span>
+            <span className={ROW_HINT}>Open Tailscale and sign in, then check again</span>
           </span>
           {status.isFetching ? (
             <LoaderCircle aria-hidden className="size-4 animate-spin text-faint" />
@@ -169,11 +171,12 @@ function HandOver() {
         ))}
         {others.length === 0 ? (
           <p className={cn(ROW, ROW_HINT, "whitespace-normal")}>
-            No other machine of yours is on Tailscale yet. Add the one Auni should run on.
+            No other computers on your Tailscale yet. Install Tailscale on the computer you want
+            Auni to run on.
           </p>
         ) : null}
       </div>
-      {pairAgain ? <PairAgain className="mt-3" then="Then pick the machine again." /> : null}
+      {pairAgain ? <PairAgain className="mt-3" then="Then pick the computer again." /> : null}
       {refused ? (
         <p role="alert" className="mt-3 px-1 text-meta leading-[1.5] text-destructive">
           {refused}
@@ -195,7 +198,7 @@ function MachineRow({
 }) {
   const os = OS_NAMES[machine.os] ?? machine.os;
   const hint = !machine.runsAuni
-    ? `${os}, which can't run Auni`
+    ? `${os} (can't run Auni)`
     : machine.online
       ? `${os}, online`
       : `${os}, offline`;
@@ -244,11 +247,11 @@ function Handing({
       <div className={BOX}>
         <p className="flex items-center gap-2 text-ui text-ink">
           <LoaderCircle aria-hidden className="size-4 animate-spin text-muted-foreground" />
-          Handing Auni over to {handover.machine}
+          Moving Auni to {handover.machine}
         </p>
         <p className="mt-1.5 text-meta leading-[1.5] text-muted-foreground">
-          Auni here has paused. Once {handover.machine} has everything, Auni runs there and this
-          computer runs nothing.
+          Auni is paused here. Once {handover.machine} has everything, Auni will run there and stop
+          here.
         </p>
       </div>
     );
@@ -271,8 +274,8 @@ function Handing({
       </div>
       <p className="mt-1 text-meta leading-[1.5] text-muted-foreground">
         {offer
-          ? `In its terminal, or give it to your coding agent there. It installs Auni and takes over everything from this computer. Its code works once, until ${until}.`
-          : "Its command showed when you picked it. For a new one, cancel this and pick it again."}
+          ? `Run this in ${handover.machine}'s terminal (or hand it to your coding agent there). It installs Auni and moves everything over. This one-time code expires at ${until}.`
+          : "The command was shown once when you started. Cancel and pick the computer again for a new one."}
       </p>
       {offer ? <CopyLine value={offer.command} command className="mt-3" /> : null}
     </div>
@@ -283,10 +286,10 @@ function Handing({
 function HandedOver({ went }: { readonly went: HandedOverWire }) {
   return (
     <div className={BOX}>
-      <p className="text-ui font-medium text-ink">Auni runs on {went.machine} now</p>
+      <p className="text-ui font-medium text-ink">Auni is now running on {went.machine}</p>
       <p className="mt-1 text-meta leading-[1.5] text-muted-foreground">
-        It may take a minute to start there. Nothing was removed from this computer, and nothing
-        here runs.
+        It may take a minute to start. Your local files weren&apos;t deleted, and Auni is stopped on
+        this computer.
       </p>
       <MoneyButton
         tone="primary"
@@ -303,7 +306,7 @@ function Waiting() {
   return (
     <div role="status" className="flex justify-center py-6">
       <LoaderCircle aria-hidden className="size-5 animate-spin text-faint" />
-      <span className="sr-only">Looking for your machines</span>
+      <span className="sr-only">Looking for your computers</span>
     </div>
   );
 }

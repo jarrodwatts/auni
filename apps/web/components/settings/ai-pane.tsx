@@ -45,8 +45,7 @@ export function AiPane() {
           </ul>
         )}
         <p className="mt-3 px-1 text-meta leading-[1.5] text-muted-foreground">
-          Auni thinks with your own Claude or ChatGPT login on {machine}, so there&apos;s nothing
-          extra to pay.
+          Auni uses your own Claude or ChatGPT login on {machine}, with nothing extra to pay.
         </p>
       </section>
       {rows.length > 1 ? (
@@ -72,7 +71,7 @@ export function AiPane() {
                 <Refusal>
                   {preferred.error instanceof CoreApiError && preferred.error.detail
                     ? preferred.error.detail
-                    : "That wasn't saved. Try again."}
+                    : "Couldn't save that. Try again."}
                 </Refusal>
               </div>
             ) : null}

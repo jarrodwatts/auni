@@ -92,9 +92,9 @@ export function WalletPane() {
         title="Your keys"
         note={
           addKey.isSuccess || added
-            ? "Your new address is ready. Show your keys and back up its key with the others."
+            ? "Your new address is ready. Open Show your keys to back it up with the others."
             : addKey.isError
-              ? "That address wasn't made. Try again."
+              ? "Couldn't create that address. Try again."
               : undefined
         }
       >
@@ -111,7 +111,7 @@ export function WalletPane() {
             label={
               walletLacks === "solana"
                 ? "Add a Solana address"
-                : "Add an address for Monad, Base and more"
+                : "Add an address for Monad, Base, and more"
             }
             hint="A new key, kept beside the one you have"
             disabled={addKey.isPending}

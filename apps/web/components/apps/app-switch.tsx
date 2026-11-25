@@ -112,7 +112,7 @@ export function AppSwitch({
             <MoneyButton
               tone="primary"
               busy={pending}
-              busyLabel="Turning it off"
+              busyLabel="Turning off"
               onClick={() => void turn(false)}
             >
               Turn it off
@@ -131,8 +131,8 @@ export function AppSwitch({
             >
               {waits?.under ??
                 (app.on
-                  ? "Auni can use it when it would help"
-                  : "Auni doesn't use it. What you have there stays yours.")}
+                  ? `Auni can use ${name} when it helps`
+                  : `Auni won't use ${name}. Anything you hold there stays yours.`)}
             </span>
           </span>
           {/* Named for what it turns on and off, not by its state ("On"), which it says itself. */}

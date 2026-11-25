@@ -47,10 +47,10 @@ export function waitingFor(app: AppWire): { readonly says: string; readonly unde
   if (keysNeeded(app).length > 0) return null;
   if (app.pairing === "ready")
     return {
-      says: "On, but waiting to be paired",
-      under: "Auni will answer you there once it is.",
+      says: "Waiting to pair",
+      under: "Pair it with your chat so Auni can answer you there.",
     };
-  return app.needs[0] ? { says: "On, but not ready yet", under: app.needs[0] } : null;
+  return app.needs[0] ? { says: "Not ready yet", under: app.needs[0] } : null;
 }
 
 export function appStanding(app: AppWire): AppStanding {
@@ -61,6 +61,6 @@ export function appStanding(app: AppWire): AppStanding {
   const trouble = app.troubles[0];
   if (trouble) return { money, badge: { tone: "loss", says: trouble.short } };
   if (app.account && app.account.usd === null)
-    return { money, badge: { tone: "neutral", says: "Couldn't read it" } };
+    return { money, badge: { tone: "neutral", says: "Couldn't read balance" } };
   return { money, badge: null };
 }

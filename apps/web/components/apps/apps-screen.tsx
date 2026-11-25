@@ -19,7 +19,7 @@ import { AppSheet } from "./app-sheet";
 import { appStanding } from "./app-standing";
 import { BehindTheScenes, isYours } from "./runs-on";
 
-const READ_FAILURE = { message: "Your apps couldn't load.", action: "reload" } as const;
+const READ_FAILURE = { message: "Couldn't load your apps.", action: "reload" } as const;
 
 /** Where the owner's money is comes first, largest first; then by name, with one turned off last. */
 function byWhatMatters(a: AppWire, b: AppWire): number {

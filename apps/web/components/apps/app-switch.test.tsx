@@ -35,6 +35,6 @@ it("is named for the app it turns on and off", () => {
   // What on means, read after its name.
   const described = /aria-describedby="([^"]+)"/u.exec(control)?.[1];
   expect(drawn).toMatch(
-    new RegExp(`id="${described}"[^>]*>Auni can use it when it would help<`, "u"),
+    new RegExp(`id="${described}"[^>]*>Auni can use Hyperliquid when it helps<`, "u"),
   );
 });

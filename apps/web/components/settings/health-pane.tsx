@@ -37,7 +37,7 @@ export function HealthPane() {
       <Disclosure
         id="setting-developers"
         title="For developers"
-        hint="Networks, logs and backups"
+        hint="Networks, logs, and backups"
         holds={["setting-networks", "setting-logs", "setting-backup"]}
       >
         <Networks />
@@ -108,15 +108,15 @@ function Checks() {
             {diagnostics.data
               ? headline
               : diagnostics.isError
-                ? "Auni couldn't check itself"
-                : "Checking everything"}
+                ? "Couldn't run health checks"
+                : "Running health checks"}
           </span>
           <span className="mt-0.5 block text-meta text-muted-foreground">
             {diagnostics.data
               ? `Checked at ${new Date(diagnostics.data.ranAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
               : diagnostics.isError
                 ? "Run auni doctor in your terminal."
-                : "Your AI, wallet, networks and apps"}
+                : "Your AI, wallet, networks, and apps"}
           </span>
         </span>
         <button
@@ -164,7 +164,7 @@ function Checks() {
           {result.command ? <CopyLine value={result.command} command /> : null}
         </div>
       ) : null}
-      {pairAgain ? <PairAgain then="Then press Fix it again." /> : null}
+      {pairAgain ? <PairAgain then="Then try Fix it again." /> : null}
 
       {findings.length > 0 ? (
         <Disclosure id="setting-every-check" title="Show every check">
@@ -222,7 +222,7 @@ function Version() {
             : data.update.available && data.update.latest
               ? `${named(data.update.latest)} is out.`
               : data.checkout
-                ? "Running from its source. Pull main for the latest."
+                ? "Running from source. Pull main for the latest."
                 : data.update.checked
                   ? "Up to date."
                   : "Free and open source, with no fees."
@@ -244,7 +244,7 @@ function Version() {
       </Setting>
       {data?.update.available && data.update.latest ? (
         <Setting
-          label="To update, run this where Auni runs"
+          label="Run this in your terminal to update"
           hint={data.update.note ?? undefined}
           stacked
         >
@@ -285,12 +285,12 @@ function Backup() {
     <SettingsGroup id="setting-backup" title="In your terminal">
       <Setting
         label="Ask your AI what's wrong"
-        hint="It reads Auni's logs and code, never your keys, and can write up an issue."
+        hint="Reads Auni's logs and code (never your keys) and can draft a bug report."
         stacked
       >
         <CopyLine value="auni triage" command />
       </Setting>
-      <Setting label="Back up and restore" hint="Your records, routines and settings." stacked>
+      <Setting label="Back up and restore" hint="Your records, routines, and settings." stacked>
         <div className="flex flex-col gap-2">
           <CopyLine value="auni export" command />
           <CopyLine value="auni import <backup-file>" command />
@@ -306,11 +306,11 @@ function Logs() {
   return (
     <SettingsGroup id="setting-logs" title="Logs">
       <Setting
-        label="Recent lines"
+        label="Recent logs"
         hint={
           logs.data?.path
-            ? `The last 200, from ${logs.data.path}, with keys and tokens taken out.`
-            : "The last 200, with keys and tokens taken out."
+            ? `The last 200 lines from ${logs.data.path}, with keys and tokens removed.`
+            : "The last 200 lines, with keys and tokens removed."
         }
         stacked={open}
       >
@@ -328,7 +328,7 @@ function Logs() {
                   onClick={() => void navigator.clipboard.writeText(logs.data!.lines.join("\n"))}
                   className={SETTINGS_BUTTON}
                 >
-                  Copy them
+                  Copy logs
                 </button>
               </div>
             </div>
@@ -343,7 +343,7 @@ function Logs() {
       </Setting>
       {logs.isError ? (
         <div className="px-4 py-3 sm:px-5">
-          <Refusal>The logs couldn&apos;t be read just now.</Refusal>
+          <Refusal>Couldn&apos;t read the logs just now.</Refusal>
         </div>
       ) : null}
     </SettingsGroup>
@@ -360,7 +360,7 @@ function Paths() {
     { label: "Runtime", value: `Node ${data.nodeVersion}, ${data.platform} ${data.arch}` },
   ];
   return (
-    <SettingsGroup title="Where things are">
+    <SettingsGroup title="File locations">
       {rows.map((row) => (
         <Setting
           key={row.label}

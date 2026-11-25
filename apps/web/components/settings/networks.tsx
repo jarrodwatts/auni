@@ -32,16 +32,16 @@ export function Networks() {
     <SettingsGroup
       id="setting-networks"
       title="Networks"
-      note={`A network's own URL comes first, then Alchemy, then public ones. They're saved in ${data.settingsFile}.`}
+      note={`Priority: your custom URL, then Alchemy, then public endpoints. Saved in ${data.settingsFile}.`}
     >
       <Secret
         label="Alchemy key"
         hint={
           data.alchemy.source === "environment"
-            ? "Set by this computer's environment, so it can't be changed here."
+            ? "Set in your environment, so it can't be edited here."
             : data.alchemy.set
-              ? "Saved. Every network goes through Alchemy unless it has its own URL."
-              : "Optional. One key for steadier access on every network."
+              ? "Saved. Used for every network without a custom URL."
+              : "Optional. One key for more reliable access across all networks."
         }
         field={data.alchemy.field}
         name="apiKey"
@@ -53,7 +53,7 @@ export function Networks() {
           label={chain.name}
           hint={
             chain.envLocked
-              ? `${SOURCE[chain.source]}, set by this computer's environment (${chain.envVar})`
+              ? `${SOURCE[chain.source]} (set via ${chain.envVar})`
               : chain.customHost
                 ? `${SOURCE.own}: ${chain.customHost}`
                 : SOURCE[chain.source]
@@ -153,7 +153,7 @@ function Secret({
             </button>
           ) : null}
           <button type="button" onClick={() => setTyping(true)} className={SETTINGS_BUTTON}>
-            {set ? "Replace" : name === "url" ? "Use my own" : "Add"}
+            {set ? "Replace" : name === "url" ? "Custom URL" : "Add"}
           </button>
         </div>
       ) : null}

@@ -47,8 +47,8 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
       {waiting && pairing.data ? (
         <div className="flex flex-col gap-3">
           <p className="text-meta leading-[1.55] text-muted-foreground">
-            Within 15 minutes, send Auni this code in a direct chat on {name}. Whoever sends it
-            becomes you there.
+            Send this code to Auni in a direct message on {name} within 15 minutes. Whoever sends
+            it is paired as you.
           </p>
           <CopyLine value={pairing.data.code} label="Your code" />
           {link ? (
@@ -58,7 +58,7 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
               rel="noreferrer"
               target="_blank"
             >
-              Open {name} with it
+              Open in {name}
               <ArrowUpRight aria-hidden className="size-4" strokeWidth={2.2} />
             </a>
           ) : null}
@@ -73,14 +73,14 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
               </>
             ) : (
               <span className="text-muted-foreground">
-                Pair it with your own chat, and Auni answers you there too.
+                Pair your {name} chat so Auni can message you there.
               </span>
             )}
           </p>
           <MoneyButton
             tone={paired ? "quiet" : "primary"}
             busy={pairing.isPending}
-            busyLabel="Making a code"
+            busyLabel="Creating code"
             className="h-10 flex-none px-4 text-ui"
             onClick={() => pairing.mutate()}
           >

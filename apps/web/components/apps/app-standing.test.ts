@@ -106,7 +106,7 @@ describe("appStanding", () => {
   it("never shows an account it couldn't read as empty", () => {
     expect(appStanding(app({ account: account(null) }))).toEqual({
       money: null,
-      badge: { tone: "neutral", says: "Couldn't read it" },
+      badge: { tone: "neutral", says: "Couldn't read balance" },
     });
   });
 

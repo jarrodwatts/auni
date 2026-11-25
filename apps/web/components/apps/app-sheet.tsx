@@ -59,7 +59,8 @@ export function AppSheet({
   // An app that only waits for a key opens with the cursor in its field, where there is a
   // keyboard already: on a phone that would throw one up over the sheet.
   const firstKey = useRef<HTMLInputElement>(null);
-  const asksKey = keysNeeded(app).length > 0;
+  const neededKeys = keysNeeded(app).length;
+  const asksKey = neededKeys > 0;
   // The moment its last key went in, said once, while this sheet stays open.
   const [connected, setConnected] = useState(false);
   // What the owner could do with it is live once nothing is missing, or money is there already.
@@ -118,14 +119,22 @@ export function AppSheet({
                 <span className="min-w-0 flex-1">
                   <span className="block text-ui font-semibold text-ink">{name} is connected</span>
                   <span className="mt-0.5 block text-meta text-muted-foreground">
-                    Auni can use it from its next step.
+                    Auni can use it right away.
                   </span>
                 </span>
               </div>
             ) : null}
             {/* What the key is for comes before the key: the same chips, waiting. */}
             {app.on && starts.length > 0 && !ready ? (
-              <Section title={asksKey ? "With a key, Auni can" : "Once it is set up, Auni can"}>
+              <Section
+                title={
+                  asksKey
+                    ? neededKeys === 1
+                      ? "With a key, Auni can"
+                      : "With your keys, Auni can"
+                    : "Once it's set up, Auni can"
+                }
+              >
                 <ul className="flex flex-wrap gap-2">
                   {starts.map((way) => (
                     <li key={way.title} className="max-w-full">
@@ -196,7 +205,7 @@ export function AppSheet({
               </div>
               {app.on || (app.account.moneyIn && app.account.moneyOut) ? null : (
                 <p className="mt-2.5 text-meta text-muted-foreground">
-                  Turn it on to move money here.
+                  Turn {name} on to move money here.
                 </p>
               )}
             </Section>
@@ -207,8 +216,8 @@ export function AppSheet({
           ) : (
             <p className="mt-9 text-meta leading-[1.5] text-muted-foreground">
               {app.inUse
-                ? `Auni uses ${name} by itself, so it has no switch.`
-                : `${name} isn't in use. Auni's settings file picks which one does this.`}
+                ? `Auni uses ${name} automatically, so there's no switch.`
+                : `${name} isn't active right now. Pick which service Auni uses in your settings file.`}
             </p>
           )}
           <p className="mt-6 text-meta leading-[1.5] text-muted-foreground">
@@ -235,14 +244,16 @@ function Holdings({ app }: { readonly app: AppWire }) {
     return (
       <Section title="You have">
         <p className="text-ui font-normal text-muted-foreground">
-          Auni couldn&apos;t read it just now. What you have there is still yours.
+          Couldn&apos;t read your {app.name} balance just now. Try again in a moment.
         </p>
       </Section>
     );
   if (account.holdings.length === 0)
     return (
       <Section title="You have">
-        <p className="text-ui font-normal text-muted-foreground">Nothing there yet.</p>
+        <p className="text-ui font-normal text-muted-foreground">
+          No balance on {app.name} yet.
+        </p>
       </Section>
     );
   const own = appListing(app.id)?.logo;

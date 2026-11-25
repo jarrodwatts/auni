@@ -23,20 +23,20 @@ export const SETTINGS_PANES: readonly SettingsPane[] = [
     id: "you",
     label: "You",
     icon: UserRound,
-    holds: "Your name, daily brief and what Auni knows about you",
+    holds: "Name, daily brief, look, and what Auni knows",
   },
   { id: "ai", label: "Your AI", icon: Sparkles, holds: "The AI Auni thinks with" },
   {
     id: "wallet",
     label: "Your wallet",
     icon: WalletMinimal,
-    holds: "Your addresses, money in and out, and your keys",
+    holds: "Addresses, deposits, withdrawals, and keys",
   },
   {
     id: "devices",
     label: "Your devices",
     icon: Smartphone,
-    holds: "Your phone, Telegram and this computer",
+    holds: "Your phone, Telegram, and this computer",
   },
   { id: "health", label: "Health", icon: HeartPulse, holds: "Whether everything's working" },
 ];

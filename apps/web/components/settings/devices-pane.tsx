@@ -57,12 +57,12 @@ export function DevicesPane() {
   if (!remote.data)
     return remote.isError ? (
       <Refusal>
-        Auni couldn&apos;t say how your devices reach it. Close Settings and open it again.
+        Couldn&apos;t load your device settings. Close Settings and open it again.
       </Refusal>
     ) : (
       <div className="flex items-center justify-center gap-2 py-16 text-meta text-muted-foreground">
         <LoaderCircle aria-hidden className="size-4 animate-spin" />
-        Looking at this computer
+        Checking this computer
       </div>
     );
   const data = remote.data;
@@ -105,7 +105,7 @@ function Scene({ data }: { readonly data: RemoteAccessWire }) {
       <figcaption className="max-w-[400px] text-center text-meta leading-[1.5] text-muted-foreground">
         {reached
           ? `Auni runs on ${data.machine}. Open it from any of your devices on Tailscale.`
-          : `Auni runs on ${data.machine}, and opens only on this computer for now.`}
+          : `Auni runs on ${data.machine}. Reachable only on this computer for now.`}
       </figcaption>
     </figure>
   );
@@ -182,7 +182,7 @@ function Phone({
         else
           setError(
             result.steps.find((step) => step.status === "fix")?.says ??
-              "Tailscale didn't take it. Check again in a moment.",
+              "Tailscale didn't accept the change. Check again in a moment.",
           );
       } else if (result.needsRestart)
         setRestart({
@@ -199,7 +199,7 @@ function Phone({
     try {
       const result = await disable.mutateAsync();
       setRestart({
-        says: "Restart Auni in your terminal to finish. It will open only on this computer.",
+        says: "Restart Auni in your terminal to finish. After that, it's reachable only on this computer.",
         command: result.serveOffCommand
           ? `${result.serveOffCommand} && ${restartAuni}`
           : restartAuni,
@@ -228,7 +228,7 @@ function Phone({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <QrCodeCanvas
               value={url}
-              label={`A code your phone's camera opens Auni with`}
+              label="QR code to open Auni on your phone"
               size={128}
             />
             <div className="flex min-w-0 flex-1 flex-col gap-2.5">
@@ -284,7 +284,7 @@ function Phone({
       ) : ts.state === "https_off" ? (
         <Setting
           label="Turn on HTTPS in Tailscale"
-          hint="In Tailscale's DNS settings, turn on MagicDNS and HTTPS Certificates, then check again."
+          hint="In Tailscale's DNS settings, turn on HTTPS Certificates, then check again."
         >
           <div className="flex gap-2">
             <a href={TAILSCALE_DNS} target="_blank" rel="noreferrer" className={SETTINGS_BUTTON}>
@@ -296,8 +296,8 @@ function Phone({
         </Setting>
       ) : (
         <Setting
-          label="Turn it on"
-          hint={`Tailscale is ready on ${data.machine}. Your phone opens Auni once this is on.`}
+          label="Turn on phone access"
+          hint={`Tailscale is ready on ${data.machine}. Turn this on to open Auni from your phone.`}
         >
           <button
             type="button"
@@ -402,10 +402,10 @@ function Running({ data }: { readonly data: RemoteAccessWire }) {
   return (
     <SettingsGroup id="setting-running" title="Keep Auni running">
       <Setting
-        label={service.staysOn.stays ? "Auni keeps running" : "Auni runs while its terminal does"}
+        label={service.staysOn.stays ? "Always on" : "Not always on"}
         hint={
           service.staysOn.stays
-            ? "It starts again by itself when this computer restarts."
+            ? "Starts automatically when this computer restarts."
             : service.staysOn.says
         }
         stacked={Boolean(handOff || inside)}
@@ -420,7 +420,7 @@ function Running({ data }: { readonly data: RemoteAccessWire }) {
         ) : inside ? (
           <>
             <p className="mb-2 text-meta text-muted-foreground">
-              To stop that, run this in your terminal:
+              To turn this off, run this in your terminal:
             </p>
             <CopyLine value="auni service uninstall" command />
           </>
@@ -432,10 +432,10 @@ function Running({ data }: { readonly data: RemoteAccessWire }) {
             className={service.installed ? SETTINGS_BUTTON : SETTINGS_PRIMARY_BUTTON}
           >
             {busy ? <LoaderCircle aria-hidden className="size-3.5 animate-spin" /> : null}
-            {service.installed ? "Stop" : "Keep it running"}
+            {service.installed ? "Turn off" : "Keep it running"}
           </button>
         ) : (
-          <Badge>Not on this system</Badge>
+          <Badge>Not supported here</Badge>
         )}
       </Setting>
       {service.lingers === false && service.lingerCommand ? (
@@ -527,7 +527,7 @@ function Browsers({ data }: { readonly data: RemoteAccessWire }) {
           label={
             <span className="flex items-center gap-2">
               {session.label || browserName(session.userAgent)}
-              {session.current ? <Badge>This one</Badge> : null}
+              {session.current ? <Badge>This browser</Badge> : null}
             </span>
           }
           hint={lastSeen(session.lastSeenAt ?? session.createdAt)}
@@ -558,7 +558,7 @@ function Browsers({ data }: { readonly data: RemoteAccessWire }) {
             {mint.data.loopback ? null : (
               <QrCodeCanvas
                 value={mint.data.url}
-                label="A code that opens the sign-in link"
+                label="QR code for the sign-in link"
                 size={120}
               />
             )}
@@ -566,7 +566,7 @@ function Browsers({ data }: { readonly data: RemoteAccessWire }) {
               <CopyLine value={mint.data.url} />
               {mint.data.loopback ? (
                 <p className="text-meta text-muted-foreground">
-                  It opens only on this computer. Turn on Use Auni on your phone to open it
+                  This link only works on this computer. Turn on phone access above to use it
                   elsewhere.
                 </p>
               ) : null}
@@ -580,7 +580,7 @@ function Browsers({ data }: { readonly data: RemoteAccessWire }) {
             className={SETTINGS_BUTTON}
           >
             {mint.isPending ? <LoaderCircle aria-hidden className="size-3.5 animate-spin" /> : null}
-            Make a link
+            Create link
           </button>
         )}
       </Setting>

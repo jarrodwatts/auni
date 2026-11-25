@@ -113,7 +113,7 @@ function Basics() {
       <Setting
         id="setting-time-zone"
         label="Time zone"
-        hint={`${me.timeZone.replaceAll("_", " ")}. Your brief and anything on the clock follow it.`}
+        hint={`${me.timeZone.replaceAll("_", " ")}. Used for your daily brief and scheduled watches.`}
       >
         {saved === "zone" ? (
           <Saved>Updated</Saved>
@@ -133,7 +133,7 @@ function Basics() {
       </Setting>
       {update.isError ? (
         <div className="px-4 py-3 sm:px-5">
-          <Refusal>{refusal(update.error, "That wasn't saved. Try again.")}</Refusal>
+          <Refusal>{refusal(update.error, "Couldn't save that. Try again.")}</Refusal>
         </div>
       ) : null}
     </SettingsGroup>
@@ -160,7 +160,7 @@ function Messages() {
       <Setting
         id="setting-brief"
         label="Daily brief"
-        hint="How your positions and watches stand, and anything waiting on you."
+        hint="A summary of your positions, watches, and anything waiting on you."
         stacked
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -201,7 +201,7 @@ function Messages() {
         hint={
           paired.length === 0 ? (
             <>
-              When a move lands or a watch fires.{" "}
+              When a move finishes or a watch fires.{" "}
               <button
                 type="button"
                 onClick={() => openSettings("devices")}
@@ -209,10 +209,10 @@ function Messages() {
               >
                 Add Telegram
               </button>{" "}
-              to hear on your phone.
+              to get them on your phone.
             </>
           ) : (
-            "When a move lands or a watch fires."
+            "When a move finishes or a watch fires."
           )
         }
         stacked
@@ -285,7 +285,7 @@ function Known() {
                 )}
               >
                 {me.profileSummary ??
-                  "Nothing yet. Auni writes this as it learns what you're into, from your chats and what you add below."}
+                  "Nothing yet. Auni builds this from your chats and anything you connect below."}
               </p>
               {topics.length > 0 ? (
                 <p className="mt-2 text-meta text-muted-foreground">{topics.join(", ")}</p>
@@ -324,7 +324,7 @@ function XHandle() {
       setSaved(true);
       window.setTimeout(() => setSaved(false), SAVED_MS);
     } catch (caught) {
-      setError(refusal(caught, "That handle wasn't saved. Check it and try again."));
+      setError(refusal(caught, "Couldn't save that handle. Check the spelling and try again."));
     }
   };
 
@@ -332,7 +332,7 @@ function XHandle() {
     <Setting
       id="setting-x"
       label="Your X handle"
-      hint="Auni reads your public posts for what you care about. No sign-in."
+      hint="Auni reads your public posts to tailor ideas. No sign-in needed."
     >
       <form
         className="flex items-center gap-2"
@@ -397,7 +397,7 @@ function Watched() {
       setOwner(await add.mutateAsync({ address: address.trim(), ...(label ? { label } : {}) }));
       setTyped("");
     } catch (caught) {
-      setError(refusal(caught, "Paste a 0x address, a name.eth or a Solana address."));
+      setError(refusal(caught, "Enter a 0x address, name.eth, or Solana address."));
     }
   };
   const fromBrowser = async () => {
@@ -458,7 +458,7 @@ function Watched() {
           <input
             aria-label="A wallet address to watch"
             value={typed}
-            placeholder="0x…, name.eth or a Solana address"
+            placeholder="0x…, name.eth, or Solana address"
             autoCapitalize="none"
             autoCorrect="off"
             disabled={add.isPending}
@@ -525,8 +525,8 @@ function Look() {
   };
 
   return (
-    <SettingsGroup title="On screen">
-      <Setting id="setting-look" label="Light or dark" hint="On every device you use Auni on.">
+    <SettingsGroup title="Display">
+      <Setting id="setting-look" label="Light or dark" hint="Applies across all your devices.">
         <div role="radiogroup" aria-label="Light or dark" className="flex gap-2">
           {LOOKS.map((entry) => (
             <button
@@ -571,7 +571,7 @@ function Look() {
         id="setting-thinking"
         inline
         label="Show Auni's thinking"
-        hint="Its reasoning, as it works, on this device."
+        hint="Show Auni's reasoning as it works (this device only)."
       >
         <Switch
           aria-label="Show Auni's thinking"

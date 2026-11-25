@@ -272,8 +272,8 @@ const checkRunner: Check = async () => {
       },
       says:
         held.length === 1
-          ? "1 move is waiting on you to check it: its card in the chat says why"
-          : `${held.length} moves are waiting on you to check them: each card in the chat says why`,
+          ? "1 move needs checking. Open its card in chat for details"
+          : `${held.length} moves need checking. Open their cards in chat for details`,
     });
   for (const { kind, jobs: many, error } of failed)
     findings.push({

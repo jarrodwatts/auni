@@ -26,7 +26,9 @@ export function toHolding(holding: HoldingWire): Holding {
     logoUrl: holding.logoUrl,
     value: usdc(dollarsToBaseUnits(holding.usdValue)),
     todayChangeBaseUnits:
-      holding.todayChangeUsd === null ? null : dollarsToBaseUnits(holding.todayChangeUsd).toString(),
+      holding.todayChangeUsd === null
+        ? null
+        : dollarsToBaseUnits(holding.todayChangeUsd).toString(),
   };
 }
 
@@ -50,6 +52,8 @@ export interface Portfolio {
   readonly otherTokens: number;
   /** Money sent in lately, newest first, for a screen waiting on it to see land. */
   readonly deposits: readonly DepositWire[];
+  /** The networks where a move can pay its network fee now, so Add money says when it can't. */
+  readonly feesPayable: readonly NetworkKey[];
 }
 
 /**
@@ -88,6 +92,7 @@ export async function getPortfolio(
     },
     otherTokens: body.otherTokens,
     deposits: body.deposits,
+    feesPayable: body.feesPayable,
   };
 }
 

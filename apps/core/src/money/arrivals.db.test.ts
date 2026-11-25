@@ -831,8 +831,11 @@ describe("deposits a waiting screen sees land", () => {
       amount: "0.081",
       network: "Base",
       usdValue: "1.22",
+      cash: null,
     });
-    expect(depositWire(eth!)).toMatchObject({ symbol: "ETH", usdValue: "210.60" });
+    expect(depositWire(eth!)).toMatchObject({ symbol: "ETH", usdValue: "210.60", cash: null });
+    // Base's USDC is cash there, which a card short on Base waits for.
+    expect(depositWire({ ...link!, instrument: NETWORKS.base.usdc }).cash).toBe("base");
     // One recorded with no name is named by its address.
     expect(depositWire({ ...link!, symbol: null }).symbol).toBe(shortAddress(LINK));
   });

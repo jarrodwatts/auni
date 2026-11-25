@@ -31,6 +31,7 @@ import { quoteAgain, retryAction, retryProposal, type Retried } from "./retry.ts
 import { holdingViews } from "./holdings.ts";
 import { madeUsd, unpricedOf, walletFlows } from "./made.ts";
 import { addToken, readOtherTokens } from "./other-tokens.ts";
+import { feesPayable } from "./fee-coin.ts";
 import { portfolioNow } from "./portfolio.ts";
 import { plainCashUsd } from "./readings.ts";
 import { sweepSoon } from "./sweep.ts";
@@ -257,7 +258,7 @@ portfolioRouter.get("/", async (req, res) => {
   sweepSoon(req.query.deposit === "1");
   // The read first: what it finds already there begins to count as it reads (see first-look.ts).
   const portfolio = await portfolioNow();
-  const [flows, deposits, others, { timeZone }] = await Promise.all([
+  const [flows, deposits, others, { timeZone }, feesNow] = await Promise.all([
     walletFlows(),
     recentDeposits(),
     // A list that can't be read now hides the row, never the portfolio.
@@ -266,6 +267,7 @@ portfolioRouter.get("/", async (req, res) => {
       return [];
     }),
     theOwner(),
+    feesPayable(portfolio.holdings),
   ]);
   res.json({
     totalUsd: portfolio.totalUsd,
@@ -285,6 +287,7 @@ portfolioRouter.get("/", async (req, res) => {
     cashUsd: portfolio.cash.usdValue,
     otherTokens: others.length,
     deposits: deposits.map(depositWire),
+    feesPayable: feesNow,
   } satisfies z.input<typeof portfolioWireSchema>);
 });
 

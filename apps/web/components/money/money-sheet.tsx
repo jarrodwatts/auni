@@ -1,9 +1,11 @@
 "use client";
 
+import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { auniDialogCardClass, auniDialogOverlayClass } from "@/components/ui/auni-dialog";
-import { Dialog, DialogContent, focusDialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, focusDialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,7 +13,7 @@ import { cn } from "@/lib/utils";
  * of the screen on a computer, and from the bottom edge, full width, on a phone, where the thumb
  * is. Focus starts on its title, so a screen reader hears what it is, never a phone keyboard by
  * accident. `held` keeps a tap outside from closing it, for a step that shouldn't vanish on a
- * stray tap (the keys).
+ * stray tap (the keys). Its Close sits in its corner, here once, so no sheet goes without one.
  */
 export function MoneySheet({
   open,
@@ -35,6 +37,16 @@ export function MoneySheet({
         onOpenAutoFocus={focusDialogTitle}
         onInteractOutside={held ? (event) => event.preventDefault() : undefined}
       >
+        <DialogClose asChild>
+          <Button
+            aria-label="Close"
+            className="absolute top-5 right-5 z-10"
+            size="icon-sm"
+            variant="ghost"
+          >
+            <X aria-hidden />
+          </Button>
+        </DialogClose>
         {children}
       </DialogContent>
     </Dialog>

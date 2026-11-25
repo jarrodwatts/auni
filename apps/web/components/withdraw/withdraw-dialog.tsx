@@ -2,7 +2,7 @@
 
 import { NETWORKS } from "@auni/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Check, LoaderCircle, Plus, X } from "lucide-react";
+import { Check, LoaderCircle, Plus } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { NetworkPicker } from "@/components/money/network-picker";
@@ -20,8 +20,10 @@ import { decideAction, useLiveAction } from "@/lib/data/actions";
 import {
   addressFits,
   cashWords,
+  placeName,
   proposeWithdrawal,
   readWithdrawCash,
+  samePlace,
   sentWords,
   WITHDRAW_NETWORKS,
   type RecentPlace,
@@ -41,6 +43,8 @@ type Step =
 
 /** Where the money goes: a place it went before, or one typed in now. */
 type To = { readonly kind: "recent"; readonly place: RecentPlace } | { readonly kind: "new" };
+
+const NEW: To = { kind: "new" };
 
 const CHIPS = WITHDRAW_NETWORKS.map(({ id, name }) => ({
   key: id,
@@ -77,8 +81,9 @@ export function WithdrawDialog({
     enabled: open,
   });
   const recent = cash.data?.recent ?? [];
-  // The latest place is picked to start with, once it's read; else a new address.
-  const chosen: To = to ?? (recent[0] ? { kind: "recent", place: recent[0] } : { kind: "new" });
+  // The latest place is picked to start with, once it's read; else a new address. Touching the
+  // new address's fields picks it, so a read that lands late never swaps in a past place.
+  const chosen: To = to ?? (recent[0] ? { kind: "recent", place: recent[0] } : NEW);
   const goesTo =
     chosen.kind === "recent"
       ? chosen.place
@@ -157,16 +162,6 @@ export function WithdrawDialog({
 
   return (
     <MoneySheet open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-      <DialogClose asChild>
-        <Button
-          aria-label="Close"
-          className="absolute top-5 right-5 z-10"
-          size="icon-sm"
-          variant="ghost"
-        >
-          <X aria-hidden />
-        </Button>
-      </DialogClose>
       {sentNow ? (
         <AuniDialogMascot state={sentNow.status === "failed" ? "sad" : "celebrating"} />
       ) : null}
@@ -225,7 +220,7 @@ export function WithdrawDialog({
           </label>
           <p className="mt-2 text-meta text-muted-foreground">
             {cash.data
-              ? cashWords(cash.data)
+              ? cashWords(cash.data, goesTo.network)
               : cash.isError
                 ? "Couldn't load your balance. You can still enter an amount."
                 : "Checking your cash"}
@@ -237,7 +232,7 @@ export function WithdrawDialog({
               {recent.map((place) => (
                 <li key={`${place.network}:${place.address}`}>
                   <PlaceRow
-                    on={chosen.kind === "recent" && chosen.place === place}
+                    on={chosen.kind === "recent" && samePlace(chosen.place, place)}
                     onPick={() => setTo({ kind: "recent", place })}
                     place={place}
                   />
@@ -246,7 +241,7 @@ export function WithdrawDialog({
               <li>
                 <Pick
                   on={chosen.kind === "new"}
-                  onPick={() => setTo({ kind: "new" })}
+                  onPick={() => setTo(NEW)}
                   mark={
                     <span className="grid size-8 place-items-center rounded-full bg-foreground/[0.06] text-muted-foreground">
                       <Plus aria-hidden className="size-4" />
@@ -264,7 +259,10 @@ export function WithdrawDialog({
                 label="Network to send on"
                 networks={CHIPS}
                 value={network}
-                onChange={(key) => setNetwork(key as WithdrawNetwork)}
+                onChange={(key) => {
+                  setTo(NEW);
+                  setNetwork(key as WithdrawNetwork);
+                }}
               />
               <label className="mt-3 block">
                 <span className="sr-only">Address on {networkName(network)}</span>
@@ -276,7 +274,10 @@ export function WithdrawDialog({
                   spellCheck={false}
                   placeholder={`Paste ${networkName(network)} address`}
                   value={address}
-                  onChange={(event) => setAddress(event.target.value)}
+                  onChange={(event) => {
+                    setTo(NEW);
+                    setAddress(event.target.value);
+                  }}
                   className="h-12 px-3.5 font-mono placeholder:font-sans"
                 />
               </label>
@@ -288,7 +289,7 @@ export function WithdrawDialog({
                 {(
                   [
                     ["exchange", "My exchange"],
-                    ["wallet", "My own wallet"],
+                    ["wallet", "My other wallet"],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -296,7 +297,10 @@ export function WithdrawDialog({
                     type="button"
                     role="radio"
                     aria-checked={destination === id}
-                    onClick={() => setDestination(id)}
+                    onClick={() => {
+                      setTo(NEW);
+                      setDestination(id);
+                    }}
                     className={cn(
                       "h-9 rounded-control text-ui font-medium transition-colors",
                       destination === id
@@ -357,21 +361,14 @@ function Pick({
 }) {
   return (
     <Row
-      role="radio"
-      aria-checked={on}
-      tabIndex={0}
-      onClick={onPick}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        onPick();
-      }}
-      className="outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35"
+      asChild
       mark={mark}
       title={title}
       meta={meta}
       end={on ? <Check aria-hidden className="size-4 text-ink" /> : null}
-    />
+    >
+      <button type="button" role="radio" aria-checked={on} onClick={onPick} />
+    </Row>
   );
 }
 
@@ -385,12 +382,10 @@ function PlaceRow({
   readonly onPick: () => void;
   readonly place: RecentPlace;
 }) {
-  const whose =
-    place.destination === "exchange"
-      ? "Your exchange"
-      : place.destination === "wallet"
-        ? "Your wallet"
-        : shortAddress(place.address);
+  const named = placeName(place.destination);
+  const whose = named
+    ? `${named.charAt(0).toUpperCase()}${named.slice(1)}`
+    : shortAddress(place.address);
   return (
     <Pick
       on={on}

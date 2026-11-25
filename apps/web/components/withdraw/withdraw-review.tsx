@@ -11,7 +11,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { CoreApiError } from "@/lib/core";
 import { decideAction, NOT_REACHED, readAction } from "@/lib/data/actions";
-import { WITHDRAW_NETWORKS, withdrawalDetails, type Withdrawal } from "@/lib/data/withdrawals";
+import {
+  placeName,
+  WITHDRAW_NETWORKS,
+  withdrawalDetails,
+  type Withdrawal,
+} from "@/lib/data/withdrawals";
 import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -108,7 +113,7 @@ export function WithdrawReview({
             size={40}
           />
           <span className="text-meta whitespace-nowrap text-muted-foreground">
-            {review.destination ? `Your ${review.destination}` : "This address"}
+            {sentenceCase(placeName(review.destination) ?? "this address")}
           </span>
         </span>
       </div>
@@ -137,7 +142,13 @@ export function WithdrawReview({
       <dl className="mt-4 divide-y divide-border text-ui">
         {[
           ["Network", network],
-          ["Arrives", pinned.arrives],
+          // What lands and when: less the fee, where it moves between networks.
+          [
+            "Arrives",
+            pinned.lands && pinned.arrives
+              ? `About ${pinned.lands}, ${pinned.arrives.toLowerCase()}`
+              : pinned.arrives,
+          ],
           ["Fee", pinned.fee],
           ["SOL for fees", pinned.solForFees],
         ].map(([label, value]) =>
@@ -186,4 +197,8 @@ export function WithdrawReview({
       </div>
     </div>
   );
+}
+
+function sentenceCase(words: string): string {
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }

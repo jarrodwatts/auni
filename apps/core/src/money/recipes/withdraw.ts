@@ -59,7 +59,8 @@ const input = {
  */
 function destinationName(destination: "exchange" | "wallet" | undefined, to: string): string {
   if (destination === "exchange") return "your exchange";
-  if (destination === "wallet") return "your wallet";
+  // Theirs, not Auni's own, which "your wallet" means everywhere else.
+  if (destination === "wallet") return "your other wallet";
   return shortAddress(to);
 }
 
@@ -164,6 +165,8 @@ export const withdrawUsdc: Recipe<typeof input> = {
           ...(bridge ? { bridge } : {}),
           arrives: terms.arrives,
           ...(terms.fee ? { fee: terms.fee } : {}),
+          // What the bridge quoted lands once its fee is taken, in whole cents down.
+          ...(fee > 0n ? { landsUsd: centsToUsd((units - fee) / 10_000n) } : {}),
           ...(topUp ? { solForFees: usdcDollars(topUp.usdc) } : {}),
         },
       },

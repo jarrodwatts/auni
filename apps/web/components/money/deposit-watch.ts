@@ -1,5 +1,6 @@
 import type { DepositWire } from "@auni/shared";
 
+import type { FundingNeed } from "@/lib/app-links";
 import { dollarsToBaseUnits } from "@/lib/data/usdc";
 
 /** A wait for money to come in, told by the deposits core records (see GET /portfolio). */
@@ -31,11 +32,13 @@ export function landedTotal(landed: readonly DepositWire[]): bigint {
 }
 
 /**
- * What a card that asked for `need` whole dollars still waits for once this much landed, in
- * base units; zero once it's covered, or when nothing was asked.
+ * What a card short of `need` still waits for once these landed, in base units: only USDC on the
+ * network it's short on counts, since any other coin, or USDC elsewhere, is no cash it can spend
+ * there. Zero once it's covered, or when nothing was asked.
  */
-export function stillNeeded(need: string | null, total: bigint): bigint {
+export function stillNeeded(need: FundingNeed | null, landed: readonly DepositWire[]): bigint {
   if (!need) return 0n;
-  const left = dollarsToBaseUnits(need) - total;
+  const left =
+    dollarsToBaseUnits(need.usd) - landedTotal(landed.filter(({ cash }) => cash === need.chain));
   return left > 0n ? left : 0n;
 }

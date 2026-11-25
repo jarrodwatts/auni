@@ -1,10 +1,12 @@
 import {
   EVM_CHAIN_KEYS,
+  NETWORK_KEYS,
   NETWORKS,
   isCash,
   listed,
   type EvmCashKey,
   type EvmChainKey,
+  type NetworkKey,
 } from "@auni/shared";
 import { and, gte } from "drizzle-orm";
 import { erc20Abi, formatEther, getAddress, type Address, type Hex } from "viem";
@@ -24,7 +26,7 @@ import {
 import { EVM_NATIVE } from "./fill-key.ts";
 import { movesCharge, ownGas, runwayLacks } from "./gas.ts";
 import { payInCalls, payInQuote, payInSettled, payInStanding, type PayInQuote } from "./pay-in.ts";
-import { readPortfolioShared } from "./portfolio.ts";
+import { readPortfolioShared, type Holding } from "./portfolio.ts";
 import { STUCK_AFTER_MS } from "./readings.ts";
 import {
   FeesUnpaid,
@@ -555,6 +557,30 @@ export async function feeCoinPaidBy(
     if (recent && (!standing || standing.status === "pending")) unknown = true;
   }
   return unknown ? "unknown" : null;
+}
+
+/**
+ * The networks where a move can pay its network fee now, as the top says the coin is found:
+ * where a sponsor pays, where the wallet holds the chain's own coin, and, once some EVM chain
+ * can send, every other EVM chain, whose coin is bought from there, and Solana, whose SOL is
+ * bought with USDC on Monad once Monad can send (sol-top-up.ts). Money on any other network
+ * can't move until some of a chain's coin arrives.
+ */
+export async function feesPayable(holdings: readonly Holding[]): Promise<NetworkKey[]> {
+  const sponsored = await Promise.all(
+    NETWORK_KEYS.map(async (key) => !(await paysOwnGas(NETWORKS[key].viem?.id ?? "solana"))),
+  );
+  const held = new Set(
+    holdings
+      .filter((holding) => holding.venue === "wallet" && holding.instrument === "native")
+      .filter((holding) => Number(holding.quantity) > 0)
+      .map((holding) => holding.chain),
+  );
+  const ready = new Set(NETWORK_KEYS.filter((key, index) => sponsored[index] || held.has(key)));
+  const evmSends = EVM_CHAIN_KEYS.some((key) => ready.has(key));
+  return NETWORK_KEYS.filter(
+    (key) => ready.has(key) || (key === "solana" ? ready.has("monad") : evmSends),
+  );
 }
 
 /**

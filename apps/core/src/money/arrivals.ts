@@ -1,4 +1,4 @@
-import { type DepositWire, type NetworkKey } from "@auni/shared";
+import { type CashKey, type DepositWire, type NetworkKey } from "@auni/shared";
 import { and, asc, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 
 import { lockOwner } from "../auth/owner.ts";
@@ -422,5 +422,6 @@ export function depositWire(row: ArrivalRow): DepositWire {
     amount: formatUnits(BigInt(row.baseUnits), row.decimals),
     network: chainName(row.chain as NetworkKey),
     usdValue: row.usdValue ?? "0.00",
+    cash: isPlainCash(row.chain, row.instrument) ? (row.chain as CashKey) : null,
   };
 }

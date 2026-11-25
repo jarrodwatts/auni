@@ -1,11 +1,12 @@
-import { NETWORKS } from "@auni/shared";
+import { NETWORK_KEYS, NETWORKS } from "@auni/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import { prepareLeg } from "./actions.ts";
-import { whereFeesArePaid } from "./fee-coin.ts";
+import { feesPayable, whereFeesArePaid } from "./fee-coin.ts";
 import { ownGas } from "./gas.ts";
 import type { Holding } from "./portfolio.ts";
 import { NoFeeCoin, type Recipe } from "./recipe.ts";
+import { paysOwnGas } from "./wallets.ts";
 
 const held = (chain: string, instrument: string, quantity: string): Holding => ({
   venue: "wallet",
@@ -37,7 +38,7 @@ vi.mock(import("./portfolio.ts"), async (original) => ({
 vi.mock(import("./wallets.ts"), async (original) => ({
   ...(await original()),
   evmAddress: async () => "0x2222222222222222222222222222222222222222",
-  paysOwnGas: async (chain: number | "solana") => chain !== NETWORKS.base.viem.id,
+  paysOwnGas: vi.fn(async (chain: number | "solana") => chain !== NETWORKS.base.viem.id),
   makeWalletIfNone: async () => {},
 }));
 vi.mock(import("./gas.ts"), () => ({ ownGas: vi.fn(), ownGasFees: vi.fn() }));
@@ -48,6 +49,39 @@ describe("whereFeesArePaid", () => {
     expect(said.message).toBe(
       "Too little POL for gas. Right now the wallet holds some of the chain's own coin for fees on Monad, and fees are paid for it on Base. What it holds on Arbitrum and Polygon can't leave until some of that chain's own coin (ETH or POL) arrives there, which the owner can send to their own address. Propose moves that start where fees can be paid, or tell the owner what's missing.",
     );
+  });
+});
+
+// Add money told every owner "a little MON pays network fees", though Auni buys the coin a move
+// needs with USDC wherever some chain can send (2026-11-25).
+describe("feesPayable", () => {
+  const usdcOnly = [held("base", NETWORKS.base.usdc, "50"), held("solana", "native", "0")];
+
+  const evm = NETWORK_KEYS.filter((key) => key !== "solana");
+
+  it("is every EVM network once one of them can send, by a sponsor or the coin held there", async () => {
+    expect(await feesPayable(usdcOnly)).toEqual(evm);
+    vi.mocked(paysOwnGas).mockResolvedValue(true);
+    try {
+      expect(await feesPayable([...usdcOnly, held("polygon", "native", "2")])).toEqual(evm);
+      // And Solana, whose SOL is bought with USDC on Monad, once Monad can send.
+      expect(await feesPayable([...usdcOnly, held("monad", "native", "2")])).toEqual(NETWORK_KEYS);
+    } finally {
+      vi.mocked(paysOwnGas).mockImplementation(async (chain) => chain !== NETWORKS.base.viem.id);
+    }
+  });
+
+  it("is only where the wallet holds the coin when it pays its own fees and no EVM chain can", async () => {
+    vi.mocked(paysOwnGas).mockResolvedValue(true);
+    try {
+      expect(await feesPayable(usdcOnly)).toEqual([]);
+      // SOL pays Solana's own fees, but buys no EVM chain's coin.
+      expect(await feesPayable([...usdcOnly, held("solana", "native", "0.1")])).toEqual(["solana"]);
+      // Coin held anywhere but the wallet pays for nothing.
+      expect(await feesPayable([{ ...held("monad", "native", "5"), venue: "aave" }])).toEqual([]);
+    } finally {
+      vi.mocked(paysOwnGas).mockImplementation(async (chain) => chain !== NETWORKS.base.viem.id);
+    }
   });
 });
 

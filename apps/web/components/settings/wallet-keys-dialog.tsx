@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Eye, EyeOff, LoaderCircle, X } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
@@ -36,16 +36,6 @@ export function WalletKeysDialog({
 }) {
   return (
     <MoneySheet held open={open} onOpenChange={onOpenChange}>
-      <DialogClose asChild>
-        <Button
-          aria-label="Close"
-          className="absolute top-5 right-5 z-10"
-          size="icon-sm"
-          variant="ghost"
-        >
-          <X aria-hidden />
-        </Button>
-      </DialogClose>
       <ShowKeys />
     </MoneySheet>
   );
@@ -192,7 +182,7 @@ export function WalletKeyList({
                 type="button"
                 variant="secondary"
               >
-                {copied ? <Check aria-hidden className="text-positive" /> : <Copy aria-hidden />}
+                {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
                 {copied ? "Copied" : "Copy"}
               </Button>
             </div>

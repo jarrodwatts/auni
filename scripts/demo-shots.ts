@@ -168,12 +168,14 @@ async function take(
 }
 
 /**
- * Presses the first button on screen whose label or words (after any number) start with `label`,
- * and says whether there was one.
+ * Presses the first button the owner could press whose label or words (after any number) start
+ * with `label`, and says whether there was one: in the dialog on top when one is open, since what's
+ * behind it can't be pressed (a thread named "Solana" in the sidebar behind Add money, say).
  */
 const PRESS = (label: string) => `(() => {
   const wanted = ${JSON.stringify(label)};
-  const button = [...document.querySelectorAll("button")].find(
+  const top = [...document.querySelectorAll('[role="dialog"]')].at(-1) ?? document;
+  const button = [...top.querySelectorAll("button")].find(
     (el) =>
       el.getClientRects().length > 0 &&
       ((el.getAttribute("aria-label") ?? "").startsWith(wanted) ||
@@ -306,11 +308,31 @@ const LAND = `new Promise((landed) => {
     const response = await real(input, init);
     if (!/\\/core\\/portfolio(\\?|$)/u.test(String(input instanceof Request ? input.url : input))) return response;
     const body = await response.json();
-    body.deposits = [{ id: "shot-landed", symbol: "USDC", amount: "250", network: "Base", usdValue: "250" }, ...body.deposits];
+    body.deposits = [{ id: "shot-landed", symbol: "USDC", amount: "250", network: "Base", usdValue: "250", cash: "base" }, ...body.deposits];
     return new Response(JSON.stringify(body), { status: response.status, headers: response.headers });
   };
   setTimeout(() => landed(true), 15_000);
 })`;
+
+/**
+ * Withdraw's read of the cash coming back late, with two places money went before, as an owner
+ * starts typing a new address before it lands: what they typed stays picked once it does.
+ */
+const LATE_PLACES = `(() => {
+  const real = window.fetch;
+  window.fetch = async (input, init) => {
+    const response = await real(input, init);
+    if (!/\\/core\\/withdrawals\\/cash$/u.test(String(input instanceof Request ? input.url : input))) return response;
+    const body = await response.json();
+    body.recent = [
+      { address: "0x1111111111111111111111111111111111111111", network: "base", destination: "exchange", at: "2026-11-20T03:00:00Z" },
+      { address: "0x3333333333333333333333333333333333333333", network: "arbitrum", destination: "wallet", at: "2026-11-12T03:00:00Z" },
+    ];
+    await new Promise((later) => setTimeout(later, 3_000));
+    return new Response(JSON.stringify(body), { status: response.status, headers: response.headers });
+  };
+  return true;
+})()`;
 
 /** Types `value` into the field named `name`, as a person would, so the page's own state hears it. */
 const FILL = (name: string, value: string) => `(() => {
@@ -494,7 +516,15 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       PRESS("Solana"),
       once,
     );
-    await take(page, out, "add-money-for-a-card", `${origin}/app?fund=50`, "top", undefined, once);
+    await take(
+      page,
+      out,
+      "add-money-for-a-card",
+      `${origin}/app?fund=50-base`,
+      "top",
+      undefined,
+      once,
+    );
     await take(page, out, "add-money-landed", `${origin}/app?fund=open`, "top", LAND, once);
     await take(page, out, "withdraw", `${origin}/app`, "top", PRESS("Withdraw"), once);
     await take(
@@ -512,6 +542,24 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
         await ${PAUSE(300)};
         ${PRESS("Review")};
         await ${PAUSE(2_500)};
+        return true;
+      })()`,
+      once,
+    );
+    await take(
+      page,
+      out,
+      "withdraw-new-address",
+      `${origin}/app`,
+      "top",
+      `(async () => {
+        ${LATE_PLACES};
+        ${PRESS("Withdraw")};
+        await ${PAUSE(500)};
+        ${FILL("amount", "20")};
+        ${PRESS("Monad")};
+        ${FILL("address", "0x2222222222222222222222222222222222222222")};
+        await ${PAUSE(4_000)};
         return true;
       })()`,
       once,

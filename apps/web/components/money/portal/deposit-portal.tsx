@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { useMoney } from "@/components/money/money-provider";
+import type { FundingNeed } from "@/lib/app-links";
 import { markActivitySeen } from "@/lib/data/activity";
 
 import { NOT_WATCHED, watchRead, type DepositWatch } from "../deposit-watch";
@@ -12,10 +13,10 @@ import { Portal } from "./portal";
 
 /**
  * The Portal on the account's own addresses, reading the money more often for as long as it's
- * open, and showing every deposit core records after it opened. `need` is the whole dollars
- * a card asked for, when one opened it.
+ * open, and showing every deposit core records after it opened. `need` is what a card is short
+ * of, when one opened it.
  */
-export function DepositPortal({ need }: { readonly need: string | null }) {
+export function DepositPortal({ need }: { readonly need: FundingNeed | null }) {
   const { depositNetworks: networks, portfolio, watchDeposits } = useMoney();
   useEffect(() => watchDeposits(), [watchDeposits]);
 
@@ -41,5 +42,12 @@ export function DepositPortal({ need }: { readonly need: string | null }) {
     );
   }, [latest, refreshMoney, queryClient]);
 
-  return <Portal landed={landed} need={need} networks={networks} />;
+  return (
+    <Portal
+      feesPayable={portfolio?.feesPayable ?? null}
+      landed={landed}
+      need={need}
+      networks={networks}
+    />
+  );
 }

@@ -29,7 +29,7 @@ export function WithdrawReviewDialog({
 
   return (
     <MoneySheet open={open} onOpenChange={onOpenChange}>
-      <DialogTitle className="text-title text-ink">Check before you send</DialogTitle>
+      <DialogTitle className="pr-10 text-title text-ink">Check before you send</DialogTitle>
       <DialogDescription className="mt-1.5 text-body text-muted-foreground">
         Money sent to the wrong address can&apos;t come back.
       </DialogDescription>

@@ -236,8 +236,23 @@ describe("nextStep", () => {
     }
   });
 
+  it("shows the tunnel before the pairing command when the other computer needs it", () => {
+    const facts: SetupFacts = {
+      ...thinking,
+      running: { running: true, webAnswers: true, browser: "no-screen" },
+    };
+    expect(said(facts)).toMatch(/ssh -L 3000:127.0.0.1:3000 <this computer>[\s\S]+Run auni pair/u);
+    expect(said({ ...facts, running: { ...facts.running, browser: "not-opened" } })).not.toContain(
+      "ssh -L",
+    );
+  });
+
   it("reads as plain words, with the command to run", () => {
-    expect(said(nextStep(thinking))).toMatch(/Run: auni$/u);
+    expect(said(thinking)).toMatch(/^Run auni\n\nAuni is stopped/u);
+    expect(said({ ...thinking, webBuilt: false })).toContain(
+      "The web app builds on the first start.",
+    );
+    expect(nextStep(thinking).run).toEqual({ command: "auni", background: true });
   });
 });
 

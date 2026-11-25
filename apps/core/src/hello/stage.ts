@@ -62,10 +62,8 @@ export const BRAIN_WAIT_MS = 3_000;
 /** How tall the sky is, in pixels, which Auni falls into and leaps out of. */
 const SKY_PIXELS = SKY_ROWS * 2;
 
-/** What the owner needs to know once Auni is up, in a terminal that runs it. */
-export const KEEP_OPEN = "Leave this window open while you use Auni. Ctrl-C stops it.";
 /** With no AI here, the next step, once Auni has gone into the browser to take it with them. */
-export const SIGN_IN_THERE = "Auni needs your AI: sign in from your browser.";
+export const SIGN_IN_THERE = "Sign in to your AI in the browser.";
 
 const STONE = { memory: 0, brain: 1, page: 2 } as const;
 /** Where Auni stands to peer at a brain stone with nothing on it: at the memory stone's edge. */
@@ -97,9 +95,9 @@ export class Stage {
     squash: 0,
   };
   private readonly stones: { label: string; state: StoneState }[] = [
-    { label: "memory", state: "working" },
-    { label: "brain", state: "waiting" },
-    { label: "your page", state: "waiting" },
+    { label: "Memory", state: "working" },
+    { label: "Your AI", state: "waiting" },
+    { label: "Web app", state: "waiting" },
   ];
   private said: string | null = null;
   private typed = 0;
@@ -136,7 +134,7 @@ export class Stage {
     this.columns = options.columns;
     this.lastFrame = options.now;
     this.lastBlink = options.now;
-    this.say("Waking up my memory");
+    this.say("Starting Auni");
     this.then(520, (t) => this.move({ lift: SKY_PIXELS * (1 - t) ** 2 }));
     this.then(200, (t) => this.move({ squash: 0.45 * (1 - t) }));
   }
@@ -171,8 +169,7 @@ export class Stage {
         break;
       case "building":
         this.building = true;
-        if (this.step === "page" && !this.page)
-          this.say("Building your page. The first time takes a minute");
+        if (this.step === "page" && !this.page) this.say("Building the web app");
         break;
       case "page":
         this.page = true;
@@ -183,7 +180,7 @@ export class Stage {
         // The stone names what Auni found to think with, the moment it's known.
         this.stones[STONE.brain] = event.found.name
           ? { label: event.found.name, state: "ready" }
-          : { label: "brain", state: "missing" };
+          : { label: "Your AI", state: "missing" };
         // Found after the scene has ended (the owner signed in from the browser), the stones
         // and what to know under them say so, as they would have had it been here all along.
         if (this.step === "ended" && event.found.name && this.shown.length > 0) {
@@ -268,13 +265,13 @@ export class Stage {
         if (!this.memory) return;
         this.step = "memory";
         this.cheer();
-        this.say("Looking for my brain");
+        this.say("Checking your AI");
         this.face("open", 1);
         return;
       }
       case "memory": {
         if (this.brain?.name) {
-          this.say("There it is!");
+          this.say("Found your AI");
           this.face("open", 0);
           this.hop(standingX(STONE.brain));
           // Behind a page already waiting, it doesn't stop to cheer.
@@ -283,7 +280,7 @@ export class Stage {
           // To the edge of the empty stone, to frown at it.
           this.hop(EDGE);
           this.face("worry", 1);
-          this.say("Hmm. No AI here for me to think with");
+          this.say("Your AI needs attention");
           // Long enough to read, and shorter with the browser already opening on its page.
           this.then(this.quick || this.leaveAsked ? 700 : 1_400);
         } else if (!this.gaveUpOnBrain(now)) return;
@@ -297,10 +294,10 @@ export class Stage {
           this.page && this.leaveAsked
             ? this.goodbye
             : this.page
-              ? "And your page is ready"
+              ? "Web app ready"
               : this.building
-                ? "Building your page. The first time takes a minute"
-                : "Setting out your page",
+                ? "Building the web app"
+                : "Starting the web app",
         );
         this.face("open", 0);
         // From the memory's stone, over the brain's, it's a long way: a bigger hop.
@@ -315,7 +312,7 @@ export class Stage {
           this.leap();
           this.step = "leaving";
         } else if (this.up && !this.up.opened && (this.brain || this.gaveUpOnBrain(now))) {
-          const words = "Come and find me at the address below";
+          const words = "Open Auni at the address below";
           this.say(words);
           this.face("open", 0);
           // Typed in full before the scene ends.
@@ -368,7 +365,6 @@ export class Stage {
       ...(this.brain?.name ? [this.brain.line] : []),
       // What fixes the brain is said here only where no browser opened to do it in.
       ...(fix ? [this.up?.opened ? SIGN_IN_THERE : fix] : []),
-      KEEP_OPEN,
     ];
   }
 

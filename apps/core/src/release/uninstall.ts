@@ -126,18 +126,19 @@ export async function uninstall({ kept, remove }: Exclude<KeysChoice, "stop">): 
 
 /** What `auni uninstall` says it left, and where. */
 export function farewell(dir: string, kept: KeptKeys | null, removed: boolean): string {
-  const data = `Your data stays in ${dir}: its database and your settings`;
-  if (removed) return `Auni is uninstalled, and your wallet's keys are removed. ${data}.`;
-  if (!kept) return `Auni is uninstalled. ${data}.`;
-  if (kept.inDataFolder)
-    return (
-      `Auni is uninstalled. ${data}, and your wallet's keys. Removing that folder loses the ` +
-      "wallet, unless its money is moved out first or you have its backup."
+  const data = `Your database and settings stay in ${dir}.`;
+  const lines = ["Auni is uninstalled.", data];
+  if (removed) lines.push("Your wallet's keys were removed.");
+  else if (kept?.inDataFolder) {
+    lines.push(
+      "Your wallet keys are in that folder.",
+      "Move your funds or save a backup before deleting it.",
     );
-  return (
-    `Auni is uninstalled. ${data}. Your wallet's keys stay ${kept.place}, and removing that ` +
-    `folder leaves them there: an Auni installed into ${dir} again signs with the same wallet. ` +
-    "Deleting that entry with your OS's keychain app removes them, and loses the wallet unless " +
-    "its money is moved out first or you have its backup."
-  );
+  } else if (kept) {
+    lines.push(
+      `Your wallet keys stay ${kept.place}.`,
+      "If you reinstall with the same data folder, Auni can use this wallet again.",
+    );
+  }
+  return lines.join("\n");
 }

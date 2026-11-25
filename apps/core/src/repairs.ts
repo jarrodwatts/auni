@@ -1,8 +1,9 @@
 import { serveDoorAgain } from "./always-on.ts";
 import { holdAgain, letGo } from "./boot.ts";
-import { doctor, line, type Finding } from "./doctor.ts";
+import { doctor, doctorSummary, line, type Finding } from "./doctor.ts";
 import { cameUp, runningAuni, stopAuni, where } from "./running.ts";
 import { enableLinger, installService, serviceOutput, startService } from "./service.ts";
+import { auniCommand } from "./setup.ts";
 
 // `auni doctor`'s repairs, as `t3 doctor` offers them: doctor says what it found (doctor.ts), and
 // a finding something safe can mend carries the repair that does. In a terminal `auni doctor`
@@ -227,6 +228,8 @@ async function repair(chosen: readonly Offer[], say: (text: string) => void): Pr
 export interface DoctorRun {
   /** The findings as JSON on stdout, and everything else said on stderr. */
   readonly json: boolean;
+  /** Show every finding and possible repair. */
+  readonly verbose?: boolean;
   /** Runs the recommended repairs unasked. */
   readonly fix: boolean;
   /** Says what the repairs would be and runs none, even with `fix`. */
@@ -242,32 +245,43 @@ export interface DoctorRun {
 export async function doctorCommand(run: DoctorRun): Promise<number> {
   const say = (text: string) => (run.json ? console.error(text) : console.log(text));
   let findings = await doctor();
-  if (!run.json) console.log(findings.map(line).join("\n"));
+  const print = (rows: readonly Finding[]) =>
+    run.verbose ? rows.map(line).join("\n") : doctorSummary(rows, auniCommand());
+  if (!run.json) say(print(findings));
   const offers = offered(findings);
   if (offers.length > 0) {
-    say(
-      [
-        "",
-        "Repairs:",
-        ...offers.map(({ does, recommended }) => `  ${does}${recommended ? " (recommended)" : ""}`),
-      ].join("\n"),
-    );
-    if (run.dryRun) say("Dry run: nothing changed.");
-    else if (!run.fix && !run.ask)
+    if (run.json || run.verbose || run.dryRun)
       say(
-        "Run auni doctor --fix to run the recommended ones, or auni doctor in a terminal to choose.",
+        [
+          "",
+          "Repairs:",
+          ...offers.map(
+            ({ does, recommended }) => `  ${does}${recommended ? " (recommended)" : ""}`,
+          ),
+        ].join("\n"),
       );
-    else {
+    if (run.dryRun) say("Dry run: nothing changed.");
+    else if (!run.fix && !run.ask) {
+      if (run.json || run.verbose) {
+        const auni = auniCommand();
+        say(
+          offers.some(({ recommended }) => recommended)
+            ? `Run ${auni} doctor --fix to run the recommended repairs.`
+            : `To choose an optional repair, run ${auni} doctor --verbose in a terminal.`,
+        );
+      }
+    } else {
+      const eligible = offers.filter(({ recommended }) => recommended || (!run.fix && run.verbose));
       const chosen: Offer[] = [];
-      for (const each of offers)
-        if (run.fix ? each.recommended : await run.ask!(each)) chosen.push(each);
-      if (chosen.length === 0)
-        say(run.fix ? "None is recommended: nothing changed." : "Nothing changed.");
-      else {
+      for (const each of eligible) if (run.fix || (await run.ask!(each))) chosen.push(each);
+      if (chosen.length === 0) {
+        if (run.fix) say("None is recommended: nothing changed.");
+        else if (eligible.length) say("Nothing changed.");
+      } else {
         say("");
         await repair(chosen, say);
         findings = await doctor();
-        if (!run.json) console.log(["", "Now:", ...findings.map(line)].join("\n"));
+        if (!run.json) say(`\nAfter repairs\n${print(findings)}`);
       }
     }
   }

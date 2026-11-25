@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -33,10 +33,11 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 describe("auni demo --at a moment", () => {
   let demo: ChildProcessByStdio<null, Readable, Readable>;
   let said = "";
+  let port: number;
   let ask: <T>(path: string) => Promise<T>;
 
   beforeAll(async () => {
-    const port = await freePort();
+    port = await freePort();
     demo = spawn(
       process.execPath,
       [AUNI, "demo", "--no-open", "--no-web", "--port", String(port), "--at", AT],
@@ -55,7 +56,7 @@ describe("auni demo --at a moment", () => {
       },
       { timeout: 120_000, interval: 200 },
     );
-    const core = `http://127.0.0.1:${/API is listening on [\d.]+:(\d+)/u.exec(said)![1]}`;
+    const core = /API ready at (http:\/\/\S+)/u.exec(said)![1]!;
     const origin = `http://localhost:${port}`;
     // A session is written with one clock and checked with the other (Date, then now()).
     const paired = await fetch(`${core}/owner/pair`, {
@@ -78,8 +79,14 @@ describe("auni demo --at a moment", () => {
   });
 
   it("makes the same owner, with every scene of their past played", () => {
-    expect(said).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);
-    expect(said).toMatch(/owner is ready \([\d.]+ s\): \d+ cards done, 5 waiting, 2 failed, 1 held/u);
+    const log = readFileSync(
+      join(scratch, `auni-demo-${userInfo().uid}-${port}`, "auni.log"),
+      "utf8",
+    );
+    expect(log).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);
+    expect(log).toMatch(
+      /owner is ready \([\d.]+ s\): \d+ cards done, 5 waiting, 2 failed, 1 held/u,
+    );
   });
 
   it("lays the past week on that moment, and reads it the same a while later", async () => {

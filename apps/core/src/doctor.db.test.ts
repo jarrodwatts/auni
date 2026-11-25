@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { brainRows } from "./agent/brain.ts";
 import { db } from "./db/client.ts";
 import { appTroubles, jobs } from "./db/schema.ts";
-import { doctor, line, type Finding } from "./doctor.ts";
+import { doctor, doctorSummary, line, type Finding } from "./doctor.ts";
 import { env } from "./env.ts";
+import * as migrations from "./db/migrations.ts";
 import { checkRelease } from "./release/check.ts";
 import { runningVersion, versionLine } from "./release/layout.ts";
 import { holderName } from "./running.ts";
@@ -134,6 +135,83 @@ describe("auni doctor", () => {
     ]);
     expect(of(findings, "apps")).toEqual(["ok   apps: nothing has kept failing"]);
     expect(of(findings, "web")).toEqual([`ok   web: ${env.WEB_ORIGIN} answers and reaches core`]);
+  });
+
+  it("leads with startup when updates are pending, while keeping independent network checks", async () => {
+    vi.spyOn(migrations, "pendingMigrations").mockResolvedValue(1);
+    vi.mocked(fetch).mockRejectedValue(new Error("fetch failed"));
+
+    const findings = await doctor();
+    expect(doctorSummary(findings, "pnpm auni")).toBe(
+      [
+        "Auni is stopped.",
+        "Run pnpm auni",
+        "Needs attention: Your AI",
+        "Waiting for startup: Web app, Wallet, Apps",
+        "Networks: 7 chains ready, 1 with limits, check Monad, Polygon",
+        "Passed: Version",
+        "Every check: pnpm auni doctor --verbose",
+      ].join("\n"),
+    );
+    // Machine readers still see the individual findings and no presentation fields.
+    expect(JSON.parse(JSON.stringify(findings))).toContainEqual({
+      check: "database",
+      status: "fix",
+      says: "1 migrations to apply: `auni` applies them as it starts",
+    });
+    expect(of(findings, "web")).toContainEqual(expect.stringMatching(/fetch failed/u));
+    expect(of(findings, "wallet")).toEqual(["fix  wallet: needs the database first"]);
+  });
+
+  it("keeps database failures visible when starting won't resolve them", () => {
+    const summary = doctorSummary(
+      [
+        { check: "database", status: "fix", says: "can't connect" },
+        { check: "runner", status: "fix", says: "needs the database first" },
+        { check: "web", status: "fix", says: "nothing answers" },
+      ],
+      "auni",
+    );
+    expect(summary).toMatch(/^Auni can't check its database\.\nRun auni doctor --verbose/u);
+    expect(summary).not.toContain("Background work");
+    expect(summary).not.toContain("Web app");
+  });
+
+  it("shows recent failed tasks without the error in the default summary", async () => {
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      await db.insert(jobs).values([
+        { kind: "found", data: {}, finishedAt: new Date(), outcome: "failed", error: "no price" },
+        { kind: "reading", data: {}, finishedAt: new Date(), outcome: "failed", error: "RPC busy" },
+      ]);
+      const findings = await doctor();
+      expect(of(findings, "runner")).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/no price/u),
+          expect.stringMatching(/RPC busy/u),
+        ]),
+      );
+      const summary = doctorSummary(findings, "auni");
+      expect(summary).toContain("Background work: 2 tasks failed in the last 24 hours.");
+      expect(summary).not.toMatch(/no price|RPC busy/u);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  it("doesn't count local-only access as working remote access", () => {
+    const summary = doctorSummary(
+      [
+        { check: "runner", status: "ok", says: "running" },
+        { check: "always-on", status: "note", says: "on this computer only" },
+        { check: "always-on", status: "ok", says: "stays awake" },
+      ],
+      "auni",
+    );
+    expect(summary).toContain("Access: this computer only.");
+    expect(summary).toContain("Passed: Background work\n");
+    expect(summary).not.toContain("Access from other devices");
   });
 
   it("says what keeps going wrong for an app, the oldest first: a read a service retired, a key out of credits", async () => {
@@ -317,7 +395,11 @@ describe("auni doctor", () => {
       ]);
       // A service from another folder: restarting it would run the same old code.
       service.command = ["/elsewhere/node", "/elsewhere/auni.mjs", "--no-open"];
-      expect(repairs(await doctor(), "runner")).toEqual([
+      const findings = await doctor();
+      expect(doctorSummary(findings, "pnpm auni")).toContain(
+        "Stop Auni, then start it from this folder to use this version.",
+      );
+      expect(repairs(findings, "runner")).toEqual([
         {
           status: "note",
           says: `Auni runs 0.0.9 (0ld0ld0ld) as a service, and this folder holds ${versionLine()}: restart it to run this one`,

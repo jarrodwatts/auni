@@ -75,18 +75,16 @@ describe("uninstalling, the wallet's keys", () => {
 
   it("are said truthfully as Auni goes: a keychain entry outlives the data folder", () => {
     expect(farewell("/home/me/.auni", inKeychain, false)).toBe(
-      "Auni is uninstalled. Your data stays in /home/me/.auni: its database and your settings. " +
-        `Your wallet's keys stay ${inKeychain.place}, and removing that folder leaves them there: ` +
-        "an Auni installed into /home/me/.auni again signs with the same wallet. Deleting that " +
-        "entry with your OS's keychain app removes them, and loses the wallet unless its money " +
-        "is moved out first or you have its backup.",
+      "Auni is uninstalled.\nYour database and settings stay in /home/me/.auni.\n" +
+        `Your wallet keys stay ${inKeychain.place}.\n` +
+        "If you reinstall with the same data folder, Auni can use this wallet again.",
     );
     expect(
       farewell("/srv/auni", { place: "in /srv/auni/wallet-keys.json", inDataFolder: true }, false),
-    ).toMatch(
-      /stays in \/srv\/auni: its database and your settings, and your wallet's keys\. Removing that folder loses the wallet/u,
+    ).toMatch(/stay in \/srv\/auni\.\nYour wallet keys are in that folder/u);
+    expect(farewell("/home/me/.auni", inKeychain, true)).toMatch(
+      /Your wallet's keys were removed/u,
     );
-    expect(farewell("/home/me/.auni", inKeychain, true)).toMatch(/your wallet's keys are removed/u);
     expect(farewell("/home/me/.auni", null, false)).not.toMatch(/keys/u);
   });
 });

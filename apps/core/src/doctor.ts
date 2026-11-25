@@ -31,6 +31,9 @@ import { answeringVersion, brainsFact, keptKeys, walletFacts, webUnreachable } f
  * `auni doctor --fix` runs when it is recommended.
  */
 
+// Presentation facts stay out of the JSON and web diagnostics contracts.
+const terminalDetail = Symbol("terminal detail");
+
 export interface Finding {
   readonly check:
     | "version"
@@ -45,6 +48,11 @@ export interface Finding {
     | "always-on";
   readonly status: "ok" | "note" | "fix";
   readonly says: string;
+  readonly [terminalDetail]?:
+    | { readonly network: NetworkKey }
+    | { readonly failedJobs: number }
+    | "migrates-on-start"
+    | "restart-to-update";
   readonly repair?: { readonly id: RepairId; readonly recommended: boolean };
 }
 
@@ -157,6 +165,7 @@ const checkDatabase: Check = async () => {
       : {
           check: "database",
           status: "fix",
+          [terminalDetail]: "migrates-on-start",
           says: `${pending} migrations to apply: \`auni\` applies them as it starts`,
         },
   ];
@@ -223,6 +232,7 @@ const checkRunner: Check = async () => {
       check: "runner",
       status: "note",
       says: `${many} ${kind} jobs failed in the last day, the latest: ${error}`,
+      [terminalDetail]: { failedJobs: many },
     });
   return findings.length > 0
     ? findings
@@ -251,6 +261,7 @@ async function behindItsCode(holder: RunningAuni): Promise<Finding | null> {
         check: "runner",
         status: "note",
         says: `Auni runs ${running} ${where(holder)}, and this folder holds ${here}: restart it to run this one`,
+        [terminalDetail]: "restart-to-update",
       };
 }
 
@@ -291,10 +302,17 @@ const PROBE_BLOCKS = 1_000;
 const checkRpcs: Check = async () =>
   (
     await Promise.all([
-      ...EVM_CHAIN_KEYS.map((chain) => guarded("rpc", () => checkEvmRpc(chain))),
-      guarded("rpc", checkSolanaRpc),
+      ...EVM_CHAIN_KEYS.map((chain) => checkNetwork(chain, () => checkEvmRpc(chain))),
+      checkNetwork("solana", checkSolanaRpc),
     ])
   ).flat();
+
+async function checkNetwork(network: NetworkKey, run: Check): Promise<Finding[]> {
+  return (await guarded("rpc", run)).map((finding) => ({
+    ...finding,
+    [terminalDetail]: { network },
+  }));
+}
 
 /** "Monad, through its public RPCs (RPC_URL_MONAD sets your own)". */
 function through(chain: NetworkKey): string {
@@ -447,3 +465,123 @@ const checkWeb: Check = async () => {
 /** Whether Tailscale brings the owner's devices here, and this machine keeps Auni running. */
 const checkAlwaysOn: Check = async () =>
   (await reachFindings()).map((finding) => ({ check: "always-on", ...finding }));
+
+const LABELS: Record<Finding["check"], string> = {
+  version: "Version",
+  database: "Database",
+  runner: "Background work",
+  service: "Background service",
+  rpc: "Networks",
+  brain: "Your AI",
+  wallet: "Wallet",
+  apps: "Apps",
+  web: "Web app",
+  "always-on": "Access from other devices",
+};
+
+/** Summarizes the same findings that --json and web diagnostics read. */
+export function doctorSummary(findings: readonly Finding[], auni: string): string {
+  const fixes = findings.filter(({ status }) => status === "fix");
+  const stopped = fixes.find(
+    ({ check, repair }) =>
+      check === "runner" && (repair?.id === "start-service" || repair?.id === "install-service"),
+  );
+  const database = fixes.find(({ check }) => check === "database");
+  const databaseDown = database && database[terminalDetail] !== "migrates-on-start";
+  const webReady = findings.some(({ check, status }) => check === "web" && status === "ok");
+  const needsStart = stopped && !databaseDown && !webReady;
+  const failedJobs = findings.reduce((total, row) => {
+    const detail = row[terminalDetail];
+    return typeof detail === "object" && "failedJobs" in detail ? total + detail.failedJobs : total;
+  }, 0);
+  const needsRestart = findings.some((row) => row[terminalDetail] === "restart-to-update");
+  const followUp = fixes.length > 0 || failedJobs > 0 || needsRestart;
+  const details = `${auni} doctor --verbose`;
+  const repair = needsStart
+    ? stopped.repair?.recommended
+    : fixes.some(({ repair }) => repair?.recommended);
+  const next = databaseDown
+    ? details
+    : needsStart && !repair
+      ? auni
+      : repair
+        ? `${auni} doctor --fix`
+        : details;
+  const state = databaseDown
+    ? "Auni can't check its database."
+    : needsStart
+      ? "Auni is stopped."
+      : stopped
+        ? "Auni's web app is open. Background work is stopped."
+        : followUp
+          ? webReady
+            ? "Auni is running, with checks to review."
+            : "Auni needs attention."
+          : "Auni is running.";
+  const lines = [state];
+  if (followUp) lines.push(`Run ${next}`);
+
+  const issues = new Set(
+    fixes
+      .filter(
+        ({ check }) =>
+          check !== "rpc" &&
+          !(database && (check === "wallet" || check === "apps")) &&
+          !(databaseDown && (check === "runner" || check === "database" || check === "web")) &&
+          !(needsStart && check === "web") &&
+          !(needsStart && (check === "runner" || check === "database")),
+      )
+      .map(({ check }) => LABELS[check]),
+  );
+  if (issues.size) lines.push(`Needs attention: ${[...issues].join(", ")}`);
+  if (needsStart)
+    lines.push(
+      database ? "Waiting for startup: Web app, Wallet, Apps" : "Waiting for startup: Web app",
+    );
+  else if (database) lines.push("Waiting for the database: Wallet, Apps");
+
+  if (needsRestart) lines.push("Stop Auni, then start it from this folder to use this version.");
+  if (failedJobs) {
+    const tasks = failedJobs === 1 ? "task" : "tasks";
+    lines.push(`Background work: ${failedJobs} ${tasks} failed in the last 24 hours.`);
+  }
+  const localOnly =
+    !env.TAILSCALE_OWNER &&
+    findings.some(({ check, status }) => check === "always-on" && status !== "fix");
+  if (localOnly) lines.push("Access: this computer only.");
+
+  const networks = findings.filter(({ check }) => check === "rpc");
+  if (networks.length) {
+    const count = (status: Finding["status"]) =>
+      networks.filter((row) => row.status === status).length;
+    const ready = count("ok");
+    const problems = networks.flatMap((row) => {
+      const detail = row[terminalDetail];
+      return row.status === "fix" && typeof detail === "object" && "network" in detail
+        ? [NETWORKS[detail.network].name]
+        : [];
+    });
+    const parts = [`${ready} ${ready === 1 ? "chain" : "chains"} ready`];
+    if (count("note")) parts.push(`${count("note")} with limits`);
+    if (count("fix"))
+      parts.push(
+        `check ${problems.length === count("fix") ? problems.join(", ") : `${count("fix")} networks`}`,
+      );
+    lines.push(`Networks: ${parts.join(", ")}`);
+  }
+
+  const healthy = new Set(
+    findings
+      .filter(
+        ({ check, status }) =>
+          check !== "rpc" &&
+          !(localOnly && check === "always-on") &&
+          status === "ok" &&
+          !issues.has(LABELS[check]),
+      )
+      .map(({ check }) => LABELS[check]),
+  );
+  if (healthy.size) lines.push(`Passed: ${[...healthy].join(", ")}`);
+  if (next !== details || !followUp) lines.push(`Every check: ${details}`);
+  return lines.join("\n");
+}

@@ -1,9 +1,8 @@
 import type { ChildProcess } from "node:child_process";
 import type { Server } from "node:http";
 
-import { brainSeen, nothingToThinkWith, onBrainReady, proveLogins } from "./agent/brain.ts";
+import { brainSeen, onBrainReady, proveLogins } from "./agent/brain.ts";
 import { lastPaired, mintPairingCode, pairingLink, theOwner } from "./auth/owner.ts";
-import { doorSocket } from "./auth/tailscale.ts";
 import { closeDatabaseConnection } from "./db/client.ts";
 import { postgresLog, type Postgres } from "./db/embedded.ts";
 import { migrateDatabase } from "./db/migrations.ts";
@@ -24,6 +23,7 @@ import type { BrainFound } from "./hello/stage.ts";
 import { plainTelling, type Telling } from "./hello/telling.ts";
 import { canOpenBrowser, noteBrowserTry, openBrowser } from "./open-browser.ts";
 import { runningAuni, runsAs, where } from "./running.ts";
+import { auniCommand } from "./setup.ts";
 import { startWebApp } from "./web-app.ts";
 
 /**
@@ -47,6 +47,8 @@ export async function start(
     readonly onceUp?: () => Promise<void>;
     /** Prints the pairing link where no browser opens: only a demo's, whose owner is made up. */
     readonly printsLink?: boolean;
+    /** How to stop when it runs without a terminal. */
+    readonly stopHint?: string;
     /** The page of the app the browser is brought to, where it isn't the app's first. */
     readonly landsOn?: string;
     /** How the start is told: the terminal's scene, or plain lines (hello/telling.ts). */
@@ -168,10 +170,10 @@ export async function start(
         },
         pack: packHere,
       });
-    } else console.log("Auni's jobs are off (--no-jobs): nothing runs in the background.");
+    } else told.say("Background work is off.");
     servers = await listen();
-    told.log(`Auni's API is listening on ${env.HOST}:${env.PORT}.`);
-    if (env.TAILSCALE_OWNER) told.say(`Its door for Tailscale is open: ${doorSocket()}.`);
+    if (!web) told.log(`API ready at http://${env.HOST}:${env.PORT}`);
+    if (env.TAILSCALE_OWNER) told.log("Tailscale access is ready.");
     await onceUp?.();
     if (web) {
       // Its banner and chatter never reach the terminal, scene or plain: only Auni's own lines do.
@@ -196,7 +198,10 @@ export async function start(
       return;
     }
     if (error instanceof StillStopping) console.log(error.message);
-    else console.error(error);
+    else {
+      console.error(`Auni couldn't start. Run ${auniCommand()} doctor\n`);
+      console.error(error);
+    }
     await stop(1);
     return;
   }
@@ -210,9 +215,14 @@ export async function start(
     opening: () => told.leaving(),
   }).catch((error: unknown) => {
     told.abandon();
-    console.error("couldn't open Auni in the browser", error);
+    console.error(`Couldn't open Auni in your browser. Run ${auniCommand()} doctor\n`, error);
     return false;
   });
+  const mode = runsAs();
+  if (mode === "terminal") told.say("Keep this terminal open. Ctrl-C stops Auni.");
+  else if (options.stopHint) told.say(options.stopHint);
+  else if (!runJobs && !handed) told.say("Stop this process to shut down Auni.");
+  else told.say(`Auni runs ${where({ as: mode })}. Stop it with ${auniCommand()} stop`);
   told.up(opened);
 }
 
@@ -274,7 +284,7 @@ export async function openOwner({
 }): Promise<boolean> {
   // Through Tailscale there is nothing to pair, and this machine's own browser is never let in.
   if (env.TAILSCALE_OWNER) {
-    say(`\nAuni is at ${env.WEB_ORIGIN}, for your devices signed in to your Tailscale account.`);
+    say(`\nOpen Auni from a device signed in to Tailscale.\n${env.WEB_ORIGIN}`);
     return false;
   }
   const paired = (await lastPaired()) !== null;
@@ -290,17 +300,19 @@ export async function openOwner({
     );
     if (opened) {
       noteBrowserTry("opened");
-      say(`\nAuni is open in your browser, at ${env.WEB_ORIGIN}`);
+      say(`\nAuni is open in your browser.\n${env.WEB_ORIGIN}`);
       return true;
     }
   }
   noteBrowserTry(open && !screen ? "no-screen" : "not-opened");
-  say(`\nAuni is at ${env.WEB_ORIGIN}`);
-  if (paired) return false;
+  if (paired) {
+    say(`\nOpen Auni at ${env.WEB_ORIGIN}`);
+    return false;
+  }
   say(
     printsLink
-      ? `Open ${pairingLink(await mintPairingCode(), landsOn)} to sign in (works once, for 15 minutes).`
-      : "Run `auni pair` for a link that pairs your browser with Auni.",
+      ? `\nOpen ${pairingLink(await mintPairingCode(), landsOn)}\nThis link works once and expires after 15 minutes.`
+      : `\nAuni is at ${env.WEB_ORIGIN}\nRun ${auniCommand()} pair to get a sign-in link.`,
   );
   return false;
 }
@@ -318,7 +330,7 @@ async function brainFound(): Promise<BrainFound> {
   return "about" in picked
     ? {
         name: picked.about.name,
-        line: `Auni thinks with ${picked.about.name}, on ${picked.login}.`,
+        line: `Your AI: ${picked.about.name} ready.`,
       }
-    : { name: null, line: nothingToThinkWith(picked.fixes) };
+    : { name: null, line: `Your AI needs attention. Run ${auniCommand()} doctor --verbose` };
 }

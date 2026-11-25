@@ -1,6 +1,14 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
@@ -77,10 +85,18 @@ describe("auni demo", () => {
   });
 
   it("makes its owner through core, every scene of their past without one refusal", () => {
-    expect(said).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);
+    const log = readFileSync(
+      join(scratch, `auni-demo-${userInfo().uid}-${port}`, "auni.log"),
+      "utf8",
+    );
+    expect(said).toMatch(/^Demo mode. No real money./u);
+    expect(said).toContain("Preparing the sample takes.");
+    expect(said).not.toContain("is held for the owner");
+    expect(said).not.toContain("owner is ready");
+    expect(log).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);
     const [, done, waiting, failed, held] =
       /owner is ready \([\d.]+ s\): (\d+) cards done, (\d+) waiting, (\d+) failed, (\d+) held/u.exec(
-        said,
+        log,
       ) ?? [];
     expect(Number(done)).toBeGreaterThanOrEqual(10);
     // Four moves and an offer of an app left for the owner to tap; the one move the story has
@@ -145,7 +161,7 @@ describe("auni demo", () => {
   };
 
   it("signs a browser in by the link it prints, which lands on a new chat", async () => {
-    const core = `http://127.0.0.1:${/API is listening on [\d.]+:(\d+)/u.exec(said)![1]}`;
+    const core = /API ready at (http:\/\/\S+)/u.exec(said)![1]!;
     const origin = `http://localhost:${port}`;
     const [, code] = /Open http:\/\/localhost:\d+\/app\/new#pair=(\S+)/u.exec(said)!;
     const paired = await fetch(`${core}/owner/pair`, {

@@ -43,7 +43,7 @@ describe("openOwner", () => {
     expect(opened()).toEqual([
       expect.stringMatching(new RegExp(`^${env.WEB_ORIGIN}/app#pair=.+`, "u")),
     ]);
-    expect(said).toContain(`Auni is open in your browser, at ${env.WEB_ORIGIN}`);
+    expect(said).toContain(`Auni is open in your browser.\n${env.WEB_ORIGIN}`);
     expect(said).not.toContain("#pair");
     expect(said).not.toContain(opened()[0]!.split("=")[1]);
     expect(browserTried()?.how).toBe("opened");
@@ -61,7 +61,7 @@ describe("openOwner", () => {
     expect(opened()).toEqual([]);
     expect(await codes()).toEqual([]);
     expect(said).toContain(`Auni is at ${env.WEB_ORIGIN}`);
-    expect(said).toContain("`auni pair`");
+    expect(said).toContain("auni pair");
   });
 
   it("says the same when there's no screen, or the browser didn't open, and records which", async () => {
@@ -74,7 +74,7 @@ describe("openOwner", () => {
     await openOwner({ open: true });
     expect(browserTried()?.how).toBe("not-opened");
     expect(said).not.toContain("#pair");
-    expect(said.match(/`auni pair`/gu)).toHaveLength(2);
+    expect(said.match(/auni pair/gu)).toHaveLength(2);
   });
 
   it("brings the browser to the page a start names, by the link it opens or prints", async () => {
@@ -85,13 +85,13 @@ describe("openOwner", () => {
     // A demo, with nothing to open a browser in, prints the same link.
     vi.mocked(canOpenBrowser).mockReturnValue(false);
     await openOwner({ open: true, printsLink: true, landsOn: "/app/new" });
-    expect(said).toMatch(new RegExp(`Open ${env.WEB_ORIGIN}/app/new#pair=\\S+ to sign in`, "u"));
+    expect(said).toMatch(new RegExp(`Open ${env.WEB_ORIGIN}/app/new#pair=\\S+`, "u"));
   });
 
   it("asks a paired owner for no pairing link", async () => {
     await pairBrowser();
     await openOwner({ open: false });
-    expect(said).toContain(`Auni is at ${env.WEB_ORIGIN}`);
+    expect(said).toContain(`Open Auni at ${env.WEB_ORIGIN}`);
     expect(said).not.toContain("auni pair");
   });
 });

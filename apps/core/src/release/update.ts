@@ -14,7 +14,7 @@ import {
 import { basename, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { auniLog, dataDir } from "../data-dir.ts";
+import { dataDir } from "../data-dir.ts";
 import { where, type RunningAuni } from "../running.ts";
 import {
   appDir,
@@ -99,13 +99,14 @@ export async function update({
     if (version !== undefined && !isReleaseTag(version))
       throw new UpdateRefused(`${version} isn't a version, such as v0.1.0.`);
     const own = Boolean(host.env.AUNI_SOURCE);
+    say(own ? "Checking the source you supplied." : "Checking for an Auni release.");
     const release = own ? null : await check(from, version, host);
     // A source is the version --version names, or the one its package.json says, as install.sh reads it.
     const to = release?.version ?? version ?? (await tagOf(from, host));
     if (to === from) {
       say(
         own && !version
-          ? `AUNI_SOURCE says it is ${to}, which Auni is on already. To build it as another, name one: auni update --version vX`
+          ? `Auni is already on ${to}. Use auni update --version <vX.Y.Z> to build the supplied source as a different version.`
           : `Auni is on ${to} already${version ? "" : ", the newest"}.`,
       );
       return "same";
@@ -116,7 +117,7 @@ export async function update({
     say(
       release
         ? described(release, from)
-        : `${to} is built from AUNI_SOURCE, which you named: it isn't a signed release, so it isn't checked.`,
+        : `Update ${from} → ${to} from the source you supplied (unsigned).`,
     );
     // Said before asking, so the yes is to stopping it too.
     if (running) say(stopsAndStarts(running, to));
@@ -124,11 +125,10 @@ export async function update({
       say("Nothing changed.");
       return "declined";
     }
-    say(`Updating Auni from ${from} to ${to}.`);
     if (!existsSync(join(versionDir(to), BUILT))) await build(from, to, host);
 
     if (running) {
-      say(`Stopping Auni, which runs ${where(running)} (running moves finish first).`);
+      say("Stopping Auni after any moves in progress finish.");
       if (!(await host.stop(running))) throw new UpdateRefused(STOP_TIMEOUT);
       // Its own Postgres stopped with it (db/embedded.ts): held again, for the export.
       await host.postgres?.hold();
@@ -144,11 +144,11 @@ export async function update({
     }
 
     switchCurrent(to);
-    say(`Starting ${to} to see that it comes up.`);
+    say(`Checking that ${to} starts.`);
     const { came, output } = await probe(host);
     if (came === "up") {
       keepOnly([from, to]);
-      say(`\n${to} came up. Auni is on ${to} now.${running ? "" : " Start it with: auni"}`);
+      say(`\nUpdated to Auni ${to}.${running ? "" : "\nRun auni to start it."}`);
       await again();
       return "updated";
     }
@@ -199,12 +199,9 @@ function described(release: Release, from: string): string {
     year: "numeric",
     timeZone: "UTC",
   });
-  const notes = release.notes || "Its release says nothing about what changed.";
-  const where =
-    byRelease(release.version, from) < 0
-      ? `It is older than ${from}, which you're on: updating goes back to it.`
-      : `You're on ${from}.`;
-  return `Auni ${release.version} was made on ${day} and is signed by Auni's release key. ${where}\n\nWhat changed in it:\n\n${notes}\n`;
+  const notes = release.notes || "This release has no notes.";
+  const action = byRelease(release.version, from) < 0 ? "Go back" : "Update";
+  return `${action} ${from} → ${release.version} (${day}, signature verified)\n\n${notes}\n`;
 }
 
 /**
@@ -248,11 +245,8 @@ async function tagOf(from: string, host: UpdateHost): Promise<string> {
 
 /** What becomes of the running Auni, said before the owner says yes. */
 function stopsAndStarts(running: RunningAuni, to: string): string {
-  const again =
-    running.as === "service"
-      ? "as a service"
-      : `in the background (its output goes to ${auniLog()})`;
-  return `Auni is running ${where(running)}: updating stops it first, letting running moves finish, and once ${to} has come up starts it again ${again}.`;
+  const again = running.as === "service" ? "as a service" : "in the background";
+  return `Auni is running ${where(running)}. It will finish moves in progress, stop, then start ${again} after ${to} is checked.`;
 }
 
 /**
@@ -270,8 +264,8 @@ async function startAgain(running: RunningAuni | null, host: UpdateHost): Promis
   const how = `${as === "service" ? "as a service" : "in the background"} ${running.as === "terminal" ? "now" : "again"}`;
   say(
     (await answers(host))
-      ? `Auni is running ${how}, at ${host.origin}. auni stop stops it.`
-      : `Auni was started ${how}, but its web app didn't answer within ${Math.round(host.healthyWithinMs / 1_000)} seconds: auni doctor says why.`,
+      ? `Auni is running ${how}.\nOpen ${host.origin}\nRun auni stop to stop it.`
+      : `Auni started ${how}, but the web app didn't answer within ${Math.round(host.healthyWithinMs / 1_000)} seconds.\nRun auni doctor`,
   );
 }
 
@@ -290,9 +284,9 @@ async function backUp(from: string, host: UpdateHost): Promise<string | null> {
       `Auni couldn't export its database first (${error instanceof Error ? error.message : String(error)}), so nothing changed.`,
     );
   });
-  say(`Everything Auni keeps is exported to ${exported}.`);
+  say(`Saved a database export to ${exported}`);
   if (!host.postgres) {
-    say("Your database is your own (DATABASE_URL), so its files aren't copied.");
+    say("Your external database stays where it is. Only the export was saved.");
     return null;
   }
   await host.postgres.release();
@@ -307,7 +301,7 @@ async function backUp(from: string, host: UpdateHost): Promise<string | null> {
     recursive: true,
     preserveTimestamps: true,
   });
-  say(`Your database is copied to ${backup}.`);
+  say("Saved a copy of Auni's database files.");
   return backup;
 }
 

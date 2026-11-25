@@ -97,12 +97,13 @@ switch (command) {
         const { mintChannelPairing } = await import("./channels/hub.ts");
         const pairing = await mintChannelPairing(channel);
         if (!pairing) {
-          console.error(`No channel "${channel}" is set up (its token in ~/.auni/.env).`);
+          console.error(`Channel "${channel}" isn't connected. Set it up in Apps first.`);
           process.exitCode = 1;
         } else
           console.log(
-            `Open ${pairing.hint}, or send Auni there: /start ${pairing.code}\n` +
-              "(works once, for 15 minutes, from your own account in a direct chat).",
+            `Open ${pairing.hint}\n` +
+              `Or send /start ${pairing.code} to Auni in a direct chat from your account.\n` +
+              "This code works once and expires after 15 minutes.",
           );
         return;
       }
@@ -110,8 +111,8 @@ switch (command) {
       if (env.TAILSCALE_OWNER) {
         // Always on, Tailscale says who the owner is (auth/tailscale.ts): nothing pairs.
         console.log(
-          `Auni is at ${env.WEB_ORIGIN}, through Tailscale: open it on any of your devices signed in to your Tailscale account, with nothing to pair. ` +
-            "To take a device's access away, remove it from your tailnet in Tailscale.",
+          `Open ${env.WEB_ORIGIN} on a device signed in to your Tailscale account.\n` +
+            "To sign a device out, remove it from your Tailscale network.",
         );
         if (flags.has("--sign-out-everywhere")) process.exitCode = 1;
         return;
@@ -123,7 +124,7 @@ switch (command) {
       }
       const link = owner.pairingLink(await owner.mintPairingCode());
       console.log(
-        `Open ${link} to pair this browser as Auni's owner (works once, for 15 minutes).`,
+        `Open this link to sign in to Auni:\n  ${link}\n\nIt works once and expires after 15 minutes.`,
       );
     });
     break;
@@ -136,8 +137,11 @@ switch (command) {
       const setup = await import("./setup.ts");
       // As starting Auni would, so a fresh machine's database has its tables to read.
       await migrateDatabase(env.DATABASE_URL);
-      const answer = setup.nextStep(await setup.readSetup());
-      console.log(flags.has("--json") ? JSON.stringify(answer, null, 2) : setup.said(answer));
+      const facts = await setup.readSetup();
+      const answer = setup.nextStep(facts);
+      console.log(
+        flags.has("--json") ? JSON.stringify(answer, null, 2) : setup.said(facts, answer),
+      );
     });
     break;
   case "doctor":
@@ -146,6 +150,7 @@ switch (command) {
       const json = flags.has("--json");
       process.exitCode = await doctorCommand({
         json,
+        verbose: flags.has("--verbose"),
         fix: flags.has("--fix"),
         dryRun: flags.has("--dry-run"),
         // Asked one at a time, starting at yes for a recommended one.
@@ -386,7 +391,7 @@ switch (command) {
     const shellEnv = { ...process.env };
     const { installed } = await import("./release/layout.ts");
     if (!installed()) {
-      console.error("This is a source checkout: update it with git pull, then pnpm install.");
+      console.error("Auni runs from source here. Run git pull, then pnpm install.");
       process.exitCode = 1;
       break;
     }
@@ -437,7 +442,7 @@ switch (command) {
   case "uninstall": {
     const { installed } = await import("./release/layout.ts");
     if (!installed()) {
-      console.error("This is a source checkout: delete its folder to remove it.");
+      console.error("Auni runs from source here. Remove this checkout to uninstall the app.");
       process.exitCode = 1;
       break;
     }
@@ -447,7 +452,7 @@ switch (command) {
     // once withDatabase has readied what env.ts reads (boot.ts).
     const choice = await withDatabase(async (): Promise<KeysChoice> => {
       const { keysChoice } = await import("./release/uninstall.ts");
-      const { runningAuni, stopAuni, where } = await import("./running.ts");
+      const { runningAuni, stopAuni } = await import("./running.ts");
       const running = await runningAuni();
       if (running && !running.here) {
         console.error(
@@ -456,12 +461,9 @@ switch (command) {
         return "stop";
       }
       console.log(
-        `Uninstalling removes Auni's app, the auni command and its service. Your data stays in ${dataDir()}.`,
+        `This removes the app, the auni command and its background service.\nYour data stays in ${dataDir()}.`,
       );
-      if (running)
-        console.log(
-          `Auni is running ${where(running)}: uninstalling stops it first, letting running moves finish.`,
-        );
+      if (running) console.log("Auni will finish any moves in progress before it stops.");
       try {
         if (!(await ownerSaysYes("Uninstall Auni?", "auni uninstall"))) {
           console.log("Nothing changed.");

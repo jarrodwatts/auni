@@ -266,7 +266,7 @@ export async function readSetup(): Promise<SetupFacts> {
 }
 
 /** The `auni` command as this machine reaches it. */
-function auniCommand({ checkout, onPath }: InstallFact): string {
+export function auniCommand({ checkout, onPath }: InstallFact = installFact()): string {
   return checkout ? "pnpm auni" : onPath ? "auni" : "~/.local/bin/auni";
 }
 
@@ -358,15 +358,43 @@ function pairSay(browser: NonNullable<RunningFact["browser"]>, auni: string): st
     return `The link Auni opened in your browser as it started has run out: ${pair}`;
   if (browser === "not-opened") return `Auni couldn't open your browser. To sign in, ${pair}`;
   // No screen here: the browser is on another computer, which reaches this one's web app through ssh.
-  const { hostname, port } = new URL(env.WEB_ORIGIN);
-  const local = hostname === "localhost" || hostname === "127.0.0.1";
-  const tunnel = local
-    ? ` If you reach this computer over ssh, connect with \`ssh -L ${port || 80}:127.0.0.1:${env.WEB_PORT} <this computer>\` first, then open the link in the browser on yours.`
+  const command = tunnelCommand();
+  const tunnel = command
+    ? ` If you reach this computer over ssh, connect with \`${command}\` first, then open the link in the browser on yours.`
     : "";
   return `Auni found no screen on this computer to open a browser on. To sign in, ${pair}${tunnel}`;
 }
 
+function tunnelCommand(): string | null {
+  const { hostname, port } = new URL(env.WEB_ORIGIN);
+  if (hostname !== "localhost" && hostname !== "127.0.0.1") return null;
+  return `ssh -L ${port || 80}:127.0.0.1:${env.WEB_PORT} <this computer>`;
+}
+
 /** One answer as a person reads it, for `auni setup` without --json. */
-export function said(answer: SetupAnswer): string {
-  return [answer.say, ...(answer.run ? [`Run: ${answer.run.command}`] : [])].join("\n");
+export function said(facts: SetupFacts, answer = nextStep(facts)): string {
+  if (answer.run)
+    return [
+      `Run ${answer.run.command}`,
+      "",
+      "Auni is stopped. Keep the terminal open while you use it.",
+      ...(facts.webBuilt ? [] : ["The web app builds on the first start."]),
+    ].join("\n");
+  if (answer.step === "start" && answer.next === "wait")
+    return facts.running.webAnswers ? "Opening the browser." : "Auni is starting its web app.";
+  if (answer.step === "start" && answer.next === "tell") {
+    const command = `${auniCommand(facts.install)} pair`;
+    if (facts.running.browser === "opened")
+      return `Open the Auni tab in your browser. If you closed it, run ${command}.`;
+    const tunnel = facts.running.browser === "no-screen" ? tunnelCommand() : null;
+    const pair = `Run ${command} on the computer running Auni, then open the link. It works once and expires after 15 minutes.`;
+    return tunnel
+      ? `If your browser is on another computer, connect to Auni from there first.\n  ${tunnel}\n\n${pair}`
+      : pair;
+  }
+  if (answer.step === "done")
+    return facts.tailscale
+      ? `Open ${env.WEB_ORIGIN} on a device signed in to your Tailscale account.`
+      : `Open ${env.WEB_ORIGIN} and tell Auni a take.`;
+  return answer.say;
 }

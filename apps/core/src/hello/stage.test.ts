@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SCENE_WIDTH, standingX } from "./scene.ts";
-import {
-  BRAIN_WAIT_MS,
-  KEEP_OPEN,
-  SIGN_IN_THERE,
-  Stage,
-  type StageEvent,
-  type StageSignal,
-} from "./stage.ts";
+import { BRAIN_WAIT_MS, SIGN_IN_THERE, Stage, type StageEvent, type StageSignal } from "./stage.ts";
 
 const ESC = String.fromCharCode(27);
 
@@ -85,7 +78,7 @@ describe("the terminal's Auni", () => {
     scene.run(4_000);
     expect(scene.stage.view.step).toBe("waking");
     expect(scene.stage.view.auni?.x).toBe(standingX(0));
-    expect(scene.stage.view.said).toBe("Waking up my memory");
+    expect(scene.stage.view.said).toBe("Starting Auni");
     expect(scene.views.some((view) => view.auni?.face === "shut")).toBe(true);
     expect(scene.signals).toEqual([]);
   });
@@ -97,9 +90,9 @@ describe("the terminal's Auni", () => {
     // On the page's stone, ready, and still here: nothing has asked it to go.
     expect(scene.stage.view.auni?.x).toBe(standingX(2));
     expect(scene.stage.view.stones.map(({ label, state }) => `${state} ${label}`)).toEqual([
-      "ready memory",
+      "ready Memory",
       "ready Claude Code",
-      "ready your page",
+      "ready Web app",
     ]);
     expect(scene.signals).toEqual([]);
 
@@ -117,7 +110,7 @@ describe("the terminal's Auni", () => {
     scene.run(300);
     scene.hear({ kind: "brain", found: FOUND });
     // The page comes up, and the browser starts to open on it, as Auni hops onto the brain's stone.
-    scene.until(() => scene.stage.view.said === "There it is!");
+    scene.until(() => scene.stage.view.said === "Found your AI");
     scene.run(300);
     scene.hear({ kind: "page" });
     const asked = scene.now;
@@ -131,7 +124,7 @@ describe("the terminal's Auni", () => {
     // Whole within the second a browser takes to come up, and with no "page is ready" before it.
     expect(whole).not.toBeNull();
     expect(whole! - asked).toBeLessThan(1_000);
-    expect(scene.views.some((view) => view.said === "And your page is ready")).toBe(false);
+    expect(scene.views.some((view) => view.said === "Web app ready")).toBe(false);
   });
 
   it("leaps off the terminal's own right edge, not the stones'", () => {
@@ -162,7 +155,6 @@ describe("the terminal's Auni", () => {
     expect(scene.stage.view.notes).toEqual([
       "Auni is open in your browser, at http://localhost:3000",
       FOUND.line,
-      KEEP_OPEN,
     ]);
   });
 
@@ -172,22 +164,20 @@ describe("the terminal's Auni", () => {
     scene.hear({ kind: "leave" });
     scene.leapt();
     expect(scene.views.some((view) => view.auni?.face === "worry")).toBe(true);
-    expect(scene.views.some((view) => view.said === "Hmm. No AI here for me to think with")).toBe(
-      true,
-    );
+    expect(scene.views.some((view) => view.said === "Your AI needs attention")).toBe(true);
     expect(scene.views.some((view) => view.said === "Let's sort it out in your browser!")).toBe(
       true,
     );
     expect(scene.stage.view.stones[1]?.state).toBe("missing");
     scene.hear({ kind: "up", opened: true });
     scene.until(() => scene.signals.some(({ signal }) => signal === "ended"));
-    expect(scene.stage.view.notes).toEqual([SIGN_IN_THERE, KEEP_OPEN]);
+    expect(scene.stage.view.notes).toEqual([SIGN_IN_THERE]);
 
     // Signed in from the browser later, the scene left on the terminal fills the stone in place.
     const before = scene.frames.length;
     scene.hear({ kind: "brain", found: FOUND });
     expect(scene.stage.view.stones[1]).toEqual({ label: "Claude Code", state: "ready" });
-    expect(scene.stage.view.notes).toEqual([FOUND.line, KEEP_OPEN]);
+    expect(scene.stage.view.notes).toEqual([FOUND.line]);
     expect(scene.frames.length).toBe(before + 1);
     expect(scene.frames.at(-1)).toContain("Claude Code");
     expect(scene.frames.at(-1)).not.toContain(SIGN_IN_THERE);
@@ -235,12 +225,8 @@ describe("the terminal's Auni", () => {
     scene.until(() => scene.signals.some(({ signal }) => signal === "ended"));
     expect(scene.signals.map(({ signal }) => signal)).toEqual(["ended"]);
     expect(scene.stage.view.auni).not.toBeNull();
-    expect(scene.stage.view.said).toBe("Come and find me at the address below");
-    expect(scene.stage.view.notes).toEqual([
-      "Auni is at http://localhost:3000",
-      MISSING.line,
-      KEEP_OPEN,
-    ]);
+    expect(scene.stage.view.said).toBe("Open Auni at the address below");
+    expect(scene.stage.view.notes).toEqual(["Auni is at http://localhost:3000", MISSING.line]);
   });
 
   it("is quick once the first take is behind the owner, and when behind a page already up", () => {

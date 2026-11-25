@@ -34,11 +34,18 @@ export async function startDemo({
   /** A new owner's first run: no past, no money, their first take ahead (first-run.ts). */
   readonly firstRun?: boolean;
 }): Promise<void> {
+  console.log(
+    "Demo mode. No real money.\n" +
+      (firstRun
+        ? 'Try a first take: "Peptides go mainstream by 2028".'
+        : "Open the tour in the first chat.") +
+      "\nNever send money to a demo address.\n\nStarting the demo.",
+  );
   const { home, ports } = await demoEnvironment(port, [...EVM_CHAIN_KEYS, "solana"]);
   takeHome(home);
   const { openPostgres } = await import("../db/embedded.ts");
 
-  const { keptSecret } = await import("../data-dir.ts");
+  const { auniLog, keptSecret } = await import("../data-dir.ts");
   process.env.TURN_TOKEN_SECRET = keptSecret("turn-token-secret");
   const database = await openPostgres({ runsAuni: true });
   process.env.DATABASE_URL = database.url;
@@ -53,17 +60,8 @@ export async function startDemo({
   const { demoApps } = await import("./app.ts");
   standIn(demoApps);
 
-  console.log(
-    "This is a demo of Auni. Its owner, its money and its AI are made up: nothing of yours is read,\n" +
-      "changed or sent anywhere, and only the stocks' logos come in from outside. It keeps its data\n" +
-      `in ${home}\n` +
-      "and removes it when it stops. Never send money to an address it shows: its wallet is nobody's.\n\n" +
-      (firstRun
-        ? "It starts as a new owner's first run. Say what you believe: it knows one take by heart,\n" +
-          '"Peptides go mainstream by 2028".\n'
-        : "New here? The page that opens offers a tour: ten minutes through everything Auni does.\n"),
-  );
   const { start } = await import("../start.ts");
+  const { takeOutput } = await import("../hello/telling.ts");
   const { seed } = firstRun ? await import("./first-run.ts") : await import("./seed.ts");
   // The browser lands on a new chat: first run's question, or one whose first starting point is
   // the tour (tour.ts).
@@ -71,8 +69,21 @@ export async function startDemo({
     web,
     open,
     jobs: true,
-    onceUp: seed,
+    onceUp: async () => {
+      if (firstRun) return seed();
+      console.log("Preparing the sample takes.");
+      // The sample history plays real jobs. Keep their diagnostics in the demo log and show
+      // them in the terminal if setup fails.
+      const output = takeOutput(process.stdout, process.stderr);
+      try {
+        await seed();
+        output.toLog(auniLog());
+      } finally {
+        output.toTerminal();
+      }
+    },
     printsLink: true,
+    stopHint: "Stop this process to end the demo.",
     landsOn: "/app/new",
   });
 }

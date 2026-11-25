@@ -1,6 +1,5 @@
 "use client";
 
-import type { ThreadId } from "@auni/shared";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState, useTransition, type MouseEvent } from "react";
 import { toast } from "sonner";
@@ -10,6 +9,7 @@ import { useConversationLaunch } from "@/components/app/conversation-launch-cont
 import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
 import { useThreads } from "@/components/app/use-threads";
 import { startFailure } from "@/components/app/thread-failure";
+import { forgetStartIds, startIdsFor } from "@/components/app/start-ids";
 import { startInOrder } from "@/components/app/start-in-order";
 import { useWelcome } from "@/components/first-run/finish";
 import { isModifiedClick } from "@/components/places/open-place";
@@ -42,18 +42,20 @@ export function useStartConversation() {
           ? (document.querySelector('[data-slot="welcome-composer"] form')?.getBoundingClientRect()
               .top ?? null)
           : null;
-      const started = begin(content, carried, composerFromTop);
+      // Chosen here, so this tab hears the chat's first turn from before core makes it; the same
+      // words sent again after an answer that never came keep them, so core gives that chat back.
+      const ids = startIdsFor(content);
+      const started = begin(content, ids.messageId, carried, composerFromTop);
       if (!started) return;
 
-      // Chosen here, so this tab hears the chat's first turn from before core makes it.
-      const threadId = crypto.randomUUID() as ThreadId;
       await startInOrder({
         createChat: async () => {
-          const made = await threadSession(threadId, { isNew: true }).start(
+          const made = await threadSession(ids.threadId, { isNew: true }).start(
             content,
-            { id: started.messageId, sentAt: started.startedAt },
-            () => startChat({ id: threadId, messageId: started.messageId, text: content }, options),
+            { id: ids.messageId, sentAt: started.startedAt },
+            () => startChat({ id: ids.threadId, messageId: ids.messageId, text: content }, options),
           );
+          forgetStartIds(ids);
           return made.thread;
         },
         welcome,

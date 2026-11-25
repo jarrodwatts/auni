@@ -40,6 +40,7 @@ interface ConversationLaunchContextValue {
   readonly launch: ConversationLaunch | null;
   readonly begin: (
     prompt: string,
+    messageId: string,
     carried?: CarriedTake,
     composerFromTop?: number | null,
   ) => ConversationLaunch | null;
@@ -71,13 +72,18 @@ export function ConversationLaunchProvider({ children }: { readonly children: Re
   }, []);
 
   const begin = useCallback(
-    (prompt: string, carried?: CarriedTake, composerFromTop: number | null = null) => {
+    (
+      prompt: string,
+      messageId: string,
+      carried?: CarriedTake,
+      composerFromTop: number | null = null,
+    ) => {
       const content = prompt.trim();
       if (!content || launchRef.current) return null;
 
       const next: ConversationLaunch = {
         id: crypto.randomUUID(),
-        messageId: crypto.randomUUID(),
+        messageId,
         phase: "creating",
         prompt: content,
         startedAt: Date.now(),

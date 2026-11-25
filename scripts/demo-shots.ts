@@ -248,9 +248,13 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
 
     await take(page, out, "money", `${origin}/app`, "top");
     // Money with its largest take opened up, and a move's receipt open over it.
-    const { takes } = await core<{ takes: { threadId: string }[] }>("takes");
+    const { takes } = await core<{ takes: { threadId: string; holdings: unknown[] }[] }>("takes");
     if (takes[0])
       await take(page, out, "money-take", `${origin}/app?take=${takes[0].threadId}`, "top");
+    // And the largest holding more than one thing, each with what it made.
+    const mixed = takes.find(({ holdings }) => holdings.length > 1);
+    if (mixed)
+      await take(page, out, "money-take-mixed", `${origin}/app?take=${mixed.threadId}`, "top");
     await take(page, out, "money-receipt", `${origin}/app`, "top", OPEN_RECEIPT, { once: true });
     await take(page, out, "apps", `${origin}/app/apps`, "top");
     // One sheet for each state an app the owner acts through is in: with money there, needing a

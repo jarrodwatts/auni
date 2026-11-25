@@ -57,7 +57,7 @@ async function cardWaiting(tx: Tx | typeof db, threadId: string): Promise<boolea
 
 const CARD_WAITING = refused(
   "card_waiting",
-  "A card here still waits for your answer. Answer it first, even with Not now, so it isn't put away unseen.",
+  "A card here still waits for your answer. Answer it first, even with Decline, so it isn't put away unseen.",
 );
 
 /** Renames a thread. */

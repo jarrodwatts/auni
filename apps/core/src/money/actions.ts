@@ -11,13 +11,12 @@ import { actions, threads, type ActionRow } from "../db/schema.ts";
 import { actionKind, wakeThread } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";
-import { fitted, leftOutPermission, tooMuchToWarn, withPermissions } from "./card-face.ts";
+import { fitted, leftOutPermission, tooMuchToShow, withLeaves } from "./card-face.ts";
 import { approval, effectLines, pinnedApproval } from "./effect.ts";
 import { failureKind, retryRefusal } from "./failure.ts";
 import { fillIdentity, tokenKey, type FillKey } from "./fill-key.ts";
 import { begins, SETTLED, step } from "./life.ts";
 import { feeCoinFor, payingFees, topUpFor } from "./fee-coin.ts";
-import { lostSaid } from "./gone-for-good.ts";
 import { feeCoinTrades, feeCoinUsd, pinned, withFeeCoin, withoutFeeCoin } from "./fee-coin-said.ts";
 import { unpaid } from "./funding.ts";
 import { countBeforeTrading } from "./other-tokens.ts";
@@ -119,8 +118,7 @@ export async function prepareLeg(
   // there is no card (see buyingSolOnce).
   const bought = described.sends ? await feeCoinFor(described.sends) : null;
   const preview = bought ? withFeeCoin(withoutFeeCoin(described), bought) : described;
-  const lost = lostSaid({ details: approvedDetails(preview) });
-  const unshowable = tooMuchToWarn(preview.effect, lost);
+  const unshowable = tooMuchToShow(preview.effect);
   if (unshowable) throw new Error(unshowable);
   // The most it may spend, which a tap allows and execute holds it to (see assertApprovedSpend).
   return {
@@ -288,10 +286,8 @@ export async function recordActions(
           lines: effectLines(leg.preview.effect),
           details: approvedDetails(leg.preview),
           // Cut to the lengths a card takes, so words from outside can't make one that fails to draw.
-          // Saying every permission the move leaves, whoever wrote its face.
-          card: leg.preview.card
-            ? fitted(withPermissions(leg.preview.card, leg.preview.effect))
-            : null,
+          // Saying everything the move leaves behind, whoever wrote its face.
+          card: leg.preview.card ? fitted(withLeaves(leg.preview.card, leg.preview.effect)) : null,
           cardFormat: CARD_FORMAT,
         })),
       )

@@ -35,6 +35,7 @@ import {
 import { SOLANA_USDC } from "./chains.ts";
 import type { SolanaQuote } from "../apps/contract.ts";
 import { ownGas } from "./gas.ts";
+import { failureKind } from "./failure.ts";
 import { paysOwnGas } from "./wallets.ts";
 
 const EVM = "0x000000000000000000000000000000000000dEaD";
@@ -193,9 +194,12 @@ describe("solForFees", () => {
 
   it("says plainly what would let it when there's too little USDC on Monad", async () => {
     chain.monadUsdc = 999_999n;
-    await expect(solForFees(SHORT)).rejects.toThrow(
+    const short = solForFees(SHORT);
+    await expect(short).rejects.toThrow(
       "send a little SOL to their Solana address, or USDC on Monad",
     );
+    // Money short, said as such, so its card offers adding money rather than Try again.
+    expect(failureKind(await short.catch((error: unknown) => error))).toBe("funds");
     expect(payIn.quote).not.toHaveBeenCalled();
   });
 
@@ -255,9 +259,9 @@ describe("solForFees", () => {
     vi.mocked(paysOwnGas).mockResolvedValue(false);
     expect(await solForFees(SHORT)).toMatchObject({ via: "swap", usdc: 383_320n });
     chain.solanaUsdc = 400_000n;
-    await expect(solForFees(SHORT, { spends: 100_000n })).rejects.toThrow(
-      "too little USDC on Solana to buy it",
-    );
+    const short = solForFees(SHORT, { spends: 100_000n });
+    await expect(short).rejects.toThrow("too little USDC on Solana to buy it");
+    expect(failureKind(await short.catch((error: unknown) => error))).toBe("funds");
   });
 });
 

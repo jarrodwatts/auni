@@ -140,7 +140,9 @@ describe("figureWidth", () => {
   it("gives a long value, and a whole address, more of the row, so none is ever cut", () => {
     expect(figureWidth({ value: "$50.00" }, false)).toBe("column");
     expect(figureWidth({ value: "under $0.01 network fee" }, false)).toBe("wide");
-    expect(figureWidth({ value: "2.5 USDC ($2.50), 1 MON ($0.02)" }, false)).toBe("row");
+    // A medium value keeps to one of a wider card's columns, so it leaves no gap beside it.
+    expect(figureWidth({ value: "2.5 USDC ($2.50), 1 MON ($0.02)" }, false)).toBe("wide");
+    expect(figureWidth({ value: "2.5 USDC ($2.50), 1 MON ($0.02), 4 WPRL" }, false)).toBe("row");
     // What it is worth, said beside it, counts too.
     expect(figureWidth({ value: "18.97 WPRL", note: "$25.00" }, false)).toBe("wide");
     expect(figureWidth({ value: "0x97c5e2b14D8A6F3c0E9b7A51D2c4F86e3a1D0b91" }, true)).toBe("row");
@@ -148,51 +150,85 @@ describe("figureWidth", () => {
 });
 
 describe("planPermissions", () => {
-  const leg = (summary: string, value?: string) => ({
-    summary,
-    lines: [
-      { label: "You give", value: "$50 of USDC" },
-      ...(value ? [{ label: "Lets", value }] : []),
-    ],
+  const permission = (lets: string) => ({ says: `From now on, it lets ${lets}.` });
+  const order = (lets: string) => ({ ...permission(lets), order: true as const });
+  const face = (leaves?: CardFace["leaves"], warning?: string): CardFace => ({
+    ...sale,
+    ...(warning ? { warning } : {}),
+    ...(leaves ? { leaves } : {}),
   });
-  const resting = "Hyperliquid fill it at $90,000 or better until you cancel";
+  const leg = (summary: string, card = face()) => ({ summary, card });
 
-  // One tap allows every move, so the plan says what each leaves before it, whoever wrote its face.
-  it("says what each move leaves able to act on the money, under its own name", () => {
+  // One tap allows every move, so the plan says all they leave before it, whoever wrote its face.
+  it("says each permission and order of every move as its own entry, permissions first", () => {
+    const stop = order(
+      "Hyperliquid close your whole BTC long, the part you hold now included, at market if BTC reaches $90,000",
+    );
     expect(
       planPermissions({
         legs: [
+          leg("Go long BTC", face([stop])),
+          leg(
+            "Send it",
+            face([
+              permission("0x1a2b…9f8e spend your USDC"),
+              permission("0x3c4d…7a6b spend your WETH"),
+            ]),
+          ),
           leg("Move $50 to Arbitrum"),
-          leg("Send it", "0x1a2b…9f8e spend your USDC"),
-          leg("Place a limit order to go long BTC", resting),
-          leg("Place a limit order to go long ETH", resting),
         ],
         moves: [],
       }),
     ).toEqual([
-      "Send it: From now on, it lets 0x1a2b…9f8e spend your USDC.",
-      `Place a limit order to go long BTC: From now on, it lets ${resting}.`,
-      `Place a limit order to go long ETH: From now on, it lets ${resting}.`,
+      { says: "Send it: From now on, it lets 0x1a2b…9f8e spend your USDC.", order: false },
+      { says: "Send it: From now on, it lets 0x3c4d…7a6b spend your WETH.", order: false },
+      { says: `Go long BTC: ${stop.says}`, order: true },
     ]);
+  });
+
+  // Two legs can leave the same words (a limit at one price on two markets): each is its own tap's.
+  it("never folds alike entries from different moves into one", () => {
+    const resting = order("Hyperliquid fill your BTC long at $5.00 or better until you cancel");
+    expect(
+      planPermissions({
+        legs: [leg("Buy A", face([resting])), leg("Buy B", face([resting]))],
+        moves: [],
+      }),
+    ).toEqual([
+      { says: `Buy A: ${resting.says}`, order: true },
+      { says: `Buy B: ${resting.says}`, order: true },
+    ]);
+  });
+
+  it("says money a leg sends for good, as its card's warning does", () => {
+    expect(
+      planPermissions({ legs: [leg("Send it", face(undefined, "Gone for good."))], moves: [] }),
+    ).toEqual([{ says: "Send it: Gone for good.", order: false }]);
   });
 
   // Telegram draws every row's permissions; the web drew only its legs', never a cash move's.
   it("says what a move that brings the plan's cash leaves too, first, as it runs first", () => {
     expect(
       planPermissions({
-        legs: [leg("Buy $5 of NVIDIA")],
+        legs: [leg("Buy $5 of NVIDIA", face([permission("0x5e6f…1c2d spend your USDC")]))],
         moves: [
           { name: "Move $5 from Base to Monad", lets: "0x1a2b…9f8e spend your USDC" },
           { name: "Take $3 out of savings" },
         ],
       }),
-    ).toEqual(["Move $5 from Base to Monad: From now on, it lets 0x1a2b…9f8e spend your USDC."]);
+    ).toEqual([
+      {
+        says: "Move $5 from Base to Monad: From now on, it lets 0x1a2b…9f8e spend your USDC.",
+        order: false,
+      },
+      { says: "Buy $5 of NVIDIA: From now on, it lets 0x5e6f…1c2d spend your USDC.", order: false },
+    ]);
   });
 
   it("says nothing for a plan that leaves none", () => {
     expect(
       planPermissions({
-        legs: [leg("Move $50 to Arbitrum"), { summary: "x", lines: [] }],
+        legs: [leg("Move $50 to Arbitrum"), leg("x", face([]))],
         moves: [{ name: "Take $3 out of savings" }],
       }),
     ).toEqual([]);

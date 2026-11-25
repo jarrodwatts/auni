@@ -284,7 +284,7 @@ function heldReason(
     stoppedWith ? `Its run stopped with: ${stoppedWith.slice(0, 300)}` : "",
     "Auni will not send it again, and keeps reading by itself in case the answer comes. " +
       (shown
-        ? "Its card now says this to the owner, with Check again and Close. "
+        ? "Its card now says this to the owner, with Check status and Dismiss card. "
         : "No card for it reached the owner's chat, so they haven't seen it. ") +
       "Tell them once, calmly: " +
       "what happened, that nothing else is at risk, and where to look (the transaction on its " +

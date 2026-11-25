@@ -45,14 +45,14 @@ export function FeedbackBody({
 
   return (
     <div className="@container" data-testid="feedback" data-kind={feedback.kind}>
-      {/* The note itself, as it would read on GitHub: its title, then each thing it says. */}
-      <div className="rounded-card bg-foreground/[0.035] px-4 pt-3.5 pb-4">
+      {/* The note itself, as it would read on GitHub, quoted: its title, then each thing it says. */}
+      <div className="border-l-2 border-border py-0.5 pl-4">
         <p className="text-caption leading-4 font-medium text-faint">What will be posted</p>
         <p className="mt-1.5 text-reading leading-[22px] font-semibold tracking-[-0.015em] text-pretty text-ink">
           {feedback.title}
         </p>
         {rows.length > 0 ? (
-          <dl className="mt-3 flex flex-col gap-2 border-t border-foreground/[0.06] pt-3">
+          <dl className="mt-3 flex flex-col gap-2">
             {rows.map((part) => (
               <div
                 key={part.field}
@@ -74,27 +74,20 @@ export function FeedbackBody({
         ) : null}
       </div>
       {feedback.optional.length > 0 ? (
-        <ul className="mt-2 flex flex-col gap-2">
+        // Plain choices between hairlines, never boxes inside the card.
+        <ul className="mt-4 flex flex-col divide-y divide-border border-y border-border">
           {feedback.optional.map((part) => {
             const on = ticked.has(part.field);
             const seen = shown.has(part.field);
             return (
-              <li
-                key={part.field}
-                className={cn(
-                  "rounded-card border transition-[background-color,border-color] duration-200 ease-settle",
-                  on
-                    ? "border-foreground/[0.14] bg-card"
-                    : "border-transparent bg-foreground/[0.035]",
-                )}
-              >
+              <li key={part.field}>
                 <AutoHeight>
                   <button
                     type="button"
                     role="checkbox"
                     aria-checked={on}
                     onClick={() => tick(part.field)}
-                    className="flex w-full items-start gap-3 rounded-card px-3.5 pt-3 pb-1.5 text-left focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
+                    className="flex w-full items-start gap-3 rounded-control pt-3 pb-1.5 text-left focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
                   >
                     <span
                       aria-hidden
@@ -120,7 +113,7 @@ export function FeedbackBody({
                     type="button"
                     aria-expanded={seen}
                     onClick={() => show(part.field)}
-                    className="mb-2 ml-[46px] flex h-7 items-center gap-1 rounded-full text-meta font-medium text-muted-foreground transition-colors hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
+                    className="mb-2 ml-[32px] flex h-7 items-center gap-1 rounded-full text-meta font-medium text-muted-foreground transition-colors hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none"
                   >
                     {seen ? "Hide it" : "See exactly what it posts"}
                     <ChevronDown
@@ -133,7 +126,7 @@ export function FeedbackBody({
                     />
                   </button>
                   {seen ? (
-                    <p className="mr-3.5 mb-3 ml-[46px] rounded-control bg-foreground/[0.04] px-3 py-2.5 text-meta leading-[19px] whitespace-pre-wrap text-ink wrap-anywhere">
+                    <p className="mb-3 ml-[32px] border-l-2 border-border pl-3 text-meta leading-[19px] whitespace-pre-wrap text-ink wrap-anywhere">
                       {part.value}
                     </p>
                   ) : null}

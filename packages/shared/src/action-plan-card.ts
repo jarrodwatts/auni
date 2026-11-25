@@ -122,9 +122,14 @@ export const actionPlanCardSchema = cardBaseSchema.extend({
   buysFirst: buysFirstSchema,
   pricedLater: pricedLaterSchema,
   /**
-   * What its moves cost in all, each kind summed, said before the tap: "$1.00 Hyperliquid fee",
-   * or "$1.25 ($1.00 Hyperliquid fee, $0.25 network fee)". Absent when they cost nothing.
+   * What its moves cost in all, each kind summed and said by its own name, as a lone card says
+   * it, before the tap: "Price impact $2.70", "Network fee $0.30". Absent when they cost nothing.
+   * Named apart from the sentence plans saved before carry as `costs`, which a card read back
+   * from a chat's history (never checked against this schema) must not take for these.
    */
-  costs: z.string().max(300).optional(),
+  costFigures: z
+    .array(z.object({ label: z.string().max(60), value: z.string().max(40) }))
+    .max(8)
+    .optional(),
 });
 export type ActionPlanCardWire = z.infer<typeof actionPlanCardSchema>;

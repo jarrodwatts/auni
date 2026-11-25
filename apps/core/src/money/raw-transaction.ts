@@ -263,7 +263,7 @@ export function appTerms(
   names: ReadonlyMap<string, TokenName>,
   chain: string,
   networkFee: string | null,
-  via: string,
+  through: Pick<AppTerms, "via" | "contract">,
 ): AppTerms {
   const tokens = ({ token, amount }: TokenLeg) => {
     const name = names.get(token);
@@ -319,7 +319,7 @@ export function appTerms(
     networkFee,
     leaves: effect.grants.map((grant) => grantLabel(grant, names)).join(" and ") || null,
     to: effect.sentTo ?? [],
-    via,
+    ...through,
     title: app.title ?? null,
     finePrint: app.finePrint ?? null,
     vouched: app.vouched === true,

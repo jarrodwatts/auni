@@ -36,3 +36,22 @@ export function askFace({
     action,
   };
 }
+
+/** Each kind of ask's summary as it reads once done, by how core words it, in the past tense. */
+const DONE_TITLES: readonly (readonly [RegExp, string])[] = [
+  [/^Save a routine: /u, "Saved routine: "],
+  [/^Replace your routine: /u, "Replaced your routine: "],
+  [/^Turn (.+) on$/u, "Turned $1 on"],
+  [/^Let this thread /u, "This thread can now "],
+  [/^Let (.+?) trade /u, "$1 can now trade "],
+];
+
+/**
+ * What an allowed ask is called once it applied, as a money card's receipt is: in the past tense
+ * ("Saved routine: Friday check"), or its summary where it has no other way to say it. Null when
+ * it reads no differently, so the card says it is done in words of its own.
+ */
+export function doneTitle(summary: string): string | null {
+  const known = DONE_TITLES.find(([asked]) => asked.test(summary));
+  return known ? summary.replace(known[0], known[1]) : null;
+}

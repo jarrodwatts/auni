@@ -6,6 +6,8 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { LogoImage } from "@/components/brand/marks";
 import { StatusMark } from "@/components/motion/status-mark";
 import { TextSwap } from "@/components/motion/text-swap";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { durations, easings, reducedMotion } from "@/lib/motion";
 import { useMediaQuery } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
@@ -20,7 +22,7 @@ import {
 } from "./failed-step";
 import { Late, MarkFace } from "./money-card-parts";
 import styles from "./money-card.module.css";
-import { overall, shownRows, spotlit, type MoveRow, type Tag } from "./move-rows";
+import { overall, shownRows, spotlit, type MoveRow } from "./move-rows";
 import { PickHoverCard, PickInline, type Anchor } from "./pick-detail";
 import { restLabel } from "./pick-money";
 
@@ -39,7 +41,7 @@ export interface Failed {
   }) => (action: FailedAction) => void;
   /** The tap core is answering now, whose button says so while the others wait. */
   readonly busy: FailedAction | null;
-  /** Why the last Try again didn't run, or what a Check again found, said beside it. */
+  /** Why the last Try again didn't run, or what a Check status found, said beside it. */
   readonly problem: string | null;
 }
 
@@ -200,31 +202,22 @@ function Row({
   const { pick } = row;
   const words = (
     <>
-      <span className="flex min-w-0 items-center gap-1.5 text-body leading-5 font-medium tracking-[-0.01em] text-ink">
+      {/* On a phone a row wraps, never cut: where its money goes, what it opens, when it's gone. */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-body leading-5 font-medium tracking-[-0.01em] text-ink">
         <span className="flex min-w-0">
           <TextSwap
             className={row.status === "now" ? styles.shimmer : undefined}
             text={row.label}
+            wrap
           />
         </span>
         {row.tags.map((tag) => (
-          <span
-            key={tag.text}
-            className={cn(
-              "flex-none rounded-full px-1.5 py-px text-caption leading-4 font-semibold",
-              TAG[tag.tone],
-            )}
-          >
-            {tag.text}
-          </span>
+          <Badge key={tag.text}>{tag.text}</Badge>
         ))}
       </span>
       {row.line ? (
         <span
-          className={cn(
-            "mt-0.5 block text-meta leading-[18px] text-muted-foreground",
-            open && hoverable ? "text-pretty" : "truncate",
-          )}
+          className={cn("mt-0.5 block text-meta leading-[18px] text-pretty text-muted-foreground")}
         >
           {row.line}
           {row.result ? (
@@ -342,18 +335,18 @@ const ACTION_LABEL: Record<FailedAction, string> = {
   retry: "Try again",
   add_money: "Add money",
   ask: "Ask Auni",
-  check: "Check again",
-  close: "Close it",
-  keep: "Not yet",
+  check: "Check status",
+  close: "Dismiss card",
+  keep: "Keep checking",
 };
 /** What a button says while core answers its tap. */
 const BUSY_LABEL: Partial<Record<FailedAction, string>> = {
   retry: "Trying again",
   check: "Checking",
-  close: "Closing",
+  close: "Dismissing",
 };
 
-/** What can help a step that didn't go through, most helpful first, as quiet pills. */
+/** What can help a step that didn't go through, most helpful first: the first one in ink. */
 export function FailedActions({
   actions,
   onAct,
@@ -365,8 +358,14 @@ export function FailedActions({
 }) {
   if (actions.length === 0) return null;
   return (
-    <span className="flex max-w-full flex-none flex-wrap items-center gap-2">
-      {actions.map((action) => (
+    // Gone with its buttons once the conversation moves on, so it holds no place in its row.
+    <span
+      className={cn(
+        "flex max-w-full flex-none flex-wrap items-center gap-2",
+        actions.every(onlyWhileNewest) && styles.whileNewest,
+      )}
+    >
+      {actions.map((action, index) => (
         <button
           key={action}
           type="button"
@@ -376,7 +375,8 @@ export function FailedActions({
           data-check-status={action === "check" ? "" : undefined}
           className={cn(
             onlyWhileNewest(action) && styles.whileNewest,
-            "h-8 flex-none rounded-full bg-foreground/[0.06] px-3.5 text-meta font-semibold text-ink transition-[background-color,transform,opacity] hover:bg-foreground/[0.09] active:scale-[.98] disabled:opacity-60",
+            buttonVariants({ size: "sm", variant: index === 0 ? "primary" : "secondary" }),
+            "font-semibold disabled:opacity-60",
           )}
         >
           <TextSwap
@@ -387,12 +387,6 @@ export function FailedActions({
     </span>
   );
 }
-
-const TAG: Record<Tag["tone"], string> = {
-  in: "bg-primary/[0.1] text-primary",
-  back: "bg-negative/10 text-negative",
-  plain: "bg-foreground/[0.05] text-ink-soft",
-};
 
 /**
  * A soft surface under the row being worked on, gliding to the next as each

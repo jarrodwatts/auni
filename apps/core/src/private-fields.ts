@@ -70,5 +70,4 @@ export function fieldWire({
 }
 
 /** Where a secret the owner pastes goes, as the one line under its field says it. */
-export const GOES_TO_SETTINGS =
-  "It goes straight to Auni's settings file on this computer. Auni's AI never sees it.";
+export const GOES_TO_SETTINGS = "Saved only on this computer. Your AI never sees it.";

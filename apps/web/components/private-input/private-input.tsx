@@ -3,7 +3,7 @@
 import type { PrivateCheckWire, PrivateFieldWire } from "@auni/shared";
 import { useState, type Ref } from "react";
 
-import { MoneyButton, MoneyButtons } from "@/components/cards/money/money-card-parts";
+import { CardButton } from "@/components/cards/card-parts";
 import { acceptPrivate, askedInputs, checkPrivate } from "@/lib/data/private";
 
 import { SecretInput, SecretNote, secretRefusal } from "./secret-input";
@@ -14,7 +14,7 @@ type Stage =
   | { readonly kind: "checked"; readonly check: PrivateCheckWire; readonly error?: string }
   | { readonly kind: "accepting"; readonly check: PrivateCheckWire | null };
 
-/** The quiet button beside the main one while nothing is checked yet: "Not now", "Cancel". */
+/** The quiet button beside the main one while nothing is checked yet: "Decline", "Cancel". */
 interface Secondary {
   readonly label: string;
   readonly busy?: boolean;
@@ -82,7 +82,7 @@ export function PrivateInput({
 
   const checked = stage.kind === "checked" || stage.kind === "accepting" ? stage.check : null;
   const first = (
-    <MoneyButton
+    <CardButton
       tone="primary"
       busy={stage.kind === "checking" || (stage.kind === "accepting" && !checked)}
       busyLabel={field.confirms ? words.check : words.confirm}
@@ -91,7 +91,7 @@ export function PrivateInput({
       className={secondary ? undefined : "w-full"}
     >
       {field.confirms ? words.check : words.confirm}
-    </MoneyButton>
+    </CardButton>
   );
 
   return (
@@ -133,26 +133,28 @@ export function PrivateInput({
       ) : null}
 
       {checked ? (
-        <MoneyButtons>
-          <MoneyButton
+        <div className="flex gap-2 [&>*:last-child]:flex-1">
+          <CardButton
+            className="flex-none px-5"
             tone="quiet"
             disabled={stage.kind === "accepting"}
             onClick={() => setStage({ kind: "typing" })}
           >
             Change
-          </MoneyButton>
-          <MoneyButton
+          </CardButton>
+          <CardButton
             tone="primary"
             busy={stage.kind === "accepting"}
             busyLabel={words.confirm}
             onClick={() => void accept(checked)}
           >
             {words.confirm}
-          </MoneyButton>
-        </MoneyButtons>
+          </CardButton>
+        </div>
       ) : secondary ? (
-        <MoneyButtons>
-          <MoneyButton
+        <div className="flex gap-2 [&>*:last-child]:flex-1">
+          <CardButton
+            className="flex-none px-5"
             tone="quiet"
             busy={secondary.busy ?? false}
             busyLabel={secondary.label}
@@ -160,9 +162,9 @@ export function PrivateInput({
             onClick={secondary.onClick}
           >
             {secondary.label}
-          </MoneyButton>
+          </CardButton>
           {first}
-        </MoneyButtons>
+        </div>
       ) : (
         first
       )}

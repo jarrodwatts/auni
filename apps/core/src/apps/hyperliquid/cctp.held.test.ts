@@ -88,8 +88,8 @@ holdsToCard("hyperliquid_deposit", {
     expect(hook).toContain(OWNER.evm.slice(2).toLowerCase());
     // And the card said plainly what Circle keeps of it, and what arrives.
     const arrives = usdLabel(Number(card.amountUsd) - 0.2);
-    expect(card.card?.figures.slice(0, 2)).toEqual([
-      { label: "You get", value: arrives },
+    expect(card.card?.figures.slice(1, 3)).toEqual([
+      { label: "You get", value: arrives, role: "gets" },
       { label: "Circle keeps", value: "$0.20" },
     ]);
     expect(JSON.stringify(card.lines)).toContain(arrives);

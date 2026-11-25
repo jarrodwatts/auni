@@ -15,7 +15,7 @@ import {
   failedStep,
   HELD_TAP_FAILED,
   retryProblem,
-  STILL_HELD,
+  stillHeld,
   type FailedAction,
   type Failure,
 } from "./failed-step";
@@ -53,7 +53,8 @@ export function useFailed<T>(
       queryKey: ["action-quote", key],
       queryFn: ({ signal }: { readonly signal: AbortSignal }) =>
         readQuote(key as ActionRecordId, signal),
-      enabled: failure.kind === "price",
+      // Only one core would run again is worth weighing.
+      enabled: failure.kind === "price" && failure.retryable,
       staleTime: QUOTE_FRESH_MS,
       retry: false,
     })),
@@ -79,7 +80,8 @@ export function useFailed<T>(
       if (action === "check" || action === "close") {
         void heldTap(step.key as ActionRecordId, action)
           .then((now) => {
-            if (action === "check" && now.phase === "needs_owner") setProblem(STILL_HELD);
+            if (action === "check" && now.phase === "needs_owner")
+              setProblem(stillHeld(now.run.held));
             return queryClient.invalidateQueries({ queryKey });
           })
           .catch(() => setProblem(HELD_TAP_FAILED))

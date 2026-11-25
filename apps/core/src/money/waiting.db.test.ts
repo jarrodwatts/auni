@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { ASK_TOOL_NAMES, CARD_FORMAT, CARD_WAITS_MS, RETRACTED } from "@auni/shared";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { eq } from "drizzle-orm";
@@ -228,6 +230,36 @@ describe("a card drawn before cards said all they say now", () => {
     // Once: the cron finds nothing more to take back or tell.
     await staleCardsJob.run({}, {} as never);
     expect(await queued("turn")).toHaveLength(1);
+  });
+
+  // Found in review: a plan waiting from the Auni before carries its permissions and resting
+  // orders in its moves' lines at card format 2, which today's web app no longer reads, so it
+  // would show none of them yet still be allowable.
+  it("takes back a plan saved at format 2, which said what it leaves where cards no longer look", async () => {
+    const thread = await insertThread();
+    const plan = randomUUID();
+    const lets = [{ label: "Lets", value: "Polymarket's exchanges trade your shares" }];
+    const legs = [
+      await insertAction({
+        threadId: thread.id,
+        status: "awaiting_permission",
+        proposalId: plan,
+        cardFormat: 2,
+        lines: lets,
+      }),
+      await insertAction({
+        threadId: thread.id,
+        status: "awaiting_permission",
+        proposalId: plan,
+        cardFormat: 2,
+      }),
+    ];
+    expect(await db.transaction(retractStale)).toEqual([thread.id]);
+    for (const leg of legs)
+      expect(await statusOf(leg.id)).toMatchObject({
+        status: "retracted",
+        error: RETRACTED.outOfDate,
+      });
   });
 
   // Found in review: a wake keeps its first 4,000 characters, and a card's summary has no cap.

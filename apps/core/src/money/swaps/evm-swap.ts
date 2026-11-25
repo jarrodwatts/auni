@@ -13,7 +13,6 @@ import {
   type Approved,
 } from "../approved.ts";
 import { RESERVES } from "../chains.ts";
-import { costsLabel } from "../effect.ts";
 import { EVM_NATIVE, evmTokenKey } from "../fill-key.ts";
 import {
   NothingMoved,
@@ -43,13 +42,7 @@ import { quoteSwap } from "./routes.ts";
 import { formatUnits, parseUnits } from "../usd.ts";
 import { walletEffect } from "../wallet-effect.ts";
 import { evmAddress } from "../wallets.ts";
-import {
-  fromBaseUnits,
-  MAX_BUY_IMPACT_PCT,
-  toBaseUnits,
-  tradeCosts,
-  usd,
-} from "./shared.ts";
+import { fromBaseUnits, MAX_BUY_IMPACT_PCT, toBaseUnits, tradeCosts, usd } from "./shared.ts";
 import { tokenCalled } from "../holdings.ts";
 import { stockName } from "./stock-index.ts";
 import type { XStock } from "./xstocks.ts";
@@ -67,7 +60,9 @@ const input = {
     .number()
     .positive()
     .optional()
-    .describe("Amount of sellToken to sell, as the wallet shows it. Leave this and amountUsd out to sell all of it."),
+    .describe(
+      "Amount of sellToken to sell, as the wallet shows it. Leave this and amountUsd out to sell all of it.",
+    ),
   amountUsd: z.number().positive().optional().describe("Dollar value of sellToken to sell."),
   slippageBps: z.number().int().min(10).max(500).optional().describe("Defaults to 100 (1%)."),
 };
@@ -240,8 +235,8 @@ function preview(
           selling: sellsForCash ? `${sold} ${swap.sell.symbol}` : null,
           atLeast: sellsForCash ? minimum : null,
           price: traded.usdPrice ? priceLabel(traded.usdPrice) : null,
-          costs: costsLabel(costs),
-          through: throughOf(route),
+          costs,
+          through: route.provider,
         }
       : null;
   const made: ActionPreview = {

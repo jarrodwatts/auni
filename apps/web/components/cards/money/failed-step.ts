@@ -1,4 +1,4 @@
-import { HELD_SAFE, type ActionQuoteWire, type FailureKind } from "@auni/shared";
+import { HELD_SAFE, type ActionQuoteWire, type FailureKind, type HeldWhy } from "@auni/shared";
 
 /**
  * A step that didn't go through says why in one plain line, with where the
@@ -70,10 +70,31 @@ export function failedStep(
 
 /** What closing a held step means, asked once before it does. */
 const CLOSING =
-  "Close it without a record? Auni stops checking, and adds nothing to any thread's record. Your portfolio still shows what you hold.";
+  "Dismiss this card? Auni stops checking on it and records nothing more. Whatever happened still shows in your balance.";
 
-/** What a Check again that found nothing new says, in place of why it is held. */
-export const STILL_HELD = "Still no answer. Auni keeps checking by itself.";
+/**
+ * How a held move's card heads where it stands, by why core holds it (HELD): one whose money
+ * moved says so, and that only what came back is unread; an order its venue never answered waits
+ * on that venue; anything else isn't confirmed yet. `note` goes under its amount.
+ */
+export function heldHeading(
+  why: HeldWhy | (string & {}) | undefined,
+  venue: string | null,
+): { readonly title: string; readonly badge: string; readonly note: string } {
+  if (why === "unrecorded") return { title: "Money moved", badge: "Fill not read", note: "moved" };
+  return {
+    title: why === "unanswered" && venue ? `Waiting on ${venue}` : "Not confirmed yet",
+    badge: "Status unknown",
+    note: "status unknown",
+  };
+}
+
+/** What a Check status that found nothing new says, in place of why it is held. */
+export function stillHeld(why: HeldWhy | (string & {}) | undefined): string {
+  return why === "unrecorded"
+    ? "Still can't read what came back. Auni keeps checking by itself."
+    : "Still no answer. Auni keeps checking by itself.";
+}
 
 /** A held step: why, in core's words, and what stays true; or, once Close was tapped, what closing means. */
 function held({ said }: Failure, closing: boolean): FailedStep {
@@ -85,7 +106,7 @@ function held({ said }: Failure, closing: boolean): FailedStep {
 }
 
 function byKind(
-  { kind, said, where }: Failure,
+  { kind, said, where, retryable }: Failure,
   quote: Pick<ActionQuoteWire, "inside" | "price"> | null,
 ): FailedStep {
   switch (kind) {
@@ -101,13 +122,20 @@ function byKind(
     case "busy":
       return { reason: `${said ?? "The venue was busy."} ${where}`, actions: ["retry", "ask"] };
     case "price":
+      // Core won't run it again, such as one that ran again on a fresh quote and failed on its price.
+      if (!retryable)
+        return {
+          reason: `The price moved, and this one needs a fresh card from Auni to go. ${where}`,
+          actions: ["ask"],
+        };
+      // A fresh quote can be inside and the route still fail, so Try again says it checks first.
       if (quote?.inside)
         return {
-          reason: `The price moved, and it's back inside what you approved. ${where}`,
+          reason: `The price moved, and it's back inside what you allowed. Try again checks it first and sends nothing if it would still fail. ${where}`,
           actions: ["retry", "ask"],
         };
       return {
-        reason: `The price moved past what you approved${quote?.price ? `, to ${quote.price}` : ""}. ${where}`,
+        reason: `The price moved past what you allowed${quote?.price ? `, to ${quote.price}` : ""}. ${where}`,
         actions: ["ask"],
       };
     case "rule":
@@ -190,13 +218,13 @@ export function needingYou(steps: Iterable<FailedStep>): number {
   return [...steps].filter((step) => step.actions.length > 0).length;
 }
 
-/** "1 needs your OK", "2 need your OK". */
+/** "1 needs you", "2 need you". */
 export function needsYouLabel(count: number): string {
-  return `${count} ${count === 1 ? "needs" : "need"} your OK`;
+  return `${count} ${count === 1 ? "needs" : "need"} you`;
 }
 
-/** What a tap on Check again or Close that never reached core says. */
-export const HELD_TAP_FAILED = "Auni couldn't be reached. Nothing changed, so try again.";
+/** What a tap on Check status or Dismiss card that got no answer says. */
+export const HELD_TAP_FAILED = "Couldn't reach Auni. Try again.";
 
 /**
  * What a tap on Try again that didn't run says, by core's answer; null when
@@ -212,7 +240,7 @@ export function retryProblem(code: string | null): string | null {
     case "needs_proof":
       return "This one can't be tried again as it is. Nothing moved.";
     default:
-      return "Auni couldn't be reached. Nothing moved, so try again.";
+      return "Couldn't confirm that reached Auni. Trying again won't send it twice.";
   }
 }
 

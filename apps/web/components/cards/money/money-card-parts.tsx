@@ -1,88 +1,16 @@
-import { Check, LoaderCircle, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Check, X } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { EDGE_SIZE, EdgeMascot } from "@/components/brand/edge-mascot";
-import { headroom, wantsAuni, type EdgeScene } from "@/components/brand/edge-pose";
 import { LogoImage, NoMark } from "@/components/brand/marks";
 import { IntegrationMark } from "@/components/integrations/integration-mark";
-import { AutoHeight } from "@/components/motion/auto-height";
 import { TextSwap } from "@/components/motion/text-swap";
 import { TurnTag } from "@/components/places/place-marks";
-import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { CardButton } from "../card-parts";
 import type { MoneyCardMark } from "./action-card-content";
 import { needsYouLabel } from "./failed-step";
 import styles from "./money-card.module.css";
-import { useNewestCard } from "./use-newest-card";
-
-/**
- * A money card is an object: a flat card with a hairline edge, its color left to the mark it is
- * about. Once settled it eases
- * down to a one-line receipt tile.
- */
-export function MoneyCardFrame({
-  auni = null,
-  children,
-  label,
-  phase,
-}: {
-  /**
-   * What Auni, peeking over the card's top edge, makes of it; null where it
-   * has nothing to watch. It comes only to the newest card that wants it,
-   * never to one already settled when it first showed, and once a card has
-   * settled and Auni has left it for a newer one, never back.
-   */
-  readonly auni?: EdgeScene | null;
-  readonly children: ReactNode;
-  readonly label: string;
-  readonly phase: "open" | "confirmed" | "expired";
-}) {
-  const settled = phase === "confirmed" || phase === "expired";
-  // Only a change of phase animates; a card drawn from history is simply there.
-  const [firstPhase] = useState(phase);
-  const [card, setCard] = useState<HTMLElement | null>(null);
-  // The first state Auni sees a card in says whether to keep it company, or leave it as history.
-  const [first, setFirst] = useState<EdgeScene | null>(null);
-  if (first === null && auni) setFirst(auni);
-  const hosting = useNewestCard(card, first ? wantsAuni(first, auni) : null);
-  // Once Auni has been here the card keeps its room, so nothing moves when it leaves for a newer one.
-  const [roomy, setRoomy] = useState(false);
-  if (hosting && !roomy) setRoomy(true);
-  return (
-    <div className="my-2 min-w-0">
-      {/* Auni can come after the card has drawn, once its state is in, so its room eases open. */}
-      <AutoHeight>
-        <div style={{ height: roomy ? headroom(EDGE_SIZE) - 8 : 0 }} />
-      </AutoHeight>
-      {/* Auni hangs behind the card and holds on in front of it, in a stack of their own. */}
-      <div className="relative isolate">
-        <section
-          ref={setCard}
-          aria-label={label}
-          className="relative z-[1] w-full min-w-0 overflow-hidden rounded-card border border-border bg-card text-ink"
-          data-phase={phase}
-          data-testid="money-card"
-        >
-          {/* A change of phase, or of anything in the card, eases it to its new height, padding and all. */}
-          <AutoHeight>
-            <div className={settled ? "px-4 py-3.5" : "p-5 sm:p-6"}>
-              <div key={phase} className={cn("relative", phase !== firstPhase && styles.enter)}>
-                {children}
-              </div>
-            </div>
-          </AutoHeight>
-        </section>
-        {hosting && card && auni ? <EdgeMascot card={card} scene={auni} /> : null}
-      </div>
-    </div>
-  );
-}
-
-/** Two equal-height buttons on one row: the quiet way out, and the move itself in black. */
-export function MoneyButtons({ children }: { readonly children: ReactNode }) {
-  return <div className="grid grid-cols-[1fr_1.6fr] gap-2">{children}</div>;
-}
 
 /**
  * What a money card is about. While its money moves a ring turns around it,
@@ -137,6 +65,36 @@ export function MoneyMark({
   );
 }
 
+/**
+ * What a card of several picks is about: the first two picks' own logos, the second tucked
+ * under the first's corner, so a basket reads as what is in it. Muted once it ended untapped.
+ */
+export function PairMark({
+  marks,
+  muted = false,
+  size = 44,
+}: {
+  readonly marks: readonly [MoneyCardMark, MoneyCardMark];
+  readonly muted?: boolean;
+  readonly size?: number;
+}) {
+  const each = Math.round(size * 0.72);
+  return (
+    <span
+      aria-hidden
+      className={cn("relative flex-none", muted && "opacity-55 grayscale")}
+      style={{ width: size, height: size }}
+    >
+      <span className="absolute top-0 left-0 flex">
+        <MarkFace mark={marks[0]} size={each} />
+      </span>
+      <span className="absolute right-0 bottom-0 flex rounded-full shadow-[0_0_0_2px_var(--card)]">
+        <MarkFace mark={marks[1]} size={each} />
+      </span>
+    </span>
+  );
+}
+
 /** A mark itself: its picture, else what stands in for it. */
 export function MarkFace({ mark, size }: { readonly mark: MoneyCardMark; readonly size: number }) {
   switch (mark.kind) {
@@ -155,59 +113,6 @@ export function MarkFace({ mark, size }: { readonly mark: MoneyCardMark; readonl
         />
       );
   }
-}
-
-export function MoneyButton({
-  busy = false,
-  busyLabel,
-  children,
-  className,
-  disabled,
-  onClick,
-  tone,
-}: {
-  readonly busy?: boolean;
-  /** What a screen reader hears while it's busy, since the hidden label is hidden from it too. */
-  readonly busyLabel?: string;
-  readonly children: ReactNode;
-  readonly className?: string;
-  readonly disabled?: boolean;
-  readonly onClick: () => void;
-  readonly tone: "primary" | "quiet" | "outline";
-}) {
-  return (
-    <button
-      type="button"
-      aria-busy={busy || undefined}
-      // Auni, over the card's edge, leans toward the primary as the pointer nears it.
-      data-tone={tone}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        buttonVariants({
-          variant: tone === "quiet" ? "secondary" : tone,
-          size: "lg",
-        }),
-        "font-semibold",
-        // A main button that can't be pressed yet waits pale, and darkens the moment it can.
-        tone === "primary" &&
-          !busy &&
-          "disabled:bg-foreground/[0.06] disabled:text-muted-foreground disabled:opacity-100",
-        busy && "disabled:opacity-100",
-        className,
-      )}
-    >
-      {/* The label keeps its room while the spinner shows, so the button never changes width. */}
-      <span className={cn("flex items-center gap-2", busy && "invisible")}>{children}</span>
-      {busy ? (
-        <LoaderCircle
-          aria-hidden
-          className="absolute inset-0 m-auto size-4 animate-spin motion-reduce:animate-none"
-        />
-      ) : null}
-      {busy && busyLabel ? <span className="sr-only">{busyLabel}</span> : null}
-    </button>
-  );
 }
 
 /** Beside a card's line while some of its steps wait on the person: "1 needs your OK". */
@@ -229,4 +134,15 @@ export function Late() {
       Can take a minute
     </span>
   );
+}
+
+/**
+ * A card's button, as screens outside the conversation (an app's sheet, first run, Settings)
+ * borrow it; a card itself uses CardButton and CardActions.
+ */
+export const MoneyButton = CardButton;
+
+/** Two equal-height buttons on one row, for a screen outside the conversation. */
+export function MoneyButtons({ children }: { readonly children: ReactNode }) {
+  return <div className="grid grid-cols-[1fr_1.6fr] gap-2">{children}</div>;
 }

@@ -18,7 +18,7 @@ export function connectAppTool(turn: ToolTurn) {
     description:
       'Offer to turn back on an app the owner turned off, from the list in "Apps you could offer": ' +
       "a card under your reply with the app's name, your one sentence on what it would add, and " +
-      "its Turn on button beside Not now. Nothing changes until they tap it; when they do, you're " +
+      "its Turn on button beside Decline. Nothing changes until they tap it; when they do, you're " +
       "woken here with its tools and skill ready, so you can finish what they asked for. If they " +
       "say no, you're told. An app that needs a key is asked for it with request_secret instead.",
     inputSchema: {

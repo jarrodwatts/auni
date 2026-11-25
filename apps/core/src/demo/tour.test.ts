@@ -147,9 +147,7 @@ describe("the tour", () => {
   });
 
   it("ignores tour markers in any thread that did not start as a tour", async () => {
-    const other = [
-      "User: Buy Nvidia\nAuni: Sure.\n**Stop 2 of 12. The plan card**",
-    ];
+    const other = ["User: Buy Nvidia\nAuni: Sure.\n**Stop 2 of 12. The plan card**"];
     expect(await play("Add something to it.", other)).toEqual({
       said: "(the scene)",
       replies: undefined,
@@ -189,5 +187,34 @@ describe("a real Auni", () => {
       .filter((path) => /\btour\b/iu.test(readFileSync(path, "utf8")))
       .map((path) => relative(REPO, path));
     expect(said).toEqual([]);
+  });
+});
+
+// The demo's failed buy hit a paused pool: its card offers no Try again, so the reply under it
+// must not offer the same buy again either.
+describe("a move that fails", () => {
+  const heard =
+    'Nothing new from the owner. Background event: Action 1 (Buy about $400 of Coinbase xStock) finished as failed: A simulation showed it would fail ("the pool is paused"), so Auni didn\'t send it.';
+
+  it("replies with another way, never the move that would fail again", async () => {
+    const said: string[] = [];
+    const stage = {
+      heard,
+      before: [],
+      context: "",
+      async *think() {},
+      async *say(words: string) {
+        said.push(words);
+        yield { type: "text", id: "text", delta: words } as BrainEvent;
+      },
+      async *call() {
+        yield* [];
+        return "";
+      },
+    } as unknown as Stage;
+    for await (const _ of sceneFor(heard).play(stage)) void _;
+    const reply = said.join(" ");
+    expect(reply).toContain("the same buy would fail again");
+    expect(reply).not.toMatch(/put it up again/u);
   });
 });

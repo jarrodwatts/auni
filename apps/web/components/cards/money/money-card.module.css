@@ -56,6 +56,11 @@
   display: none;
 }
 
+/* A ghost button left alone once those go: its words line up with the text above (-ml-3). */
+:global([data-slot="conversation-turn"]:has(~ [data-slot="conversation-turn"])) .aloneOnceMovedOn {
+  margin-left: calc(var(--spacing) * -3);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .step {
     animation: none;

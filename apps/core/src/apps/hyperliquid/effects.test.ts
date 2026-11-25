@@ -53,7 +53,8 @@ describe("Hyperliquid's effects", () => {
     expect(approval(effect, [])).toEqual({ kind: "tap" });
   });
 
-  it("names each resting order as what it lets Hyperliquid do later", async () => {
+  // A plan says these apart from the moves they belong to, so each names its market, never "it".
+  it("names each resting order as what it lets Hyperliquid do later, by its market", async () => {
     const { effect } = await hyperliquidOrder.describe(
       {
         market: "BTC",
@@ -68,8 +69,8 @@ describe("Hyperliquid's effects", () => {
       context,
     );
     expect(effect.grants.map(({ lets }) => lets)).toEqual([
-      "Hyperliquid fill it at $95,000 or better until you cancel",
-      "Hyperliquid close the whole position at market if BTC reaches $90,000",
+      "Hyperliquid fill your BTC long at $95,000 or better until you cancel",
+      "Hyperliquid close your whole BTC long at market if BTC reaches $90,000",
     ]);
     expect(effect.gets[0]?.lands).toBe("on Hyperliquid once it fills");
     vi.mocked(readPosition).mockResolvedValue(LONG);
@@ -78,11 +79,45 @@ describe("Hyperliquid's effects", () => {
       context,
     );
     expect(effectLines(stops.effect)).toEqual([
-      { label: "Lets", value: "Hyperliquid take profit on it at market at $120,000" },
+      {
+        label: "Lets",
+        value: "Hyperliquid take profit on your BTC position at market at $120,000",
+      },
     ]);
     // Its card names the position it read, by the market as it resolved.
     expect(stops.summary).toBe("Update the stops on your BTC position");
     expect(stops.card?.title).toBe("Set a take-profit on your BTC long");
+  });
+
+  // A plan shows no figures, so a stop's line is where it says it covers what is held already.
+  it("says a stop on a position already open covers the part held now", async () => {
+    vi.mocked(readPosition).mockResolvedValue(LONG);
+    const { effect } = await hyperliquidOrder.describe(
+      {
+        market: "BTC",
+        side: "long",
+        sizeUsd: 100,
+        leverage: 5,
+        orderType: "market",
+        slippagePercent: 1,
+        stopLoss: 90_000,
+        takeProfit: 120_000,
+      },
+      context,
+    );
+    expect(effect.grants).toEqual([
+      {
+        lets: "Hyperliquid close your whole BTC long, the part you hold now included, at market if BTC reaches $90,000",
+        reach: "venue",
+        order: true,
+      },
+      {
+        lets: "Hyperliquid take profit on your whole BTC long, the part you hold now included, at market at $120,000",
+        reach: "venue",
+        order: true,
+      },
+    ]);
+    vi.mocked(readPosition).mockReset();
   });
 
   // Execute refuses each of these with nothing sent, so no card is made for one.

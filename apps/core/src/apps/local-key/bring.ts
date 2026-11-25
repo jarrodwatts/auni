@@ -14,7 +14,7 @@ import { addressesOf } from "./keys.ts";
 const SOLANA_INPUT = {
   name: "solana",
   label: "Solana private key",
-  placeholder: "Base58, about 88 characters",
+  placeholder: "About 88 letters and numbers",
   set: false,
 };
 
@@ -31,8 +31,7 @@ export const BRING_INPUTS: PrivateFieldWire["inputs"] = [
 export const SOLANA_INPUTS: PrivateFieldWire["inputs"] = [SOLANA_INPUT];
 
 /** Where keys the owner brings go, as the line under their field says it. */
-export const GOES_TO_WALLET =
-  "It goes straight to Auni's wallet on this computer. Auni's AI never sees it.";
+export const GOES_TO_WALLET = "Saved to your wallet, only on this computer. Your AI never sees it.";
 
 /**
  * The keys pasted, in whichever of the field's inputs, checked: refused with a fixed message,

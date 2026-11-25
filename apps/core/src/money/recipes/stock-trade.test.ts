@@ -128,7 +128,7 @@ describe("stock_trade's preview", () => {
     const card = await describeTrade({ stock: "NVDA", side: "buy", amountUsd: 25 });
     expect(card.details).toMatchObject({ chain: "monad" });
     expect(card.unpriced).toBe("loses on fill");
-    expect(card.effect.costs).toEqual([{ label: "price move", usd: 1 }]);
+    expect(card.effect.costs).toEqual([{ label: "price impact", usd: 1 }]);
     expect(previewSolanaSwap).not.toHaveBeenCalled();
   });
 
@@ -216,7 +216,7 @@ describe("stock_trade on a card that buys SOL once", () => {
     // ETH are no cost, as what the fees don't use stays, so the card says them apart.
     expect(costsLabel(costsTogether(previews.map(({ effect }) => effect)))).toBeNull();
     expect(feeCoinsSaid(previews.map(({ details }) => ({ details: details! })))).toBe(
-"Also buys about $1.09 of ETH and SOL for network fees, most of which stays in your wallet. Bought through Relay and Jupiter.",
+      "Also buys about $1.09 of ETH and SOL for network fees, most of which stays in your wallet. Bought through Relay and Jupiter.",
     );
   });
 

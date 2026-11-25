@@ -15,7 +15,7 @@ describe("untapped", () => {
   it("says how a card ended before any tap: updated, taken back and why, or declined", () => {
     expect(untapped([leg("replaced"), leg("replaced")])).toBe("Updated below");
     expect(untapped([leg("retracted", RETRACTED.stale)])).toBe(RETRACTED.stale);
-    expect(untapped([leg("cancelled"), leg("cancelled")])).toBe("You said not now");
+    expect(untapped([leg("cancelled"), leg("cancelled")])).toBe("Declined");
   });
 
   it("is null for a card still waiting, or one the owner allowed", () => {

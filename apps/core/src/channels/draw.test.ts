@@ -313,6 +313,16 @@ describe("drawCard", () => {
     const text = drawCard(view([sale]), "g").text;
     expect(text.split(literal(lets))).toHaveLength(2);
     expect(text).not.toContain("Lets:");
+    // A decided plan no longer asks, so neither line says it.
+    const decided = drawCard(
+      view([
+        { ...sale, id: "a1", status: "cancelled" as const },
+        { ...sale, id: "a2", status: "cancelled" as const },
+      ]),
+      null,
+    ).text;
+    expect(decided).not.toContain("From now on");
+    expect(decided).not.toContain("Lets:");
     // With no warning saying it, the Lets line stays.
     expect(drawCard(view([{ ...sale, card: null }]), "g").text).toContain(`Lets: ${literal(lets)}`);
   });

@@ -157,7 +157,8 @@ function compactApproval(label: string): string {
 
 function reviewLines(leg: ActionRow, showLets: boolean): string[] {
   const { card } = leg;
-  const warning = lossWarning(leg, card?.warning);
+  // Once a plan is decided its permissions are no longer asked for, so only a loss is still said.
+  const warning = lossWarning(leg, showLets ? card?.warning : null);
   // The warning says each permission in a sentence already; the line stays for orders it leaves out.
   const lines = leg.lines
     .filter(({ label, value }) => label !== LETS_LINE || (showLets && !warning?.includes(value)))

@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { toolInput } from "../agent/tool.ts";
-import { appById, closedHere } from "../apps/registry.ts";
+import { appById, closedHere, ledgerAt } from "../apps/registry.ts";
 import { applyAsk, isAsk } from "../asks.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
@@ -60,7 +60,7 @@ import {
 import { dollars } from "./summaries.ts";
 import { normalizeUsd, parseUnits } from "./usd.ts";
 import { signerFor } from "./wallets.ts";
-import { chainKey } from "./chains.ts";
+import { chainKey, placeName } from "./chains.ts";
 
 export interface ActionContext {
   /** Null for a move started outside every conversation (a withdrawal from Settings). */
@@ -423,10 +423,11 @@ const unstarted = (leg: ActionRow): boolean => leg.phase === "queued" && leg.txs
 /**
  * The one place a run starts: claims a queued move, with every leg of its plan locked, so no two
  * legs start, or are stopped, at once. A move the owner allowed on a card drawn before cards said
- * all they say now, which didn't show a permission it leaves (leftOutPermission), is taken back
- * instead, with every leg of its plan, while none has started; its thread is woken in the same
- * write, so Auni can put it up again. Once any leg has started, the plan runs on, so no money is
- * left halfway. Null when it isn't queued, or was taken back.
+ * all they say now, which didn't show a permission it leaves (leftOutPermission), never runs:
+ * while none of its plan has started, the whole card is taken back, so nothing moves for a pick
+ * that won't run; once some has, only that leg is paused, its card saying where its cash now is,
+ * and the rest run on. Its thread is woken in the same write once that settles every leg, keyed
+ * as a run's end tells it (tellSettled), so it hears once. Null when it isn't queued, or wasn't run.
  */
 async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
   const [row] = await tx
@@ -441,24 +442,46 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
     .where(row.proposalId ? eq(actions.proposalId, row.proposalId) : eq(actions.id, actionId))
     .orderBy(actions.id)
     .for("update");
-  if (card.every(unstarted) && leftOutPermission(card)) {
-    const [first] = await step(
-      tx,
-      "recall",
-      inArray(
+  const leg = card.find(({ id }) => id === actionId);
+  let stopped: ActionRow[] = [];
+  if (card.every(unstarted)) {
+    if (leftOutPermission(card)) {
+      const legs = inArray(
         actions.id,
         card.map(({ id }) => id),
-      ),
-      { error: RETRACTED.unshown },
-    );
-    // Keyed as its run's end tells it (tellSettled), so the thread hears once.
-    const told = first?.threadId ? await settledOutcome(first, tx) : null;
-    if (first?.threadId && told)
-      await wakeThread(first.threadId, told.reason.slice(0, 2_000), { key: told.id, tx });
-    return null;
+      );
+      stopped = await step(tx, "recall", legs, { error: RETRACTED.unshown });
+    }
+  } else if (leg && unstarted(leg) && leftOutPermission([leg])) {
+    stopped = await step(tx, "skip", eq(actions.id, actionId), {
+      error: pausedSaid(leg),
+      failureKind: "unshown",
+    });
   }
-  const [claimed] = await step(tx, "claim", eq(actions.id, actionId));
-  return claimed ?? null;
+  if (stopped.length === 0) {
+    const [claimed] = await step(tx, "claim", eq(actions.id, actionId));
+    return claimed ?? null;
+  }
+  const [first] = stopped;
+  const told = first?.threadId ? await settledOutcome(first, tx) : null;
+  if (first?.threadId && told)
+    await wakeThread(first.threadId, told.reason.slice(0, 2_000), { key: told.id, tx });
+  return null;
+}
+
+/**
+ * What a paused leg's card says, first what stopped it, then where the cash it was to spend sits
+ * now, which the moves before it may have brought there, so the agent's cut of it (settledOutcome)
+ * keeps both.
+ */
+function pausedSaid(leg: ActionRow): string {
+  const { draws } = stagedLeg(leg);
+  const place =
+    draws && (ledgerAt(draws) ? `${placeName(draws)} account` : `wallet on ${placeName(draws)}`);
+  const where = place
+    ? `Its ${dollars(leg.amountUsd)} is in your ${place}.`
+    : "Nothing of it moved.";
+  return `Paused before sending: its card didn't show a permission it leaves. ${where} Auni will put it up again fresh.`;
 }
 
 export async function actionById(actionId: string): Promise<ActionRow | null> {

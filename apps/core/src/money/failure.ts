@@ -40,9 +40,10 @@ export function failureKind(error: unknown): FailureKind {
 
 /**
  * Failures the same step can't get past by running again: the money isn't
- * there, the venue won't take it, or something went out, or may have.
+ * there, the venue won't take it, something went out, or may have, or its card never showed a
+ * permission it leaves.
  */
-const FINAL: ReadonlySet<FailureKind> = new Set(["funds", "rule", "sent"]);
+const FINAL: ReadonlySet<FailureKind> = new Set(["funds", "rule", "sent", "unshown"]);
 
 /** Why Try again can't run a step again, as the web reads it. */
 export type RetryRefusal = "not_failed" | "not_retryable" | "needs_proof";

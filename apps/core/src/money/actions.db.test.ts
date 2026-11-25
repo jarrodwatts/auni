@@ -205,17 +205,75 @@ describe("executeAction", () => {
       expect(await wakes()).toEqual([expect.stringContaining(`Every leg of proposal ${PLAN}`)]);
     });
 
-    it("runs on once any leg of its plan has started, so no money is left halfway", async () => {
-      await old({
+    // The cash its funding move brought: done, and sent, so the plan has started.
+    const funded = (fields: Parameters<typeof insertAction>[0] = {}) =>
+      old({
         proposalId: PLAN,
         lines: [],
         status: "done",
         startedAt: new Date(),
         txs: [{ chain: "polygon", hash: "0xbridge" }],
+        ...fields,
       });
-      const sale = await old({ proposalId: PLAN });
-      expect(await executeAction(sale.id)).toMatchObject({ status: "done" });
+
+    // Found in review: a first Polymarket buy behind a funding move already sent ran on, and let
+    // Polymarket's exchanges trade the shares, which its plan's card never showed.
+    it("pauses a leg that would leave what its card didn't show once its plan has started, saying where its cash is", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id });
+      const pick = await old({ threadId: thread.id, proposalId: PLAN, amountUsd: "25" });
+      lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
+      try {
+        const row = await executeAction(pick.id);
+        expect(row).toMatchObject({
+          status: "failed",
+          failureKind: "unshown",
+          startedAt: null,
+          txs: [],
+          error:
+            "Paused before sending: its card didn't show a permission it leaves. Its $25 is in your wallet on Polygon. Auni will put it up again fresh.",
+        });
+        expect(row.error!.length).toBeLessThanOrEqual(160);
+      } finally {
+        lookup.recipe = buy;
+      }
+      expect(executions).toBe(0);
+      expect(signing.options).toBeUndefined();
+      // It settled the plan, so its thread hears, once, with where the cash is.
+      const [wake, ...more] = await wakes();
+      expect(more).toEqual([]);
+      expect(wake).toContain(`Every leg of proposal ${PLAN}`);
+      expect(wake).toContain("Its $25 is in your wallet on Polygon");
+      // Only a fresh card runs it.
+      expect(await executeAction(pick.id)).toMatchObject({ status: "failed" });
+      expect(executions).toBe(0);
+      expect(await wakes()).toHaveLength(1);
+    });
+
+    it("runs a remaining leg that leaves nothing its card didn't show", async () => {
+      await funded();
+      const rest = await old({ proposalId: PLAN, lines: [] });
+      expect(await executeAction(rest.id)).toMatchObject({ status: "done" });
       expect(executions).toBe(1);
+    });
+
+    it("lets a leg already sending finish, and wakes the thread only once every leg settled", async () => {
+      const thread = await insertThread();
+      await funded({ threadId: thread.id });
+      // Started before the update: its run goes on, and a second delivery of its job leaves it.
+      const sending = await old({ threadId: thread.id, proposalId: PLAN, startedAt: new Date() });
+      const pick = await old({ threadId: thread.id, proposalId: PLAN });
+      expect(await executeAction(pick.id)).toMatchObject({
+        status: "failed",
+        failureKind: "unshown",
+      });
+      expect(await executeAction(sending.id)).toMatchObject({
+        status: "running",
+        phase: "sending",
+      });
+      expect(executions).toBe(0);
+      // Its plan hasn't settled, so its thread hears when the sending leg's run ends.
+      expect(await wakes()).toEqual([]);
     });
   });
 

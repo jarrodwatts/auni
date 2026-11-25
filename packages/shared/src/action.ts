@@ -128,9 +128,11 @@ export function filledUsd(run: MoveRun): string | null {
  * approved, a venue's rule, stopped because a move before it didn't go, an
  * order nobody filled that was closed with nothing moved, the coin its card
  * bought for its network fee not come (fees: the purchase went out once and is
- * never made again, so the move itself can run again), or something sent, or a
- * run that died partway and may have (never run again as it is). Unknown is
- * anything else.
+ * never made again, so the move itself can run again), something sent, or a
+ * run that died partway and may have (never run again as it is), or paused
+ * before sending because it was allowed on a card from before that didn't show a
+ * permission it leaves (unshown: only a fresh card runs it, which Auni puts up
+ * itself). Unknown is anything else.
  */
 export const failureKindSchema = z.enum([
   "funds",
@@ -142,6 +144,7 @@ export const failureKindSchema = z.enum([
   "unfilled",
   "fees",
   "sent",
+  "unshown",
   "unknown",
 ]);
 export type FailureKind = z.infer<typeof failureKindSchema>;

@@ -142,6 +142,15 @@ function byKind(
         reason: "Skipped, since the money for it couldn't be moved first. Nothing was spent.",
         actions: [],
       };
+    case "unshown":
+      // Core's sentence says where its cash is now, which the moves before it may have moved, and
+      // Auni puts it up again itself on a fresh card, so there is nothing to tap here.
+      return {
+        reason:
+          said ??
+          "Paused before sending: its card didn't show a permission it leaves. Auni will put it up again fresh.",
+        actions: [],
+      };
     case "unknown":
     case null:
       return { reason: `${said ?? "It didn't go through."} ${where}`, actions: ["retry", "ask"] };

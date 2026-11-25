@@ -27,7 +27,9 @@ import { actions, type ActionRow } from "../db/schema.ts";
  *          |                       its own starts here, as does one a card showed coming later
  *          |                       (ExecuteResult.later), its job due then
  *          |- skip --> failed      the proposal job, for a leg whose money never came; an
- *          |                       allowed ask that no longer applies
+ *          |                       allowed ask that no longer applies; the action job, for a
+ *          |                       leg allowed on a card from before that didn't show a
+ *          |                       permission it leaves, once its plan has started (startRun)
  *          |- apply -> done        the Allow that decides an ask, in its own transaction
  *          |- recall -> retracted  the action job, in place of its claim: allowed on a card from
  *          |                       before (CARD_FORMAT) that didn't show a permission it leaves,

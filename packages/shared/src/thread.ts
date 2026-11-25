@@ -7,6 +7,7 @@ import {
   automationFireIdSchema,
   automationRuleIdSchema,
   messageIdSchema,
+  proposalIdSchema,
   threadIdSchema,
   timestampSchema,
 } from "./shared.ts";
@@ -134,8 +135,13 @@ export const messageMetadataWireSchema = z.looseObject({
       }),
     )
     .optional(),
-  /** A background answer that ended with nothing worth telling, and why. */
+  /**
+   * A background answer that ended with nothing worth telling, and why: core marks one only when
+   * it shows the owner no words and no card, so the chat leaves it out.
+   */
   quiet: z.string().optional(),
+  /** Money that came in while this plan waited on the owner, which its card tells. */
+  forPlan: proposalIdSchema.optional(),
 });
 
 /** `GET /threads/:id/messages`: each message in the UI parts it streamed as. */

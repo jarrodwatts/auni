@@ -47,7 +47,7 @@ export function ThoughtRail({ live, text }: { readonly live: boolean; readonly t
         <button
           aria-controls={id}
           aria-expanded={open}
-          className="auni-thought-more"
+          className="auni-thought-more focus-ring"
           onClick={() => setOpen((was) => !was)}
           type="button"
         >
@@ -110,7 +110,7 @@ export function TurnSteps({
       <button
         aria-controls={bodyId}
         aria-expanded={open}
-        className="auni-steps-line"
+        className="auni-steps-line focus-ring"
         data-slot="steps-line"
         onClick={() => setOpened((was) => !was)}
         type="button"

@@ -217,7 +217,8 @@ const STEP = (label: string): Opener => ({
  * Sends a message core never confirms: the page's own fetch answers the send with a server fault,
  * so the thread shows what it says when a message may not have reached Auni.
  */
-const SEND_UNCONFIRMED = `(() => {
+const SEND_UNCONFIRMED: Opener = {
+  does: `(() => {
   const real = window.fetch;
   window.fetch = (input, init) =>
     init?.method === "POST" && /\\/messages$/u.test(typeof input === "string" ? input : input.url)
@@ -229,7 +230,9 @@ const SEND_UNCONFIRMED = `(() => {
   box.dispatchEvent(new Event("input", { bubbles: true }));
   box.form?.requestSubmit();
   return true;
-})()`;
+})()`,
+  shows: `document.querySelector('[role="alert"]')`,
+};
 
 /**
  * Every screen, into `out`, as an owner whose system is set to `look` sees it. Each look gets a
@@ -370,9 +373,13 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
           once: true,
         },
       );
+    // A turn's steps opened, in a chat whose answer looked a few things up before it spoke (its
+    // chat-... picture shows them folded to one line).
+    const looked = threads.find((thread) => /story with sol/iu.test(thread.title ?? ""));
+    if (looked)
+      await take(page, out, "work-open", `${origin}/app/chat/${looked.id}`, "end", OPEN_WORK);
     if (busiest) {
       const chat = `${origin}/app/chat/${busiest.id}`;
-      await take(page, out, "work-open", chat, "end", OPEN_WORK);
       // Last, as the pane stays open once opened (on this device) for every thread after it.
       const details: Opener = {
         does: PRESS("Show details"),

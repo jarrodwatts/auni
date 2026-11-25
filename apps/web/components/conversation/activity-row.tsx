@@ -134,7 +134,7 @@ export function ActivityRow({
   return (
     <button
       aria-expanded={open}
-      className="auni-activity-row auni-activity-control"
+      className="auni-activity-row auni-activity-control focus-ring"
       data-active={active || undefined}
       data-slot="conversation-activity-row"
       onClick={() => setOpen((was) => !was)}

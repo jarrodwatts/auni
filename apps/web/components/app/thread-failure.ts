@@ -37,10 +37,11 @@ export const SEND_FAILURES: Record<SendFailure, ThreadFailure> = {
     money: "If Auni did get it, any move shows up as a card here. Sending again won't run it twice.",
     action: "resend",
   },
-  // The turn may have moved money before it failed; the cards above show what it did.
+  // The turn may have started a move before it failed, maybe before its card reached the chat:
+  // core tells the agent so once it ends (money/actions.ts), so it ends up told here either way.
   turn: {
     message: "Auni stopped before finishing this answer.",
-    money: "If anything moved before it stopped, you'll see its card above.",
+    money: "Any move it had started carries on, and you'll see how it ends here.",
     action: "ask_again",
   },
 };

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "../db/client.ts";
-import { actions, fills, threads } from "../db/schema.ts";
+import { actions, fills, messages, threads } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { settledOutcome } from "./actions.ts";
 import { APPROVED_SALE_OF } from "./approved.ts";
@@ -18,7 +18,7 @@ import {
 import { moneyOf } from "./recipe.ts";
 import { parseUnits } from "./usd.ts";
 
-beforeEach(() => wipe(threads, actions, fills));
+beforeEach(() => wipe(messages, threads, actions, fills));
 
 // Settled long enough ago that a read of the wallet shows it.
 const settledLongAgo = (id: string) =>
@@ -369,6 +369,37 @@ describe("recordResult", () => {
     expect((await settledOutcome(done!))?.reason).toContain(
       `finished as done. ${filled}. It spent $1.51`,
     );
+  });
+
+  // An Auto move begun as its turn was cut off has no card in the chat, and the agent was told the
+  // owner saw how it ended there (2026-11-25 review): it's told so only where a card is.
+  it("tells the agent the owner saw it end only where its card reached their chat", async () => {
+    const thread = await insertThread();
+    const settle = async () => {
+      const action = await insertAction({ threadId: thread.id, status: "done" });
+      return { action, says: async () => (await settledOutcome(action))?.reason };
+    };
+    const card = (id: string) => [
+      { type: "data-cards", id: "c", data: { cards: [{ kind: "action", actionReference: id }] } },
+    ];
+
+    const unseen = await settle();
+    expect(await unseen.says()).toContain("No card for it reached the owner's chat");
+
+    const kept = await settle();
+    await db
+      .insert(messages)
+      .values({ threadId: thread.id, role: "assistant", parts: card(kept.action.id) });
+    expect(await kept.says()).toContain("Its card already shows the owner how it ended.");
+
+    // Still on the answer its turn is giving.
+    const giving = await settle();
+    await db
+      .update(threads)
+      .set({ answerSoFar: { turn: "t", began: "", parts: card(giving.action.id) } })
+      .where(eq(threads.id, thread.id));
+    expect(await giving.says()).toContain("Its card already shows the owner how it ended.");
+    expect(await unseen.says()).toContain("No card for it reached the owner's chat");
   });
 
   // A real Polymarket buy's card said $1.58, the most it could cost with Polymarket's fee at its

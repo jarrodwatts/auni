@@ -13,8 +13,10 @@ import type { z } from "zod";
 import { toolCopy } from "@/lib/tool-copy";
 
 interface AuniMessageMetadata {
-  /** A background answer Auni ended with nothing to tell, and why. */
+  /** A background answer Auni ended showing nothing (no words, no card), and why. */
   readonly quiet?: string;
+  /** Money in that came while this plan waited on the owner, which its card tells. */
+  readonly forPlan?: string;
   /** Absent on an answer core started without the person (an automation, a finished action). */
   readonly origin?: "human";
   /** When the message was sent, for the timestamp under a user bubble. */
@@ -87,8 +89,18 @@ export function pendingAnswer(prompt: AuniUiMessage | null): AuniUiMessage {
 export function toAuniMetadata(raw: unknown): AuniMessageMetadata {
   const parsed = messageMetadataWireSchema.safeParse(raw ?? {});
   if (!parsed.success) return {};
-  const { createdAt, fires, noBrain, origin, posted, replyToId, stopped, quiet, supersedesId } =
-    parsed.data;
+  const {
+    createdAt,
+    fires,
+    forPlan,
+    noBrain,
+    origin,
+    posted,
+    replyToId,
+    stopped,
+    quiet,
+    supersedesId,
+  } = parsed.data;
   return {
     // An answer core started on its own is not the person's to regenerate.
     ...(origin === "human" ? { origin } : {}),
@@ -99,6 +111,7 @@ export function toAuniMetadata(raw: unknown): AuniMessageMetadata {
     ...(noBrain ? { noBrain } : {}),
     ...(posted ? { posted } : {}),
     ...(quiet ? { quiet } : {}),
+    ...(forPlan ? { forPlan } : {}),
     ...(fires?.length ? { fires } : {}),
   };
 }
@@ -202,7 +215,8 @@ export function turnKeys(turns: readonly AuniUiMessage[]): string[] {
 
 /**
  * What a thread shows: each exchange as last asked, without the ones an edit replaced, and
- * without an answer Auni settled quietly about a move (its card already says how it went). A
+ * without an answer Auni settled quietly about a move (its card already says how it went). Core
+ * marks an answer quiet only when it shows no words and no card (conversation/turn.ts). A
  * watch's quiet answer stays, under its rule, as what came of the watch.
  */
 export function visibleThreadMessages(

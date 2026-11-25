@@ -22,16 +22,11 @@
 
 .auni-activity-control {
   position: relative;
+  border-radius: var(--radius-control);
 }
 
 .auni-activity-control:hover {
   color: var(--foreground);
-}
-
-.auni-activity-control:focus-visible {
-  border-radius: var(--radius-control);
-  outline: 2px solid color-mix(in oklab, var(--ring) 55%, transparent);
-  outline-offset: 2px;
 }
 
 .auni-activity-icon {

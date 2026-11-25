@@ -219,6 +219,28 @@ describe("telling them money arrived", () => {
     expect(await db.select().from(arrivals)).toHaveLength(3);
   });
 
+  // A deposit days after a plan had run was drawn inside that plan's old card, its day lost
+  // (2026-11-25 review): only a plan still waiting on the owner is named.
+  it("names the plan in that chat still waiting on the owner, and never one that settled", async () => {
+    const thread = await chat();
+    const plan = (proposalId: string, status: "awaiting_permission" | "done") =>
+      insertAction({ threadId: thread.id, proposalId, status });
+    await plan("00000000-0000-4000-8000-00000000000a", "done");
+    await hint("0xafter", [usdc({ position: "log:1" })]);
+    await plan("00000000-0000-4000-8000-00000000000b", "awaiting_permission");
+    await hint("0xwhile", [usdc({ position: "log:2" })]);
+
+    const told = await db
+      .select({ metadata: messages.metadata })
+      .from(messages)
+      .where(eq(messages.role, "assistant"))
+      .orderBy(asc(messages.createdAt));
+    expect(told.map(({ metadata }) => metadata.forPlan)).toEqual([
+      undefined,
+      "00000000-0000-4000-8000-00000000000b",
+    ]);
+  });
+
   it("starts the main conversation for someone with none", async () => {
     await hint("0xfirst", [usdc()]);
     const [started] = await db.select().from(threads);

@@ -1,16 +1,16 @@
-import type { ArrivalCardWire, CardWire } from "@auni/shared";
+import type { ArrivalCardWire } from "@auni/shared";
 
 import { messageCards, type AuniUiMessage } from "./conversation";
 
-/** Cards that put money in, which may wait on money arriving before they can. */
-const MONEY_IN = new Set<CardWire["kind"]>(["action_plan"]);
-
 /**
- * Money that came in right after an answer whose card puts money in is that card's news: the card
- * tells it in its own place, above the step it made possible (ArrivedLine), and the chat doesn't
- * tell it again under the card. `told` is, by the index of such an answer, the arrivals it tells;
- * `folded` the indices of the messages they came in, which the chat then leaves out. Only news
- * core posted (no words, nothing but money in) is taken; anything else between keeps its place.
+ * Money that came in while a plan's card waited on the owner, right after the answer holding it,
+ * is that card's news: the card tells it in its own place, above the step it made possible
+ * (ArrivedLine), and the chat doesn't tell it again under the card. Core names the plan still
+ * waiting when it posts the news (`forPlan`, money/news.ts); money in after a plan settled names
+ * none, so it keeps its own place and day, never drawn inside an old card. `told` is, by the
+ * index of such an answer, the arrivals it tells; `folded` the indices of the messages they came
+ * in, which the chat then leaves out. Only news core posted (no words, nothing but money in) is
+ * taken; anything else between keeps its place.
  */
 export function arrivalsForCards(turns: readonly AuniUiMessage[]): {
   readonly told: ReadonlyMap<number, readonly ArrivalCardWire[]>;
@@ -18,16 +18,21 @@ export function arrivalsForCards(turns: readonly AuniUiMessage[]): {
 } {
   const told = new Map<number, ArrivalCardWire[]>();
   const folded = new Set<number>();
-  let card: number | null = null;
+  let card: { readonly index: number; readonly plans: ReadonlySet<string> } | null = null;
   turns.forEach((message, index) => {
     const arrivals = moneyIn(message);
-    if (arrivals && card !== null) {
-      told.set(card, [...(told.get(card) ?? []), ...arrivals]);
+    const plan = message.metadata?.forPlan;
+    if (arrivals && card && plan && card.plans.has(plan)) {
+      told.set(card.index, [...(told.get(card.index) ?? []), ...arrivals]);
       folded.add(index);
       return;
     }
-    const cards = message.role === "assistant" ? messageCards(message) : [];
-    card = cards.some(({ kind }) => MONEY_IN.has(kind)) ? index : null;
+    const plans = new Set(
+      (message.role === "assistant" ? messageCards(message) : []).flatMap((one) =>
+        one.kind === "action_plan" ? [one.proposalId] : [],
+      ),
+    );
+    card = plans.size > 0 ? { index, plans } : null;
   });
   return { told, folded };
 }

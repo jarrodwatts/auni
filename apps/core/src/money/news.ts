@@ -8,7 +8,7 @@ import {
   type NetworkKey,
   type VenueEventCardWire,
 } from "@auni/shared";
-import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { fenced } from "../agent/fence.ts";
@@ -20,7 +20,7 @@ import { publishThread } from "../conversation/threads.ts";
 import { publishThreadEvent } from "../conversation/stream.ts";
 import { answered } from "../conversation/tidy.ts";
 import { db, type Tx } from "../db/client.ts";
-import { arrivals, messages, threads } from "../db/schema.ts";
+import { actions, arrivals, messages, threads } from "../db/schema.ts";
 import {
   deliverKind,
   foundKind,
@@ -134,7 +134,30 @@ export async function tellArrivals(tx: Tx, recorded: readonly ArrivalRow[]): Pro
   if (news.length === 0) return landed;
   const cards = news.map(arrivalCard);
   const place = woken[0] ?? (await mainChat(tx));
-  return [...landed, await post(tx, place, cards)];
+  const forPlan = news.some((one) => one.direction === "in")
+    ? await waitingPlan(tx, place.id)
+    : undefined;
+  return [...landed, await post(tx, place, cards, forPlan ? { forPlan } : {})];
+}
+
+/**
+ * The plan in this chat still waiting on the owner's tap, which money coming in now may be for:
+ * its card tells it above the step it makes possible. One already settled never is, however near.
+ */
+async function waitingPlan(tx: Tx, threadId: string): Promise<string | undefined> {
+  const [plan] = await tx
+    .select({ id: actions.proposalId })
+    .from(actions)
+    .where(
+      and(
+        eq(actions.threadId, threadId),
+        eq(actions.status, "awaiting_permission"),
+        isNotNull(actions.proposalId),
+      ),
+    )
+    .orderBy(desc(actions.createdAt))
+    .limit(1);
+  return plan?.id ?? undefined;
 }
 
 /** A token they held quietly as Other that Auni came to recognise, as told. */
@@ -458,7 +481,12 @@ export function why(cause: Happened["cause"], venue: string): string {
  * One message of cards left in a thread, which the agent reads in its history as what happened, and
  * sent to their home channel with it, as Auni's answers said unasked are.
  */
-async function post(tx: Tx, place: Place, cards: readonly NewsCard[]): Promise<Posted> {
+async function post(
+  tx: Tx,
+  place: Place,
+  cards: readonly NewsCard[],
+  more: { readonly forPlan?: string } = {},
+): Promise<Posted> {
   const messageId = randomUUID();
   await tx.insert(messages).values({
     id: messageId,
@@ -467,7 +495,7 @@ async function post(tx: Tx, place: Place, cards: readonly NewsCard[]): Promise<P
     parts: [{ type: "data-cards", id: messageId, data: { cards } }],
     origin: "automation",
     // The agent reads it in the thread's history as what happened (see renderMessage).
-    metadata: { reason: cards.map(sentence).join(" "), posted: true },
+    metadata: { reason: cards.map(sentence).join(" "), posted: true, ...more },
   });
   await tx
     .update(threads)

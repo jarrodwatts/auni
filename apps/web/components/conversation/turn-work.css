@@ -22,17 +22,12 @@
   font-size: var(--text-meta);
   line-height: var(--text-meta--line-height);
   font-weight: 500;
-  outline: none;
+  border-radius: var(--radius-control);
   transition: color 120ms var(--motion-settle);
 }
 
 .auni-thought-more:hover {
   color: var(--foreground);
-}
-
-.auni-thought-more:focus-visible {
-  border-radius: var(--radius-control);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 55%, transparent);
 }
 
 /* A run of steps: quiet lines, flush with the answer's words. */
@@ -62,17 +57,12 @@
   font-size: var(--text-ui);
   line-height: var(--text-ui--line-height);
   text-align: start;
-  outline: none;
+  border-radius: var(--radius-control);
   transition: color 120ms var(--motion-settle);
 }
 
 .auni-steps-line:hover {
   color: var(--foreground);
-}
-
-.auni-steps-line:focus-visible {
-  border-radius: var(--radius-control);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 55%, transparent);
 }
 
 .auni-steps-marks {

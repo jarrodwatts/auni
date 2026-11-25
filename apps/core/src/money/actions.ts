@@ -42,7 +42,7 @@ import {
 } from "./recipe.ts";
 import { recipeForTool, toolRecipe } from "./recipes/index.ts";
 import { Refused } from "./refused.ts";
-import { replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
+import { cardReached, replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
 import { errorWords } from "../safe-words.ts";
 import { settleFromReceipts } from "./reconcile.ts";
 import {
@@ -757,7 +757,11 @@ export async function settledOutcome(
   if (!SETTLED.includes(action.status)) return null;
   if (!action.proposalId)
     return {
-      reason: withCardShows(actionOutcome(action).replace(/[^.!?]$/u, "$&."), " "),
+      reason: settledSaid(
+        actionOutcome(action).replace(/[^.!?]$/u, "$&."),
+        " ",
+        await cardSays(action, executor),
+      ),
       id: `action-settled-${action.id}-a${action.attempts}`,
     };
   const legs = await proposalActions(action.proposalId, executor);
@@ -774,7 +778,7 @@ export async function settledOutcome(
   });
   const heading = `Every leg of proposal ${action.proposalId} has settled`;
   return {
-    reason: withCardShows(
+    reason: settledSaid(
       [
         notDone.length === 0
           ? `${heading}:`
@@ -786,17 +790,25 @@ export async function settledOutcome(
         ),
       ].join("\n"),
       "\n",
+      await cardSays(action, executor),
     ),
     id: `proposal-settled-${action.proposalId}-a${cardRuns(legs)}`,
   };
 }
 
-/** What the owner already sees of a settled move: its card, changed in place to how it ended. */
-const CARD_SHOWS = "Its card already shows the owner how it ended.";
+/**
+ * What the owner already sees of a settled move: its card, changed in place to how it ended, when
+ * one reached their chat. Said only as it's true: a move begun as its turn was cut off has none.
+ */
+async function cardSays(action: ActionRow, executor: Pick<typeof db, "select">): Promise<string> {
+  return (await cardReached(action, executor))
+    ? "Its card already shows the owner how it ended."
+    : "No card for it reached the owner's chat, so they haven't seen it or how it ended.";
+}
 
-/** A settled wake's words cut to fit SETTLED_SAID, with CARD_SHOWS whole after them. */
-function withCardShows(said: string, between: string): string {
-  return `${said.slice(0, SETTLED_SAID - between.length - CARD_SHOWS.length)}${between}${CARD_SHOWS}`;
+/** A settled wake's words cut to fit SETTLED_SAID, with what the owner saw of it whole after them. */
+function settledSaid(said: string, between: string, seen: string): string {
+  return `${said.slice(0, SETTLED_SAID - between.length - seen.length)}${between}${seen}`;
 }
 
 /**

@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../db/client.ts";
 import { actions, jobs, threads } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
-import { allowAction, allowProposal } from "./decide.ts";
+import { queued } from "../test/jobs.ts";
+import { allowAction, allowProposal, declineAction, declineProposal } from "./decide.ts";
 
 beforeEach(() => wipe(threads, actions, jobs));
 
@@ -34,6 +35,43 @@ describe("a card drawn before cards said all they say now", () => {
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
       "awaiting_permission",
       "awaiting_permission",
+    ]);
+  });
+
+  // Found in review: the tap took such a card back first, so the agent heard it could put the
+  // move up again, not that the owner had said no. The web app and every channel decline here.
+  it("is declined on a lone move's Decline, and the thread hears the owner's no", async () => {
+    const thread = await insertThread();
+    const old = await insertAction({
+      threadId: thread.id,
+      status: "awaiting_permission",
+      cardFormat: 1,
+    });
+    expect((await declineAction(old.id))?.id).toBe(old.id);
+    expect(await statusOf(old.id)).toBe("cancelled");
+    expect((await queued("turn")).map(({ data }) => data.reason)).toEqual([
+      expect.stringContaining(`The owner declined action ${old.id}`),
+    ]);
+  });
+
+  it("is declined, every leg, on a plan's Decline, and the thread hears the owner's no", async () => {
+    const thread = await insertThread();
+    const legs = await Promise.all([
+      insertAction({ threadId: thread.id, status: "awaiting_permission", proposalId: PLAN }),
+      insertAction({
+        threadId: thread.id,
+        status: "awaiting_permission",
+        proposalId: PLAN,
+        cardFormat: 1,
+      }),
+    ]);
+    expect(await declineProposal(PLAN)).toHaveLength(2);
+    expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
+      "cancelled",
+      "cancelled",
+    ]);
+    expect((await queued("turn")).map(({ data }) => data.reason)).toEqual([
+      expect.stringContaining(`The owner declined proposal ${PLAN}`),
     ]);
   });
 

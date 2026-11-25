@@ -222,6 +222,9 @@ describe("a card drawn before cards said all they say now", () => {
     expect(more).toEqual([]);
     expect(woke?.data).toMatchObject({ threadId: thread.id });
     expect(woke?.data.reason).toContain(`"Sell half of the Fed bet" (card ${old.id})`);
+    // The card says what that wake is for, so the owner isn't asked for what Auni will do itself.
+    expect(RETRACTED.outOfDate).toContain("Auni will put it up again");
+    expect(RETRACTED.outOfDate).not.toMatch(/ask again/iu);
     // Once: the cron finds nothing more to take back or tell.
     await staleCardsJob.run({}, {} as never);
     expect(await queued("turn")).toHaveLength(1);

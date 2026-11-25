@@ -110,11 +110,11 @@ export function replacedNote(replaced: readonly WaitingCard[]): string | null {
 
 /**
  * Takes back every card that can no longer be allowed as it was shown, as Auni starts, as a cron
- * runs and before any tap, in that tap's transaction. One that has waited a day for the owner's
+ * runs and before any Allow, in that tap's transaction. One that has waited a day for the owner's
  * tap (CARD_WAITS_MS): its prices and the agent's reasons for it are a day old, so it says so and
  * the owner asks again; its thread isn't woken, since nothing happened there. And a money card
  * drawn before cards said all they say now (CARD_FORMAT), which Allow would refuse: it says it is
- * out of date, and its thread is woken, so the agent can put the move up again. Either way its
+ * out of date, and its thread is woken, so the agent puts the move up again if it still fits. Either way its
  * sealed card is left as it was shown. In one transaction, so no card is taken back without the
  * wake that tells its thread. Returns the threads whose cards it took back.
  */

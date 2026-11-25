@@ -3,7 +3,12 @@ import { z } from "zod";
 import { dollarsSchema } from "./money.ts";
 import { CASH_KEYS } from "./networks.ts";
 import { listed } from "./words.ts";
-import { actionRecordIdSchema, proposalIdSchema, threadIdSchema, timestampSchema } from "./shared.ts";
+import {
+  actionRecordIdSchema,
+  proposalIdSchema,
+  threadIdSchema,
+  timestampSchema,
+} from "./shared.ts";
 
 /**
  * Where a money action is. Cancelled: the owner declined it. Replaced: a newer card took its
@@ -96,7 +101,8 @@ export const CARD_FORMAT = 2;
 export const RETRACTED = {
   stale: "Taken back after a day without a tap. Ask again if you still want it.",
   agent: "Taken back by Auni: it no longer fits.",
-  outOfDate: "Out of date: Auni's cards now say more about each move. Ask again for a fresh one.",
+  outOfDate:
+    "Out of date: Auni's cards now say more about each move. Auni will put it up again fresh if it still fits.",
 } as const;
 
 /** How a held move the owner closed reads afterwards: when its money had moved, and when nothing showed it had. */

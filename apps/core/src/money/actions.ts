@@ -246,11 +246,7 @@ export async function recordActions(
     await lockCards(tx);
     // Lock the thread row so two plans in an auto thread can't both spend its free cash.
     const [thread] = context.threadId
-      ? await tx
-          .select()
-          .from(threads)
-          .where(eq(threads.id, context.threadId))
-          .for("update")
+      ? await tx.select().from(threads).where(eq(threads.id, context.threadId)).for("update")
       : [];
     const actsOnItsOwn =
       thread?.archivedAt === null &&
@@ -459,8 +455,9 @@ export async function decideActions(
 ): Promise<ActionRow[]> {
   let stale: string[] = [];
   const rows = await db.transaction(async (tx) => {
-    // A card past its day is taken back first, so no tap allows one (see retractStale).
-    stale = await retractStale(tx);
+    // A card that can no longer be allowed as shown is taken back before an Allow, so none is
+    // (see retractStale). A Decline is the owner's no, which the agent hears as one, whatever card.
+    if (decision === "allow") stale = await retractStale(tx);
     const decided = await step(
       tx,
       decision,

@@ -421,6 +421,19 @@ describe("approving a card", () => {
     expect(signer.calls).toBe(0);
   });
 
+  // Its Decline is the owner's no, which the thread hears as one, not that it can go up again.
+  it("declines a card drawn before cards said all they say now, and tells the thread", async () => {
+    const action = await waiting({ cardFormat: 1 });
+    await deliverCard(action);
+    expect(
+      await press({ from: OWNER }, await messageIdOf(action.id), `decline:${grantOnCard()}`),
+    ).toBe("Declined.");
+    expect(await statusOf(action.id)).toBe("cancelled");
+    expect((await queued("turn")).flatMap(({ data }) => data.reason ?? [])).toEqual([
+      expect.stringContaining(`declined action ${action.id}`),
+    ]);
+  });
+
   it("applies an ask on the owner's press, through the same path, with nothing to sign", async () => {
     const ask = await waitingAsk();
     await deliverCard(ask);
@@ -770,6 +783,21 @@ describe("approving a plan", () => {
       "awaiting_permission",
     ]);
     expect(signer.calls).toBe(0);
+  });
+
+  it("declines a plan with a leg drawn before cards said all they say now, and tells the thread", async () => {
+    const legs = await planLegs({ cardFormat: 1 });
+    await deliverPlan(PLAN);
+    expect(await press({ from: OWNER }, await planMessage(), `decline:${grantOnCard()}`)).toBe(
+      "Declined.",
+    );
+    expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
+      "cancelled",
+      "cancelled",
+    ]);
+    expect((await queued("turn")).flatMap(({ data }) => data.reason ?? [])).toEqual([
+      expect.stringContaining(`declined proposal ${PLAN}`),
+    ]);
   });
 
   // The grant rides in a button a channel can deliver twice; a press that decided nothing spends

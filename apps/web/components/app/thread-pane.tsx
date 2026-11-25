@@ -1,6 +1,7 @@
 "use client";
 
 import type { MessageId, ThreadId } from "@auni/shared";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { toast } from "sonner";
@@ -57,6 +58,8 @@ export function ThreadPane({
   readonly threadId: ThreadId;
   readonly placeholder: string;
 }) {
+  const search = useSearchParams();
+  const linkedCard = search.get("status") ?? search.get("card");
   const { launch, settle: settleLaunch } = useConversationLaunch();
   const { readThread, refreshThreads, threads } = useThreads();
   const changeThread = useChangeThread();
@@ -339,8 +342,8 @@ export function ThreadPane({
           <Composer
             // Remounting with the returned or edited words puts them back under the cursor.
             key={editing?.userMessageId ?? returnedDraft?.key ?? threadId}
-            // Wait for history before autofocusing so an arriving QuestionPicker keeps its number-key shortcuts.
-            autoFocus={historyReady && !openQuestion}
+            // A linked card or open question gets the keyboard on arrival.
+            autoFocus={historyReady && !openQuestion && (!linkedCard || editing !== null)}
             // With no AI to think with, a turn only asks for one: nothing is running to stop.
             busy={busy && !brainless}
             disabled={historyFailed}

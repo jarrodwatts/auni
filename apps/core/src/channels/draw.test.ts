@@ -157,9 +157,39 @@ describe("drawCard", () => {
       null,
     );
     expect(settled.text).toContain("1 bought, 1 didn't go through");
+    expect(settled.text).toContain(
+      "**2. Buy $5 of Tesla**\nDidn't go through. Nothing left your wallet.",
+    );
     expect(settled.buttons?.flat()).toEqual([
       { label: "Open in Auni", url: "https://auni.example/app/chat/t" },
     ]);
+  });
+
+  it("keeps the wallet outcome next to each failed or unsure move in an oversized plan", () => {
+    const legs = [
+      leg({
+        status: "failed",
+        failureKind: "sent",
+        lines: [{ label: "Terms", value: "x".repeat(3_500) }],
+      }),
+      leg({ summary: "Buy Tesla", status: "running", phase: "unsure" }),
+      leg({
+        summary: "Buy gold",
+        status: "running",
+        phase: "needs_owner",
+        run: { held: "unrecorded" },
+      }),
+    ];
+    const { text } = drawCard(view(legs), null);
+    expect(text).toContain(
+      "**1. Buy about $10 of Nvidia**\nDidn't go through. Money may have moved or a fee may have been charged.",
+    );
+    expect(text).toContain(
+      "**2. Buy Tesla**\nChecking whether it went through. Auni can't yet tell whether money moved.",
+    );
+    expect(text).toContain(
+      "**3. Buy gold**\nMoney moved, but Auni couldn't confirm what came back",
+    );
   });
 
   it("names the local computer for owner proof and removes approval buttons", () => {

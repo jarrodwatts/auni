@@ -110,7 +110,7 @@ export function appDestination(path: string) {
   const origin = new URL(env.WEB_ORIGIN);
   const onPhone =
     env.TAILSCALE_OWNER && origin.protocol === "https:" && origin.hostname.endsWith(".ts.net");
-  return { link: onPhone ? new URL(path, origin).href : null, machine: hostname().split(".")[0] };
+  return { link: onPhone ? new URL(path, origin).href : null, machine: hostname().split(".")[0]! };
 }
 
 const threadPath = (threadId: string | null) =>
@@ -261,9 +261,9 @@ export async function pendingCard(
   if (source && segment?.kind === "card")
     return () => sendCard(app, chat, source.threadId, segment.card);
   if (row.phase !== "needs_owner") return null;
-  // There is no card to open yet. The notice itself gives the known status.
+  // Without a card to check, the owner can still look at their holdings.
   return async () => {
-    const refs = await app.channel.send(chat, drawHeldNotice(row));
+    const refs = await app.channel.send(chat, drawHeldNotice(row, appDestination("/app")));
     if (row.threadId) await recordSent(app, row.threadId, refs, {});
   };
 }

@@ -217,9 +217,12 @@ async function pending(found: Found, chat: string): Promise<void> {
     if (ready <= 4) await send();
   }
   if (ready > 4) {
-    const { link } = appDestination("/app");
+    const { link, machine } = appDestination("/app");
+    const more = ready - 4;
     await found.channel.send(chat, {
-      text: `${ready - 4} more waiting in Auni`,
+      text: link
+        ? `${more} more waiting in Auni`
+        : `${more} more waiting. Open Auni on ${literal(machine)} to see them.`,
       ...(link && { buttons: [[{ label: "Open Money", url: link }]] }),
     });
   }

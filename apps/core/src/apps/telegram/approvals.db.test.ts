@@ -1,4 +1,5 @@
 import { rmSync } from "node:fs";
+import { hostname } from "node:os";
 
 import { and, desc, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -318,7 +319,10 @@ describe("pairing", () => {
     expect(firstGrant).not.toBe(secondGrant);
     expect(await deliveryOf(held.id)).toMatchObject({ grantHash: null });
     expect(await deliveryOf(proof.id)).toMatchObject({ grantHash: null });
-    expect(replies.at(-1)).toMatchObject({ text: "1 more waiting in Auni" });
+    expect(replies.at(-1)).toMatchObject({
+      text: `1 more waiting. Open Auni on ${hostname().split(".")[0]} to see them.`,
+    });
+    expect(replies.at(-1)?.reply_markup).toBeUndefined();
     expect(replies.some(({ text }) => String(text).includes("Status unknown"))).toBe(true);
     expect(replies.some(({ text }) => String(text).includes("Confirm it's you first."))).toBe(true);
     expect(
@@ -335,6 +339,39 @@ describe("pairing", () => {
     expect(await press({ from: OWNER }, await messageIdOf(first.id), callback!)).toBe("Allowed.");
     expect(await statusOf(second.id)).toBe("awaiting_permission");
   });
+
+  it.each([false, true])(
+    "shows where to look for a held move without a saved card (phone link: %s)",
+    async (onPhone) => {
+      const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };
+      const origin = "https://evo-t1.example.ts.net";
+      try {
+        Object.assign(env, {
+          WEB_ORIGIN: onPhone ? origin : "http://localhost:3000",
+          TAILSCALE_OWNER: onPhone ? "owner@example.com" : undefined,
+        });
+        await waiting({ summary: "Existing order", status: "running", phase: "needs_owner" });
+        fake.calls.length = 0;
+        fake.message({ from: OWNER }, "/pending");
+        await fake.handled();
+        const [notice] = fake.sent("sendMessage");
+        expect(notice?.text).toContain("Existing order");
+        expect(notice?.text).toContain("Auni can't confirm whether money moved");
+        if (onPhone) {
+          expect(notice?.reply_markup).toEqual({
+            inline_keyboard: [[{ text: "Open Money", url: `${origin}/app` }]],
+          });
+        } else {
+          expect(notice?.text).toContain(
+            `Open Auni on ${hostname().split(".")[0]} to see what you hold.`,
+          );
+          expect(notice?.reply_markup).toBeUndefined();
+        }
+      } finally {
+        Object.assign(env, saved);
+      }
+    },
+  );
 
   it("opens the exact plan and held card in Auni and links the queue overflow", async () => {
     const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };

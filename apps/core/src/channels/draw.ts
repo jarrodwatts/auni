@@ -229,6 +229,20 @@ function planProgress(legs: readonly ActionRow[]): string {
     .join(", ");
 }
 
+function compactPlanState(leg: ActionRow): string {
+  if (leg.phase === "needs_owner" && leg.run.held !== "unrecorded")
+    return "Status unknown. Money may have moved. Auni won't send it again.";
+  if (
+    leg.status === "failed" ||
+    (leg.status === "done" && leg.error) ||
+    leg.phase === "unsure" ||
+    leg.phase === "needs_owner" ||
+    leg.run.settledBy === "owner"
+  )
+    return legStatus(leg, false);
+  return "";
+}
+
 function cardText(legs: readonly ActionRow[], whole: boolean): string {
   const one = legs.length === 1;
   const compactPlan = !one && !whole;
@@ -236,6 +250,11 @@ function cardText(legs: readonly ActionRow[], whole: boolean): string {
     !one && legs.every(({ status }) => status !== "awaiting_permission" && status !== "running");
   const notes = whole ? tapNotes(legs) : "";
   const waitingPlan = !one && legs.some(({ status }) => status === "awaiting_permission");
+  const compactStates = compactPlan ? legs.map(compactPlanState) : [];
+  // Leave room for money outcomes before sharing the rest between the move names.
+  const limit = compactPlan
+    ? Math.max(40, Math.floor((2_000 - compactStates.join("\n").length) / legs.length))
+    : 250;
   const text = legs.map((leg, index) => {
     const filled = whole ? receipt(leg) : null;
     const [title, ...detail] = filled?.split("\n") ?? [];
@@ -248,34 +267,22 @@ function cardText(legs: readonly ActionRow[], whole: boolean): string {
       : [];
     const showState =
       !filled &&
-      !compactPlan &&
       (!waitingPlan || leg.status !== "awaiting_permission") &&
       (!settledPlan || leg.status === "failed" || leg.error);
-    // Compact plans still name every leg, sharing the available space between their titles.
     const name = literal(heading);
-    const limit = compactPlan ? Math.floor(2_000 / legs.length) : 250;
     const shortName = name.slice(0, limit - 1).replace(/\\+$/u, "") + "…";
     return [
       `**${prefix}${whole || name.length <= limit ? name : shortName}**`,
       quote(facts),
       one && notes,
-      showState && legStatus(leg, whole),
+      compactPlan ? compactStates[index] : showState && legStatus(leg, whole),
     ]
       .filter(Boolean)
       .join("\n");
   });
   if (one) return text[0]!;
   const title = `**${literal(planName(legs))}**`;
-  const heldNotes = compactPlan
-    ? [...new Set(legs.filter((leg) => leg.phase === "needs_owner").map(heldStatus))]
-    : [];
-  return [
-    title,
-    ...text,
-    notes,
-    (compactPlan || settledPlan || waitingPlan) && planProgress(legs),
-    ...heldNotes,
-  ]
+  return [title, ...text, notes, (compactPlan || settledPlan || waitingPlan) && planProgress(legs)]
     .filter(Boolean)
     .join(compactPlan ? "\n" : "\n\n");
 }
@@ -386,7 +393,8 @@ function legStatus(leg: ActionRow, whole: boolean): string {
       return "Waiting on you";
     case "running":
       if (leg.phase === "queued") return "Queued to send";
-      if (leg.phase === "needs_owner") return heldStatus(leg);
+      if (leg.phase === "needs_owner")
+        return `${heldStatus(leg)} Your Money page shows what you hold.`;
       if (leg.phase === "unsure")
         return "Checking whether it went through. Auni can't yet tell whether money moved.";
       if (leg.phase === "landing")
@@ -420,22 +428,26 @@ function legStatus(leg: ActionRow, whole: boolean): string {
 }
 
 function heldStatus(leg: ActionRow): string {
-  const money = "Your Money page shows what you hold.";
   switch (leg.run.held) {
     case "unrecorded":
-      return `Money moved, but Auni couldn't confirm what came back and won't send it again. ${money}`;
+      return "Money moved, but Auni couldn't confirm what came back and won't send it again.";
     case "overdue":
-      return `Status unknown. Still unconfirmed after a day, so Auni won't send it again. ${money}`;
+      return "Status unknown. Still unconfirmed after a day, so Auni won't send it again.";
     case "unanswered":
-      return `Status unknown. Auni sent this and never heard back, so it won't send it again. ${money}`;
+      return "Status unknown. Auni sent this and never heard back, so it won't send it again.";
     default:
-      return `Status unknown. Auni can't confirm whether money moved and won't send it again. ${money}`;
+      return "Status unknown. Auni can't confirm whether money moved and won't send it again.";
   }
 }
 
 /** A status notice for a held move without a sealed card to re-send. */
-export function drawHeldNotice(leg: ActionRow): ChannelMessage {
-  return { text: `${literal(leg.summary)}\n\n${heldStatus(leg)}` };
+export function drawHeldNotice(leg: ActionRow, where: AppDestination): ChannelMessage {
+  const { text, buttons } = viaApp(where, "Open Money", "see what you hold");
+  const next = buttons ? "Your Money page shows what you hold." : text;
+  return {
+    text: `${literal(leg.summary)}\n\n${heldStatus(leg)} ${next}`,
+    ...(buttons && { buttons }),
+  };
 }
 
 function failedOutcome(leg: ActionRow): string {

@@ -155,6 +155,15 @@ describe("retryRefusal", () => {
     expect(retryRefusal({ ...old, proposalId: "plan" })).toBe("not_retryable");
     // Found in review: one that leaves nothing, or showed what it leaves, can still finish its plan.
     expect(retryRefusal({ ...old, lines: [] })).toBeNull();
+    // Core's plain face drew the line, as far as a figure went (500 characters).
+    expect(retryRefusal({ ...old, card: null })).toBeNull();
+    expect(
+      retryRefusal({
+        ...old,
+        card: null,
+        lines: [{ label: "Lets", value: `${lets.value} and `.repeat(20) }],
+      }),
+    ).toBe("not_retryable");
     expect(
       retryRefusal({ ...old, card: { ...FACE, warning: `It lets ${lets.value} afterwards.` } }),
     ).toBeNull();

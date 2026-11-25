@@ -25,13 +25,12 @@ import {
   allowProposal,
   declineAction,
   declineProposal,
-  OUT_OF_DATE,
   outOfDate,
+  takenBack,
 } from "../money/decide.ts";
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
-import { takeBackStale } from "../money/waiting.ts";
 import {
   hashOf,
   legsDigest,
@@ -357,7 +356,6 @@ async function decide(
 
 type Decided = { readonly won: boolean; readonly answer: string };
 const NOT_WAITING: Decided = { won: false, answer: "That was decided already." };
-const OUT_OF_DATE_DECIDED: Decided = { won: false, answer: OUT_OF_DATE };
 const TAKES_PROOF: Decided = {
   won: false,
   answer: "This one checks it's you, so allow it in the app.",
@@ -374,13 +372,13 @@ async function allowed(
     if (outcome.kind === "not_waiting") return NOT_WAITING;
     if (outcome.kind === "in_its_field")
       return { won: false, answer: "Paste it in the app, never in a chat." };
-    if (outcome.kind === "out_of_date") return OUT_OF_DATE_DECIDED;
+    if (outcome.kind === "out_of_date") return { won: false, answer: outcome.said };
     return { won: true, answer: "Allowed." };
   }
   // Said before asking for money a plan that can never run would need.
   if (outOfDate(legs)) {
-    await takeBackStale();
-    return OUT_OF_DATE_DECIDED;
+    const refused = await takenBack(legs);
+    return refused ? { won: false, answer: refused.said } : NOT_WAITING;
   }
   const waiting = legs.filter((leg) => leg.status === "awaiting_permission");
   if ((await Promise.all(waiting.map((leg) => needsStepUp(leg)))).some(Boolean)) return TAKES_PROOF;
@@ -392,7 +390,7 @@ async function allowed(
       answer: `Add ${dollars(funding.needUsd)} to your wallet first, then tap Allow again.`,
     };
   const rows = await allowProposal(target.proposalId);
-  if (rows === "out_of_date") return OUT_OF_DATE_DECIDED;
+  if (!Array.isArray(rows)) return { won: false, answer: rows.said };
   return rows.length > 0 ? { won: true, answer: "Allowed." } : NOT_WAITING;
 }
 

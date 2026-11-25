@@ -97,7 +97,8 @@ export const CARD_FORMAT = 2;
 /**
  * Why Auni took back a card still waiting for the owner's tap, in the words its card, its
  * channel message and the agent all read: it waited a day (CARD_WAITS_MS), Auni no longer
- * stands behind it, or it was drawn before cards said all they say now (CARD_FORMAT).
+ * stands behind it, or it was drawn before cards said all they say now (CARD_FORMAT). Each fits
+ * whole in the agent's cut of a plan's leg (core's LEG_SAID).
  */
 export const RETRACTED = {
   stale: "Taken back after a day without a tap. Ask again if you still want it.",
@@ -105,7 +106,7 @@ export const RETRACTED = {
   outOfDate:
     "Out of date: Auni's cards now say more about each move. Auni will put it up again fresh if it still fits.",
   unshown:
-    "Stopped before anything was sent: Auni's cards now say more about each move, and this card didn't show a permission it leaves. Auni will put it up again fresh if it still fits.",
+    "Stopped before anything was sent: its card didn't show a permission it leaves, which Auni's cards now show. Auni will put it up again fresh if it still fits.",
 } as const;
 
 /** How a held move the owner closed reads afterwards: when its money had moved, and when nothing showed it had. */

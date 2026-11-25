@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { actionWireSchema, CARD_FORMAT, HELD, RETRACTED } from "@auni/shared";
+import { actionWireSchema, CARD_FORMAT, HELD, NETWORKS, RETRACTED } from "@auni/shared";
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { accounts } from "../apps/registry.ts";
 import { db } from "../db/client.ts";
 import { actions, fills, jobs, threads } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
@@ -15,6 +16,8 @@ import {
   actionWire,
   decideActions,
   executeAction,
+  LEG_SAID,
+  pausedSaid,
   prepareLeg,
   proposeAction,
   recordActions,
@@ -182,8 +185,7 @@ describe("executeAction", () => {
         failureKind: "unshown",
         txs: [{ hash: "0xa" }],
         // What that try sent is on its record; nothing says its cash is where it started.
-        error:
-          "Paused before sending: its card didn't show a permission it leaves. An earlier try sent what its record shows, and nothing more went. Auni will put it up again fresh.",
+        error: pausedSaid("polygon", true),
       });
       expect(executions).toBe(0);
     });
@@ -242,10 +244,8 @@ describe("executeAction", () => {
           startedAt: null,
           txs: [],
           error:
-            "Paused before sending: its card didn't show a permission it leaves. Its $25 is in, or on its way to, your wallet on Polygon. Auni will put it up again fresh.",
+            "Paused before sending: its card didn't show a permission it leaves. Its cash is in, or headed to, your wallet on Polygon. Auni will put it up again.",
         });
-        // The agent's cut of each leg (settledOutcome) keeps why and where its cash is.
-        expect(row.error!.indexOf("Polygon.")).toBeLessThan(160);
       } finally {
         lookup.recipe = buy;
       }
@@ -255,11 +255,69 @@ describe("executeAction", () => {
       const [wake, ...more] = await wakes();
       expect(more).toEqual([]);
       expect(wake).toContain(`Every leg of proposal ${PLAN}`);
-      expect(wake).toContain("Its $25 is in, or on its way to, your wallet on Polygon.");
+      expect(wake).toContain("Its cash is in, or headed to, your wallet on Polygon.");
       // Only a fresh card runs it.
       expect(await executeAction(pick.id)).toMatchObject({ status: "failed" });
       expect(executions).toBe(0);
       expect(await wakes()).toHaveLength(1);
+    });
+
+    // Found in review: an 11-leg plan's one wake ran out on its done legs' long summaries before
+    // it named the two legs paused, why, or where their cash was, so nothing put them up again.
+    it("tells the agent every paused leg, why and where its cash is, before the legs that went through", async () => {
+      const thread = await insertThread();
+      const plan = { threadId: thread.id };
+      await funded({
+        ...plan,
+        summary: "Bridge $225 in USDC to Polygon",
+        createdAt: new Date(2026, 0, 1),
+      });
+      for (let index = 1; index < 9; index++)
+        await funded({
+          ...plan,
+          createdAt: new Date(2026, 0, index + 1),
+          summary: `Buy $25 of Yes on “Will the published year-end figures for market ${index} meet or exceed the target in the December announcement, using the final release and any revisions made before the close of the calendar year?”`,
+        });
+      const picks = await Promise.all(
+        [1, 2].map((day) =>
+          old({
+            ...plan,
+            proposalId: PLAN,
+            amountUsd: "25",
+            summary: `Polymarket pick ${day}`,
+            createdAt: new Date(2026, 1, day),
+          }),
+        ),
+      );
+      lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
+      try {
+        await Promise.all(picks.map(({ id }) => executeAction(id)));
+      } finally {
+        lookup.recipe = buy;
+      }
+      expect(executions).toBe(0);
+      const [reason, ...more] = await wakes();
+      expect(more).toEqual([]);
+      const wake = String(reason);
+      for (const [index, { id }] of picks.entries()) {
+        const told = `Action ${id} (Polymarket pick ${index + 1}) finished as failed: ${pausedSaid("polygon", false)}`;
+        expect(wake).toContain(told);
+        expect(wake.indexOf(told)).toBeLessThan(wake.indexOf("finished as done"));
+      }
+    });
+
+    // The agent reads each leg's first LEG_SAID characters (settledOutcome): what stopped it, where
+    // its cash is, and that Auni puts it up again, wherever that cash is.
+    it("says each paused or taken-back leg whole within the agent's cut of it", () => {
+      const places = [...Object.keys(NETWORKS), ...accounts().map(({ about }) => about.id)];
+      const said = [
+        ...Object.values(RETRACTED),
+        pausedSaid(null, false),
+        pausedSaid("polygon", true),
+        ...places.map((place) => pausedSaid(place, false)),
+      ];
+      for (const each of said) expect(each.length, each).toBeLessThanOrEqual(LEG_SAID);
+      expect(pausedSaid("hyperliquid", false)).toContain("your Hyperliquid account.");
     });
 
     it("runs a remaining leg that leaves nothing its card didn't show", async () => {

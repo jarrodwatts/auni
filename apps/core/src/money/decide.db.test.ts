@@ -28,7 +28,10 @@ describe("a card drawn before cards said all they say now", () => {
       status: "awaiting_permission",
       cardFormat: 1,
     });
-    expect(await allowAction(old.id, true)).toEqual({ kind: "out_of_date" });
+    expect(await allowAction(old.id, true)).toEqual({
+      kind: "out_of_date",
+      said: RETRACTED.outOfDate,
+    });
     expect(await rowOf(old.id)).toMatchObject({ status: "retracted", error: RETRACTED.outOfDate });
     expect((await queued("turn")).map(({ data }) => data.reason)).toEqual([
       expect.stringContaining(`card ${old.id}`),
@@ -36,6 +39,33 @@ describe("a card drawn before cards said all they say now", () => {
     expect(await queued("action")).toEqual([]);
     const now = await insertAction({ status: "awaiting_permission" });
     expect((await allowAction(now.id, true)).kind).toBe("allowed");
+  });
+
+  // Found in review: one also a day old is taken back as stale, which wakes no one, yet the tap
+  // promised Auni would put it up again. The tap says what taking it back did.
+  it("tells a tap on one a day old to ask again, as its card says, since no one puts it up", async () => {
+    const thread = await insertThread();
+    const dayOld = new Date(Date.now() - 25 * 60 * 60_000);
+    const lone = await insertAction({
+      threadId: thread.id,
+      status: "awaiting_permission",
+      cardFormat: 1,
+      createdAt: dayOld,
+    });
+    expect(await allowAction(lone.id, true)).toEqual({
+      kind: "out_of_date",
+      said: RETRACTED.stale,
+    });
+    expect(await rowOf(lone.id)).toMatchObject({ status: "retracted", error: RETRACTED.stale });
+    await insertAction({
+      threadId: thread.id,
+      status: "awaiting_permission",
+      proposalId: PLAN,
+      cardFormat: 1,
+      createdAt: dayOld,
+    });
+    expect(await allowProposal(PLAN)).toEqual({ kind: "out_of_date", said: RETRACTED.stale });
+    expect(await queued("turn")).toEqual([]);
   });
 
   it("allows no leg of a plan with one such leg, takes every leg back then, and wakes its thread once", async () => {
@@ -50,7 +80,7 @@ describe("a card drawn before cards said all they say now", () => {
         }),
       ),
     );
-    expect(await allowProposal(PLAN)).toBe("out_of_date");
+    expect(await allowProposal(PLAN)).toEqual({ kind: "out_of_date", said: RETRACTED.outOfDate });
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([
       "retracted",
       "retracted",

@@ -33,6 +33,7 @@ import {
   MayHaveSent,
   NothingMoved,
   type ActionPreview,
+  type CashPlace,
   type ExecuteResult,
   type KeptTx,
   type Later,
@@ -454,7 +455,7 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
     // Even one tried again whose first run sent something: what it sent doesn't say it granted
     // what its card left out (a swap first, say), and pausing it moves nothing.
     stopped = await step(tx, "skip", eq(actions.id, actionId), {
-      error: pausedSaid(leg),
+      error: pausedSaid(stagedLeg(leg).draws, leg.txs.length > 0),
       failureKind: "unshown",
     });
   }
@@ -470,23 +471,21 @@ async function startRun(tx: Tx, actionId: string): Promise<ActionRow | null> {
 }
 
 /**
- * What a paused leg's card says, first what stopped it, then where the cash it was to spend sits
- * now, which the moves before it may have brought there, so the agent's cut of it (settledOutcome)
- * keeps both. Of one an earlier try sent from (a fee coin, a swap), only its record says where
- * that went.
+ * What a paused leg's card says: what stopped it, where the cash it was to spend sits now, which
+ * the moves before it may have brought there, and that Auni puts it up again, all within the
+ * agent's cut of it (LEG_SAID). Of one an earlier try sent from (a fee coin, a swap), only its
+ * record says where that went. Its summary names the amount.
  */
-function pausedSaid(leg: ActionRow): string {
-  const { draws } = stagedLeg(leg);
+export function pausedSaid(draws: CashPlace | null, triedBefore: boolean): string {
   const place =
     draws && (ledgerAt(draws) ? `${placeName(draws)} account` : `wallet on ${placeName(draws)}`);
   // The moves before it may still be landing it there: a stage starts once patience runs out.
-  const where =
-    leg.txs.length > 0
-      ? "An earlier try sent what its record shows, and nothing more went."
-      : place
-        ? `Its ${dollars(leg.amountUsd)} is in, or on its way to, your ${place}.`
-        : "Nothing of it moved.";
-  return `Paused before sending: its card didn't show a permission it leaves. ${where} Auni will put it up again fresh.`;
+  const where = triedBefore
+    ? "An earlier try sent only what its record shows."
+    : place
+      ? `Its cash is in, or headed to, your ${place}.`
+      : "Nothing of it moved.";
+  return `Paused before sending: its card didn't show a permission it leaves. ${where} Auni will put it up again.`;
 }
 
 export async function actionById(actionId: string): Promise<ActionRow | null> {
@@ -712,6 +711,9 @@ export async function startProposal(executor: Executor, rows: readonly ActionRow
     );
 }
 
+/** How much of each leg's error the agent reads when its plan settles: Auni's own words fit whole. */
+export const LEG_SAID = 160;
+
 /**
  * What to tell the agent once an action finishes: a lone action reports alone, a
  * proposal's leg only once every leg has settled (one wake for the whole
@@ -728,11 +730,16 @@ export async function settledOutcome(
     return { reason: actionOutcome(action), id: `action-settled-${action.id}-a${action.attempts}` };
   const legs = await proposalActions(action.proposalId, executor);
   if (!legs.every((leg) => SETTLED.includes(leg.status))) return null;
+  // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
+  const told = [
+    ...legs.filter((leg) => leg.status !== "done"),
+    ...legs.filter((leg) => leg.status === "done"),
+  ];
   return {
     reason: [
       `Every leg of proposal ${action.proposalId} has settled:`,
-      ...legs.map(
-        (leg) => `- ${actionOutcome({ ...leg, error: leg.error?.slice(0, 160) ?? null })}`,
+      ...told.map(
+        (leg) => `- ${actionOutcome({ ...leg, error: leg.error?.slice(0, LEG_SAID) ?? null })}`,
       ),
     ].join("\n"),
     id: `proposal-settled-${action.proposalId}-a${cardRuns(legs)}`,

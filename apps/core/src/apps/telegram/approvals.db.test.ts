@@ -1,5 +1,6 @@
 import { rmSync } from "node:fs";
 
+import { RETRACTED } from "@auni/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,7 +22,7 @@ import {
   type ThreadRow,
 } from "../../db/schema.ts";
 import { executeAction } from "../../money/actions.ts";
-import { allowAction, OUT_OF_DATE } from "../../money/decide.ts";
+import { allowAction } from "../../money/decide.ts";
 import { insertAction, insertThread, wipe } from "../../test/db.ts";
 import { queued } from "../../test/jobs.ts";
 import { FACE, stubRecipe } from "../../test/recipe.ts";
@@ -416,7 +417,7 @@ describe("approving a card", () => {
     await deliverCard(action);
     expect(
       await press({ from: OWNER }, await messageIdOf(action.id), `allow:${grantOnCard()}`),
-    ).toBe(OUT_OF_DATE);
+    ).toBe(RETRACTED.outOfDate);
     // Taken back in the same press, so no surface shows it waiting to be allowed again.
     expect(await statusOf(action.id)).toBe("retracted");
     expect(signer.calls).toBe(0);
@@ -777,7 +778,7 @@ describe("approving a plan", () => {
     // Short of cash, it still says it can never run, not to add money first.
     funding.needUsd = "5.00";
     expect(await press({ from: OWNER }, await planMessage(), `allow:${grantOnCard()}`)).toBe(
-      OUT_OF_DATE,
+      RETRACTED.outOfDate,
     );
     // Taken back in the same press, so no surface shows it waiting to be allowed again.
     expect(await Promise.all(legs.map(({ id }) => statusOf(id)))).toEqual([

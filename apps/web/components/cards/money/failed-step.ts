@@ -148,7 +148,7 @@ function byKind(
       return {
         reason:
           said ??
-          "Paused before sending: its card didn't show a permission it leaves. Auni will put it up again fresh.",
+          "Paused before sending: its card didn't show a permission it leaves. Auni will put it up again.",
         actions: [],
       };
     case "unknown":

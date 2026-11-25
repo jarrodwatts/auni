@@ -1,3 +1,4 @@
+import { CoreApiError } from "@/lib/core";
 import type { SendFailure } from "@/lib/data/thread-session";
 
 /**
@@ -51,4 +52,13 @@ export const HISTORY_FAILURE: ThreadFailure = {
   action: "reload",
 };
 
-export const START_FAILURE = "Auni couldn't start this chat. Your words are back in the box to send again.";
+/**
+ * Why a chat didn't start, for the line under the box its words went back to: a new owner's first
+ * take makes their wallet before its chat (core's `wallet_not_made` when it can't), so that
+ * failure says so rather than blaming the chat.
+ */
+export function startFailure(error: unknown): string {
+  return error instanceof CoreApiError && error.code === "wallet_not_made"
+    ? "Auni couldn't make your wallet, so this chat didn't start. Your words are back in the box to send again."
+    : "Auni couldn't start this chat. Your words are back in the box to send again.";
+}

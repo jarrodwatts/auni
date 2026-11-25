@@ -22,9 +22,9 @@ network on purpose, as a later `-H` wins.
   itself until the app can open.
 - First run is the owner's first take (`components/first-run/first-take.tsx`, at `/app/new`):
   one question with the starting points and a line saying which AI is ready. Only an AI that
-  can't think stops it (`pick-your-ai.tsx`). Sending the take finishes it (`finish.ts`, core's
-  `POST /setup/done`, which makes the wallet); a wallet the owner already has comes in before
-  that (`bring-wallet.tsx`). Chat fallbacks: `brain-needed.tsx`, `spare-key.tsx`.
+  can't think stops it (`pick-your-ai.tsx`). The take's chat finishes it (core's
+  `POST /places/chat`, which makes the wallet; `finish.ts` mirrors it); a wallet the owner already
+  has comes in before that (`bring-wallet.tsx`). Chat fallbacks: `brain-needed.tsx`, `spare-key.tsx`.
 - Settings (`components/settings/`): grouped searchable modal over `/me`, `/brains`, `/apps`, and
   `/system/*` (`lib/data/system.ts`) for General, Appearance, Personalization, AI Brains, Wallet,
   Channels, Remote access (Tailscale, service, sessions, handover), Network/RPCs, Diagnostics, About.

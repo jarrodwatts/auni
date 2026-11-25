@@ -1,11 +1,13 @@
 import type { ModelSelectionWire, ThreadActMode } from "@auni/shared";
 import { and, asc, desc, eq, exists, isNull, sql } from "drizzle-orm";
 
-import { theOwner } from "../auth/owner.ts";
+import { lockOwner } from "../auth/owner.ts";
 import { db, type Tx } from "../db/client.ts";
 import { messages, owner, threads, type ThreadRow } from "../db/schema.ts";
+import { refreshStartingPoints } from "../jobs/kinds.ts";
 import { normalizeUsd } from "../money/usd.ts";
 import { messageText } from "./history.ts";
+import { publishMe } from "./stream.ts";
 
 const TITLE_CHARS = 48;
 
@@ -29,32 +31,40 @@ export interface StartChatOptions {
 
 /**
  * A new thread with Auni, titled by its first message, optionally carrying the
- * model selection and autonomy budget picked in the composer.
+ * model selection and autonomy budget picked in the composer. The owner's first one ends first
+ * run, in the same transaction: from then they're welcomed, and their starting points are on
+ * their way. Until a chat is there, they're still in first run (a reload brings it back).
  */
 export async function startChat(
   firstMessage: string,
   options: StartChatOptions = {},
 ): Promise<ThreadRow> {
-  const me = await theOwner();
-  const selection =
-    options.modelSelection !== undefined ? options.modelSelection : me.defaultModelSelection;
-  const actMode: ThreadActMode = options.actMode ?? "ask_first";
-  const budgetUsd =
-    options.budgetUsd !== undefined ? normalizeUsd(options.budgetUsd) : "0.00";
-  const [created] = await db
-    .insert(threads)
-    .values({
-      title: chatTitle(firstMessage),
-      actMode,
-      budgetUsd,
-      modelSelection: selection,
-    })
-    .returning();
-  if (!created) throw new Error("Failed to start the chat.");
-  // Remember an explicit choice as the default for the next new thread.
-  if (options.modelSelection !== undefined) {
-    await db.update(owner).set({ defaultModelSelection: options.modelSelection });
-  }
+  const { created, welcomed } = await db.transaction(async (tx) => {
+    const me = await lockOwner(tx);
+    const selection =
+      options.modelSelection !== undefined ? options.modelSelection : me.defaultModelSelection;
+    const actMode: ThreadActMode = options.actMode ?? "ask_first";
+    const budgetUsd =
+      options.budgetUsd !== undefined ? normalizeUsd(options.budgetUsd) : "0.00";
+    const [row] = await tx
+      .insert(threads)
+      .values({
+        title: chatTitle(firstMessage),
+        actMode,
+        budgetUsd,
+        modelSelection: selection,
+      })
+      .returning();
+    if (!row) throw new Error("Failed to start the chat.");
+    // Remember an explicit choice as the default for the next new thread.
+    if (options.modelSelection !== undefined)
+      await tx.update(owner).set({ defaultModelSelection: options.modelSelection });
+    if (me.welcomedAt !== null) return { created: row, welcomed: false };
+    await tx.update(owner).set({ welcomedAt: sql`now()` });
+    await refreshStartingPoints(tx, me.startingPointsAt);
+    return { created: row, welcomed: true };
+  });
+  if (welcomed) publishMe();
   return created;
 }
 

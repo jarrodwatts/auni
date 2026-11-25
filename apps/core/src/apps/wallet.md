@@ -35,7 +35,7 @@ Two wallets ship:
      asking never makes one (null too for a kind it holds no key of). The sweep and readings ask
      each minute before reading the wallet (`hasWallet`), so keep it cheap once there is one.
      Local-key: read from its store until found, then held in memory.
-   - `create()`: makes the owner's wallet as they send their first take (`POST /setup/done`),
+   - `create()`: makes the owner's wallet with their first take's chat (`POST /places/chat`),
      once: throw `WalletExists` (`contract.ts`) when there is one. Local-key generates its keys under
      a database lock, so two asks at once make one; Privy makes its two server wallets.
    - `bring` (optional): a private field (`../private-fields.ts`) for keys the owner already holds,

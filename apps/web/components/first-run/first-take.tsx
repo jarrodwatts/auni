@@ -22,8 +22,8 @@ import { whereAuniRuns } from "./where";
 /**
  * First run: the owner's first take, asked straight away. Only an AI that can't think yet stops
  * it, and then only until one can (PickYourAi). Under the take, one quiet line says what's ready;
- * the wallet is made as the take is sent (useFirstTake), unless the owner brings their own
- * first. Remote access, signals and the rest are Settings', for later.
+ * core makes the wallet with the take's chat, unless the owner brings their own first. Remote
+ * access, signals and the rest are Settings', for later.
  */
 export function FirstTake() {
   const brains = useBrains();

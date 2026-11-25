@@ -20,12 +20,9 @@ export function useSetup() {
   });
 }
 
-/**
- * The steps only the owner takes: finishing first run as their first take is sent, and saving
- * the spare key, or putting it off.
- */
+/** The steps only the owner takes: saving the spare key, or putting it off. */
 interface SetupStep {
-  readonly path: "setup/done" | "setup/backup" | "setup/backup/later";
+  readonly path: "setup/backup" | "setup/backup/later";
 }
 
 /** Takes one step, keeping core's answer as where first run stands now. */

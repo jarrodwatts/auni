@@ -8,9 +8,9 @@ import { requestComposerFocus } from "@/components/app/composer";
 import { useConversationLaunch } from "@/components/app/conversation-launch-context";
 import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
 import { useThreads } from "@/components/app/use-threads";
-import { START_FAILURE } from "@/components/app/thread-failure";
+import { startFailure } from "@/components/app/thread-failure";
 import { startInOrder } from "@/components/app/start-in-order";
-import { useFirstTake } from "@/components/first-run/finish";
+import { useWelcome } from "@/components/first-run/finish";
 import { isModifiedClick } from "@/components/places/open-place";
 import { startChat, threadHref, type StartChatOptions } from "@/lib/data/places";
 import { threadSession } from "@/lib/data/thread-session";
@@ -29,7 +29,7 @@ export function useStartConversation() {
   const { begin, cancel, continueToThread, launch } = useConversationLaunch();
   const [error, setError] = useState<string | null>(null);
   const [, startNavigation] = useTransition();
-  const { finish: finishFirstRun, welcome } = useFirstTake();
+  const welcome = useWelcome();
   const start = useCallback(
     async (prompt: string, carried?: CarriedTake, options?: StartChatOptions): Promise<void> => {
       const content = prompt.trim();
@@ -45,8 +45,6 @@ export function useStartConversation() {
       if (!started) return;
 
       await startInOrder({
-        // The owner's first take finishes first run as it goes (core makes their wallet).
-        finishFirstRun,
         createChat: () => startChat(content, options),
         welcome,
         open: async (thread) => {
@@ -66,14 +64,15 @@ export function useStartConversation() {
             pathname === "/app/new" ? router.replace(href) : router.push(href),
           );
         },
-        giveBack: async () => {
+        giveBack: async (failure) => {
           await carried?.landed;
           cancel(started.id);
           // Asked in a new chat's own box, the reason shows under it; asked from elsewhere
           // (search), it goes to a new chat's box, and the reason with it.
-          if (pathname === "/app/new") setError(START_FAILURE);
+          const reason = startFailure(failure);
+          if (pathname === "/app/new") setError(reason);
           else {
-            toast.error(START_FAILURE);
+            toast.error(reason);
             router.push("/app/new");
           }
           // Either way the words are back in that box, never lost to a failed start.
@@ -85,7 +84,6 @@ export function useStartConversation() {
       begin,
       cancel,
       continueToThread,
-      finishFirstRun,
       launch,
       pathname,
       rememberThread,

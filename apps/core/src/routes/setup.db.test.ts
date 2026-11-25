@@ -4,28 +4,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireOwner } from "../auth/middleware.ts";
 import { db } from "../db/client.ts";
-import { actions, arrivals, fills, jobs, owner, ownerSessions } from "../db/schema.ts";
+import { actions, arrivals, fills, jobs, ownerSessions } from "../db/schema.ts";
 import { env } from "../env.ts";
 import type { WalletAddresses } from "../apps/contract.ts";
 import { insertAction, setOwner, wipe } from "../test/db.ts";
-import { queued } from "../test/jobs.ts";
 import { serve } from "../test/serve.ts";
 import { ownerRouter } from "./owner.ts";
 import { setupRouter } from "./setup.ts";
 
-// A wallet made only when asked, once.
+// No wallet until a test makes one.
 const wallet = vi.hoisted(() => ({ made: null as WalletAddresses | null }));
 vi.mock("../apps/registry.ts", async (importOriginal) => {
   const real = await importOriginal<typeof import("../apps/registry.ts")>();
-  const { WalletExists: Exists } = await import("../apps/contract.ts");
-  const provided = {
-    addresses: async () => wallet.made ?? { evm: null, solana: null },
-    create: async () => {
-      if (wallet.made) throw new Exists();
-      wallet.made = { evm: "0x00000000000000000000000000000000000000e1", solana: null };
-      return wallet.made;
-    },
-  };
+  const provided = { addresses: async () => wallet.made ?? { evm: null, solana: null } };
   return {
     ...real,
     theWallet: () => provided,
@@ -62,6 +53,9 @@ beforeEach(async () => {
   cookie = paired.headers.get("set-cookie")!.split(";")[0]!;
 });
 
+const makeWallet = () => {
+  wallet.made = { evm: "0x00000000000000000000000000000000000000e1", solana: null };
+};
 const read = () => fetch(url("/setup"), { headers: { cookie } });
 const post = (path: string, body: unknown = {}, origin = env.WEB_ORIGIN) =>
   fetch(url(`/setup/${path}`), {
@@ -97,20 +91,15 @@ describe("GET /setup", () => {
   });
 });
 
-describe("finishing first run", () => {
-  it("takes the first take only from the app's own pages", async () => {
-    expect((await post("done", {}, "https://evil.example")).status).toBe(403);
-    expect(wallet.made).toBeNull();
-  });
-
+describe("the spare key", () => {
   it("keeps the spare key saved only once there is a wallet to back up", async () => {
     expect(await (await post("backup")).json()).toEqual({ error: "no_wallet" });
-    await post("done");
+    makeWallet();
     expect(await (await post("backup")).json()).toMatchObject({ spareKey: "saved" });
   });
 
   it("offers the spare key once a first trade has gone through, until put off for later", async () => {
-    await post("done");
+    makeWallet();
     expect(await (await read()).json()).toMatchObject({ spareKey: "not-yet" });
     const bought = await insertAction({});
     await db.insert(fills).values({
@@ -130,7 +119,7 @@ describe("finishing first run", () => {
   // Review, 2026-11-17: money added for a card the owner then declined held no fill, so its
   // wallet's key was never offered, and lived only on this machine.
   it("offers the spare key once money came in and nothing waits on the owner, traded or not", async () => {
-    await post("done");
+    makeWallet();
     const waiting = await insertAction({ status: "awaiting_permission" });
     await db.insert(arrivals).values({
       chain: "monad",
@@ -148,32 +137,5 @@ describe("finishing first run", () => {
     expect(await (await read()).json()).toMatchObject({ spareKey: "not-yet" });
     await db.update(actions).set({ status: "cancelled" }).where(eq(actions.id, waiting.id));
     expect(await (await read()).json()).toMatchObject({ spareKey: "due" });
-  });
-
-  it("makes the wallet the owner didn't bring, and opens the app on their take", async () => {
-    const done = await post("done");
-    expect(await done.json()).toMatchObject({
-      welcomed: true,
-      wallet: { addresses: { evm: "0x00000000000000000000000000000000000000e1" } },
-      // Nothing is asked first: the spare key waits for a first trade to go through.
-      spareKey: "not-yet",
-    });
-    const finishedAt = async () => (await db.select().from(owner))[0]!.welcomedAt;
-    const first = await finishedAt();
-    expect(first).toBeInstanceOf(Date);
-    // Auni's chat opens next, with its starting points on their way.
-    expect(await queued("starting-points")).toMatchObject([{ key: "starting-points:none" }]);
-    // Finishing again keeps when it first finished.
-    await post("done");
-    expect(await finishedAt()).toEqual(first);
-    expect(await queued("starting-points")).toHaveLength(1);
-  });
-
-  it("keeps the wallet the owner brought, making none", async () => {
-    wallet.made = { evm: "0x00000000000000000000000000000000000000b1", solana: null };
-    expect(await (await post("done")).json()).toMatchObject({
-      welcomed: true,
-      wallet: { addresses: { evm: "0x00000000000000000000000000000000000000b1" } },
-    });
   });
 });

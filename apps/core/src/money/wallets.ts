@@ -37,9 +37,15 @@ export async function hasWallet(): Promise<boolean> {
   return evm !== null || solana !== null;
 }
 
-/** Makes the owner's wallet, once: WalletExists when there is one. */
-export async function createWallet(): Promise<WalletAddresses> {
-  return (await theWallet()).create();
+/**
+ * Makes the owner's wallet unless there is one. One made meanwhile, say by a second tab sending
+ * its first take at once, is theirs.
+ */
+export async function makeWalletIfNone(): Promise<void> {
+  if (await hasWallet()) return;
+  await (await theWallet()).create().catch((error: unknown) => {
+    if (!(error instanceof WalletExists)) throw error;
+  });
 }
 
 /**

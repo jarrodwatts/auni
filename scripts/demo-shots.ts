@@ -232,6 +232,12 @@ const OPEN_WORK: Opener = {
   shows: `document.querySelector('.auni-steps-line[aria-expanded="true"]')`,
 };
 
+/** First run's dialog for a wallet the owner already has, from the line under the question. */
+const BRING_WALLET: Opener = {
+  does: PRESS("Bring an existing wallet"),
+  shows: `document.querySelector('[role="dialog"]')`,
+};
+
 /** The AI's sign-in under way, as its Cancel shows. */
 const SIGNING_IN = `[...document.querySelectorAll("button")].some((el) => el.textContent?.trim() === "Cancel")`;
 
@@ -440,13 +446,18 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
 }
 
 /**
- * First run, as a new owner meets it (`auni demo --first-run`): their first take's question, and,
- * with their AI not yet signed in (`--signed-out`), its ask for one and the sign-in it starts.
+ * First run, as a new owner meets it (`auni demo --first-run`): their first take's question, as
+ * one who made a wallet already sees it and as one with none yet does (`--no-wallet`, with the
+ * dialog to bring one), and, with their AI not yet signed in (`--signed-out`), its ask for one and
+ * the sign-in it starts.
  */
 async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
-  for (const signedOut of [false, true]) {
+  for (const mode of ["wallet", "no-wallet", "signed-out"] as const) {
     const browser = await launch();
-    const demo = startDemo("--first-run", ...(signedOut ? ["--signed-out"] : []));
+    const demo = startDemo(
+      "--first-run",
+      ...(mode === "no-wallet" ? ["--no-wallet"] : mode === "signed-out" ? ["--signed-out"] : []),
+    );
     try {
       const { page } = browser;
       await page.look(look);
@@ -455,8 +466,15 @@ async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise
       const origin = new URL(link).origin;
       await page.open(link);
       await page.until("location.pathname.startsWith('/app') && !location.hash");
-      if (!signedOut) {
+      if (mode === "wallet") {
         await take(page, out, "first-run", `${origin}/app/new`, "top");
+        continue;
+      }
+      if (mode === "no-wallet") {
+        await take(page, out, "first-run-no-wallet", `${origin}/app/new`, "top");
+        await take(page, out, "first-run-bring-wallet", `${origin}/app/new`, "top", BRING_WALLET, {
+          once: true,
+        });
         continue;
       }
       await take(page, out, "first-run-pick-your-ai", `${origin}/app/new`, "top");

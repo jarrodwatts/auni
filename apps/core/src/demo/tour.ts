@@ -177,13 +177,13 @@ const STOPS: readonly Stop[] = [
   },
   {
     title: "Your money",
-    does: "Open [Portfolio](/app). One number for everything, wherever it sits. **Needs you** lists every card still waiting for a tap, and Eli Lilly and Novo Nordisk sit right there in your holdings.",
+    does: "Open [Money](/app). Your total sits at the top, followed by each take with what it holds and what it has made. Eli Lilly and Novo Nordisk sit under the take that bought them, and every move is saved as a receipt.",
     reply: "I found them there",
     looked: true,
   },
   {
     title: "The look",
-    does: "Last one. Open [Settings](/app?settings=appearance) and pick **Dark**, or whichever look you are not in now. It opens over Portfolio, so you see the change at once. Then come back here.",
+    does: "Last one. Open [Settings](/app?settings=appearance) and pick **Dark**, or whichever look you are not in now. It opens over Money, so you see the change at once. Then come back here.",
     reply: "I've picked a look",
     looked: true,
   },
@@ -197,14 +197,14 @@ const WELCOME =
   `The tour has ${STOPS.length} stops and takes about ten minutes. The next step is always one tap, and you can wander off whenever you like: this chat keeps your place.`;
 
 const END =
-  `**${OVER}** Everything you tapped ran my real code: the cards, the moves, the portfolio. Only the AI, the wallet and the world outside were stood in for.\n\n` +
+  `**${OVER}** Everything you tapped ran my real code: the cards, the moves, your money. Only the AI, the wallet and the world outside were stood in for.\n\n` +
   "Thank you for walking it. Poke at anything from here: nothing in this demo can break.";
 
 /** What to try once the tour is over, as replies docked under its last words, and what each is answered. */
 const AFTER: readonly { readonly reply: string; readonly says: string }[] = [
   {
     reply: "What is still waiting for me?",
-    says: "Every card still waiting for your tap is under **Needs you** on [Portfolio](/app). Open one, read it, and allow it or turn it down: either way you see what a real one does.",
+    says: "Every card still waiting for your tap is under **Needs you**. Open one, read it, and allow or decline it. Either way, you'll see what a real one does.",
   },
   {
     reply: "Show me an Auto thread",

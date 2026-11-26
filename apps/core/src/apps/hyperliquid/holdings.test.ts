@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { gainOf, holdingsByThread } from "../../money/books.ts";
+import { formatUnits } from "../../money/usd.ts";
 import { hyperliquidFreeCents, readPosition } from "./account.ts";
 import { info } from "./api.ts";
 import { readHyperliquid } from "./holdings.ts";
@@ -117,5 +119,35 @@ describe.each(STATES)("an account with $name", ({ name, value, free, onOrders, p
     for (const [coin, worth] of positions)
       expect(cents(String((await readPosition(USER, market(coin)))!.valueUsd))).toBe(worth);
     expect(await readPosition(USER, market("BTC"))).toBeNull();
+  });
+});
+
+describe("what each position made", () => {
+  beforeEach(() => {
+    answers = fixture("both");
+  });
+
+  it("is what Hyperliquid says, a losing ARB long and a winning MON short, under the take that opened it", async () => {
+    const positions = (await readHyperliquid(USER))
+      .filter((holding) => !holding.cash)
+      .map(({ baseUnits, pricedUnits: _, ...holding }) => ({
+        ...holding,
+        venue: "hyperliquid",
+        quantity: formatUnits(baseUnits, holding.decimals),
+        usdValue: holding.usdValue ?? null,
+      }));
+    const opened = (threadId: string, instrument: string, side: "buy" | "sell", quantity: string) =>
+      ({ threadId, chain: "hyperliquid", instrument, side, quantity, usdValue: "1.00" }) as const;
+    const { threads } = holdingsByThread(positions, [
+      opened("arb", "ARB", "buy", "29902.4"),
+      opened("mon", "MON", "sell", "26686"),
+    ]);
+    const gain = (threadId: string) => gainOf(threads.get(threadId)![0]!);
+    // ARB: $426.44 of margin with funding and margin added, $122.42 down by Hyperliquid, on the
+    // $441.33 its entry put up (29,902.4 at $0.14759 over 10x): -27.7%, as Hyperliquid's own
+    // return on equity says, where value less margin would say -$14.90.
+    expect(gain("arb")).toEqual({ costCents: 44_133n, changeCents: -12_242n });
+    // MON: short 26,686 from $0.016864 at 5x ($90.01), up $0.22.
+    expect(gain("mon")).toEqual({ costCents: 9_001n, changeCents: 22n });
   });
 });

@@ -171,9 +171,14 @@ export async function paysFees(
   return paysOwnGas(viem ? viem.id : "solana");
 }
 
+/** A holding's id on the wire: by where it is and what it is. */
+export function holdingId(holding: Pick<Holding, "chain" | "instrument">): string {
+  return `${holding.chain}:${holding.instrument}`;
+}
+
 async function view(holding: Holding, stocks: StockIndex): Promise<HoldingFace> {
   const base = {
-    id: `${holding.chain}:${holding.instrument}`,
+    id: holdingId(holding),
     usdValue: holding.usdValue ?? "0.00",
   };
   // Cash orders hold reads the same at any account, wearing its app's logo.

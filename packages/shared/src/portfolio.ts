@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { dollarsSchema } from "./money.ts";
 import { NETWORK_KEYS } from "./networks.ts";
+import { threadIdSchema } from "./shared.ts";
 
 /** One holding as a person reads it, on GET /portfolio and in a thread's inspector. */
 export const holdingWireSchema = z.object({
@@ -81,3 +82,59 @@ export const otherTokensWireSchema = z.object({
   ),
 });
 export type OtherTokensWire = z.infer<typeof otherTokensWireSchema>;
+
+/**
+ * A take: a thread that holds positions now, by the fills Auni recorded in it, with its share of
+ * each holding (never more than the wallet holds), what that is worth, and what it has made.
+ */
+const takeWireSchema = z.object({
+  threadId: threadIdSchema,
+  title: z.string(),
+  /** What its holdings are worth now. */
+  valueUsd: dollarsSchema,
+  /**
+   * Signed: what the holdings it has now made since it bought them, from what its own fills
+   * paid for each (never the wallet's average), and for a perp what its venue says it has made;
+   * null when nothing records any cost.
+   */
+  changeUsd: dollarsSchema.nullable(),
+  /** What the holdings `changeUsd` counts cost (a perp's, the margin its entry put up); null with it. */
+  costUsd: dollarsSchema.nullable(),
+  /** Largest first. */
+  holdings: z.array(
+    holdingWireSchema.extend({
+      /** What this holding alone has made since the take bought it, as `changeUsd` counts it. */
+      changeUsd: dollarsSchema.nullable(),
+      /** What it cost, as `costUsd` counts it; null with its change. */
+      costUsd: dollarsSchema.nullable(),
+      /** Savings, whose change is the interest they earned. */
+      savings: z.boolean(),
+    }),
+  ),
+});
+export type TakeWire = z.infer<typeof takeWireSchema>;
+
+/** Cash no take holds, in one place: the owner's own wallets, or an app that keeps some. */
+const cashPlaceWireSchema = z.object({
+  /** "wallet" for the owner's own wallets, which Withdraw sends from; else the app's id. */
+  venue: z.string(),
+  /** The app's name, as Withdraw names it. */
+  name: z.string(),
+  logoUrl: z.string().nullable(),
+  /** It earns there (savings), rather than waiting to trade there. */
+  savings: z.boolean(),
+  usdValue: dollarsSchema,
+});
+
+/**
+ * Core's GET /takes: every take, largest first, the holdings no take holds, and the cash no take
+ * holds. Together with money on its way they add up to the portfolio's total.
+ */
+export const takesWireSchema = z.object({
+  takes: z.array(takeWireSchema),
+  /** Every holding, or the part of one, that no take holds and isn't cash, largest first. */
+  loose: z.array(holdingWireSchema),
+  /** The owner's own wallets first, always; then each app that keeps some, largest first. */
+  cash: z.array(cashPlaceWireSchema),
+});
+export type TakesWire = z.infer<typeof takesWireSchema>;

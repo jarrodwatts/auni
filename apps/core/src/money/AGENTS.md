@@ -75,7 +75,8 @@ traces, and coin that came in where the wallet spent more of it within one sweep
 - A chain's coin for its fees, bought on the card when the wallet is short or low, once a card:
   `money/fee-coin.ts` (EVM), `money/sol-top-up.ts` (SOL), `money/fee-coin-said.ts` (words).
 - Holdings and value: `money/portfolio.ts`, `money/chain-holdings.ts`, `money/books.ts` (who holds
-  what, by fills), `money/readings.ts` (the `reading` job, `jobs/readings.ts`), `money/holdings.ts`,
+  what, by fills), `money/takes.ts` (each take's share, worth and what it made: `GET /takes`),
+  `money/readings.ts` (the `reading` job, `jobs/readings.ts`), `money/holdings.ts`,
   `money/value-history.ts`; what a first look finds is put in (`money/first-look.ts`).
   Prices: `money/history.ts`, from the account holding it, else the token feeds
   (`money/token-feeds.ts`).

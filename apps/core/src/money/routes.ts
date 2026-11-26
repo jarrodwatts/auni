@@ -34,6 +34,7 @@ import { addToken, readOtherTokens } from "./other-tokens.ts";
 import { portfolioNow } from "./portfolio.ts";
 import { plainCashUsd } from "./readings.ts";
 import { sweepSoon } from "./sweep.ts";
+import { readTakes } from "./takes.ts";
 import { startOfDay, valueHistory } from "./value-history.ts";
 
 const uuid = z.uuid();
@@ -347,4 +348,11 @@ activityRouter.get("/", async (req, res) => {
 activityRouter.post("/seen", async (req, res) => {
   await markActivitySeen();
   res.status(204).end();
+});
+
+/** Every take, with what it holds, what that is worth and what it made; and what no take holds. */
+export const takesRouter = Router();
+
+takesRouter.get("/", async (_req, res) => {
+  res.json(await readTakes());
 });

@@ -229,6 +229,9 @@ export {
   type OtherTokensWire,
   otherTokensWireSchema,
   portfolioWireSchema,
+  type TakeWire,
+  type TakesWire,
+  takesWireSchema,
 } from "./portfolio.ts";
 export {
   type ReplyOption,

@@ -14,14 +14,14 @@ const RANGE_DAYS: Readonly<Record<Exclude<ChartRange, "All">, number>> = {
 };
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
-/** What each period is called under the number it moves. */
+/** Each period as it ends "+$88.63 (0.5%) made ...". */
 const RANGE_LABEL: Readonly<Record<ChartRange, string>> = {
-  Today: "Today",
-  "1W": "Past week",
-  "1M": "Past month",
-  "3M": "Past 3 months",
-  "1Y": "Past year",
-  All: "All time",
+  Today: "today",
+  "1W": "in the past week",
+  "1M": "in the past month",
+  "3M": "in the past 3 months",
+  "1Y": "in the past year",
+  All: "so far",
 };
 
 /**
@@ -65,13 +65,13 @@ export function dayLabel(observedAt: string, intraday: boolean): string {
 
 /**
  * What a chart's move is over, named from its first drawn point, `from`,
- * where the move counts from: the period, or where it starts when that is
- * later ("Since Oct 21"), as for a history younger than the period.
+ * where the move counts from: the period ("in the past week"), or where it
+ * starts when that is later ("since Oct 21"), as for a history younger than the period.
  */
 export function moveLabel(range: ChartRange, from: string | undefined): string {
   return !from || coversRange(Date.parse(from), range)
     ? RANGE_LABEL[range]
-    : `Since ${dayLabel(from, range === "Today")}`;
+    : `since ${dayLabel(from, range === "Today")}`;
 }
 
 /**

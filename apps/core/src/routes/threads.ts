@@ -35,9 +35,9 @@ import {
 import { db } from "../db/client.ts";
 import { messages, threads, type ThreadRow } from "../db/schema.ts";
 import { cancelLane } from "../jobs/queue.ts";
-import { allFills, holdingsOfThread } from "../money/books.ts";
 import { holdingViews } from "../money/holdings.ts";
 import { portfolioNow } from "../money/portfolio.ts";
+import { heldByTakes, takeChange, takeRecords } from "../money/takes.ts";
 import { threadPot } from "../money/pot.ts";
 import { centsToUsd } from "../money/usd.ts";
 import { startOfDay } from "../money/value-history.ts";
@@ -108,22 +108,23 @@ threadsRouter.get("/:threadId/messages", async (req, res) => {
 threadsRouter.get("/:threadId/state", async (req, res) => {
   const thread = await threadParam(req, res);
   if (!thread) return;
-  const [pot, portfolio, everyFill, { timeZone }] = await Promise.all([
+  const [pot, portfolio, records, { timeZone }] = await Promise.all([
     threadPot(db, thread),
     portfolioNow().catch((error: unknown) => {
       console.warn(`thread ${thread.id} state couldn't read portfolio:`, error);
       return null;
     }),
-    allFills(db),
+    takeRecords(),
     theOwner(),
   ]);
   const freeBudgetUsd = centsToUsd(pot.freeCashCents > 0n ? pot.freeCashCents : 0n);
-  const mine = portfolio ? holdingsOfThread(thread.id, portfolio.assets.holdings, everyFill) : [];
+  const mine = portfolio ? (heldByTakes(portfolio, records).threads.get(thread.id) ?? []) : [];
   const holdings = mine.length > 0 ? await holdingViews(mine, startOfDay(timeZone)) : [];
   res.json({
     budgetUsd: thread.budgetUsd,
     freeBudgetUsd,
     holdings,
+    ...takeChange(mine),
   } satisfies z.input<typeof threadStateWireSchema>);
 });
 

@@ -84,11 +84,18 @@ export const updateThreadRequestSchema = z
   .partial();
 export type UpdateThreadRequest = z.infer<typeof updateThreadRequestSchema>;
 
-/** `GET /threads/:threadId/state`: live budget headroom and holdings opened in this thread. */
+/**
+ * `GET /threads/:threadId/state`: live budget headroom, the holdings opened in this thread, and
+ * what they made since it bought them, the same as Money's take says (see GET /takes).
+ */
 export const threadStateWireSchema = z.object({
   budgetUsd: dollarsSchema,
   freeBudgetUsd: dollarsSchema,
   holdings: z.array(holdingWireSchema),
+  /** Signed, since entry; null when nothing records any cost. */
+  changeUsd: dollarsSchema.nullable(),
+  /** What `changeUsd` counts cost; null with it. */
+  costUsd: dollarsSchema.nullable(),
 });
 export type ThreadStateWire = z.infer<typeof threadStateWireSchema>;
 

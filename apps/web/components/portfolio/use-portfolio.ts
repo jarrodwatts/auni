@@ -5,6 +5,7 @@ import { keepPreviousData, skipToken, useQuery, useQueryClient } from "@tanstack
 import { useCallback } from "react";
 
 import { getPortfolio, getValueHistory } from "@/lib/data/portfolio";
+import { getTakes } from "@/lib/data/takes";
 import { getThreadState } from "@/lib/data/threads";
 
 /**
@@ -46,12 +47,24 @@ export function usePortfolio(depositExpected = false) {
   });
 }
 
+/**
+ * Every take with its share of the money, what that is worth and what it made, and what no
+ * take holds: read as often as the money, which it splits.
+ */
+export function useTakes() {
+  return useQuery({
+    queryKey: ["takes"],
+    queryFn: ({ signal }) => getTakes(signal),
+    refetchInterval: MONEY_POLL_MS,
+    refetchOnWindowFocus: (query) => query.state.status === "error",
+  });
+}
+
 /** Live holdings opened in one thread and its remaining auto-spend budget. */
 export function useThreadState(threadId: ThreadId | undefined) {
   return useQuery({
     queryKey: ["thread-state", threadId],
-    queryFn:
-      threadId === undefined ? skipToken : ({ signal }) => getThreadState(threadId, signal),
+    queryFn: threadId === undefined ? skipToken : ({ signal }) => getThreadState(threadId, signal),
     refetchInterval: MONEY_POLL_MS,
   });
 }
@@ -59,6 +72,7 @@ export function useThreadState(threadId: ThreadId | undefined) {
 /** Every read of the account's money, by the first part of its key. */
 const MONEY_READS = [
   "portfolio",
+  "takes",
   "balance-history",
   "thread-state",
   "withdraw-cash",

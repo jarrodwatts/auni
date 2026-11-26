@@ -1,7 +1,7 @@
 import type { Address } from "viem";
 
 import { QUANTITY_DECIMALS } from "../../money/fill-key.ts";
-import { centsToUsd, parseUnits } from "../../money/usd.ts";
+import { centsToUsd, parseUnits, signedUsdToCents } from "../../money/usd.ts";
 import type { AccountHolding } from "../contract.ts";
 import { readAccount, splitAccount } from "./account.ts";
 import { coinKey } from "./keys.ts";
@@ -39,6 +39,7 @@ export async function readHyperliquid(owner: Address): Promise<AccountHolding[]>
       short: position.szi.startsWith("-"),
       leverage: position.leverage.value,
       ...(position.entryPx ? { averageCostUsd: position.entryPx } : {}),
+      unrealizedPnlUsd: centsToUsd(signedUsdToCents(position.unrealizedPnl)),
     })),
   ];
 }

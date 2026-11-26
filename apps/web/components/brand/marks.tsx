@@ -118,7 +118,7 @@ export function AssetLogo({
 }
 
 /** The direction a move went, as the small filled caret money apps use. */
-export function MoveCaret({ down }: { readonly down: boolean }) {
+function MoveCaret({ down }: { readonly down: boolean }) {
   return (
     <svg
       aria-hidden

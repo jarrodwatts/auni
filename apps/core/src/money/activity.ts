@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import {
+  isAsk,
   isVenueTool,
   knownAsset,
   appListing,
@@ -19,7 +20,7 @@ import { actions, arrivals, fills, owner, threads, type ActionRow } from "../db/
 import { accounts, ledgerAt } from "../apps/registry.ts";
 import { PNL_DECIMALS } from "./books.ts";
 import { subjectLogo } from "./action-card.ts";
-import { chainLabel, chainName, explorerTx, placeName } from "./chains.ts";
+import { chainLabel, chainName, explorerTx, placeLogo, placeName } from "./chains.ts";
 import { coinName } from "./coins.ts";
 import { QUANTITY_DECIMALS, tokenKey } from "./fill-key.ts";
 import { formatAmount, priceLabel, shortAddress } from "./format.ts";
@@ -103,6 +104,8 @@ export type LegDoes =
       /** What it put in, brought back, or sent out of their account. */
       readonly money: { readonly flow: MoneyFlow | "out"; readonly usd: string } | null;
       readonly logo: Logo | null;
+      /** What closing a position locked in, in cents, signed, as its venue said; absent for anything else. */
+      readonly made?: bigint;
     }
   | {
       /** Something they held loose, sold to pay for the picks. */
@@ -145,6 +148,19 @@ function cashStep(move: CashMove): string {
       return `Moved cash from ${placeName(move.from)} to ${placeName(move.to)}`;
     case "to_account":
       return `Moved cash to ${placeName(move.place)}`;
+  }
+}
+
+/** The mark of where a move of cash went: the account it left or reached, or the wallet it reached. */
+function cashLogo(move: CashMove): string | null {
+  switch (move.kind) {
+    case "from_savings":
+      return null;
+    case "from_account":
+    case "to_account":
+      return placeLogo(move.place);
+    case "between_wallets":
+      return placeLogo(move.to);
   }
 }
 
@@ -225,11 +241,12 @@ function moves(facts: ActivityFacts): Listed[] {
         id: card.id,
         title: only?.text ?? titleOf(card.picks),
         subtitle: `${name?.trim() || "Auni"}, ${when(card.at, facts.timeZone)}`,
+        category: card.picks.some((pick) => pick.money?.flow === "out") ? "transfer" : "trade",
         amount: only
           ? only.amountUsd
             ? { usd: only.amountUsd, direction: null, tone: "neutral" }
             : null
-          : moveAmount(card.picks),
+          : (madeAmount(card.picks) ?? moveAmount(card.picks)),
         threadId: card.threadId as Item["threadId"],
         logo: only ? saleLogo(card.legs) : (card.picks.find((pick) => pick.logo)?.logo ?? null),
         at: card.at.toISOString(),
@@ -261,6 +278,21 @@ export function titleOf(
     .join(", ");
 }
 
+/** What closing positions locked in, signed: a card of closes only, each one's result known. */
+function madeAmount(picks: readonly Extract<LegDoes, { kind: "pick" }>[]): Amount | null {
+  if (picks.length === 0 || picks.some((pick) => pick.made === undefined)) return null;
+  return resultAmount(picks.reduce((sum, pick) => sum + pick.made!, 0n));
+}
+
+/** A result locked in, as a row's amount: a gain in, a loss out, nothing plain. */
+function resultAmount(cents: bigint): Amount {
+  const usd = centsToUsd(cents < 0n ? -cents : cents);
+  if (cents === 0n) return { usd, direction: null, tone: "neutral" };
+  return cents < 0n
+    ? { usd, direction: "out", tone: "loss" }
+    : { usd, direction: "in", tone: "gain" };
+}
+
 /**
  * What a move put in, plain, as a buy is; else what it moved between their
  * own accounts, plain; else what it sent out of their account, signed; else
@@ -285,12 +317,12 @@ export function stepsOf(legs: readonly Leg[]): Step[] {
   const sales = legs.flatMap((leg) => (leg.does.kind === "sale" ? [leg.does] : []));
   const moves = legs.flatMap(({ does }) => (does.kind === "cash" ? [does] : []));
   const intoAccount = moves.some(({ move }) => move.kind === "to_account");
-  const cash = new Map<string, string[]>();
+  const cash = new Map<string, { usd: string[]; logoUrl: string | null }>();
   for (const kind of CASH_ORDER)
     for (const { move, usd } of moves) {
       if (move.kind !== kind || (kind === "between_wallets" && intoAccount)) continue;
       const step = cashStep(move);
-      cash.set(step, [...(cash.get(step) ?? []), usd]);
+      cash.set(step, { usd: [...(cash.get(step)?.usd ?? []), usd], logoUrl: cashLogo(move) });
     }
   const steps: Step[] = [
     ...(sales.length === 0
@@ -298,14 +330,12 @@ export function stepsOf(legs: readonly Leg[]): Step[] {
       : [
           {
             text:
-              sales.length === 1
-                ? `Sold ${sales[0]!.name} you held loose`
-                : `Sold ${sales.length} things you held loose`,
+              sales.length === 1 ? `Sold ${sales[0]!.name}` : `Sold ${sales.length} other holdings`,
             amountUsd: sumUsd(sales.map((sale) => sale.usd)),
             logoUrl: sales.length === 1 ? (sales[0]!.logo?.src ?? null) : null,
           },
         ]),
-    ...[...cash].map(([text, usd]) => ({ text, amountUsd: sumUsd(usd), logoUrl: null })),
+    ...[...cash].map(([text, { usd, logoUrl }]) => ({ text, amountUsd: sumUsd(usd), logoUrl })),
     ...legs.flatMap(({ does }) =>
       does.kind === "pick"
         ? [{ text: does.step, amountUsd: does.money?.usd ?? null, logoUrl: does.logo?.src ?? null }]
@@ -332,6 +362,8 @@ function outsideItem(one: Outside, facts: ActivityFacts): Listed {
     item: {
       kind: "outside",
       id: one.id,
+      // A venue closing a position or paying out a market is a trade's end, whatever it made.
+      category: "trade",
       title: one.title,
       subtitle: [...(name?.trim() ? [name.trim()] : []), when(one.at, facts.timeZone)].join(", "),
       amount: one.amount,
@@ -368,6 +400,7 @@ function arrivalItems(facts: ActivityFacts): Listed[] {
       item: {
         kind: "arrival",
         id: first.id,
+        category: "transfer",
         title: out ? "Money left your wallet" : "Money arrived",
         subtitle: `Your wallet, ${when(first.at, facts.timeZone)}`,
         amount: {
@@ -439,8 +472,11 @@ export async function readActivity(only: string | null): Promise<ActivityWire> {
   const { activitySeenAt, timeZone } = await theOwner();
   const fillsOf = Map.groupBy(recorded, (fill) => fill.actionId);
   const own = (row: ActionRow) => fillsOf.get(row.id) ?? [];
+  // An ask changed Auni, not money: it stays in its thread, as the card the owner allowed.
   const legs = await Promise.all(
-    rows.filter((row) => !isVenueTool(row.tool)).map((row) => legsOf(row, own(row), names)),
+    rows
+      .filter((row) => !isVenueTool(row.tool) && !isAsk(row.tool))
+      .map((row) => legsOf(row, own(row), names)),
   );
   const payoutTools = new Set<string>(
     accounts().flatMap(({ account }) => (account.payouts ? [account.payouts.tool] : [])),
@@ -487,7 +523,7 @@ async function legsOf(row: ActionRow, own: readonly FillRow[], names: Namer): Pr
     threadId: row.threadId,
     touches: touchesOf(row.threadId, prompt),
     at,
-    does: await readLeg(row, names, prompt.length > 0),
+    does: await readLeg(row, names, prompt),
     story: storyOf(row, prompt),
   };
   const later = Map.groupBy(own.filter(late), (fill) => fill.createdAt.getTime());
@@ -503,7 +539,11 @@ async function legsOf(row: ActionRow, own: readonly FillRow[], names: Namer): Pr
  * can't read shows as it was told then, and is reported, rather than taking
  * the rest of activity down with it.
  */
-async function readLeg(row: ActionRow, names: Namer, filled: boolean): Promise<LegDoes> {
+async function readLeg(
+  row: ActionRow,
+  names: Namer,
+  filled: readonly FillRow[],
+): Promise<LegDoes> {
   const recipe = recipeForTool(row.tool);
   try {
     return await doesOf(row, recipe, recipe ? subjectOf(recipe, row) : null, names, filled);
@@ -690,28 +730,33 @@ function tradedPosition(
       got: side(named, size),
       level: level("Entered at", price, "price"),
     };
-  // What the venue said each fill locked in, to the cent; unknown if it said nothing of one.
-  const made = filled.every((fill) => fill.pnlUsd !== null)
-    ? Math.round(
-        Number(
-          formatUnits(
-            filled.reduce((sum, fill) => sum + signedUnits(fill.pnlUsd!, PNL_DECIMALS), 0n),
-            PNL_DECIMALS,
-          ),
-        ) * 100,
-      )
-    : null;
+  const { made } = madeBy(filled);
   return {
     gave: side(named, size),
     got:
-      made === null
+      made === undefined
         ? null
         : {
-            ...side(made < 0 ? "It lost" : "It made", dollars(centsToUsd(BigInt(Math.abs(made))))),
-            tone: made < 0 ? "loss" : made > 0 ? "gain" : "neutral",
+            ...side(
+              made < 0n ? "Realized loss" : "Realized profit",
+              dollars(centsToUsd(made < 0n ? -made : made)),
+            ),
+            tone: made < 0n ? "loss" : made > 0n ? "gain" : "neutral",
           },
     level: level("Closed at", price, "price"),
   };
+}
+
+/**
+ * What the venue said fills closing a position locked in, to the nearest cent; nothing when it
+ * said nothing of one of them, or there are none.
+ */
+function madeBy(filled: readonly FillRow[]): { made?: bigint } {
+  if (filled.length === 0 || filled.some((fill) => fill.pnlUsd === null)) return {};
+  const fine = filled.reduce((sum, fill) => sum + signedUnits(fill.pnlUsd!, PNL_DECIMALS), 0n);
+  const half = 10n ** BigInt(PNL_DECIMALS - 2) / 2n;
+  const step = 10n ** BigInt(PNL_DECIMALS - 2);
+  return { made: (fine + (fine < 0n ? -half : half)) / step };
 }
 
 /**
@@ -736,13 +781,13 @@ function linksOf(row: ActionRow, lands: string | null): Story["links"] {
     .slice(0, 4);
 }
 
-/** What one leg of a move did, as its card would name it; `filled` when it traded as it ran. */
+/** What one leg of a move did, as its card would name it, by what it `filled` as it ran. */
 async function doesOf(
   row: ActionRow,
   recipe: Recipe | undefined,
   subject: Subject | null,
   names: Namer,
-  filled: boolean,
+  filled: readonly FillRow[],
 ): Promise<LegDoes> {
   const money = moneyOf(row);
   if (!recipe)
@@ -785,7 +830,7 @@ async function doesOf(
   switch (subject?.kind) {
     case "perp":
       // An order that filled nothing as it was placed rests as a limit: what fills later says it opened.
-      if (subject.opens && !filled)
+      if (subject.opens && filled.length === 0)
         return {
           ...pick(
             "Placed an order for",
@@ -806,12 +851,20 @@ async function doesOf(
             `Closed ${subject.closes.all ? "" : "part of "}${name}, ${subject.closes.leverage}x ${subject.closes.side}`,
           ),
           name: `${name} ${subject.closes.side}`,
+          ...madeBy(filled),
         };
       return { ...pick("Set stops on", `Set stops on ${name}`), money: null };
     case "cash":
       return row.tool === WITHDRAW_TOOL
         ? { ...pick("Withdrew", "Sent to your address", "out"), name: dollars(row.amountUsd) }
-        : { ...pick("Saved", "Put into savings"), name: dollars(row.amountUsd) };
+        : {
+            ...pick("Saved", "Put into savings"),
+            name: dollars(row.amountUsd),
+            // Savings wear the mark of the app that keeps them.
+            logo: row.venue
+              ? { src: appListing(row.venue)?.logo ?? null, name: venueName(row) }
+              : null,
+          };
     case "app":
       return pick("Used", row.summary);
     case "token":
@@ -883,6 +936,7 @@ async function laterFill(
       step: why(order, venueName(row)),
       money: margin === null ? null : { flow: "in", usd: margin },
       logo: { src: face.logoUrl, name: face.name },
+      ...(order === "exit" ? madeBy(filled) : {}),
     },
     story: storyWith(
       traded && { gave: traded.gave, got: traded.got, levels: [traded.level], facts: [] },
@@ -911,14 +965,7 @@ async function venueFillOf(
   return {
     ...outsideOf(row, own),
     title: words.title,
-    amount:
-      cents === 0n
-        ? null
-        : {
-            usd: centsToUsd(cents),
-            direction: pnl < 0 ? "out" : "in",
-            tone: pnl < 0 ? "loss" : "gain",
-          },
+    amount: cents === 0n ? null : resultAmount(pnl < 0 ? -cents : cents),
     logo: { src: face.logoUrl, name: face.name },
     // The venue acting on a position, or someone trading it elsewhere: theirs to decide about.
     decision: true,

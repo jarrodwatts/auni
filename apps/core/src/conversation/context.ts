@@ -5,12 +5,13 @@ import { fenced } from "../agent/fence.ts";
 import { reachWire } from "../always-on.ts";
 import { db } from "../db/client.ts";
 import { actions, automations, threads, type ThreadRow } from "../db/schema.ts";
-import { allFills, holdingsOfThread } from "../money/books.ts";
+import { gainOf } from "../money/books.ts";
 import { portfolioNow, type Holding, type Portfolio } from "../money/portfolio.ts";
 import { threadPot } from "../money/pot.ts";
 import { cardMoneys } from "../money/recipes/index.ts";
 import { dollars } from "../money/summaries.ts";
 import { within } from "../money/swaps/shared.ts";
+import { heldByTakes, takeChange, takeRecords } from "../money/takes.ts";
 import { centsToUsd, sumUsd, usdToCents } from "../money/usd.ts";
 import { cardsOf } from "../money/waiting.ts";
 
@@ -25,7 +26,10 @@ export async function promptPortfolio(waitMs = PORTFOLIO_WAIT_MS): Promise<Portf
   try {
     return await within(portfolioNow(), waitMs);
   } catch (error) {
-    console.warn("portfolio unreadable for prompt:", error instanceof Error ? error.message : error);
+    console.warn(
+      "portfolio unreadable for prompt:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -101,11 +105,25 @@ export async function waitingCardsContext(threadId: string): Promise<string | nu
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
 
-function holdingLine(holding: Holding): string {
+function holdingLine(holding: Holding, made = ""): string {
   const value = holding.usdValue ? dollars(holding.usdValue) : "unpriced";
   const side = holding.short ? " short" : "";
   const lev = holding.leverage ? ` ${holding.leverage}x` : "";
-  return `${holding.symbol}${lev}${side} (${value} on ${holding.chain})`;
+  return `${holding.symbol}${lev}${side} (${value} on ${holding.chain}${made})`;
+}
+
+/** Signed dollars, as the owner reads a gain: "+$50", "-$12.40". */
+function signedDollars(usd: string): string {
+  return usd.startsWith("-") ? `-${dollars(usd.slice(1))}` : `+${dollars(usd)}`;
+}
+
+/** A thread's own position, with what it made since this thread bought it, as Money shows it. */
+function positionLine(holding: Holding): string {
+  const gain = gainOf(holding);
+  return holdingLine(
+    holding,
+    gain ? `, ${signedDollars(centsToUsd(gain.changeCents))} since entry` : "",
+  );
 }
 
 /**
@@ -113,9 +131,9 @@ function holdingLine(holding: Holding): string {
  * appended to the turn's system reminder.
  */
 export async function threadContext(thread: ThreadRow): Promise<string> {
-  const [portfolio, everyFill, watches, reach] = await Promise.all([
+  const [portfolio, records, watches, reach] = await Promise.all([
     promptPortfolio(),
-    allFills(db),
+    takeRecords(),
     db
       .select({
         id: automations.id,
@@ -149,17 +167,24 @@ export async function threadContext(thread: ThreadRow): Promise<string> {
   }
 
   if (portfolio) {
-    const mine = holdingsOfThread(thread.id, portfolio.assets.holdings, everyFill);
+    const mine = heldByTakes(portfolio, records).threads.get(thread.id) ?? [];
     if (mine.length > 0) {
+      const { changeUsd, costUsd } = takeChange(mine);
+      const together =
+        changeUsd && costUsd
+          ? `; together ${signedDollars(changeUsd)} since entry on ${dollars(costUsd)} put in`
+          : "";
       lines.push(
-        `Positions opened in this thread: ${mine.map(holdingLine).join(", ")}.`,
+        `Positions opened in this thread: ${mine.map(positionLine).join(", ")}${together}.`,
       );
     }
     const topAssets = [...portfolio.assets.holdings]
       .sort((a, b) => Number(b.usdValue ?? 0) - Number(a.usdValue ?? 0))
       .slice(0, 8);
     const holdingsSummary =
-      topAssets.length > 0 ? `; holdings: ${topAssets.map(holdingLine).join(", ")}` : "";
+      topAssets.length > 0
+        ? `; holdings: ${topAssets.map((holding) => holdingLine(holding)).join(", ")}`
+        : "";
     const missing =
       portfolio.unavailable.length > 0
         ? ` (unavailable right now: ${portfolio.unavailable.join(", ")})`

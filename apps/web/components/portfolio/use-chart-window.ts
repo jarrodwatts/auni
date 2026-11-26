@@ -64,6 +64,9 @@ export function useChartWindow(live: LiveValue | null) {
     move: scrub
       ? madeChange(measured.filter((reading) => reading.at <= Date.parse(scrub.observedAt)))
       : madeChange(measured),
-    label: scrub ? dayLabel(scrub.observedAt, true) : moveLabel(range, drawn[0]?.observedAt),
+    // What the change is over: the period, or up to the reading under the pointer.
+    label: scrub
+      ? `by ${dayLabel(scrub.observedAt, true)}`
+      : moveLabel(range, drawn[0]?.observedAt),
   };
 }

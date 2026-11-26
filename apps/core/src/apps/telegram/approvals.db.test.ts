@@ -57,6 +57,11 @@ vi.mock("../../money/funding.ts", async (importOriginal) => ({
   proposalFunding: async () =>
     funding.needUsd ? { chain: "base", needUsd: funding.needUsd } : null,
 }));
+vi.mock("../../agent/brain.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agent/brain.ts")>()),
+  brainRows: async () => [],
+  pickBrain: async () => ({ fixes: [] }),
+}));
 
 vi.mock("../../money/portfolio.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),

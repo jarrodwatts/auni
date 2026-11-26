@@ -1,37 +1,42 @@
 # Auni
 
-> Auni is an open-source AI agent for a person's own money, which they run on their own machine
+> Auni is an open-source AI agent for a person's own money, which they run on their own computer
 > with their own AI login (Claude Code or Codex) and their own wallet. It researches a take they
-> have, builds a position for it, and manages it; every money move is a card they tap to allow.
-> Nobody operates it: no accounts, no fees, no token. MIT licensed, unaudited, use at your own
-> risk.
+> have, builds a position for it, and manages it. Every money move is a card they tap to allow,
+> unless they turn on Auto for a take, with a dollar budget they set. Nobody operates it: no
+> accounts, no fees, no token. MIT licensed, unaudited, use at your own risk.
 
 This is a pnpm monorepo in TypeScript on Node 24, run as one program: `auni` runs its own
 Postgres, `apps/core` (the API and the job runner that runs turns, moves and watches) and
-`apps/web` (the Next.js app); `packages/shared` holds what both read. `auni doctor` says what
-works and what to fix. Each outside service is one app folder in `apps/core/src/apps/<id>/`.
+`apps/web` (the Next.js app); `packages/shared` holds what both read. Each outside service is one
+app folder in `apps/core/src/apps/<id>/`.
+
+## Setting up and using Auni
 
 Helping someone set Auni up? Install it with
 `curl -fsSL https://raw.githubusercontent.com/jarrodwatts/auni/main/install.sh | sh` (it builds
 from source into `~/.auni/app`), then follow `auni setup --json` until it says stop, as the agent
-skill below explains. Never ask for a private key, seed phrase or login token, and never read a
-pairing link: `auni` opens it in their browser.
+skill explains. Never ask for a private key, seed phrase or login token, and never read a pairing
+link: `auni` opens it in their browser.
 
-## Start here
-
-- [README](README.md): what Auni is and isn't, how to install, run and update it yourself
 - [Agent skill](skills/auni/SKILL.md): installing Auni and setting it up with
-  `auni setup --json`, running it and changing it, for a coding agent (also a Claude Code plugin: `.claude-plugin/`)
+  `auni setup --json`, running it, fixing it and changing it (also a Claude Code plugin:
+  `.claude-plugin/`)
+- [README](README.md): what Auni is and isn't, what keeps the money safe, the commands, and known
+  limits
+- `auni --help` lists every command and `auni <command> --help` its options. `auni demo` runs the
+  whole app with fake money and no login; `auni doctor` says what works and what to fix
+- [Settings](apps/core/.env.example): every setting in `~/.auni/.env`
+
+## Contributing and building apps
+
 - [Repo map](AGENTS.md): Auni's words and the checks every change passes; each area's own
   AGENTS.md, beside its code, says the rest
-
-## Extending it
-
 - [Apps](apps/core/src/apps/AGENTS.md): what an app is, its three sizes and its parts, the rules,
   and `pnpm scaffold <id> [--with <parts>]`. Read it first, whatever you add
-- Know-how, the smallest app: `pnpm scaffold <id>`, then write its `SKILL.md` (when Claude should
-  load it, and the steps that work there). Nothing else is needed
-- A reader, so a transaction Claude builds for a service reads as a real card under its name:
+- Know-how, the smallest app: `pnpm scaffold <id>`, then write its `SKILL.md` (when the agent
+  should load it, and the steps that work there). Nothing else is needed
+- A reader, so a transaction the agent builds for a service reads as a real card under its name:
   `pnpm scaffold <id> --with reads`, then its `addresses` and `reads`, as
   [KyberSwap's](apps/core/src/apps/kyberswap/reader.ts) are
 - A venue, for what a transaction can't do: `pnpm scaffold <id> --with moves,account`, then each

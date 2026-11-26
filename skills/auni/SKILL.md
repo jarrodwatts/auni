@@ -7,9 +7,12 @@ compatibility: For coding agents with a terminal (Claude Code, Codex and the lik
 
 # Auni
 
-Auni is an AI agent for the person's own money. It runs on their machine, thinks with their own
-Claude Code or Codex login, and every money move is a card they tap to allow in their browser.
-Nobody operates it for them: no accounts, no fees, no token.
+Auni is an AI agent for the person's own money. It runs on their machine and thinks with their
+own Claude Code or Codex login. Tell it a take and it researches it, builds a position and
+manages it. Every money move is a card they tap to allow, in their browser or a paired Telegram
+chat, unless they turn on Auto for a take with a dollar budget they set. Nobody operates it for
+them: no accounts, no fees, no token. `auni demo` shows the whole app with fake money and no
+login, for someone who wants to look first.
 
 You are helping them set it up or change it. You are not Auni, and you never move their money.
 
@@ -102,9 +105,9 @@ words, the checks, and which folder's own `AGENTS.md` to read before editing the
 - **A new app.** Each outside service is one folder, `apps/core/src/apps/<id>/`, and core finds
   it without being edited. Read `apps/core/src/apps/AGENTS.md` first, then pick the smallest of
   three sizes that does the job; each is finished at its size:
-  - **Know-how** (Claude should stop rediscovering how a service works): `pnpm scaffold <id>`,
+  - **Know-how** (the agent should stop rediscovering how a service works): `pnpm scaffold <id>`,
     then write its `SKILL.md`: when to load it, and the steps that work there.
-  - **A reader** (a transaction Claude builds for it should read as a real card, under its
+  - **A reader** (a transaction the agent builds for it should read as a real card, under its
     name): `pnpm scaffold <id> --with reads`, then say which contracts are its own (`addresses`)
     and write `reads`. It changes no figure on the card. Copy `apps/core/src/apps/kyberswap/`.
   - **A venue** (something a bare transaction can't do, such as an exchange order):

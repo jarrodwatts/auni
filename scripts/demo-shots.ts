@@ -527,7 +527,7 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const onTop = (words: string) =>
       `[...document.querySelectorAll('[role="dialog"]')].at(-1)?.textContent.includes(${JSON.stringify(words)})`;
     const wallet = `${origin}/app?settings=wallet`;
-    const KEYS = `(async () => { ${PRESS("Show wallet keys")}; await ${PAUSE(800)}; return true; })()`;
+    const KEYS = `(async () => { ${PRESS("Show your keys")}; await ${PAUSE(800)}; return true; })()`;
     const SHOWN = `(async () => { await ${KEYS}; ${PRESS("Show keys")}; await ${PAUSE(1_500)}; return true; })()`;
     const shots: readonly [string, string, Opener | undefined][] = [
       ["add-money", `${origin}/app?fund=open`, undefined],

@@ -28,7 +28,7 @@ export function toThread(wire: ThreadWire): Thread {
   return {
     id: wire.id,
     title: wire.title?.trim() || "New conversation",
-    state: wire.status === "idle" ? "done" : wire.status,
+    state: wire.status === "running" ? "running" : "done",
     moneyLine: wire.moneyLine,
     asking: wire.asking,
     unread: wire.unread,

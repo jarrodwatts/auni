@@ -2,7 +2,6 @@ import {
   startedChatWireSchema,
   type ModelSelectionWire,
   type StartChatRequest,
-  type ThreadActMode,
 } from "@auni/shared";
 
 import { chatHref } from "@/lib/app-links";
@@ -18,17 +17,13 @@ export function threadHref(thread: Pick<Thread, "id">): string {
 
 export interface StartChatOptions {
   readonly modelSelection?: ModelSelectionWire | null;
-  readonly actMode?: ThreadActMode;
-  readonly budgetUsd?: string;
 }
 
-/** A new thread with Auni, titled by the first message and optional starting settings. */
+/** A new chat with Auni, titled by the first message, answered by the AI picked for it. */
 export async function startChat(text: string, options?: StartChatOptions): Promise<Thread> {
   const body: StartChatRequest = {
     text,
     ...(options?.modelSelection ? { modelSelection: options.modelSelection } : {}),
-    ...(options?.actMode ? { actMode: options.actMode } : {}),
-    ...(options?.budgetUsd !== undefined ? { budgetUsd: options.budgetUsd } : {}),
   };
   const { thread } = startedChatWireSchema.parse(
     await requestCore("places/chat", { method: "POST", body: JSON.stringify(body) }),

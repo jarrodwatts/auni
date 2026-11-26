@@ -31,8 +31,9 @@ export interface ValueHistory {
 export interface Thread {
   readonly id: ThreadId;
   readonly title: string;
-  readonly state: "needs_user" | "running" | "done";
-  /** What the thread waits on the person for, in one line. */
+  /** Whether Auni is writing in it. What waits on the person is `moneyLine` and `asking`, either way. */
+  readonly state: "running" | "done";
+  /** The card in it waiting on the person, in one line; it waits while Auni writes too. */
   readonly moneyLine: string | null;
   /** Auni's last answer asks the person something they haven't answered. */
   readonly asking: boolean;

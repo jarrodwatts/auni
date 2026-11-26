@@ -1,23 +1,17 @@
 "use client";
 
 import { appListing, STARTING_POINTS, type FactSource } from "@auni/shared";
-import { RefreshCw } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
-import { useStartConversation } from "@/components/app/use-start-conversation";
+import { requestComposerFocus } from "@/components/app/composer";
 import { useMoney } from "@/components/money/money-provider";
 import { LogoImage, preloadLogo } from "@/components/brand/marks";
 import { useMe } from "@/components/personalization/use-me";
-import {
-  useRefreshStartingPoints,
-  useStartingPoints,
-  useStartingPointsKept,
-} from "@/lib/data/starting-points";
-import { formatUsdcBalance } from "@/lib/money";
-import { cn } from "@/lib/utils";
+import { useStartingPoints, useStartingPointsKept } from "@/lib/data/starting-points";
 import tightMascot from "@/public/brand/auni-mascot-tight.png";
 
 /** A point's picture, whether a coin, a market's own or Auni's mascot. */
@@ -37,19 +31,16 @@ const WAITING_WIDTHS = [212, 176, 238, 194].slice(0, STARTING_POINTS);
 // Each point is a bare row, no box: its picture, then one line of what's true (in ink) and what
 // to do (lighter). The picture's left edge sits on the composer's placeholder text, and the
 // words start a fixed GAP after it. Rows are 52 tall with nothing between them, so the evenness
-// comes from the rhythm. A row lightens under a pointer. On a phone the words may run to the
-// row's edge, which keeps no padding there.
-const ROW = "flex h-[52px] w-full items-center rounded-card pr-0 text-left sm:pr-3";
+// comes from the rhythm. Under a pointer a row lightens and an arrow says it picks those words.
+const ROW = "group/point flex h-[52px] w-full items-center rounded-card pr-3 text-left";
 const ROW_SPACING = { paddingLeft: INSET, gap: GAP } as const;
 
 /**
  * Ways into a new chat, drawn from what Auni sees of the owner (core's starting points), each
- * wearing a picture of what it's about. A tap starts the chat with its prompt.
+ * wearing a picture of what it's about. Picking one puts its words in the box (pickStartingPoint).
  */
 export function StartingPoints() {
-  const { busy, error, start } = useStartConversation();
-  const { points, waiting, pending } = useStartingPoints();
-  const refresh = useRefreshStartingPoints();
+  const { points, waiting } = useStartingPoints();
   const { portfolio } = useMoney();
   const me = useMe();
   const { addMoneyHref, settingsHref } = useAppDialogs();
@@ -80,11 +71,10 @@ export function StartingPoints() {
             >
               <button
                 type="button"
-                disabled={busy}
-                onClick={() => void start(point.prompt)}
+                onClick={() => pickStartingPoint(point)}
                 title={point.sources.map(cited).join("\n")}
                 style={ROW_SPACING}
-                className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60`}
+                className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-ring-inset`}
               >
                 {/* 15px on a phone, PHONE_TEXT_PX, which core measures each line at (lineFits). */}
                 <PointImage image={point.image} />
@@ -95,6 +85,10 @@ export function StartingPoints() {
                     {point.action}
                   </span>
                 </span>
+                <ArrowRight
+                  aria-hidden
+                  className="ml-2 size-4 flex-none text-faint opacity-0 transition-[opacity,translate] duration-200 ease-settle group-hover/point:translate-x-0.5 group-hover/point:opacity-100 group-focus-visible/point:opacity-100 motion-reduce:transition-none max-sm:hidden"
+                />
               </button>
             </li>
           ))}
@@ -102,66 +96,42 @@ export function StartingPoints() {
       )}
       {/* Always one line tall: their money is read after the page draws, and a line arriving
           then would push the page, which is centred, up by half of it. */}
-      <div
-        className="mt-2 flex h-5 items-center justify-between gap-3 pr-2 text-meta leading-5 text-muted-foreground"
+      <p
+        className="mt-2 flex h-5 items-center pr-2 text-meta text-muted-foreground"
         style={{ paddingLeft: WORDS_START }}
       >
-        <span className="min-w-0 truncate">
-          {portfolio?.empty ? (
-            <span className="auni-stagger-in inline-block">
-              Balance {formatUsdcBalance(0n)}.{" "}
-              <Link
-                href={addMoneyHref}
-                scroll={false}
-                className="font-medium text-primary transition-opacity hover:opacity-75"
-              >
-                Add money
-              </Link>
-              {needsSignals ? (
-                <>
-                  {" or "}
-                  <Link
-                    href={settingsHref("personalization")}
-                    scroll={false}
-                    className="transition-colors hover:text-ink"
-                  >
-                    tailor with X or wallet
-                  </Link>
-                </>
-              ) : null}
-            </span>
-          ) : needsSignals ? (
+        {portfolio?.empty ? (
+          <span className="auni-stagger-in truncate">
+            Your balance is $0.{" "}
             <Link
-              href={settingsHref("personalization")}
+              href={addMoneyHref}
               scroll={false}
-              className="transition-colors hover:text-ink"
+              className="font-medium text-primary transition-opacity hover:opacity-75"
             >
-              Connect X or a watch-only wallet for tailored ideas
+              Add money
             </Link>
-          ) : null}
-        </span>
-        {!waiting ? (
-          <button
-            type="button"
-            disabled={refresh.isPending || pending}
-            onClick={() => refresh.mutate()}
-            className="inline-flex flex-none items-center gap-1 text-caption text-faint transition-colors hover:text-ink disabled:opacity-50"
+          </span>
+        ) : needsSignals ? (
+          <Link
+            href={settingsHref("personalization")}
+            scroll={false}
+            className="truncate transition-colors hover:text-ink"
           >
-            <RefreshCw
-              aria-hidden
-              className={cn("size-3", (refresh.isPending || pending) && "animate-spin")}
-            />
-            <span>Refresh</span>
-          </button>
+            Personalize ideas with your X handle or wallet
+          </Link>
         ) : null}
-      </div>
-      {error && (
-        <p role="alert" className="mt-2 text-center text-caption text-destructive">
-          {error}
-        </p>
-      )}
+      </p>
     </div>
   );
+}
+
+/**
+ * A point picked, by click, tap or key alike: its words take the new chat's box, focused with the
+ * caret at their end, for the owner to read, change, then send. A point's words carry more than
+ * its line says (what Auni is asked to do), so none is ever sent unseen.
+ */
+export function pickStartingPoint(point: { readonly prompt: string }): void {
+  requestComposerFocus("new", point.prompt, true);
 }
 
 /**

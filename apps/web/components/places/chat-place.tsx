@@ -1,50 +1,45 @@
 "use client";
 
 import type { ThreadId } from "@auni/shared";
+import type { AutomationWire } from "@auni/shared";
 import { Archive, Eye, Zap } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { useThreads } from "@/components/app/use-threads";
 import { Mascot } from "@/components/brand/mascot";
 import { useThreadState } from "@/components/portfolio/use-portfolio";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Thread } from "@/lib/data/views";
-import { formatUsdcBalance } from "@/lib/money";
+import { liveWatches, useWatches } from "@/components/watching/use-watches";
+import type { Thread, ThreadState } from "@/lib/data/views";
+import { formatUsd } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 import { ChatMenu, useTidyChat } from "./chat-menu";
 import { PlaceConversation } from "./place-conversation";
 import { PlaceHeader } from "./place-header";
+import { TakeFigures } from "./place-marks";
+import { takeValue } from "./use-takes";
 
 export const CHAT_PLACEHOLDER = "Ask Auni anything";
 
-/** A thread: conversation down the middle, with its on-demand inspector panel on the right. */
+/**
+ * Auto in the header: what it has left, once the chat's state says. Until then, or if that read
+ * fails, just "Auto": the whole budget in its place would say nothing of it was spent.
+ */
+export function autoLabel(state: ThreadState | undefined): string {
+  return state ? `Auto: ${formatUsd(state.freeBudgetUsd)} left` : "Auto";
+}
+
+/** A chat: the conversation down the middle, with its inspector on the right when wanted. */
 export function ChatPlace({ threadId }: { readonly threadId: ThreadId }) {
   const { loading, threads } = useThreads();
   const thread = threads.find(({ id }) => id === threadId);
   const state = useThreadState(thread ? threadId : undefined);
+  const [watch] = liveWatches(useWatches({ threadId }).data ?? []);
 
   if (!thread && !loading) return <MissingPlace />;
-
-  const holdings = state.data?.holdings ?? [];
-  const totalBaseUnits = holdings.reduce(
-    (sum, holding) => sum + BigInt(holding.value.baseUnits),
-    0n,
-  );
-  const auto = thread?.actMode === "within_limits";
-  const headerBadge =
-    totalBaseUnits > 0n ? (
-      <span className="font-semibold text-ink">{formatUsdcBalance(totalBaseUnits)}</span>
-    ) : auto ? (
-      <span className="flex items-center gap-1 font-medium text-primary">
-        <Zap aria-hidden className="size-3.5" />
-        Auto
-      </span>
-    ) : (thread?.watchCount ?? 0) > 0 ? (
-      <span className="flex items-center gap-1 text-muted-foreground">
-        <Eye aria-hidden className="size-3.5" />
-        Watching
-      </span>
-    ) : undefined;
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col">
@@ -52,7 +47,7 @@ export function ChatPlace({ threadId }: { readonly threadId: ThreadId }) {
       <PlaceHeader
         icon={null}
         title={thread ? thread.title : <Skeleton className="h-4 w-40 rounded-control" />}
-        money={headerBadge}
+        money={thread ? headerFigures(thread, state.data, watch) : undefined}
         pane={thread !== undefined}
         actions={thread ? <ChatMenu thread={thread} place="header" /> : null}
       />
@@ -71,29 +66,57 @@ function ArchivedNote({ thread }: { readonly thread: Thread }) {
   return (
     <div className="flex flex-none items-center justify-center gap-3 border-b border-foreground/[0.06] bg-sidebar px-4 py-2.5 text-ui text-muted-foreground">
       <Archive aria-hidden className="size-4 flex-none text-faint" strokeWidth={1.75} />
-      <span className="min-w-0">
-        Archived. It comes back to Threads when you or Auni write here.
-      </span>
-      <button
-        type="button"
-        onClick={restore}
-        className="h-7 flex-none rounded-full bg-background px-3 text-meta font-medium text-ink ring-1 ring-foreground/[0.1] transition-colors hover:bg-foreground/[0.04]"
-      >
-        Bring back
-      </button>
+      <span className="min-w-0">Archived. It comes back when you or Auni write here.</span>
+      <Button variant="outline" size="sm" onClick={restore} className="flex-none">
+        Restore
+      </Button>
     </div>
   );
 }
 
-/** A link to a thread that is gone, or was never this person's. */
+/** A link to a chat that is gone, or was never this owner's. */
 function MissingPlace() {
   return (
     <section className="flex h-full flex-col items-center justify-center px-6 text-center">
       <Mascot alt="" size={64} state="sad" />
-      <p className="mt-4 text-body font-semibold text-ink">This thread isn&apos;t here</p>
-      <Link href="/app" className="auni-text-link mt-2 text-ui">
-        Back to Portfolio
+      <p className="mt-4 text-body font-semibold text-ink">This chat isn&apos;t here</p>
+      <p className="mt-1 text-ui text-muted-foreground">It may have been deleted.</p>
+      <Link href="/app/new" className="auni-text-link mt-3 text-ui">
+        Start a new take
       </Link>
     </section>
+  );
+}
+
+/**
+ * What the header says of a chat, and the way into its inspector: what its take is worth and how
+ * that moved today, then what Auto has left to spend, or, holding nothing, what it watches.
+ */
+function headerFigures(
+  thread: Thread,
+  state: ThreadState | undefined,
+  watch: AutomationWire | undefined,
+): ReactNode {
+  const take = takeValue(state?.holdings ?? []);
+  const auto = thread.actMode === "within_limits";
+  if (!take && !auto && !watch) return undefined;
+  return (
+    <>
+      {take ? <TakeFigures take={take} /> : null}
+      {auto ? (
+        <span
+          className={cn("flex items-center gap-1 text-ink tabular-nums", take && "max-sm:hidden")}
+        >
+          <Zap aria-hidden className="size-3.5" />
+          {autoLabel(state)}
+        </span>
+      ) : null}
+      {!take && !auto && watch ? (
+        <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+          <Eye aria-hidden className="size-3.5 flex-none" />
+          <span className="max-w-[220px] truncate max-sm:max-w-[140px]">{watch.description}</span>
+        </span>
+      ) : null}
+    </>
   );
 }

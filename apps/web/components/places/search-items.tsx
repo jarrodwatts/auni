@@ -63,11 +63,13 @@ export function useSearchGroups(query: string, withdraw: () => void): readonly S
   const now = useMinute();
 
   return useMemo(() => {
-    const chatItem = ({ thread }: ChatPlace, detail?: string): SearchItem => ({
+    const chatItem = ({ thread, take }: ChatPlace, detail?: string): SearchItem => ({
       key: thread.id,
       title: thread.title,
       mark: <MessageCircle {...ICON} />,
-      ...(detail ? { detail } : { trailing: chatAge(thread.updatedAt, now) }),
+      ...(detail
+        ? { detail }
+        : { trailing: take ? formatUsdcBalance(take.value) : chatAge(thread.updatedAt, now) }),
       href: chatHref(thread.id),
       thread: thread.id,
     });
@@ -93,7 +95,7 @@ export function useSearchGroups(query: string, withdraw: () => void): readonly S
         .slice(0, 6);
       return [
         { label: "Recent", items },
-        { label: items.length > 0 ? "Threads" : "Jump to", items: rest },
+        { label: items.length > 0 ? "Chats" : "Jump to", items: rest },
         { label: "Jump to", items: items.length + rest.length > 0 ? [] : start },
       ].filter((found) => found.items.length > 0);
     }
@@ -147,7 +149,7 @@ export function useSearchGroups(query: string, withdraw: () => void): readonly S
       .filter(({ score }) => score > 0);
 
     return [
-      group("Threads", threadMatches, LIMIT.threads),
+      group("Chats", threadMatches, LIMIT.threads),
       group("Holdings", holdings, LIMIT.holdings),
       group("Go to", pageMatches, LIMIT.pages),
     ]

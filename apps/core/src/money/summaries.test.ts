@@ -8,7 +8,7 @@ const back = (usd: string) => ({ flow: "back" as const, usd });
 const moving = (usd: string) => ({ flow: "move" as const, usd });
 const leg = (money: Money | null) => ({
   money,
-  summary: "Buy about $50 of Eli Lilly",
+  says: "Buy about $50 of Eli Lilly",
 });
 
 describe("money math for the portfolio and the sidebar", () => {
@@ -31,6 +31,11 @@ describe("money math for the portfolio and the sidebar", () => {
     expect(askLine([leg(going("100.10")), leg(going("49.90"))])).toBe("2 moves, $150 in");
     expect(askLine([leg(going("50"))])).toBe("Buy about $50 of Eli Lilly");
     expect(askLine([])).toBeNull();
+    // A move whose words carry no dollars has its money said beside them.
+    expect(askLine([{ says: "Sell Yes", money: back("201.50") }])).toBe(
+      "Sell Yes, about $201.50 back",
+    );
+    expect(askLine([{ says: "Stake 60 MON", money: null }])).toBe("Stake 60 MON");
   });
 
   it("never adds what sells bring back to what buys put in", () => {

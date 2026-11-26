@@ -100,3 +100,9 @@ export function appHref(appId: string): string {
 export function chatHref(threadId: string): string {
   return `/app/chat/${threadId}`;
 }
+
+/** Everything waiting on the owner, in one place: a sidebar group on desktop, a tab on a phone. */
+export const NEEDS_YOU_HREF = "/app/needs-you";
+
+/** A phone's list of takes and chats; on desktop the sidebar holds it. */
+export const CHATS_HREF = "/app/chats";

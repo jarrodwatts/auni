@@ -325,25 +325,6 @@ button:not(:disabled),
   }
 }
 
-@keyframes auni-account-balance-update {
-  0% {
-    color: var(--ring);
-    opacity: 0.3;
-    text-shadow: 0 0 10px --alpha(var(--ring) / 28%);
-    transform: translateY(3px);
-  }
-  55% {
-    color: color-mix(in oklab, var(--ring) 85%, var(--foreground));
-    opacity: 1;
-    text-shadow: 0 0 6px --alpha(var(--ring) / 14%);
-    transform: translateY(0);
-  }
-  100% {
-    color: inherit;
-    text-shadow: none;
-  }
-}
-
 @keyframes auni-vault-dial {
   from {
     transform: rotate(-300deg);

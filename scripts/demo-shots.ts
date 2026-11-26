@@ -7,7 +7,7 @@
 // prints, and visits Money (a take opened up, a receipt), the apps (the list, a sheet in each
 // state the demo's owner has one in, and one Auni itself runs on), a new chat, each pane of
 // Settings, every conversation the demo's owner has, and the states between them (the search
-// palette, a thread's details pane, a phone's menu, a turn's work opened up, a page that isn't
+// palette, a thread's details pane, Needs you, a phone's Chats and More, a turn's work opened up, a page that isn't
 // there, and a browser that isn't paired, or brings a link already used), and first run as a new
 // owner meets it (each step of its setup), each at a desktop and a phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
 // A screen longer than the window is taken a window at a time: a conversation from its end back
@@ -326,11 +326,13 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const busiest =
       threads.find((thread) => /long bitcoin/iu.test(thread.title ?? "")) ?? threads[0];
     await take(page, out, "search", `${origin}/app`, "top", SEARCH, { once: true });
-    const places: Opener = {
-      does: PRESS("Open places"),
+    await take(page, out, "needs-you", `${origin}/app/needs-you`, "top");
+    await take(page, out, "chats", `${origin}/app/chats`, "top", undefined, { only: "phone" });
+    const more: Opener = {
+      does: PRESS("More"),
       shows: `document.querySelector('[role="dialog"]')`,
     };
-    await take(page, out, "phone-menu", `${origin}/app`, "top", places, {
+    await take(page, out, "phone-more", `${origin}/app`, "top", more, {
       only: "phone",
       once: true,
     });

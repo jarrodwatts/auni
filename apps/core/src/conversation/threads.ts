@@ -1,4 +1,4 @@
-import { ASK_TOOL_NAMES, type messageWireSchema, type threadWireSchema } from "@auni/shared";
+import { ASK_TOOL_NAMES, isAsk, type messageWireSchema, type threadWireSchema } from "@auni/shared";
 import { and, asc, desc, eq, exists, inArray, notInArray, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 
@@ -8,10 +8,12 @@ import {
   automations,
   messages,
   threads,
+  type ActionRow,
   type MessageRow,
   type ThreadRow,
 } from "../db/schema.ts";
-import { cardMoneys } from "../money/recipes/index.ts";
+import { askWaits } from "../asks.ts";
+import { cardMoneys, filledFace } from "../money/recipes/index.ts";
 import { askLine } from "../money/summaries.ts";
 import { replyTargets } from "./history.ts";
 import { publishThreadRow } from "./stream.ts";
@@ -74,10 +76,16 @@ export function threadUnread(thread: Pick<ThreadRow, "repliedAt" | "readAt">): b
   return !thread.readAt || thread.readAt < thread.repliedAt;
 }
 
+/** What a move on a waiting card does, in its card's own short words: its button's. */
+function waitingWords(row: ActionRow): string {
+  if (isAsk(row.tool)) return askWaits(row);
+  return filledFace(row)?.action ?? row.summary;
+}
+
 /**
  * Each thread's newest card still waiting on the person, in one line: one to allow, or a held
- * move to check or close (see money/held.ts). Older cards to allow never linger here: a newer
- * plan replaces them when it is recorded.
+ * move to check or close (see money/held.ts), said as its tap is with its money. Older cards to
+ * allow never linger here: a newer plan replaces them when it is recorded.
  */
 async function waitingAsks(threadIds: readonly string[]): Promise<Map<string, string>> {
   if (threadIds.length === 0) return new Map();
@@ -94,18 +102,16 @@ async function waitingAsks(threadIds: readonly string[]): Promise<Map<string, st
   const asks = new Map<string, string>();
   for (const action of waiting) {
     if (!action.threadId || asks.has(action.threadId)) continue;
-    if (action.phase === "needs_owner") {
-      asks.set(action.threadId, `Not confirmed: ${action.summary}`);
-      continue;
-    }
-    const legs = action.proposalId
-      ? waiting.filter((leg) => leg.proposalId === action.proposalId)
-      : [action];
+    const held = action.phase === "needs_owner";
+    const legs =
+      action.proposalId && !held
+        ? waiting.filter((leg) => leg.proposalId === action.proposalId)
+        : [action];
     const moneys = cardMoneys(legs);
     const line = askLine(
-      legs.map((leg, index) => ({ summary: leg.summary, money: moneys[index]! })),
+      legs.map((leg, index) => ({ says: waitingWords(leg), money: moneys[index]! })),
     );
-    if (line) asks.set(action.threadId, line);
+    if (line) asks.set(action.threadId, held ? `Status unknown: ${line}` : line);
   }
   return asks;
 }

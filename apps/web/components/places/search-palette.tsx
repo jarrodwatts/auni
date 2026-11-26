@@ -35,8 +35,8 @@ export function useSearch(): SearchContextValue {
   return useContext(SearchContext);
 }
 
-/** The places search offers again once they've been opened: Portfolio, Activity, Apps, or a thread. */
-const PLACE_PATH = /^\/app(?:\/activity|\/apps|\/chat\/[^/]+)?$/u;
+/** The places search offers again once they've been opened: Money, Apps, Needs you, or a chat. */
+const PLACE_PATH = /^\/app(?:\/apps|\/needs-you|\/chat\/[^/]+)?$/u;
 
 /**
  * Search lives in one palette over everything, opened by ⌘K (Ctrl+K)

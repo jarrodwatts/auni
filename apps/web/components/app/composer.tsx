@@ -37,13 +37,44 @@ function focusDraftFromTap(target: EventTarget, input: HTMLTextAreaElement | nul
   input.setSelectionRange(input.value.length, input.value.length);
 }
 
-let focusRequest: { readonly draftKey: string; readonly text: string } | null = null;
+interface FocusRequest {
+  readonly draftKey: string;
+  readonly text: string;
+  /** The text takes the draft's place: the owner picked these words to send. */
+  readonly replace: boolean;
+}
+
+let focusRequest: FocusRequest | null = null;
 const focusListeners = new Set<() => void>();
 
-/** Focuses the composer with this draft key, now or as soon as it's on screen, with `text` if it's empty. */
-export function requestComposerFocus(draftKey: string, text = ""): void {
-  focusRequest = { draftKey, text };
+/**
+ * Focuses the composer with this draft key, now or as soon as it's on screen, with `text` if it's
+ * empty, or in place of what's there when `replace`.
+ */
+export function requestComposerFocus(draftKey: string, text = "", replace = false): void {
+  focusRequest = { draftKey, text, replace };
   for (const listener of focusListeners) listener();
+}
+
+/** The draft once a focus request lands on it. */
+export function draftAfter(current: string, { text, replace }: FocusRequest): string {
+  if (!text) return current;
+  return replace ? text : current || text;
+}
+
+/**
+ * Lands a focus request on the box: its draft as draftAfter says, focused with the caret at the
+ * end. Returns the draft. React writing new words in puts the caret at their end; words already
+ * there (picked twice, or kept from before) would keep it wherever it last was, at the start.
+ */
+export function landFocusRequest(
+  input: Pick<HTMLTextAreaElement, "value" | "focus" | "setSelectionRange">,
+  request: FocusRequest,
+): string {
+  const draft = draftAfter(input.value, request);
+  input.focus();
+  input.setSelectionRange(draft.length, draft.length);
+  return draft;
 }
 
 /** What a docked lead (a question Auni is asking) can do with the reply box it sits in. */
@@ -72,10 +103,8 @@ interface ComposerProps {
   readonly initialMessage?: string;
   /** Docked above the words, inside the same enclosure: a question waiting on the person. */
   readonly lead?: ReactNode;
-  /** Inline control inside the bottom-right of the composer box beside Send (model picker). */
+  /** The one quiet control inside the box, at its bottom left: which AI answers, and how hard it thinks. */
   readonly inlineControl?: ReactNode;
-  /** Quiet control strip directly beneath the composer box (environment left, autonomy right). */
-  readonly footerStrip?: ReactNode;
   readonly placeholder: string;
   /** Keeps the box grounded and typeable while holding submit until messages finish loading. */
   readonly sendDisabled?: boolean;
@@ -89,7 +118,6 @@ export function Composer({
   busy = false,
   disabled = false,
   draftKey,
-  footerStrip,
   initialMessage = "",
   inlineControl,
   lead,
@@ -126,10 +154,9 @@ export function Composer({
     const take = () => {
       const input = inputRef.current;
       if (!input || focusRequest?.draftKey !== draftKey) return;
-      const { text } = focusRequest;
+      const request = focusRequest;
       focusRequest = null;
-      if (text) setMessage((current) => current || text);
-      input.focus();
+      setMessage(landFocusRequest(input, request));
     };
     take();
     focusListeners.add(take);
@@ -207,11 +234,11 @@ export function Composer({
               "overflow-y-auto disabled:cursor-not-allowed disabled:opacity-60",
             )}
           />
-          <div className="flex items-center justify-end gap-1.5">
-            {inlineControl}
+          <div className="flex items-center gap-1.5">
+            <div className="-ml-1 flex min-w-0 flex-1 items-center">{inlineControl}</div>
             {/* Send: a 34px disc in a 38px target, quiet grey until there is something to send, then ink. */}
             <button
-              className="group/submit flex size-9 flex-none items-center justify-center rounded-full text-background outline-none active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100"
+              className="group/submit flex size-9 flex-none items-center justify-center rounded-full text-background focus-ring active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100"
               type={showStop ? "button" : "submit"}
               aria-label={
                 showStop ? "Stop response" : busy && !onStop ? "Auni is responding" : "Send message"
@@ -219,7 +246,7 @@ export function Composer({
               disabled={disabled || (!showStop && (!canSend || message.trim().length === 0))}
               onClick={showStop ? onStop : undefined}
             >
-              <span className="pointer-events-none flex size-8 items-center justify-center rounded-full bg-foreground transition-[background-color,color] duration-200 ease-settle group-hover/submit:bg-foreground/85 group-focus-visible/submit:ring-[3px] group-focus-visible/submit:ring-ring/50 group-disabled/submit:bg-foreground/[0.07] group-disabled/submit:text-foreground/35">
+              <span className="pointer-events-none flex size-8 items-center justify-center rounded-full bg-foreground transition-[background-color,color] duration-200 ease-settle group-hover/submit:bg-foreground/85 group-disabled/submit:bg-foreground/[0.07] group-disabled/submit:text-foreground/35">
                 {showStop ? (
                   <Square className="size-3 fill-current" aria-hidden />
                 ) : busy && !onStop ? (
@@ -232,9 +259,6 @@ export function Composer({
           </div>
         </div>
       </form>
-      {footerStrip ? (
-        <div className="mt-1.5 flex items-center justify-between gap-2 px-1">{footerStrip}</div>
-      ) : null}
     </div>
   );
 }

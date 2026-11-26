@@ -5,6 +5,7 @@ import {
   isAsk,
   listed,
   threadActModeSchema,
+  secretTitle,
 } from "@auni/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -83,8 +84,8 @@ const setThreadAutonomy = defineAsk({
       .from(threads)
       .where(eq(threads.id, input.thread_id))
       .for("update");
-    if (!current) return "That thread is gone.";
-    if (current.archivedAt) return "That thread was archived before you allowed this.";
+    if (!current) return "That chat is gone.";
+    if (current.archivedAt) return "That chat was archived before you allowed this.";
     await tx
       .update(threads)
       .set({ actMode: input.act_mode, budgetUsd: input.budget_usd })
@@ -263,7 +264,8 @@ function whatItAsksFor(row: ActionRow): Pick<AskCard, "app" | "field"> {
  */
 export function askWaits(row: Pick<ActionRow, "tool" | "input" | "summary">): string {
   if (!isAsk(row.tool)) throw new Error(`${row.tool} is not an ask.`);
-  if (row.tool === "request_secret") return `Paste your ${row.summary}`;
+  // As the card heads it, so the two never read differently side by side.
+  if (row.tool === "request_secret") return secretTitle(row.summary);
   const ask = ASKS[row.tool] as Ask<unknown>;
   return ask.action(ask.input.parse(row.input));
 }

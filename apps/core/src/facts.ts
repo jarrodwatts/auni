@@ -14,6 +14,7 @@ import { dollars } from "./money/summaries.ts";
 import { hasWallet } from "./money/wallets.ts";
 import { within } from "./money/swaps/shared.ts";
 import { centsToUsd, signedUsdToCents, usdToCents } from "./money/usd.ts";
+import { heldByTakes, takeRecords, type TakeRecords } from "./money/takes.ts";
 import { startOfDay } from "./money/value-history.ts";
 
 // What Auni sees that matters to the owner now: their own money, active threads, and what each app
@@ -52,9 +53,10 @@ const FACTS_PORTFOLIO_WAIT_MS = 30_000;
 
 /** Everything Auni sees now: their money first, which is always there, then their signals & the rest. */
 export async function readFacts(): Promise<Fact[]> {
-  const [wallet, portfolio, activeThreads, me] = await Promise.all([
+  const [wallet, portfolio, records, activeThreads, me] = await Promise.all([
     hasWallet().catch(() => true),
     promptPortfolio(FACTS_PORTFOLIO_WAIT_MS),
+    takeRecords(),
     db
       .select()
       .from(threads)
@@ -67,9 +69,7 @@ export async function readFacts(): Promise<Fact[]> {
               db
                 .select({ one: sql`1` })
                 .from(automations)
-                .where(
-                  and(eq(automations.threadId, threads.id), eq(automations.status, "active")),
-                ),
+                .where(and(eq(automations.threadId, threads.id), eq(automations.status, "active"))),
             ),
           ),
         ),
@@ -78,7 +78,7 @@ export async function readFacts(): Promise<Fact[]> {
       .limit(ACTIVE_THREADS_TOLD),
     theOwner(),
   ]);
-  const held = await heldNow(portfolio);
+  const held = await heldNow(portfolio, records);
   const seen: OwnerSeen = {
     holdings: held.map(({ holding, name, image }) => ({
       symbol: holding.symbol,
@@ -88,7 +88,7 @@ export async function readFacts(): Promise<Fact[]> {
     })),
   };
   return [
-    ...(wallet ? moneyFacts(portfolio) : [NO_WALLET_YET]),
+    ...(wallet ? moneyFacts(portfolio, records) : [NO_WALLET_YET]),
     ...activeThreads.map(activeThreadFact),
     ...held.slice(0, HOLDINGS_TOLD).map(holdingFact),
     ...personalFacts(me),
@@ -192,7 +192,7 @@ interface Held {
  * Their largest holdings besides cash and the coin their fees are paid in, which is no holding
  * to talk about selling (see paysFees), each with its name and its move today.
  */
-async function heldNow(portfolio: Portfolio | null): Promise<Held[]> {
+async function heldNow(portfolio: Portfolio | null, records: TakeRecords): Promise<Held[]> {
   const candidates = (portfolio?.holdings ?? []).filter(
     (holding) => !holding.cash && usdToCents(holding.usdValue ?? "0") > 0n,
   );
@@ -206,7 +206,7 @@ async function heldNow(portfolio: Portfolio | null): Promise<Held[]> {
   const [faces, moves] = await Promise.all([
     // Names and logos are a nicety: a slow stock catalog leaves each its symbol.
     within(holdingFaces(holdings), FACT_WAIT_MS).catch(() => null),
-    dayMoves(holdings, startOfDay(timeZone)),
+    dayMoves(holdings, startOfDay(timeZone), records.fills),
   ]);
   return holdings.map((holding, index) => ({
     holding,
@@ -269,7 +269,7 @@ function checkIn(total: string | null): FactStart[] {
  * Their money as a whole, there even when it's empty or can't be read, and their cash as a fact
  * of its own, which wears cash's own mark as the portfolio shows it.
  */
-function moneyFacts(portfolio: Portfolio | null): Fact[] {
+function moneyFacts(portfolio: Portfolio | null, records: TakeRecords): Fact[] {
   const source = { app: AUNI, label: "Your money", link: "/app" };
   if (!portfolio)
     return [
@@ -289,7 +289,8 @@ function moneyFacts(portfolio: Portfolio | null): Fact[] {
         starts: [FIRST_MONEY, NEW_HERE, A_BELIEF, MOVING],
       },
     ];
-  const cash = portfolio.cash.usdValue;
+  // Cash as Money shows it: savings a take bought ("Keep my idle cash earning") are already at work.
+  const cash = heldByTakes(portfolio, records).cashUsd;
   const whole: Fact = {
     text: `The owner has ${dollars(portfolio.totalUsd)} in all, ${dollars(cash)} of it cash.`,
     source,

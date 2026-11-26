@@ -55,18 +55,25 @@ export function recipeForTool(tool: string): Recipe | undefined {
   return everyRecipe().find((recipe) => recipe.tool === tool);
 }
 
-type MoneyRow = Pick<ActionRow, "tool" | "input" | "details" | "run" | "amountUsd">;
+type MoneyRow = Pick<ActionRow, "tool" | "input" | "details" | "run" | "amountUsd" | "card">;
+
+/** How a card's note starts when what comes back is a floor, not a quote. */
+const FLOOR = "at least";
 
 /**
  * The money a recorded move moves, and which way: cash it readies without
  * selling anything (a bridge, savings back to the wallet) moves rather than
- * goes in.
+ * goes in. What a sale's card promises at least ("at least, if all 310 sell")
+ * stays a floor, on the card's own condition ("if all 310 sell"), until it has come back.
  */
 export function rowMoney(row: MoneyRow): Money | null {
   const money = moneyOf(row);
-  return money?.flow === "in" && recipeForTool(row.tool)?.readies?.(row.input as never)
-    ? { ...money, flow: "move" }
-    : money;
+  if (money?.flow === "in" && recipeForTool(row.tool)?.readies?.(row.input as never))
+    return { ...money, flow: "move" };
+  const note = row.card?.note;
+  if (money?.flow === "back" && !row.run.returnedUsd && note?.startsWith(FLOOR))
+    return { ...money, least: note.slice(FLOOR.length).replace(/^[,\s]+/u, "") };
+  return money;
 }
 
 /**

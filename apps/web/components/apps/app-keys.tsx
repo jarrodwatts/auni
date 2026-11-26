@@ -11,7 +11,7 @@ import { AutoHeight } from "@/components/motion/auto-height";
 import { SecretInput, SecretNote, secretRefusal } from "@/components/private-input/secret-input";
 import { clearAppSecret, saveAppSecrets, useRefreshApps } from "@/lib/data/apps";
 
-import { keysNeeded } from "./app-standing";
+import { keysNeeded, keysWord } from "./app-standing";
 import { Section } from "./sheet-section";
 
 /**
@@ -34,7 +34,7 @@ export function AppKeysNeeded({
 }) {
   const needed = keysNeeded(app);
   if (needed.length === 0) return null;
-  const keys = needed.length === 1 ? "key" : "keys";
+  const keys = keysWord(app, needed);
   return (
     <Section title={holding ? `Add your ${keys} to trade` : `Add your ${keys} to use ${app.name}`}>
       {holding ? (

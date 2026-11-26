@@ -119,7 +119,14 @@ threadsRouter.get("/:threadId/state", async (req, res) => {
   ]);
   const freeBudgetUsd = centsToUsd(pot.freeCashCents > 0n ? pot.freeCashCents : 0n);
   const mine = portfolio ? (heldByTakes(portfolio, records).threads.get(thread.id) ?? []) : [];
-  const holdings = mine.length > 0 ? await holdingViews(mine, startOfDay(timeZone)) : [];
+  const holdings =
+    mine.length > 0
+      ? await holdingViews(
+          mine,
+          startOfDay(timeZone),
+          records.fills.filter((fill) => fill.threadId === thread.id),
+        )
+      : [];
   res.json({
     budgetUsd: thread.budgetUsd,
     freeBudgetUsd,

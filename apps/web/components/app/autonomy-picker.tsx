@@ -246,7 +246,7 @@ export function AutonomyPicker({
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      openSettings("remote");
+                      openSettings("machine");
                     }}
                     className="font-medium underline underline-offset-2"
                   >

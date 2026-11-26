@@ -1,6 +1,12 @@
 "use client";
 
-import { appListing, ASK_LINE, SOLANA_BRING_FIELD, type AskCardWire } from "@auni/shared";
+import {
+  appListing,
+  ASK_LINE,
+  secretTitle,
+  SOLANA_BRING_FIELD,
+  type AskCardWire,
+} from "@auni/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -25,7 +31,6 @@ import {
   CardReceipt,
   NOT_REACHED_TAP,
 } from "./card-parts";
-import { secretTitle } from "./secret-title";
 
 /** The address that opens a secret's card with its field ready, as a chat app's link does. */
 const CARD_PARAM = "card";

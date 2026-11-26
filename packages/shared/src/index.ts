@@ -54,7 +54,7 @@ export {
   type PlanMove,
 } from "./action-plan-card.ts";
 export { type ArrivalCardWire, arrivalCardSchema } from "./arrival-card.ts";
-export { ASK_DONE, ASK_LINE, type AskCardWire, askCardSchema } from "./ask-card.ts";
+export { ASK_DONE, ASK_LINE, type AskCardWire, askCardSchema, askSummary } from "./ask-card.ts";
 export { type DepositCardWire, DEPOSIT_WAIT_MS, depositCardSchema } from "./deposit-card.ts";
 export {
   type Feedback,
@@ -219,6 +219,7 @@ export {
 } from "./apps.generated.ts";
 export { formatExactUsd, type UsdcMoneyWire, usdcMoneyWireSchema } from "./money.ts";
 export { textAsMeant } from "./tool-input.ts";
+export { secretTitle } from "./secret-title.ts";
 export { clip, listed, withArticle } from "./words.ts";
 export { splitKeys } from "./wallet-keys.ts";
 export { type StartChatRequest, startChatRequestSchema, startedChatWireSchema } from "./places.ts";

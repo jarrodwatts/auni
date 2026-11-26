@@ -48,6 +48,24 @@ it("shows the address to send to before the watch has started, and says it's get
   expect(sheet).not.toContain("Preparing your wallet address");
 });
 
+// Add $50 for a card short on Base let the owner pick Solana: the title still said Base while
+// the code, Copy and the watch moved to Solana (review of 2026-11-26).
+it("holds money for a card to the card's network, with other money a separate way in", () => {
+  const sheet = renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}>
+      <Dialog open>
+        <DepositPortal need={{ usd: "50", chain: "base" }} />
+      </Dialog>
+    </QueryClientProvider>,
+  );
+  const words = sheet.replaceAll(/<[^>]*>/gu, "");
+  expect(words).toContain("Send $50 USDC on Base");
+  expect(words).toContain("Choose Base as the network when you send.");
+  expect(words).toContain("Getting ready to watch for your transfer on Base");
+  expect(sheet).not.toContain('role="radiogroup"');
+  expect(words).toContain("Add other money");
+});
+
 afterEach(() => vi.useRealTimers());
 
 // A first take whose wallet couldn't be made left none, and Add money had no address to show,

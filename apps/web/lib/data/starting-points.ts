@@ -68,12 +68,15 @@ function useRead() {
  */
 export function useStartingPoints(): {
   readonly points: readonly StartingPoint[];
+  /** When what they rest on was read. */
+  readonly observedAt: string | null;
   readonly waiting: boolean;
   readonly pending: boolean;
 } {
   const query = useRead();
   return {
     points: query.data?.points ?? [],
+    observedAt: query.data?.observedAt ?? null,
     waiting: query.isPending || waitingOn(query.data),
     pending: query.data?.pending ?? false,
   };

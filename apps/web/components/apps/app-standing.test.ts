@@ -1,7 +1,15 @@
 import type { AppWire } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { appStanding, keysNeeded, moneyInOut, needOf, waysToTry } from "./app-standing";
+import {
+  appStanding,
+  keysFirst,
+  keysNeeded,
+  keysWord,
+  moneyInOut,
+  needOf,
+  waysToTry,
+} from "./app-standing";
 import { turningOff } from "./turning-off";
 
 const KEY = {
@@ -214,5 +222,29 @@ describe("turningOff", () => {
       why: stays,
       fix: "Close every position I have open on Venue.",
     });
+  });
+});
+
+describe("keysFirst", () => {
+  const waiting = { needs: ["Add your key"], settings: [KEY] };
+
+  it("shows only the key form while an app with nothing there waits for its key", () => {
+    expect(keysFirst(app(waiting))).toBe(true);
+    expect(keysFirst(app({ ...waiting, account: account("0.00") }))).toBe(true);
+  });
+
+  it("keeps the switch, and its way off, for an app holding money or one that can't be read", () => {
+    expect(keysFirst(app({ ...waiting, account: account("408.58") }))).toBe(false);
+    expect(keysFirst(app({ ...waiting, account: account(null) }))).toBe(false);
+    expect(keysFirst(app({ settings: [{ ...KEY, set: "file" }] }))).toBe(false);
+  });
+});
+
+describe("keysWord", () => {
+  it("names one field as the owner pastes it, else says keys", () => {
+    const token = { ...KEY, label: "Telegram bot token" };
+    expect(keysWord({ name: "Telegram" }, [token])).toBe("bot token");
+    expect(keysWord({ name: "Elfa" }, [{ ...KEY, label: "Elfa API key" }])).toBe("key");
+    expect(keysWord({ name: "Polymarket" }, [KEY, token])).toBe("keys");
   });
 });

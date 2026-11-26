@@ -47,8 +47,6 @@ export interface Portfolio {
   readonly empty: boolean;
   /** All non-cash holdings across wallets and venues, plus money on the way. */
   readonly holdings: readonly Holding[];
-  /** US dollars ready to use across wallets, savings, and free margin. */
-  readonly cash: Holding;
   /** How many tokens sit in their wallets that Auni doesn't count: anyone can send one. */
   readonly otherTokens: number;
   /** Money sent in lately, newest first, for a screen waiting on it to see land. */
@@ -82,15 +80,6 @@ export async function getPortfolio(
     looking,
     empty: total === 0n && !partial && !looking,
     holdings: body.holdings.map(toHolding),
-    cash: {
-      id: "cash",
-      name: "Cash",
-      detail: "US dollars, ready to use",
-      logoUrl: "/brand/tokens/usdc.svg",
-      value: usdc(dollarsToBaseUnits(body.cashUsd)),
-      // Cash holds its value.
-      todayChangeBaseUnits: "0",
-    },
     otherTokens: body.otherTokens,
     deposits: body.deposits,
     feesPayable: body.feesPayable,

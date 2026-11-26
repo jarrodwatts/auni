@@ -31,8 +31,8 @@ export function healthOf(findings: readonly DoctorFindingWire[]): {
       needs.length === 0
         ? "Everything's working"
         : needs.length === 1
-          ? "1 thing needs you"
-          : `${needs.length} things need you`,
+          ? "1 thing to fix"
+          : `${needs.length} things to fix`,
     needs,
   };
 }

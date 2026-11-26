@@ -1,10 +1,10 @@
-import { ASK_LINE, type AskCardWire } from "@auni/shared";
+import { ASK_LINE, askSummary, type AskCardWire } from "@auni/shared";
 
 type Line = AskCardWire["lines"][number];
 
 /** An ask as its card draws it: every word is one core recorded, only laid out. */
 export interface AskFace {
-  /** What the tap agrees to, as core's summary says it. */
+  /** What the tap agrees to, as core's summary says it, in today's words (see askSummary). */
   readonly title: string;
   /** The quiet line under the title: how a thread it changes will act. */
   readonly line: string | null;
@@ -29,7 +29,7 @@ export function askFace({
   const budget = lines.find(({ label }) => label === ASK_LINE.budget);
   const acts = lines.find(({ label }) => label === ASK_LINE.acts);
   return {
-    title: summary,
+    title: askSummary(summary),
     line: acts?.value ?? null,
     figure: budget ? { value: budget.value, label: budget.label.toLowerCase() } : null,
     details: lines.filter((line) => line !== budget && line !== acts),
@@ -42,7 +42,7 @@ const DONE_TITLES: readonly (readonly [RegExp, string])[] = [
   [/^Save a routine: /u, "Saved routine: "],
   [/^Replace your routine: /u, "Replaced your routine: "],
   [/^Turn (.+) on$/u, "Turned $1 on"],
-  [/^Let this thread /u, "This thread can now "],
+  [/^Let this (?:take|thread) /u, "This take can now "],
   [/^Let (.+?) trade /u, "$1 can now trade "],
 ];
 

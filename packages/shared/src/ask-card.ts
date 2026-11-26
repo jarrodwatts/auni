@@ -15,7 +15,7 @@ export const askCardSchema = cardBaseSchema.extend({
   kind: z.literal("ask"),
   actionReference: actionRecordIdSchema,
   ask: z.enum(ASK_TOOL_NAMES),
-  /** "Let this thread trade on its own up to $500". */
+  /** "Let this take trade on its own up to $500"; as recorded, so see askSummary. */
   summary: z.string().max(500),
   /** Everything the Allow agrees to, a routine's whole text included. */
   lines: z.array(z.object({ label: z.string().max(60), value: z.string().max(4_000) })).max(8),
@@ -43,6 +43,16 @@ export const ASK_LINE = {
   why: "Auni says",
   changes: "What it changes",
 } as const;
+
+/**
+ * An ask's summary in today's words, on every surface: an Auto card recorded while a take was
+ * still called a thread ("Let this thread trade on its own up to $500") reads "Let this take
+ * trade…". Only the words it is shown in change; what the tap allows is the row's own input
+ * and lines.
+ */
+export function askSummary(summary: string): string {
+  return summary.replace(/^Let this thread /u, "Let this take ");
+}
 
 /** What an allowed ask says once it applied, on every surface. */
 export const ASK_DONE: Readonly<Record<AskToolName, string>> = {

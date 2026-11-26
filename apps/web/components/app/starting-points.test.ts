@@ -2,7 +2,7 @@ import { LINE_WIDTH_PX, lineFits, lineWidth } from "@auni/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { requestComposerFocus } from "./composer";
-import { pickStartingPoint, WORDS_START } from "./starting-points";
+import { pickStartingPoint, seenOn, WORDS_START } from "./starting-points";
 
 vi.mock("./composer", () => ({ requestComposerFocus: vi.fn() }));
 
@@ -71,5 +71,24 @@ describe("picking a starting point", () => {
       expect(fetch).not.toHaveBeenCalled();
     }
     expect(requestComposerFocus).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("where a starting point's claim came from", () => {
+  const at = "2026-11-26T02:05:00.000Z";
+  const clock = new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  it("names the outside source and when it was read, before the owner sends it", () => {
+    const market = { app: "polymarket", label: "Will the Fed cut in December?", link: null };
+    expect(seenOn([market], at)).toBe(`Polymarket at ${clock}`);
+    const prices = { app: "prices", label: "BTC on Hyperliquid", link: null };
+    const money = { app: "auni", label: "Your money", link: "/app" };
+    expect(seenOn([prices, money, market], at)).toBe(
+      `BTC on Hyperliquid and Polymarket at ${clock}`,
+    );
+  });
+
+  it("says nothing for a point about the owner's own money", () => {
+    expect(seenOn([{ app: "auni", label: "Your cash", link: "/app" }], at)).toBeNull();
   });
 });

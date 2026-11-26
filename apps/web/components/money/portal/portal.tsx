@@ -82,17 +82,21 @@ interface PortalProps {
  */
 export function Portal({
   landed,
-  need = null,
+  need: asked = null,
   networks,
   feesPayable = null,
   watching,
 }: PortalProps) {
+  // Money for a card is one asset on one network, so the sheet is locked to it: title, code,
+  // copy and watch all agree. Anything else comes in by Add other money, the plain sheet.
+  const [other, setOther] = useState(false);
+  const need = other ? null : asked;
   // Stand-in addresses hold the places until the wallets are ready.
   const ready = networks.length > 0;
   const promised = ready ? networks : PLACEHOLDERS;
   const addresses = depositAddresses(promised);
-  const [picked, setPicked] = useState<NetworkKey>(need?.chain ?? EASIEST);
-  const network = promised.find(({ key }) => key === picked) ?? promised[0]!;
+  const [picked, setPicked] = useState<NetworkKey>(asked?.chain ?? EASIEST);
+  const network = promised.find(({ key }) => key === (need?.chain ?? picked)) ?? promised[0]!;
   const entry = addresses.find((each) => each.networks.includes(network)) ?? null;
   const clipboard = useClipboardCopy();
   const copied = entry !== null && clipboard.copiedValue === entry.address;
@@ -140,7 +144,6 @@ export function Portal({
     logo,
   }));
   const { coin } = NETWORKS[network.key];
-  const needOn = need ? NETWORKS[need.chain].name : null;
 
   return (
     <div
@@ -161,14 +164,24 @@ export function Portal({
               ? forTheCard(need, left, landed.length > 0 ? what : null)
               : "Send from an exchange or another wallet."}
           </DialogDescription>
-          <NetworkPicker
-            className="mt-5"
-            label="Network to send on"
-            networks={chips.filter(({ key }) => isCash(key))}
-            more={chips.filter(({ key }) => !isCash(key))}
-            value={network.key}
-            onChange={setPicked}
-          />
+          {need ? (
+            <button
+              type="button"
+              className="mt-3 text-meta font-medium text-primary transition-opacity hover:opacity-75 focus-ring rounded-control"
+              onClick={() => setOther(true)}
+            >
+              Add other money
+            </button>
+          ) : (
+            <NetworkPicker
+              className="mt-5"
+              label="Network to send on"
+              networks={chips.filter(({ key }) => isCash(key))}
+              more={chips.filter(({ key }) => !isCash(key))}
+              value={network.key}
+              onChange={setPicked}
+            />
+          )}
         </div>
       </div>
 
@@ -178,7 +191,7 @@ export function Portal({
         coin={newest?.symbol ?? null}
         hero={hero}
         ringed={false}
-        orbit={{ networks: promised, lit: null, arriving }}
+        orbit={{ networks: promised, lit: need ? [network] : null, arriving }}
       >
         <QrCard addresses={ready ? addresses : []} shown={entry} />
       </PortalHero>
@@ -221,11 +234,7 @@ export function Portal({
               </p>
             ) : null}
             <p className="mt-3 text-center text-meta text-muted-foreground">
-              {need && need.chain !== network.key
-                ? `Your card needs USDC on ${needOn}. Money sent on ${network.networkName} won't count toward it.`
-                : need
-                  ? `Send USDC on ${network.networkName}.`
-                  : whatToSend(network.key)}
+              {need ? `Send USDC on ${network.networkName}.` : whatToSend(network.key)}
               {/* Only where the wallet can't pay a fee yet (see feesPayable in core's fee-coin.ts). */}
               {feesPayable && !feesPayable.includes(network.key)
                 ? network.key === "solana"

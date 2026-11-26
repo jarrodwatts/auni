@@ -190,8 +190,8 @@ export function AppSheet({
                   way={money.out}
                   busy={busy}
                   icon={<ArrowUpRight aria-hidden className="size-4" strokeWidth={2.2} />}
-                  label="Take money out"
-                  onAsk={() => ask(`I want to take money out of ${name}.`)}
+                  label="Bring cash back"
+                  onAsk={() => ask(`I want to bring cash back from ${name}.`)}
                 />
               </div>
               {money.blocked ? (

@@ -85,8 +85,9 @@ The steps, in order, and what each one waits on:
 If setup exits non-zero, show the person its message, then see "When something's wrong" below.
 
 Optional extras, only if they want them, such as Telegram or a key for Elfa's news watches:
-`README.md` says how to add each. A key is theirs to paste into its app under Apps, in the web
-app, where it works at once: never ask them for it. Every other setting goes in `~/.auni/.env`
+`README.md` says how to add each. A key for an app (Elfa, Jupiter) is theirs to paste into that
+app under Apps, in the web app, where it works at once; Telegram's bot token and pairing are under
+**Settings → Your devices**. Never ask them for either. Every other setting goes in `~/.auni/.env`
 (`apps/core/.env.example` lists them all) and takes effect on the next start (`auni stop`, then
 start it as before). `auni update` checks a newer release, says what changed and that it stops
 the running Auni, and asks; show the person what it says, and run `auni update --yes` only once
@@ -128,9 +129,11 @@ words, the checks, and which folder's own `AGENTS.md` to read before editing the
 
 ## When something's wrong
 
-- **Anything at all**: start with `auni doctor`, which checks the version, the database, the
-  jobs, the service, each chain's RPC, the brain, the wallet and the web app. Act on every `fix`
-  line it prints. Where a safe repair exists (starting or restarting the service, starting it at
+- **Anything at all**: start with `auni doctor`, which checks the version, the database,
+  background work, the service, the networks, the brain, the wallet and the web app. It says
+  first whether Auni is running and the command to run next, then each problem on a line of its
+  own. `auni doctor --json` gives every check with its status: act on each one marked `fix`
+  (`--verbose` prints them all as text). Where a safe repair exists (starting or restarting the service, starting it at
   boot) it lists it: `auni doctor --dry-run` shows them, and `auni doctor --fix` runs the
   recommended ones once the person says yes. None touches keys or money.
 - **Still stuck**: follow `triage.md` beside this file, the playbook `auni triage` starts the
@@ -140,7 +143,7 @@ words, the checks, and which folder's own `AGENTS.md` to read before editing the
 - **"Auni is already running"**: another `auni` has this database, and it opened that one; it
   says how that one runs (in a terminal, in the background, as a service). `auni stop` stops it,
   whatever started it; `auni service uninstall` removes the service for good.
-- **Turns never start, or watches never fire**: `auni doctor`'s jobs line says whether the job
-  runner is running and what is late or failed.
+- **Turns never start, or watches never fire**: `auni doctor`'s Background work line (the
+  `runner` check in `--json`) says whether the job runner is running and what is late or failed.
 - **A card failed**: its message says why; nothing moved unless the card says it may have. Read the
   thread before suggesting the person try again.

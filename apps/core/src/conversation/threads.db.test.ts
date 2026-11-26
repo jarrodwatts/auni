@@ -137,7 +137,7 @@ describe("listThreads", () => {
     expect(lines).toEqual({
       [sell.id]: "Sell Yes, about $201.50 back",
       [buy.id]: "Buy $250",
-      [key.id]: "Paste your Elfa API key",
+      [key.id]: "Paste your Elfa key",
     });
   });
 

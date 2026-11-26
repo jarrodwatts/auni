@@ -29,6 +29,7 @@ import { proposalFunding } from "./funding.ts";
 import { pickDetail } from "./pick-detail.ts";
 import { legsToRetry } from "./proposal-order.ts";
 import { quoteAgain, retryAction, retryProposal, type Retried } from "./retry.ts";
+import { allFills } from "./books.ts";
 import { holdingViews } from "./holdings.ts";
 import { madeUsd, unpricedOf, walletFlows } from "./made.ts";
 import { addToken, readOtherTokens } from "./other-tokens.ts";
@@ -259,7 +260,7 @@ portfolioRouter.get("/", async (req, res) => {
   sweepSoon(req.query.deposit === "1");
   // The read first: what it finds already there begins to count as it reads (see first-look.ts).
   const portfolio = await portfolioNow();
-  const [flows, deposits, others, { timeZone }, feesNow] = await Promise.all([
+  const [flows, deposits, others, { timeZone }, feesNow, fills] = await Promise.all([
     walletFlows(),
     recentDeposits(),
     // A list that can't be read now hides the row, never the portfolio.
@@ -269,6 +270,7 @@ portfolioRouter.get("/", async (req, res) => {
     }),
     theOwner(),
     feesPayable(portfolio.holdings),
+    allFills(db),
   ]);
   res.json({
     totalUsd: portfolio.totalUsd,
@@ -283,9 +285,8 @@ portfolioRouter.get("/", async (req, res) => {
     looking: [...portfolio.looking],
     holdings: [
       ...onTheWay(portfolio.onTheWay.usdValue),
-      ...(await holdingViews(portfolio.assets.holdings, startOfDay(timeZone))),
+      ...(await holdingViews(portfolio.assets.holdings, startOfDay(timeZone), fills)),
     ],
-    cashUsd: portfolio.cash.usdValue,
     otherTokens: others.length,
     deposits: deposits.map(depositWire),
     feesPayable: feesNow,
@@ -343,6 +344,7 @@ function onTheWay(usdValue: string): HoldingWire[] {
       detail: "Arriving in a few minutes",
       logoUrl: "/brand/tokens/usdc.svg",
       usdValue,
+      priced: true,
       todayChangeUsd: null,
     },
   ];

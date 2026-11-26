@@ -7,7 +7,12 @@
 
 <p align="center">
   <b>An AI agent for your own money, running on your own computer.</b><br>
-  Tell it a take. It researches it and builds the position. Nothing moves until you tap.
+  Tell it a take. It researches it and builds the position. Nothing moves until you tap,<br>
+  unless you turn on Auto for a take, with a budget you set.
+</p>
+
+<p align="center">
+  <a href="#try-it"><b>Try it with fake money</b></a>
 </p>
 
 <p align="center">
@@ -29,21 +34,21 @@
     <td width="33%" valign="top">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screens/1-take-dark.webp">
-        <img src="docs/screens/1-take-light.webp" alt="Auni's new chat on a phone, asking: What's the take, Sam?">
+        <img src="docs/screens/1-take-light.webp" alt="A chat on a phone: the owner says the AI buildout has years to run, and Auni answers with its reasoning and a card to buy $1,800 of Nvidia and $900 of Tesla, $2,700 to put in.">
       </picture>
       <p><b>1. Say what you think.</b><br>"The AI buildout has years to run." Auni digs into it with your own AI.</p>
     </td>
     <td width="33%" valign="top">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screens/2-allowed-dark.webp">
-        <img src="docs/screens/2-allowed-light.webp" alt="The same take after the owner tapped: the card now reads Both went through, Bought Nvidia $1,800 and Bought Tesla $900.">
+        <img src="docs/screens/2-allowed-light.webp" alt="The same chat after the owner tapped: the card now reads Both went through, Bought Nvidia $1,800 and Bought Tesla $900.">
       </picture>
       <p><b>2. Tap the card.</b><br>Each move is a card with the exact amounts. It settles in place once it lands.</p>
     </td>
     <td width="33%" valign="top">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screens/3-money-dark.webp">
-        <img src="docs/screens/3-money-light.webp" alt="Auni's Money page on a phone: $19,149.95 account value, and each take with its value and change since entry.">
+        <img src="docs/screens/3-money-light.webp" alt="Money on a phone: the same take, Double down on AI, now a take worth $2,697.30 holding Nvidia and Tesla, beside the others with their change since entry.">
       </picture>
       <p><b>3. Watch it as a position.</b><br>Money shows every take, what it holds, and how it's doing.</p>
     </td>
@@ -158,7 +163,8 @@ there, or says how to add WSL first.
   computer's network. Only Auni's own tools, which run outside the box, can do anything that
   matters.
 - **Risky moves check it's you.** A first withdrawal to a new address, a raw transaction a card
-  can't vouch for, and showing your keys all ask you to confirm it's you first.
+  can't vouch for, showing your keys, and moving Auni to another computer all ask you to confirm
+  it's you first.
 - **Only you.** Auni answers only on this computer, to browsers you paired, and to a Telegram
   chat you paired. To reach it from your phone, `auni up --always-on` puts it behind your own
   Tailscale account.
@@ -189,12 +195,16 @@ there, or says how to add WSL first.
 | `auni uninstall`       | Remove Auni and keep your data and keys                             |
 
 `auni <command> --help` says more. Everything Auni keeps is in `~/.auni`, and your settings are
-in `~/.auni/.env` ([apps/core/.env.example](apps/core/.env.example) lists them all).
+in `~/.auni/.env` ([apps/core/.env.example](apps/core/.env.example) lists them all). The one
+exception is your wallet's keys, which sit in your OS keychain when there is one, so backing up
+`~/.auni` alone doesn't back them up: open **Settings › Your wallet › Show your keys** and keep
+them somewhere safe.
 
 - **Adding money.** Add money in the app shows your address and a QR code. Auni spends USDC; send
-  some MON with it on Monad for network fees, and Auni tops that up from your USDC as it runs low.
-- **Telegram.** Make a bot with Telegram's BotFather, paste its token into Telegram under Apps, and pair
-  your chat there.
+  some MON with it on Monad for network fees. When a move is short of fees, its card buys a
+  little more with your USDC first.
+- **Telegram.** Make a bot with Telegram's BotFather, paste its bot token under **Settings › Your
+  devices**, and pair your chat there.
 - **Keys for data.** Some apps do more with a key of your own, such as Elfa's market news. Paste it
   into that app under Apps; it works at once. Auni runs fine without any.
 - **Other wallets.** To use keys you already have, pick "Bring an existing wallet" before your

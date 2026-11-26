@@ -214,7 +214,7 @@ describe("a move that fails", () => {
     } as unknown as Stage;
     for await (const _ of sceneFor(heard).play(stage)) void _;
     const reply = said.join(" ");
-    expect(reply).toContain("the same buy would fail again");
+    expect(reply).toContain("The same buy would fail the same way");
     expect(reply).not.toMatch(/put it up again/u);
   });
 });

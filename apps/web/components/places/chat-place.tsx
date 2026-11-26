@@ -29,7 +29,9 @@ export const CHAT_PLACEHOLDER = "Ask Auni anything";
  * fails, just "Auto": the whole budget in its place would say nothing of it was spent.
  */
 export function autoLabel(state: ThreadState | undefined): string {
-  return state ? `Auto: ${formatUsd(state.freeBudgetUsd)} left` : "Auto";
+  return state
+    ? `Auto: ${formatUsd(state.freeBudgetUsd)} of ${formatUsd(state.budgetUsd)} left`
+    : "Auto";
 }
 
 /** A chat: the conversation down the middle, with its inspector on the right when wanted. */
@@ -104,11 +106,11 @@ function headerFigures(
     <>
       {take ? <TakeFigures take={take} /> : null}
       {auto ? (
-        <span
-          className={cn("flex items-center gap-1 text-ink tabular-nums", take && "max-sm:hidden")}
-        >
+        // On a phone beside a take's figures only its mark fits: the same control opens the
+        // details, which say what Auto has left.
+        <span className="flex items-center gap-1 text-ink tabular-nums">
           <Zap aria-hidden className="size-3.5" />
-          {autoLabel(state)}
+          <span className={cn(take && "max-sm:sr-only")}>{autoLabel(state)}</span>
         </span>
       ) : null}
       {!take && !auto && watch ? (

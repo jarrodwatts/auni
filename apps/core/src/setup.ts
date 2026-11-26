@@ -304,8 +304,8 @@ export function nextStep(f: SetupFacts): SetupAnswer {
     return at("brain", {
       next: "tell",
       say:
-        "Auni thinks with an AI CLI you're logged in to on this computer, and none is ready " +
-        `yet. Run one of these yourself, in your own terminal:\n${fixes.join("\n")}`,
+        "Auni thinks with your own AI, Claude or Codex, signed in on this computer, and neither " +
+        `is ready yet. Run one of these yourself, in your own terminal:\n${fixes.join("\n")}`,
       waitSeconds: 15,
     });
   }

@@ -74,20 +74,30 @@ vi.mock("./portfolio.ts", async (importOriginal) => ({
     ),
 }));
 
+/** Whose fills each holdingViews call was given to tell its day's move by. */
+const dayFills = vi.hoisted(() => [] as (string | null)[][]);
+
 // Names, logos and the day's move are holdings.ts's to read; here a holding is shown as it is.
 vi.mock("./holdings.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  holdingViews: (held: readonly Holding[]) =>
-    Promise.resolve(
+  holdingViews: (
+    held: readonly Holding[],
+    _today: number,
+    given: readonly { threadId: string | null }[],
+  ) => {
+    dayFills.push(given.map((fill) => fill.threadId));
+    return Promise.resolve(
       held.map((holding) => ({
         id: `${holding.chain}:${holding.instrument}`,
         name: holding.symbol,
         detail: holding.quantity,
         logoUrl: null,
         usdValue: holding.usdValue ?? "0.00",
+        priced: holding.usdValue !== null,
         todayChangeUsd: null,
       })),
-    ),
+    );
+  },
 }));
 
 const url = serve(express().use("/owner", ownerRouter).use("/takes", requireOwner, takesRouter));
@@ -95,6 +105,7 @@ const url = serve(express().use("/owner", ownerRouter).use("/takes", requireOwne
 let cookie = "";
 beforeEach(async () => {
   await wipe(ownerSessions, threads, fills, arrivals, otherTokens);
+  dayFills.length = 0;
   wallet.holdings = [nvidia, btcLong, cash];
   const { mintPairingCode } = await import("../auth/owner.ts");
   const paired = await fetch(url("/owner/pair"), {
@@ -185,6 +196,16 @@ describe("GET /takes", () => {
       expect.objectContaining({ name: "NVDAx", changeUsd: "300.00", costUsd: "1500.00" }),
       expect.objectContaining({ name: "TSLAx", changeUsd: "-100.00", costUsd: "600.00" }),
     ]);
+  });
+
+  it("tells each take's day by its own fills, and what no take holds by the owner's", async () => {
+    const ai = await insertThread({ title: "AI buildout" });
+    const btc = await insertThread({ title: "Go long bitcoin" });
+    await bought(ai.id, nvidia, "10", "1000.00");
+    await bought(btc.id, btcLong, "0.01", "600.00");
+    await bought(null, nvidia, "5", "600.00");
+    await read();
+    expect(dayFills.toSorted()).toEqual([[ai.id], [btc.id], [null]].toSorted());
   });
 
   it("caps what takes hold at what the wallet holds, the first to buy first", async () => {

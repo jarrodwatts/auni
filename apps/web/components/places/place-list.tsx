@@ -36,7 +36,7 @@ function needYou(count: number): string {
   return `${count} ${count === 1 ? "needs" : "need"} you`;
 }
 
-/** What a waiting chat asks of the person, in one line. */
+/** What a waiting chat asks of the person, in full: a sale's floor comes with its condition. */
 export function askOf({ thread }: ChatPlace): string {
   return thread.moneyLine ?? "Waiting for your answer";
 }

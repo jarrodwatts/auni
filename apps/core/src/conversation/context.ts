@@ -127,6 +127,17 @@ function positionLine(holding: Holding): string {
 }
 
 /**
+ * Cash as Money shows it, and savings a take holds named apart: the owner's buying power counts
+ * them, since they can be taken out, but they are that take's, never idle cash.
+ */
+function cashLine(portfolio: Portfolio, cashUsd: string): string {
+  const saved = usdToCents(portfolio.cash.usdValue) - usdToCents(cashUsd);
+  return saved > 0n
+    ? `${dollars(cashUsd)} cash (plus ${dollars(centsToUsd(saved))} in savings a take holds; buying power ${dollars(portfolio.cash.usdValue)})`
+    : `${dollars(cashUsd)} cash`;
+}
+
+/**
  * Everything about this thread and the owner's current portfolio/environment,
  * appended to the turn's system reminder.
  */
@@ -167,7 +178,8 @@ export async function threadContext(thread: ThreadRow): Promise<string> {
   }
 
   if (portfolio) {
-    const mine = heldByTakes(portfolio, records).threads.get(thread.id) ?? [];
+    const split = heldByTakes(portfolio, records);
+    const mine = split.threads.get(thread.id) ?? [];
     if (mine.length > 0) {
       const { changeUsd, costUsd } = takeChange(mine);
       const together =
@@ -190,7 +202,7 @@ export async function threadContext(thread: ThreadRow): Promise<string> {
         ? ` (unavailable right now: ${portfolio.unavailable.join(", ")})`
         : "";
     lines.push(
-      `Wallet portfolio: ${dollars(portfolio.totalUsd)} total, ${dollars(portfolio.cash.usdValue)} cash${holdingsSummary}${missing}.`,
+      `Wallet portfolio: ${dollars(portfolio.totalUsd)} total, ${cashLine(portfolio, split.cashUsd)}${holdingsSummary}${missing}.`,
     );
   }
 

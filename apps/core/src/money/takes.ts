@@ -7,6 +7,7 @@ import { theOwner } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
 import { allFills, gainOf, holdingsByThread, worthUsd } from "./books.ts";
+import type { DayFill } from "./day-moves.ts";
 import { holdingId, holdingViews } from "./holdings.ts";
 import { arrivalFlows } from "./made.ts";
 import { portfolioNow, type Holding, type Portfolio } from "./portfolio.ts";
@@ -14,7 +15,7 @@ import { centsToUsd, usdToCents } from "./usd.ts";
 import { startOfDay } from "./value-history.ts";
 
 /** What the takes are read from: every fill, and the money that came in from outside Auni. */
-interface TakeRecords {
+export interface TakeRecords {
   readonly fills: Parameters<typeof holdingsByThread>[1];
   readonly sentIn: Parameters<typeof holdingsByThread>[3];
 }
@@ -28,36 +29,60 @@ export async function takeRecords(): Promise<TakeRecords> {
 /** Cash that only waits to be spent: what no take holds, wherever it sits. */
 const waiting = (holding: Holding) => holding.cash && !holding.heldForOrders;
 
+/** What the portfolio comes to, as Money shows it (see heldByTakes). */
+interface MoneySplit {
+  /** What each take holds, by the fills Auni recorded in it. */
+  readonly threads: Map<string, Holding[]>;
+  /** What no take holds and isn't cash. */
+  readonly loose: Holding[];
+  /**
+   * Cash: what no take holds and only waits to be spent, wherever it sits. Savings a take
+   * bought are that take's ("Keep my idle cash earning"), never Cash.
+   */
+  readonly cash: Holding[];
+  /** What Cash comes to, in dollars. */
+  readonly cashUsd: string;
+}
+
 /**
- * What every take holds, by the fills Auni recorded in it (see holdingsByThread), and the rest:
- * each holding that isn't cash, and savings, which a take can buy ("Keep my idle cash earning"
- * puts it into savings). The thread inspector, the agent's context and GET /takes all read this,
- * so they give a take the same holdings, worth and gain.
+ * What every take holds, by the fills Auni recorded in it (see holdingsByThread), what no take
+ * holds, and Cash. Savings count as a holding a take can buy ("Keep my idle cash earning" puts
+ * it into savings); savings no take bought are Cash. Money, the thread inspector, the agent's
+ * context and its portfolio tool, new chat's starting points and Telegram's /money all read
+ * this, so a take holds the same and Cash is the same figure everywhere.
  */
 export function heldByTakes(
   portfolio: Pick<Portfolio, "assets" | "cash" | "observedAt">,
   records: TakeRecords,
-): ReturnType<typeof holdingsByThread> {
+): MoneySplit {
   const savings = portfolio.cash.holdings.filter((holding) => isSavings(holding.venue));
-  return holdingsByThread(
+  const split = holdingsByThread(
     [...portfolio.assets.holdings, ...savings],
     records.fills,
     new Date(portfolio.observedAt),
     records.sentIn,
   );
+  const cash = [
+    ...portfolio.cash.holdings.filter((holding) => !isSavings(holding.venue)),
+    ...split.loose.filter(waiting),
+  ];
+  return {
+    threads: split.threads,
+    loose: split.loose.filter((holding) => !waiting(holding)),
+    cash,
+    cashUsd: worthUsd(cash),
+  };
 }
 
 /**
  * The owner's takes: each thread that holds something now, by the fills Auni recorded in it,
  * with what it holds, what that is worth and what it has made; what no take holds; and the cash
- * no take holds, by where it is.
+ * no take holds, by where it is. `read` is the portfolio to split, when the caller has one.
  */
-export async function readTakes(): Promise<z.input<typeof takesWireSchema>> {
-  const [portfolio, records, { timeZone }] = await Promise.all([
-    portfolioNow(),
-    takeRecords(),
-    theOwner(),
-  ]);
+export async function readTakes(
+  read: Promise<Portfolio> = portfolioNow(),
+): Promise<z.input<typeof takesWireSchema>> {
+  const [portfolio, records, { timeZone }] = await Promise.all([read, takeRecords(), theOwner()]);
   const split = heldByTakes(portfolio, records);
   const ids = [...split.threads.keys()];
   const titles = new Map(
@@ -71,13 +96,14 @@ export async function readTakes(): Promise<z.input<typeof takesWireSchema>> {
         ).map(({ id, title }) => [id, title?.trim() || "Untitled take"]),
   );
   const today = startOfDay(timeZone);
+  const byThread = Map.groupBy(records.fills, (fill) => fill.threadId);
   const takes = await Promise.all(
     [...split.threads].map(async ([threadId, held]) => ({
       threadId,
       title: titles.get(threadId) ?? "Untitled take",
       valueUsd: worthUsd(held),
       ...takeChange(held),
-      holdings: await takeHoldings(held, today),
+      holdings: await takeHoldings(held, today, byThread.get(threadId) ?? []),
     })),
   );
   return {
@@ -85,21 +111,15 @@ export async function readTakes(): Promise<z.input<typeof takesWireSchema>> {
     takes: takes
       .filter((take) => take.holdings.length > 0)
       .toSorted((a, b) => Number(usdToCents(b.valueUsd) - usdToCents(a.valueUsd))),
-    loose: await holdingViews(
-      split.loose.filter((holding) => !waiting(holding)),
-      today,
-    ),
-    cash: cashPlaces([
-      ...portfolio.cash.holdings.filter((holding) => !isSavings(holding.venue)),
-      ...split.loose.filter(waiting),
-    ]),
+    loose: await holdingViews(split.loose, today, byThread.get(null) ?? []),
+    cash: cashPlaces(split.cash),
   };
 }
 
 /** A take's holdings as a person reads them, each with what it alone has made (see takeChange). */
-async function takeHoldings(held: readonly Holding[], today: number) {
+async function takeHoldings(held: readonly Holding[], today: number, fills: readonly DayFill[]) {
   const byId = new Map(held.map((holding) => [holdingId(holding), holding]));
-  return (await holdingViews(held, today)).map((view) => {
+  return (await holdingViews(held, today, fills)).map((view) => {
     const holding = byId.get(view.id)!;
     return { ...view, ...takeChange([holding]), savings: isSavings(holding.venue) };
   });

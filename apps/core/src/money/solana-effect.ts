@@ -329,7 +329,7 @@ export async function simulateSolana(
     instructions.at(-1);
   const balances = [...result.preTokenBalances, ...result.postTokenBalances];
   return {
-    effect: { out, in: into, grants: grants(result, owner) },
+    effect: { out, in: into, grants: grants(result, owner, writable) },
     fee,
     rent: rent > 0n ? rent : 0n,
     short,
@@ -426,27 +426,34 @@ function failure(simulation: Pick<Simulation, "err" | "logs">): Error {
 }
 
 /**
- * Permissions over the wallet's tokens it leaves: a delegate that can spend
- * them, someone else who can close the account (taking a wrapped SOL account's
- * SOL), and a token account that was the wallet's and is now someone else's.
+ * Permissions over the wallet's tokens it leaves, each naming the token account it reaches: a
+ * delegate that can spend them, someone else who can close the account (taking a wrapped SOL
+ * account's SOL), and a token account that was the wallet's and is now someone else's.
+ * `writable` are the addresses of the accounts the simulation returned, in order.
  */
-function grants(result: Simulation, owner: string): TokenGrant[] {
-  const left = result.accounts.flatMap((account) => {
+function grants(
+  result: Simulation & Pick<Balances, "accountKeys">,
+  owner: string,
+  writable: readonly string[],
+): TokenGrant[] {
+  const left = result.accounts.flatMap((account, at) => {
     const parsed = account && "parsed" in account.data ? account.data.parsed : undefined;
     const info = parsed?.type === "account" ? parsed.info : null;
-    if (info?.owner !== owner) return [];
-    const spend = (to: string | undefined) =>
-      to && to !== owner ? [{ kind: "spend" as const, token: info.mint, to }] : [];
+    const address = writable[at];
+    if (info?.owner !== owner || !address) return [];
+    const grant = (kind: "spend" | "close", to: string | undefined) =>
+      to && to !== owner ? [{ kind, token: info.mint, to, account: address }] : [];
     return [
-      ...spend(BigInt(info.delegatedAmount?.amount ?? 0) > 0n ? info.delegate : undefined),
-      ...spend(info.closeAuthority),
+      ...grant("spend", BigInt(info.delegatedAmount?.amount ?? 0) > 0n ? info.delegate : undefined),
+      ...grant("close", info.closeAuthority),
     ];
   });
   const after = new Map(result.postTokenBalances.map((each) => [each.accountIndex, each.owner]));
   const handed = result.preTokenBalances.flatMap(({ accountIndex, mint, owner: was }) => {
     const now = after.get(accountIndex);
-    return was === owner && now && now !== owner
-      ? [{ kind: "operator" as const, token: mint, to: now }]
+    const account = result.accountKeys[accountIndex];
+    return was === owner && now && now !== owner && account
+      ? [{ kind: "ownership" as const, token: mint, to: now, account }]
       : [];
   });
   return [...left, ...handed];

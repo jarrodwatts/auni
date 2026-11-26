@@ -160,9 +160,13 @@ describe("retryRefusal", () => {
     const order = { label: "Lets", value: "Hyperliquid close the whole position at $90" };
     expect(retryRefusal({ ...two, lines: [order], details: {} })).toBeNull();
     // One pinned exactly runs again, with the owner's proof as any power over the wallet takes.
-    const exactly = { ...shortly, grantsExactly: "spend:0x1:0x2" };
+    const exactly = { ...shortly, grantsExactly: "spend:0x1:0x2::" };
     expect(retryRefusal({ ...two, details: exactly })).toBe("needs_proof");
-    expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT })).toBe("needs_proof");
+    expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT, details: exactly })).toBe("needs_proof");
+    // Found in review: one pinned before each permission kept which token account or NFT it
+    // reaches, whatever its card's format, vouched for less than a send is now held to.
+    const fewer = { ...shortly, grantsExactly: "spend:0x1:0x2" };
+    expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT, details: fewer })).toBe("not_retryable");
     // Found in review: a format-1 card pinned no more, whether core drew its line whole or its
     // own words warned of it, so it is never tried again either.
     const one = { ...two, cardFormat: 1 };
@@ -203,7 +207,10 @@ describe("retryRefusal", () => {
     expect(retryRefusal({ ...failed, tool: "withdraw_usdc" })).toBe("needs_proof");
     expect(retryRefusal({ ...failed, details: { leavesTo: "0xabc" } })).toBe("needs_proof");
     expect(
-      retryRefusal({ ...failed, details: { needsStepUp: "lets 0xabc spend your USDC" } }),
+      retryRefusal({
+        ...failed,
+        details: { needsStepUp: "lets 0xabc spend your USDC", grantsExactly: "spend:0x1:0xabc::" },
+      }),
     ).toBe("needs_proof");
   });
 });

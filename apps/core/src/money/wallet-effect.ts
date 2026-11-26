@@ -43,11 +43,23 @@ export interface Moved {
   readonly in: readonly TokenLeg[];
 }
 
-/** A permission over the owner's tokens left to someone, on any chain. */
+/**
+ * A permission over the owner's tokens left to someone, on any chain, with every distinction a
+ * simulation sees, since its card is allowed for that one permission (see pinnedApproval):
+ * - `spend`: spend the token (an allowance, a Solana delegate), or move the one NFT `id`;
+ * - `operator`: move all of the token, whatever it is;
+ * - `ownership`: own the contract `token`, or on Solana the token `account` itself;
+ * - `close`: close the Solana token `account`, taking the SOL it holds.
+ */
 export interface TokenGrant {
-  readonly kind: "spend" | "operator" | "ownership";
+  readonly kind: "spend" | "operator" | "ownership" | "close";
+  /** The token's whole address on EVM (a contract's, for ownership), or its mint on Solana. */
   readonly token: string;
   readonly to: string;
+  /** On Solana, the one token account of the owner's it reaches. */
+  readonly account?: string;
+  /** On EVM, the one NFT an approval reaches, by its id. */
+  readonly id?: string;
 }
 
 /** What a transaction does to the owner's wallet, on any chain, as a simulation or a receipt reads it. */
@@ -229,7 +241,14 @@ function read(logs: readonly Log[], owner: Address) {
         ? encodeFunctionData({ abi: reads, functionName: "getApproved", args: [BigInt(three)] })
         : encodeFunctionData({ abi: erc20Abi, functionName: "allowance", args: [owner, to] });
       const check = { to: contract, data };
-      grants.set(`${contract}:${to}:${three}`, { kind: "spend", token: contract, to, check });
+      const id = three ? { id: BigInt(three).toString() } : {};
+      grants.set(`${contract}:${to}:${three}`, {
+        kind: "spend",
+        token: contract,
+        to,
+        ...id,
+        check,
+      });
     } else if ((selector === PERMIT2_APPROVAL || selector === PERMIT2_PERMIT) && three) {
       const [token, to] = [topicAddress(two), topicAddress(three)];
       const args = [owner, token, to] as const;
@@ -516,13 +535,16 @@ export function worth(legs: readonly TokenLeg[], names: ReadonlyMap<string, Toke
 /**
  * "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b spend your USDC": who holds the permission, by
  * their whole address, since anyone can make one that shares a short form's first and last
- * digits; and what it lets them do.
+ * digits; and what it lets them do, by its kind (see TokenGrant).
  */
 export function grantLabel(grant: TokenGrant, names: ReadonlyMap<string, TokenName>): string {
-  const to = grant.to;
-  if (grant.kind === "ownership") return `${to} own ${grant.token}`;
+  const { kind, to, account, id } = grant;
   const token = tokenLabel(grant.token, names);
-  return grant.kind === "spend" ? `${to} spend your ${token}` : `${to} move all your ${token}`;
+  if (kind === "close") return `${to} close your ${token} account`;
+  if (kind === "ownership")
+    return account ? `${to} own your ${token} account` : `${to} own ${grant.token}`;
+  if (kind === "operator") return `${to} move all your ${token}`;
+  return id ? `${to} move your ${token} #${id}` : `${to} spend your ${token}`;
 }
 
 /**

@@ -123,6 +123,13 @@ describe("the approval ladder for a raw batch", () => {
       "proof: lets 0x2222222222222222222222222222222222222222 move all your PRL",
     ],
     [
+      "approving one NFT takes the owner's proof, naming it",
+      effect([
+        log(TOKEN, "Approval(address,address,uint256)", [pad(OWNER), pad(ROUTER), pad("0x7")]),
+      ]),
+      "proof: lets 0x2222222222222222222222222222222222222222 move your PRL #7",
+    ],
+    [
       "authorizing an ERC-777 operator takes the owner's proof",
       effect([erc777(ROUTER, true)]),
       "proof: lets 0x2222222222222222222222222222222222222222 move all your PRL",

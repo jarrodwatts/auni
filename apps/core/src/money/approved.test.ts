@@ -232,6 +232,43 @@ describe("assertStillAsShown", () => {
     expect(other({ kind: "operator" })).toThrow(/now lets/u);
   });
 
+  // Found in review: it pinned a permission by its kind, token and holder alone, so one over
+  // another NFT of the same collection, or another of the owner's token accounts for the same
+  // mint, passed as the one the card showed.
+  it("refuses a permission over another NFT, or another token account, than its card showed", () => {
+    const now = simulated(5_000_000n, 100n);
+    const held = (exact: Partial<TokenGrant>) => {
+      const shown = { ...trade, grants: [spends(exact)] };
+      const vouched = { ...approved, details: { ...approved.details, ...pinnedApproval(shown) } };
+      return (fresh: Partial<TokenGrant>) => () =>
+        assertStillAsShown(vouched, { ...trade, grants: [spends(fresh)] }, now);
+    };
+    const nft = held({ id: "7" });
+    expect(nft({ id: "7" })).not.toThrow();
+    expect(nft({ id: "8" })).toThrow(/now lets/u);
+    expect(nft({ id: undefined })).toThrow(/now lets/u);
+    const account = held({ account: "6Fnf9PuEXNhbZbrmUxPirWHRQWt4VpxVbXywqM3xhFgg" });
+    expect(account({ account: "6Fnf9PuEXNhbZbrmUxPirWHRQWt4VpxVbXywqM3xhFgg" })).not.toThrow();
+    expect(account({ account: "FzbcyEZ9m8xjtergWgWDq7mfPoHEbboBF791B6cTpzbq" })).toThrow(
+      /now lets/u,
+    );
+    expect(
+      account({ account: "6Fnf9PuEXNhbZbrmUxPirWHRQWt4VpxVbXywqM3xhFgg", kind: "close" }),
+    ).toThrow(/now lets/u);
+  });
+
+  it("refuses a permission pinned by fewer parts than each is kept by now", () => {
+    const now = simulated(5_000_000n, 100n);
+    const details = {
+      ...approved.details,
+      needsStepUp: `lets ${spends().lets}`,
+      grantsExactly: `spend:${USDC}:${SPENDER}`,
+    };
+    expect(() =>
+      assertStillAsShown({ ...approved, details }, { ...trade, grants: [spends()] }, now),
+    ).toThrow(/now lets/u);
+  });
+
   it("refuses a permission a card pinned only in words, as cards were before", () => {
     const now = simulated(5_000_000n, 100n);
     const details = { ...approved.details, needsStepUp: `lets ${spends().lets}` };

@@ -48,8 +48,9 @@ export type Grant = {
   | {
       /**
        * It reaches the owner's main wallet, so it is named `exact`ly: its kind, the token's whole
-       * address or mint, and whoever holds it. That, never its words, is what its card pins and
-       * what is checked again before signing (see pinnedApproval).
+       * address or mint, whoever holds it, and the one token account or NFT it reaches. That,
+       * never its words, is what its card pins and what is checked again before signing (see
+       * pinnedApproval).
        */
       readonly reach: "wallet";
       readonly exact: TokenGrant;
@@ -97,8 +98,30 @@ function stepUpOnly(effect: Effect): string[] {
 const walletGrants = (effect: Pick<Effect, "grants">) =>
   effect.grants.flatMap((grant) => (grant.reach === "wallet" ? [grant] : []));
 
-/** Under this details key, each lasting power over the main wallet a card showed, exactly: "kind:token:holder,…". */
+/**
+ * Under this details key, each lasting power over the main wallet a card showed, exactly:
+ * "kind:token:holder:account:id,…", a part it doesn't name left empty (see TokenGrant).
+ */
 const GRANTS_EXACTLY = "grantsExactly";
+
+const pinned = ({ kind, token, to, account = "", id = "" }: TokenGrant) =>
+  [kind, token, to, account, id].join(":");
+
+/**
+ * The powers over the main wallet an action pinned exactly; null when it pinned none, or pinned
+ * them before each was kept whole (fewer parts), which says less than its card is now held to.
+ */
+function pinnedGrants(details: Record<string, string>): TokenGrant[] | null {
+  const each = details[GRANTS_EXACTLY]?.split(",").map((grant) => grant.split(":"));
+  if (!each?.every((parts) => parts.length === 5)) return null;
+  return each.map(([kind, token, to, account, id]) => ({
+    kind: kind as TokenGrant["kind"],
+    token: token!,
+    to: to!,
+    ...(account ? { account } : {}),
+    ...(id ? { id } : {}),
+  }));
+}
 
 /**
  * What an action keeps of its effect for the ladder's proof rung (see
@@ -109,9 +132,7 @@ const GRANTS_EXACTLY = "grantsExactly";
  */
 export function pinnedApproval(effect: Effect): Record<string, string> {
   const needsStepUp = stepUpOnly(effect).join("; ");
-  const grants = walletGrants(effect).map(
-    ({ exact }) => `${exact.kind}:${exact.token}:${exact.to}`,
-  );
+  const grants = walletGrants(effect).map(({ exact }) => pinned(exact));
   return {
     ...(needsStepUp ? { needsStepUp } : {}),
     ...(grants.length > 0 ? { [GRANTS_EXACTLY]: grants.join(",") } : {}),
@@ -119,31 +140,34 @@ export function pinnedApproval(effect: Effect): Record<string, string> {
   };
 }
 
-/** The same permission: its kind, its token and who holds it, each whole. */
+/** The same permission: its kind, its token, who holds it and what of it it reaches, each whole. */
 function samePermission(left: TokenGrant, right: TokenGrant): boolean {
   return (
     left.kind === right.kind &&
     sameDestination(left.token, right.token) &&
-    sameDestination(left.to, right.to)
+    sameDestination(left.to, right.to) &&
+    // A Solana account, whose base58 is exact, and an NFT's id, in decimal.
+    left.account === right.account &&
+    left.id === right.id
   );
 }
 
-/** Whether an action pinned a power over the main wallet by its words alone, not exactly. */
+/**
+ * Whether an action pinned a power over the main wallet by less than all it is: by its words
+ * alone, or before every part of it was kept (see pinnedGrants).
+ */
 export function unpinnedGrant(details: Record<string, string>): boolean {
   const words = details.needsStepUp?.split("; ").some((reason) => reason.startsWith("lets "));
-  return words === true && details[GRANTS_EXACTLY] === undefined;
+  return words === true && pinnedGrants(details) === null;
 }
 
 /**
  * The first power over the main wallet `fresh` leaves that its card didn't show, by what it is
- * exactly, never its words; null when it shows them all. A card pinned before these were kept
- * showed none of them.
+ * exactly, never its words; null when it shows them all. A card that pinned them by less than all
+ * they are (see unpinnedGrant) showed none of them.
  */
 export function unshownGrant(details: Record<string, string>, fresh: Effect): Grant | null {
-  const shown = (details[GRANTS_EXACTLY]?.split(",") ?? []).map((each) => {
-    const [kind, token, to] = each.split(":");
-    return { kind, token, to } as TokenGrant;
-  });
+  const shown = pinnedGrants(details) ?? [];
   return (
     walletGrants(fresh).find(({ exact }) => !shown.some((each) => samePermission(each, exact))) ??
     null

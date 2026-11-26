@@ -204,6 +204,12 @@ describe("executeAction", () => {
         await raw({ card: null }),
         await raw({ card: { ...FACE, warning: `It lets ${lets.value} afterwards.` } }),
         await raw({ cardFormat: 2, card: null }),
+        // Found in review: pinned before each permission kept which token account or NFT it reaches.
+        await raw({
+          cardFormat: CARD_FORMAT,
+          card: null,
+          details: { ...words, grantsExactly: "spend:0x1:0x2" },
+        }),
       ];
       for (const { id } of rows)
         expect(await executeAction(id)).toMatchObject({
@@ -218,7 +224,7 @@ describe("executeAction", () => {
       const pinned = await raw({
         cardFormat: CARD_FORMAT,
         card: null,
-        details: { ...words, grantsExactly: "spend:0x1:0x2" },
+        details: { ...words, grantsExactly: "spend:0x1:0x2::" },
       });
       expect(await executeAction(pinned.id)).toMatchObject({
         status: "failed",

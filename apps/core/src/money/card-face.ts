@@ -433,10 +433,10 @@ type OldCard = Pick<ActionRow, "lines" | "card" | "cardFormat" | "tool" | "propo
 
 /**
  * Whether a card drawn before cards said all they say now (CARD_FORMAT) left out a lasting
- * permission one of its moves leaves, so the owner allowed it unseen. Until format 3 a card named
- * a permission over the main wallet by its short words alone, which another can share, and its
- * row pinned no exact one, so any such move from an older card is taken back, whatever it showed
- * (see unpinnedGrant). A card from format 2 on said every other permission. One before format 2
+ * permission one of its moves leaves, so the owner allowed it unseen. A row that pinned a
+ * permission over the main wallet by less than all it is, as every card did until format 3 (by
+ * its short words alone, which another can share), is taken back whatever it showed (see
+ * unpinnedGrant). A card from format 2 on said every other permission. One before format 2
  * is judged by its recorded Lets line: a plan's card drew no move's Lets line, and a lone move's
  * card showed it whole only when core drew its face from its lines and the line fit (LINE_MOST,
  * where a figure was cut), or the move's own words warned of it whole, as the card drew them:
@@ -446,8 +446,9 @@ type OldCard = Pick<ActionRow, "lines" | "card" | "cardFormat" | "tool" | "propo
  */
 export function leftOutPermission(legs: readonly OldCard[]): boolean {
   return legs.some((leg) => {
-    if (leg.cardFormat >= CARD_FORMAT || isAsk(leg.tool)) return false;
+    if (isAsk(leg.tool)) return false;
     if (unpinnedGrant(leg.details)) return true;
+    if (leg.cardFormat >= CARD_FORMAT) return false;
     const lets = leg.lines.find(({ label }) => label === LETS_LINE)?.value;
     if (!lets || leg.cardFormat >= 2) return false;
     if (leg.proposalId !== null) return true;

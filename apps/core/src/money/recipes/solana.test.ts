@@ -189,6 +189,18 @@ const delegated: Partial<Scene> = {
   },
 };
 
+/** The wallet's USDC account, left with someone else able to close it. */
+const closable = {
+  owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  space: 165,
+  data: {
+    parsed: {
+      type: "account",
+      info: { mint: NETWORKS.solana.usdc, owner: OWNER, closeAuthority: POOL },
+    },
+  },
+};
+
 let scene: (lent: boolean) => Scene = () => swap();
 let landed: unknown = null;
 
@@ -374,7 +386,12 @@ describe("send_solana_transaction", () => {
           { account: POOL, mint: BONK, decimals: 5, pre: [OWNER, 0], post: [APP, 0] },
         ],
       },
-      "lets JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 move all your Bonk",
+      "lets JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 own your Bonk account",
+    ],
+    [
+      "leaves someone else able to close a token account",
+      { accounts: { [USDC_ACCOUNT]: closable } },
+      "lets GZuFT72jZWfuZk4YC6diVDWJ4LZGQNQnrUNLbsYjFo5i close your USDC account",
     ],
     [
       "changes an account an app keeps in the wallet's name",
@@ -574,6 +591,24 @@ describe("send_solana_transaction", () => {
       const shown = (): Scene => ({ ...swap(), ...delegated });
       const { sent } = await run(shown);
       expect(sent).toHaveLength(1);
+    });
+
+    // Found in review: the check before signing compared a permission's kind, mint and holder
+    // alone, and called a close authority a spend, so the same holder's power over another of the
+    // wallet's accounts for that mint, or of another kind, passed as the one the card showed.
+    it("sends none whose permission reaches another token account, or is another kind", async () => {
+      const shown = (): Scene => ({ ...swap(), ...delegated });
+      const elsewhere = (): Scene => ({
+        ...swap(),
+        accounts: { [BONK_ACCOUNT]: delegated.accounts![USDC_ACCOUNT] },
+      });
+      await expect(run(shown, elsewhere)).rejects.toThrow(
+        "This now lets GZuFT72jZWfuZk4YC6diVDWJ4LZGQNQnrUNLbsYjFo5i spend your USDC",
+      );
+      const closing = (): Scene => ({ ...swap(), accounts: { [USDC_ACCOUNT]: closable } });
+      await expect(run(shown, closing)).rejects.toThrow(
+        "This now lets GZuFT72jZWfuZk4YC6diVDWJ4LZGQNQnrUNLbsYjFo5i close your USDC account",
+      );
     });
 
     it("holds the owner's proof to every risk its card showed, sending none it didn't", async () => {

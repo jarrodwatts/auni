@@ -43,9 +43,9 @@ export const APP_ABOUTS = {
       aave_withdraw: {
         kind: "money",
         copy: [
-          "Preparing to take money out of savings",
-          "Prepared to take money out of savings",
-          "Couldn’t prepare that withdrawal",
+          "Preparing to bring your cash back",
+          "Prepared to bring your cash back",
+          "Couldn’t prepare that",
         ],
         sends: true,
       },
@@ -246,9 +246,9 @@ export const APP_ABOUTS = {
       hyperliquid_withdraw: {
         kind: "money",
         copy: [
-          "Preparing a withdrawal",
-          "Prepared a withdrawal",
-          "Couldn’t prepare that withdrawal",
+          "Preparing to bring your cash back",
+          "Prepared to bring your cash back",
+          "Couldn’t prepare that",
         ],
         sends: true,
       },

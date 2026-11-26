@@ -126,6 +126,41 @@ describe("drawCard", () => {
     ).toMatch(/Replaced by a newer card$/u);
   });
 
+  it("draws an Auto card recorded while a take was called a thread in today's words", () => {
+    const auto = leg({
+      tool: "set_thread_autonomy",
+      amountUsd: "0",
+      summary: "Let this thread trade on its own up to $4,000",
+      lines: [{ label: "Budget", value: "$4,000" }],
+    });
+    const drawn = drawCard(view([auto]), "g");
+    expect(drawn.text).toContain("Let this take trade on its own up to $4,000");
+    expect(JSON.stringify(drawn)).not.toContain("this thread");
+  });
+
+  it("names a plan's floor with its card's condition, or not at all", () => {
+    const sale = (id: string, shares: number, usd: string) =>
+      leg({
+        id,
+        tool: "polymarket_order",
+        amountUsd: "0",
+        summary: `Sell up to ${shares} shares`,
+        details: { returnsUsd: usd },
+        card: {
+          title: "Sell Yes",
+          action: `Sell up to ${shares} shares`,
+          note: `at least, if all ${shares} sell`,
+          figures: [],
+        } as unknown as ActionRow["card"],
+      });
+    const one = drawCard(view([leg(), sale("a2", 310, "191.68")]), "g").text;
+    expect(one).toContain(
+      `**${literal("2 moves, $10 to put in, at least $191.68 back if all 310 sell")}**`,
+    );
+    const two = drawCard(view([sale("a2", 310, "191.68"), sale("a3", 10, "4")]), "g").text;
+    expect(two).toContain(`**${literal("2 moves")}**`);
+  });
+
   it("shows every leg's review facts before offering one tap for both", () => {
     const sell = leg({
       id: "a2",

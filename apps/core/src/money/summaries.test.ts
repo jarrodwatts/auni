@@ -38,11 +38,22 @@ describe("money math for the portfolio and the sidebar", () => {
     expect(askLine([{ says: "Stake 60 MON", money: null }])).toBe("Stake 60 MON");
   });
 
-  it("keeps a card's floor a floor, never softening it to a quote", () => {
-    const least = (usd: string) => ({ ...back(usd), least: true as const });
+  it("keeps a card's floor a floor on its card's condition, never softening it to a quote", () => {
+    const least = (usd: string, condition = "if all 310 sell") => ({
+      ...back(usd),
+      least: condition,
+    });
     expect(askLine([{ says: "Sell up to 310 shares", money: least("191.68") }])).toBe(
-      "Sell up to 310 shares, at least $191.68 back",
+      "Sell up to 310 shares, at least $191.68 back if all 310 sell",
     );
+    expect(moneyLine([going("25"), least("191.68")])).toBe(
+      "$25 to put in, at least $191.68 back if all 310 sell",
+    );
+    // A floor that holds as it is needs no condition, alone or added up.
+    expect(moneyLine([least("50", ""), least("20", "")])).toBe("at least $70 back");
+    // Floors on conditions of their own add up to no honest figure, so it isn't said.
+    expect(askLine([leg(least("191.68")), leg(least("12", "if all 10 sell"))])).toBe("2 moves");
+    expect(moneyLine([least("191.68"), least("12")])).toBeNull();
     // A floor beside a quote adds up to a quote.
     expect(moneyLine([least("191.68"), back("10")])).toBe("about $201.68 back");
   });

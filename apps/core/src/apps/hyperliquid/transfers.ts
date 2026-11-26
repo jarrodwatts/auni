@@ -232,12 +232,12 @@ function centsOf(amountUsd: number): bigint {
 function withdrawalCents(cents: bigint, free: bigint): bigint {
   if (cents > free) {
     throw new Error(
-      `Hyperliquid has ${dollars(centsToUsd(free))} free to withdraw; open positions hold the rest as margin.`,
+      `Hyperliquid has ${dollars(centsToUsd(free))} free to bring back; open positions hold the rest as margin.`,
     );
   }
   if (cents <= centsOf(MINIMUM_WITHDRAWAL_USD)) {
     throw new Error(
-      `Hyperliquid has ${dollars(centsToUsd(free))} free to withdraw; a withdrawal has to be over $2, since Hyperliquid keeps $1 of it.`,
+      `Hyperliquid has ${dollars(centsToUsd(free))} free to bring back; bringing cash back has to be over $2, since Hyperliquid keeps $1 of it.`,
     );
   }
   return cents;

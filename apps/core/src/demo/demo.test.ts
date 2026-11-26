@@ -341,7 +341,7 @@ describe("auni demo", () => {
     await tap(tour);
     await says(tour, /Needs you/u);
     // Docked again are only those not asked yet, so the next tap is never the same question.
-    expect(await docked(tour)).toBe("Show me an Auto thread");
+    expect(await docked(tour)).toBe("Show me an Auto take");
     await tap(tour);
     await says(tour, /AI buildout/u);
     expect(await docked(tour)).toBe("How do I run it for real?");

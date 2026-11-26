@@ -273,13 +273,17 @@ async function readMoney(): Promise<string> {
   ]);
   const sum = (values: readonly { usdValue: string }[]) =>
     sumUsd(values.map(({ usdValue }) => usdValue));
-  const other = sum(money.loose);
+  // A group none of whose holdings has a price now is worth what can't be told, not $0.
+  const worth = (holdings: readonly { priced: boolean }[], usd: string) =>
+    holdings.some(({ priced }) => priced) ? dollars(usd) : "Value unavailable";
   const missing = [...new Set([...read.unavailable, ...read.looking])];
   return [
     `> Total: ${dollars(read.totalUsd)}${moneyChange(history?.points ?? [])}`,
     `> Cash: ${dollars(sum(money.cash))}`,
-    ...money.takes.map((take) => `> ${literal(take.title)}: ${dollars(take.valueUsd)}`),
-    ...(money.loose.length ? [`> Other holdings: ${dollars(other)}`] : []),
+    ...money.takes.map(
+      (take) => `> ${literal(take.title)}: ${worth(take.holdings, take.valueUsd)}`,
+    ),
+    ...(money.loose.length ? [`> Other holdings: ${worth(money.loose, sum(money.loose))}`] : []),
     ...(read.onTheWay.moves.length ? [`> On the way: ${dollars(read.onTheWay.usdValue)}`] : []),
     ...(missing.length ? [`\nStill missing balances from ${literal(missing.join(", "))}.`] : []),
   ].join("\n");

@@ -78,7 +78,7 @@ export async function readFacts(): Promise<Fact[]> {
       .limit(ACTIVE_THREADS_TOLD),
     theOwner(),
   ]);
-  const held = await heldNow(portfolio);
+  const held = await heldNow(portfolio, records);
   const seen: OwnerSeen = {
     holdings: held.map(({ holding, name, image }) => ({
       symbol: holding.symbol,
@@ -192,7 +192,7 @@ interface Held {
  * Their largest holdings besides cash and the coin their fees are paid in, which is no holding
  * to talk about selling (see paysFees), each with its name and its move today.
  */
-async function heldNow(portfolio: Portfolio | null): Promise<Held[]> {
+async function heldNow(portfolio: Portfolio | null, records: TakeRecords): Promise<Held[]> {
   const candidates = (portfolio?.holdings ?? []).filter(
     (holding) => !holding.cash && usdToCents(holding.usdValue ?? "0") > 0n,
   );
@@ -206,7 +206,7 @@ async function heldNow(portfolio: Portfolio | null): Promise<Held[]> {
   const [faces, moves] = await Promise.all([
     // Names and logos are a nicety: a slow stock catalog leaves each its symbol.
     within(holdingFaces(holdings), FACT_WAIT_MS).catch(() => null),
-    dayMoves(holdings, startOfDay(timeZone)),
+    dayMoves(holdings, startOfDay(timeZone), records.fills),
   ]);
   return holdings.map((holding, index) => ({
     holding,

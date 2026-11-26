@@ -112,7 +112,7 @@ describe("hyperliquidWithdraw", () => {
     mode = "default";
     spot = { total: "10.795", hold: "0" };
     await expect(withdraw("10.80", 10.8)).rejects.toThrow(
-      "Hyperliquid has $10.79 free to withdraw; open positions hold the rest as margin.",
+      "Hyperliquid has $10.79 free to bring back; open positions hold the rest as margin.",
     );
     expect(sendUserSigned).not.toHaveBeenCalled();
   });
@@ -120,7 +120,7 @@ describe("hyperliquidWithdraw", () => {
   it("refuses withdrawing all when the fee would leave a dollar or less", async () => {
     spot = { total: "1.50", hold: "0" };
     await expect(hyperliquidWithdraw.describe({}, {})).rejects.toThrow(
-      "a withdrawal has to be over $2",
+      "bringing cash back has to be over $2",
     );
   });
 });

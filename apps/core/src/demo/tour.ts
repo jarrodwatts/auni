@@ -207,7 +207,7 @@ const AFTER: readonly { readonly reply: string; readonly says: string }[] = [
     says: "Every card still waiting for your tap is under **Needs you**. Open one, read it, and allow or decline it. Either way, you'll see what a real one does.",
   },
   {
-    reply: "Show me an Auto thread",
+    reply: "Show me an Auto take",
     says: "Open **AI buildout** in the sidebar. It is set to act on its own within a $4,000 budget, with its positions, notes and what's left of that budget in its details.",
   },
   {

@@ -456,7 +456,7 @@ describe("pairing", () => {
       quantity: "40",
       usdValue: "40.00",
     };
-    vi.mocked(portfolioNow).mockResolvedValue({
+    const read = {
       totalUsd: "295.00",
       observedAt: new Date().toISOString(),
       unavailable: [],
@@ -468,7 +468,8 @@ describe("pairing", () => {
         moves: [{ actionId: crypto.randomUUID(), lands: "Base", usdValue: "10.00" }],
       },
       holdings: [position, loose, usdc, aave],
-    });
+    };
+    vi.mocked(portfolioNow).mockResolvedValue(read);
     await db.update(threads).set({ title: "ETH take" }).where(eq(threads.id, thread.id));
     const other = await insertThread({ title: "Other ETH take" });
     const now = Date.now();
@@ -516,6 +517,23 @@ describe("pairing", () => {
     expect(fake.sent("sendMessage")[0]?.reply_markup).toBeUndefined();
     expect(portfolioNow).toHaveBeenCalledTimes(1);
     expect(await queued("turn")).toEqual([]);
+
+    // Holdings with no price now are worth what can't be told, never $0.
+    const unpriced = [position, loose].map((holding) => ({ ...holding, usdValue: null }));
+    vi.mocked(portfolioNow).mockResolvedValue({
+      ...read,
+      assets: { usdValue: "0.00", holdings: unpriced },
+      holdings: [...unpriced, usdc, aave],
+    });
+    fake.calls.length = 0;
+    fake.message({ from: OWNER }, "/money");
+    await fake.handled();
+    const text = fake.sent("sendMessage")[0]?.text;
+    expect(text).toContain("ETH take: Value unavailable\n");
+    expect(text).toContain("Other ETH take: Value unavailable\n");
+    expect(text).toContain("Keep my idle cash earning: $40\n");
+    expect(text).toContain("Other holdings: Value unavailable\n");
+    vi.mocked(portfolioNow).mockResolvedValue(read);
 
     const saved = { WEB_ORIGIN: env.WEB_ORIGIN, TAILSCALE_OWNER: env.TAILSCALE_OWNER };
     try {

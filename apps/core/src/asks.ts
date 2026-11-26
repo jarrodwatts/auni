@@ -84,8 +84,8 @@ const setThreadAutonomy = defineAsk({
       .from(threads)
       .where(eq(threads.id, input.thread_id))
       .for("update");
-    if (!current) return "That thread is gone.";
-    if (current.archivedAt) return "That thread was archived before you allowed this.";
+    if (!current) return "That chat is gone.";
+    if (current.archivedAt) return "That chat was archived before you allowed this.";
     await tx
       .update(threads)
       .set({ actMode: input.act_mode, budgetUsd: input.budget_usd })

@@ -12,8 +12,14 @@ export const holdingWireSchema = z.object({
   detail: z.string(),
   /** A web-served path or a reviewed https logo; null shows the name's initial. */
   logoUrl: z.string().nullable(),
+  /** "0.00" when it has no price now, which `priced` tells apart from being worth nothing. */
   usdValue: dollarsSchema,
-  /** Since the person's midnight, at today's quantity; null when no price history was readable. */
+  /** Whether it has a price now, so a screen can say its value is unavailable rather than $0. */
+  priced: z.boolean(),
+  /**
+   * Since the person's midnight, or since it was bought when that was later; null when no
+   * price history was readable.
+   */
   todayChangeUsd: dollarsSchema.nullable(),
 });
 export type HoldingWire = z.infer<typeof holdingWireSchema>;

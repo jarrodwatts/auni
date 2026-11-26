@@ -7,6 +7,7 @@ import { theOwner } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
 import { allFills, gainOf, holdingsByThread, worthUsd } from "./books.ts";
+import type { DayFill } from "./day-moves.ts";
 import { holdingId, holdingViews } from "./holdings.ts";
 import { arrivalFlows } from "./made.ts";
 import { portfolioNow, type Holding, type Portfolio } from "./portfolio.ts";
@@ -95,13 +96,14 @@ export async function readTakes(
         ).map(({ id, title }) => [id, title?.trim() || "Untitled take"]),
   );
   const today = startOfDay(timeZone);
+  const byThread = Map.groupBy(records.fills, (fill) => fill.threadId);
   const takes = await Promise.all(
     [...split.threads].map(async ([threadId, held]) => ({
       threadId,
       title: titles.get(threadId) ?? "Untitled take",
       valueUsd: worthUsd(held),
       ...takeChange(held),
-      holdings: await takeHoldings(held, today),
+      holdings: await takeHoldings(held, today, byThread.get(threadId) ?? []),
     })),
   );
   return {
@@ -109,15 +111,15 @@ export async function readTakes(
     takes: takes
       .filter((take) => take.holdings.length > 0)
       .toSorted((a, b) => Number(usdToCents(b.valueUsd) - usdToCents(a.valueUsd))),
-    loose: await holdingViews(split.loose, today),
+    loose: await holdingViews(split.loose, today, byThread.get(null) ?? []),
     cash: cashPlaces(split.cash),
   };
 }
 
 /** A take's holdings as a person reads them, each with what it alone has made (see takeChange). */
-async function takeHoldings(held: readonly Holding[], today: number) {
+async function takeHoldings(held: readonly Holding[], today: number, fills: readonly DayFill[]) {
   const byId = new Map(held.map((holding) => [holdingId(holding), holding]));
-  return (await holdingViews(held, today)).map((view) => {
+  return (await holdingViews(held, today, fills)).map((view) => {
     const holding = byId.get(view.id)!;
     return { ...view, ...takeChange([holding]), savings: isSavings(holding.venue) };
   });

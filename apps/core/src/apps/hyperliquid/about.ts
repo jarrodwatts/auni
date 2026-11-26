@@ -59,7 +59,11 @@ export default {
     },
     hyperliquid_withdraw: {
       kind: "money",
-      copy: ["Preparing a withdrawal", "Prepared a withdrawal", "Couldn’t prepare that withdrawal"],
+      copy: [
+        "Preparing to bring your cash back",
+        "Prepared to bring your cash back",
+        "Couldn’t prepare that",
+      ],
       sends: true,
     },
     hyperliquid_markets: {

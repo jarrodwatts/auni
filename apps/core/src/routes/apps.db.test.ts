@@ -1,5 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
@@ -8,16 +8,10 @@ import { eq } from "drizzle-orm";
 import express from "express";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { toolsFor } from "../agent/mcp.ts";
 import { db } from "../db/client.ts";
-import {
-  actions,
-  appTroubles,
-  arrivalCursors,
-  fills,
-  jobs,
-  threads,
-} from "../db/schema.ts";
+import { actions, appTroubles, arrivalCursors, fills, jobs, threads } from "../db/schema.ts";
 import { actionKind } from "../jobs/kinds.ts";
 import { decideActions, executeAction } from "../money/actions.ts";
 import { readPortfolio } from "../money/portfolio.ts";
@@ -130,7 +124,7 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 beforeEach(async () => {
-  home = mkdtempSync(join(tmpdir(), "auni-apps-"));
+  home = tempDir("auni-apps-");
   process.env.AUNI_HOME = home;
   delete process.env.APPS_OFF;
   // Each test reads the portfolio afresh, not the reading the one before it shared.
@@ -138,7 +132,6 @@ beforeEach(async () => {
   await wipe(actions, fills, threads, arrivalCursors, jobs, appTroubles);
 });
 afterEach(() => {
-  rmSync(home, { recursive: true, force: true });
   process.env.AUNI_HOME = real;
   delete process.env.APPS_OFF;
   delete process.env.ELFA_AUTO_API_KEY;

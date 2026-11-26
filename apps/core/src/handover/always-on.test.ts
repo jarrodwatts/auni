@@ -1,9 +1,9 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import type { UpReport } from "../always-on.ts";
 import { setUpAlwaysOn } from "./always-on.ts";
 
@@ -15,7 +15,7 @@ vi.mock("../release/layout.ts", async (importOriginal) => ({
 }));
 
 function upPrints(report: UpReport): string {
-  const folder = mkdtempSync(join(tmpdir(), "auni-up-"));
+  const folder = tempDir("auni-up-");
   const args = join(folder, "args.json");
   standIn.script = join(folder, "up.mjs");
   writeFileSync(
@@ -78,7 +78,7 @@ describe("always-on setup at the end of a takeover", () => {
   });
 
   it("says so when setup stops before its report", async () => {
-    standIn.script = join(mkdtempSync(join(tmpdir(), "auni-up-")), "up.mjs");
+    standIn.script = join(tempDir("auni-up-"), "up.mjs");
     writeFileSync(standIn.script, "process.exit(3);");
     const said: string[] = [];
     expect(await setUpAlwaysOn({}, AT, (text) => said.push(text))).toBe(false);

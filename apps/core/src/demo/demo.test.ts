@@ -1,16 +1,8 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { tmpdir, userInfo } from "node:os";
+import { userInfo } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
@@ -18,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { CARD_FORMAT, type StartingPoint } from "@auni/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { sceneFor } from "./scenes.ts";
 import { demoPairCode } from "./test-pair.ts";
 
@@ -26,7 +19,7 @@ import { demoPairCode } from "./test-pair.ts";
 // scene of their past through core without one refusal, and touch none of what was named.
 
 const AUNI = fileURLToPath(new URL("../../bin/auni.mjs", import.meta.url));
-const scratch = mkdtempSync(join(tmpdir(), "auni-demo-test-"));
+const scratch = tempDir("auni-demo-test-", afterAll);
 
 function freePort(): Promise<number> {
   return new Promise((resolve) => {
@@ -37,8 +30,6 @@ function freePort(): Promise<number> {
     });
   });
 }
-
-afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 describe("auni demo", () => {
   const theirs = join(scratch, "their-auni");
@@ -80,7 +71,7 @@ describe("auni demo", () => {
   }, 180_000);
 
   afterAll(async () => {
-    if (demo.exitCode !== null) return;
+    if (!demo || demo.exitCode !== null || demo.signalCode !== null) return;
     demo.kill("SIGTERM");
     await new Promise((exited) => demo.once("exit", exited));
   });

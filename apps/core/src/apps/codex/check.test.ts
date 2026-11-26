@@ -1,9 +1,9 @@
-import { chmodSync, mkdirSync, mkdtempSync, renameSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import { check } from "./check.ts";
 
 /**
@@ -11,7 +11,7 @@ import { check } from "./check.ts";
  * (codex-cli 0.164.0): `account` is account/read's account, `authMethod` getAuthStatus's.
  */
 function codexThatSays(said: { account: unknown; authMethod: string | null }): string {
-  const dir = mkdtempSync(join(tmpdir(), "auni-codex-"));
+  const dir = tempDir("auni-codex-");
   const answers = {
     initialize: { userAgent: "codex" },
     "account/read": { account: said.account, requiresOpenaiAuth: true },
@@ -68,7 +68,7 @@ describe.runIf(process.platform !== "win32")("the Codex check", () => {
 
   it("finds the Codex Auni installed in its tools folder, when the PATH has none", async () => {
     const [dir, node] = codexThatSays({ account: null, authMethod: null }).split(delimiter);
-    process.env.AUNI_HOME = join(mkdtempSync(join(tmpdir(), "auni-home-")), ".auni");
+    process.env.AUNI_HOME = join(tempDir("auni-home-"), ".auni");
     process.env.PATH = node!;
     expect(await run()).toMatchObject({
       why: "not-installed",

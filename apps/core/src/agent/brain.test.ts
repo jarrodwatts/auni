@@ -1,10 +1,9 @@
-import { mkdtempSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir } from "node:os";
 
 import type { AppAbout } from "@auni/shared";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { dataDir, settingsFile } from "../data-dir.ts";
 import { env } from "../env.ts";
 import type { Brain, BrainCheck, BrainEvent, BrainTurn } from "../apps/contract.ts";
@@ -18,7 +17,7 @@ vi.mock("node:os", async (actual) => ({
 const registered: { about: AppAbout; brain: Brain }[] = [];
 vi.mock("../apps/registry.ts", () => ({ brains: () => registered }));
 /** Where Postgres says it keeps its files: a folder of the owner's, outside home (embedded, Homebrew). */
-const databaseFolder = mkdtempSync(join(tmpdir(), "auni-pg-data-"));
+const databaseFolder = tempDir("auni-pg-data-", afterAll);
 let databaseSays: string | null = databaseFolder;
 vi.mock("../db/client.ts", () => ({ databaseFiles: () => Promise.resolve(databaseSays) }));
 

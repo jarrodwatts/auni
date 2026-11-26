@@ -1,11 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { eq } from "drizzle-orm";
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { declinedOffers } from "../connect.ts";
 import { db } from "../db/client.ts";
 import { actions, jobs, messages, threads } from "../db/schema.ts";
@@ -36,7 +36,7 @@ let home: string;
 const realHome = process.env.AUNI_HOME;
 let logged = "";
 beforeEach(async () => {
-  home = mkdtempSync(join(tmpdir(), "auni-secret-"));
+  home = tempDir("auni-secret-");
   process.env.AUNI_HOME = home;
   delete process.env.ELFA_AUTO_API_KEY;
   await wipe(threads, actions, jobs, messages);
@@ -55,7 +55,6 @@ beforeEach(async () => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
-  rmSync(home, { recursive: true, force: true });
   process.env.AUNI_HOME = realHome;
   delete process.env.ELFA_AUTO_API_KEY;
   expect(logged).not.toContain(API_KEY);

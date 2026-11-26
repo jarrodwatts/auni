@@ -1,11 +1,11 @@
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { getBase58Encoder } from "@solana/kit";
 import { privateKeyToAddress } from "viem/accounts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import {
   addressesOf,
   generateKeys,
@@ -38,7 +38,7 @@ vi.mock("@napi-rs/keyring", () => ({
   },
 }));
 
-const scratch = () => mkdtemp(join(tmpdir(), "auni-keys-"));
+const scratch = () => tempDir("auni-keys-");
 const KEYS = {
   evm: "0x4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318",
   solana: null,
@@ -79,7 +79,7 @@ const none = (): KeychainEntry => {
 
 describe("keyStore", () => {
   it("keeps keys in a file only this user can read when no keychain answers", async () => {
-    const dir = join(await scratch(), "data");
+    const dir = join(scratch(), "data");
     const store = keyStore(dir, none);
     expect(await store.read()).toBeNull();
 
@@ -91,7 +91,7 @@ describe("keyStore", () => {
   });
 
   it("keeps keys in a keychain that answers, and reads them there however the file is moved", async () => {
-    const dir = await scratch();
+    const dir = scratch();
     const entry = keychain();
     const store = keyStore(dir, () => entry);
 
@@ -104,7 +104,7 @@ describe("keyStore", () => {
 
   // Over ssh, say, the keychain may be out of reach: that's no reason to make a second wallet.
   it("never flips: keys in the keychain stay there while it can't be read", async () => {
-    const dir = await scratch();
+    const dir = scratch();
     const entry = keychain();
     await keyStore(dir, () => entry).write(KEYS);
 
@@ -112,7 +112,7 @@ describe("keyStore", () => {
   });
 
   it("never flips: keys in the file stay there once a keychain answers", async () => {
-    const dir = await scratch();
+    const dir = scratch();
     await keyStore(dir, none).write(KEYS);
     const entry = keychain();
 
@@ -123,7 +123,7 @@ describe("keyStore", () => {
   it("finds keys a keychain kept after the file that pointed there was lost", async () => {
     const entry = keychain();
     entry.held = JSON.stringify(KEYS);
-    const dir = await scratch();
+    const dir = scratch();
 
     expect(await keyStore(dir, () => entry).read()).toEqual(KEYS);
     expect(
@@ -138,10 +138,10 @@ describe("keyStore", () => {
   // A dev checkout and the real install on one machine must not sign with, or replace, one wallet.
   it("keeps each data folder's keys apart in one keychain", async () => {
     const machine = keychainOfEntries();
-    const first = keyStore(await scratch(), machine);
+    const first = keyStore(scratch(), machine);
     await first.write(KEYS);
 
-    const second = keyStore(await scratch(), machine);
+    const second = keyStore(scratch(), machine);
     expect(await second.read()).toBeNull();
     const other = { evm: null, solana: "x" };
     await second.write(other);
@@ -152,7 +152,7 @@ describe("keyStore", () => {
   it("reads keys from the keychain entry its file names", async () => {
     const machine = keychainOfEntries();
     machine("wallet-keys").held = JSON.stringify(KEYS);
-    const dir = await scratch();
+    const dir = scratch();
     await writeFile(
       join(dir, "wallet-keys.json"),
       JSON.stringify({ keychain: "auni/wallet-keys" }),
@@ -162,7 +162,7 @@ describe("keyStore", () => {
   });
 
   it("never writes over keys already there", async () => {
-    const dir = await scratch();
+    const dir = scratch();
     const store = keyStore(dir, none);
     await store.write(KEYS);
     await expect(store.write({ evm: null, solana: "x" })).rejects.toMatchObject({
@@ -174,7 +174,7 @@ describe("keyStore", () => {
   // A wallet brought with its EVM key alone gains a Solana key beside it, in Settings.
   it("adds a key beside the ones kept, in the file or the keychain, never replacing one", async () => {
     const both = { ...KEYS, solana: (await generateKeys()).solana };
-    const dir = await scratch();
+    const dir = scratch();
     const store = keyStore(dir, none);
     await store.write(KEYS);
     await store.add(both);
@@ -188,18 +188,18 @@ describe("keyStore", () => {
     );
     expect(await store.read()).toEqual(both);
 
-    const inKeychain = keyStore(await scratch(), keychainOfEntries());
+    const inKeychain = keyStore(scratch(), keychainOfEntries());
     await inKeychain.write(KEYS);
     await inKeychain.add(both);
     expect(await inKeychain.read()).toEqual(both);
 
-    await expect(keyStore(await scratch(), none).add(both)).rejects.toThrow(
+    await expect(keyStore(scratch(), none).add(both)).rejects.toThrow(
       "There are no wallet keys here to add to.",
     );
   });
 
   it("says where the keys are without them, in the file or the keychain", async () => {
-    const inFile = await scratch();
+    const inFile = scratch();
     expect(await keyStore(inFile, none).where()).toBeNull();
     await keyStore(inFile, none).write(KEYS);
     expect(await keyStore(inFile, none).where()).toEqual({
@@ -207,7 +207,7 @@ describe("keyStore", () => {
       inDataFolder: true,
     });
 
-    const inKeychain = await scratch();
+    const inKeychain = scratch();
     const entry = keychain();
     await keyStore(inKeychain, () => entry).write(KEYS);
     const where = await keyStore(inKeychain, none).where();
@@ -220,7 +220,7 @@ describe("keyStore", () => {
 
   it("removes the keys for good: the keychain's entry, then the file", async () => {
     const machine = keychainOfEntries();
-    const dir = await scratch();
+    const dir = scratch();
     const store = keyStore(dir, machine);
     await store.write(KEYS);
 
@@ -230,7 +230,7 @@ describe("keyStore", () => {
     expect(await store.where()).toBeNull();
     expect(await store.read()).toBeNull();
 
-    const inFile = keyStore(await scratch(), none);
+    const inFile = keyStore(scratch(), none);
     await inFile.write(KEYS);
     await inFile.remove();
     expect(await inFile.read()).toBeNull();
@@ -242,7 +242,7 @@ describe("keyStore", () => {
       ...keychain(),
       deletePassword: () => Promise.reject(new Error("The keychain is locked.")),
     };
-    const dir = await scratch();
+    const dir = scratch();
     await keyStore(dir, () => entry).write(KEYS);
 
     await expect(keyStore(dir, () => entry).remove()).rejects.toThrow(/locked/u);
@@ -251,7 +251,7 @@ describe("keyStore", () => {
 
   // An add cut off before its rename leaves the keys beside the file, too.
   it("removes the keys an add left half written", async () => {
-    const dir = await scratch();
+    const dir = scratch();
     await keyStore(dir, none).write(KEYS);
     await writeFile(join(dir, "wallet-keys.json.new"), JSON.stringify(KEYS));
 
@@ -261,7 +261,7 @@ describe("keyStore", () => {
   });
 
   it("says stored keys are unreadable without quoting them", async () => {
-    const dir = await scratch();
+    const dir = scratch();
     await writeFile(join(dir, "wallet-keys.json"), `{"evm": "${KEYS.evm.slice(0, 40)}`);
     const thrown = await keyStore(dir, none)
       .read()
@@ -280,7 +280,7 @@ describe("machineKeyStore", () => {
 
   // A test's, a demo's or a throwaway's: a keychain entry would outlive its folder.
   it("keeps a second Auni's keys in its own folder, never reaching the keychain", async () => {
-    process.env.AUNI_HOME = await scratch();
+    process.env.AUNI_HOME = scratch();
     const store = machineKeyStore();
     expect(await store.read()).toBeNull();
 
@@ -295,7 +295,7 @@ describe("machineKeyStore", () => {
 
   // Left to itself the library falls back to the kernel's keyring, which a reboot clears.
   it("keeps the owner's own keys, in ~/.auni, in the OS keychain: on Linux the Secret Service's alone", async () => {
-    process.env.HOME = await scratch();
+    process.env.HOME = scratch();
     delete process.env.AUNI_HOME;
     const own = join(process.env.HOME, ".auni");
 

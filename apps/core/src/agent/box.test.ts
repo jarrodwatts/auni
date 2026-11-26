@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { dataDir } from "../data-dir.ts";
 import { theBox } from "./box.ts";
 
@@ -15,7 +15,7 @@ afterEach(() => {
 
 /** Runs as an install does: its Node is the private one in the data folder. */
 function installed(): string {
-  vi.stubEnv("AUNI_HOME", mkdtempSync(join(tmpdir(), "auni-box-")));
+  vi.stubEnv("AUNI_HOME", join(tempDir("auni-box-"), "data"));
   const node = join(dataDir(), "app/node/24.22.2/bin/node");
   mkdirSync(dirname(node), { recursive: true });
   Object.defineProperty(process, "execPath", { value: node });

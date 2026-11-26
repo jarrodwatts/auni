@@ -1,9 +1,9 @@
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import { toolsDir } from "../../data-dir.ts";
 import { terminal } from "./terminal.ts";
 
@@ -11,7 +11,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("Codex in the owner's terminal", () => {
   it("starts their codex on the prompt, in a read-only sandbox that can't read what triage hides", () => {
-    const root = mkdtempSync(join(tmpdir(), "auni-codex-"));
+    const root = tempDir("auni-codex-");
     mkdirSync(join(root, "bin"));
     writeFileSync(join(root, "bin/codex"), "#!/bin/sh\n");
     chmodSync(join(root, "bin/codex"), 0o755);
@@ -32,8 +32,8 @@ describe("Codex in the owner's terminal", () => {
   });
 
   it("starts the codex Auni installed in its tools folder, off the owner's PATH", () => {
-    vi.stubEnv("PATH", mkdtempSync(join(tmpdir(), "auni-path-")));
-    vi.stubEnv("AUNI_HOME", join(mkdtempSync(join(tmpdir(), "auni-home-")), "data"));
+    vi.stubEnv("PATH", tempDir("auni-path-"));
+    vi.stubEnv("AUNI_HOME", join(tempDir("auni-home-"), "data"));
     expect(terminal("Read the playbook", [])).toBeNull();
     mkdirSync(join(toolsDir(), "bin"), { recursive: true });
     writeFileSync(join(toolsDir(), "bin/codex"), "#!/bin/sh\n");

@@ -1,11 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { AskToolName } from "@auni/shared";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { tempDir } from "./test/temp-dir.ts";
 import { toolsFor } from "./agent/mcp.ts";
 import { systemPrompt } from "./agent/prompt.ts";
 import { routinesDir } from "./agent/routines.ts";
@@ -28,14 +28,13 @@ const realHome = process.env.AUNI_HOME;
 const SETTINGS = ["APPS_OFF", "ELFA_AUTO_API_KEY"];
 
 beforeEach(async () => {
-  home = mkdtempSync(join(tmpdir(), "auni-asks-"));
+  home = tempDir("auni-asks-");
   process.env.AUNI_HOME = home;
   for (const name of SETTINGS) delete process.env[name];
   rmSync(routinesDir(), { recursive: true, force: true });
   await wipe(threads, actions, jobs);
 });
 afterEach(() => {
-  rmSync(home, { recursive: true, force: true });
   process.env.AUNI_HOME = realHome;
   for (const name of SETTINGS) delete process.env[name];
 });

@@ -1,16 +1,13 @@
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, vi } from "vitest";
+import { afterAll, afterEach, vi } from "vitest";
 
-// No test may touch the owner's real wallet keys. Each worker gets a scratch data folder of its
-// own, never ~/.auni, set here inside the worker so files running at once never share one (two
-// saving the same routine would overwrite each other's file). A child a test spawns inherits it,
-// and a data folder other than ~/.auni keeps its keys in its own file (machineKeyStore).
-process.env.AUNI_HOME = join(
-  tmpdir(),
-  `auni-test-${process.pid}-${process.env.VITEST_POOL_ID ?? "0"}`,
-);
+import { tempDir } from "./temp-dir.ts";
+
+// Each file gets its own home, so tests and children spawned by them never reach ~/.auni.
+// Auni creates work and tools folders beside its home. Keep all three inside the scratch folder.
+// The Tailscale tests bind a Unix socket here, so keep both names short.
+process.env.AUNI_HOME = join(tempDir("", afterAll), "h");
 
 // The OS keychain outlives every test, so reaching it fails the test that did, even where the
 // keys would have gone to a file once it refused (as every caller of a keychain that isn't

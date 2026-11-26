@@ -1,9 +1,9 @@
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import { claudeCli } from "./cli.ts";
 import { terminal } from "./terminal.ts";
 
@@ -11,7 +11,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 /** A PATH holding only `command`, as an owner's with it installed would. */
 function pathWith(command: string | null): void {
-  const bin = mkdtempSync(join(tmpdir(), "auni-path-"));
+  const bin = tempDir("auni-path-");
   if (command) {
     writeFileSync(join(bin, command), "#!/bin/sh\n");
     chmodSync(join(bin, command), 0o755);

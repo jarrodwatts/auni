@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 
 import { brainSeen, onBrainReady, proveLogins, terminalBrainLine } from "./agent/brain.ts";
 import { lastPaired, mintPairingCode, pairingLink, theOwner } from "./auth/owner.ts";
+import { ctrlCHandler } from "./ctrl-c.ts";
 import { closeDatabaseConnection } from "./db/client.ts";
 import { postgresLog, type Postgres } from "./db/embedded.ts";
 import { migrateDatabase } from "./db/migrations.ts";
@@ -232,25 +233,17 @@ export async function start(
 /**
  * Calls `stop` each time Auni is asked to stop. SIGTERM (`auni stop`, a service's stop) stops
  * gently however often it comes, so asking again never cuts a send short; a second Ctrl-C stops
- * at once. A Ctrl-C reaches every process in the terminal's group, and pnpm also passes it on,
- * so one press can arrive twice: only one a second or more later is a second press. Closing the
- * terminal window hangs up on Auni (SIGHUP), which Node would otherwise die of at once, leaving
- * its Postgres running, since pg_ctl started that in a session of its own: it stops gently too,
- * with nowhere left to print, so a write to the closed terminal can't kill it on the way.
+ * at once. Closing the terminal window hangs up on Auni (SIGHUP), which Node would otherwise
+ * die of at once, leaving its Postgres running in a session of its own. Auni stops gently
+ * instead, with nowhere left to print, so a write to the closed terminal can't kill it on the way.
  */
 export function onStopAsked(stop: () => void, signals: NodeJS.EventEmitter = process): void {
-  let firstInterrupt = 0;
   signals.on("SIGTERM", stop);
   signals.on("SIGHUP", () => {
     for (const out of [process.stdout, process.stderr]) out.on("error", () => {});
     stop();
   });
-  signals.on("SIGINT", () => {
-    if (!firstInterrupt) {
-      firstInterrupt = Date.now();
-      stop();
-    } else if (Date.now() - firstInterrupt > 1_000) process.exit(130);
-  });
+  signals.on("SIGINT", ctrlCHandler(stop));
 }
 
 /** Whether an Auni serves this machine's API port: one that is stopping has closed it. */

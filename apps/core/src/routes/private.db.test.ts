@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import express from "express";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { toolsFor } from "../agent/mcp.ts";
 import type { ThreadRow } from "../db/schema.ts";
 import { PrivateFieldRefused, type PrivateField } from "../private-fields.ts";
@@ -249,7 +249,7 @@ describe("an app's secret setting", () => {
   let elfaSays: () => Response | Promise<Response> = ELFA.took;
   const asked: string[] = [];
   beforeEach(() => {
-    home = mkdtempSync(join(tmpdir(), "auni-private-"));
+    home = tempDir("auni-private-");
     process.env.AUNI_HOME = home;
     writeFileSync(join(home, ".env"), BY_HAND);
     elfaSays = ELFA.took;
@@ -263,7 +263,6 @@ describe("an app's secret setting", () => {
     });
   });
   afterEach(() => {
-    rmSync(home, { recursive: true, force: true });
     process.env.AUNI_HOME = real;
     delete process.env.ELFA_AUTO_API_KEY;
   });

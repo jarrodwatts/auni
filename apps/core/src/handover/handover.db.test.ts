@@ -1,7 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -9,6 +8,7 @@ import { gzipSync } from "node:zlib";
 import postgres from "postgres";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import type { WalletKeys } from "../apps/contract.ts";
 import { dataDir, envFile } from "../data-dir.ts";
 import { env } from "../env.ts";
@@ -89,7 +89,7 @@ const children = new Set<ChildProcess>();
 beforeEach(async () => {
   runner = { stops: 0, starts: 0 };
   lendToHandover(laptop());
-  target = mkdtempSync(join(tmpdir(), "auni-takeover-target-"));
+  target = tempDir("auni-takeover-target-");
   targetName = `${new URL(env.DATABASE_URL).pathname.slice(1)}_takeover_${++tests}`;
   targetUrl = Object.assign(new URL(env.DATABASE_URL), { pathname: `/${targetName}` }).href;
   await admin.unsafe(`drop database if exists "${targetName}" with (force)`);
@@ -112,7 +112,6 @@ afterEach(async () => {
   await admin.unsafe(`drop database if exists "${targetName}" with (force)`);
   rmSync(join(dataDir(), "handed-over.json"), { force: true });
   rmSync(envFile(), { force: true });
-  rmSync(target, { recursive: true, force: true });
 });
 afterAll(() => admin.end());
 

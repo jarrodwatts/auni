@@ -1,24 +1,21 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "./test/temp-dir.ts";
 import { starOnGitHub, starredOnGitHub } from "./github-star.ts";
 
 // The owner's GitHub CLI, stood in for by a `gh` first on PATH that prints and exits as each
 // test has it, and keeps the arguments it was run with.
 describe.runIf(process.platform !== "win32")("the owner's GitHub CLI", () => {
-  const bins: string[] = [];
   afterEach(() => {
     vi.unstubAllEnvs();
-    for (const bin of bins.splice(0)) rmSync(bin, { recursive: true, force: true });
   });
 
   /** A `gh` that says `said` on stderr and exits `code`; null for no `gh` at all. */
   function gh(answer: { readonly code: number; readonly said?: string } | null) {
-    const bin = mkdtempSync(join(tmpdir(), "auni-gh-"));
-    bins.push(bin);
+    const bin = tempDir("auni-gh-");
     vi.stubEnv("PATH", answer ? `${bin}:${process.env.PATH}` : bin);
     if (!answer) return () => "";
     writeFileSync(

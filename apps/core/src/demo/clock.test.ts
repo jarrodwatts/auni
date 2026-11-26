@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { tmpdir, userInfo } from "node:os";
+import { userInfo } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../test/temp-dir.ts";
 import { demoPairCode } from "./test-pair.ts";
 
 // A demo started `--at` a moment long past, as `pnpm demo:shots` starts it. Whatever day and
@@ -18,7 +19,7 @@ import { demoPairCode } from "./test-pair.ts";
 const AUNI = fileURLToPath(new URL("../../bin/auni.mjs", import.meta.url));
 const AT = "2026-11-11T12:00:00.000Z";
 const DAY_MS = 24 * 60 * 60_000;
-const scratch = mkdtempSync(join(tmpdir(), "auni-demo-clock-test-"));
+const scratch = tempDir("auni-demo-clock-test-", afterAll);
 
 function freePort(): Promise<number> {
   return new Promise((resolve) => {
@@ -29,8 +30,6 @@ function freePort(): Promise<number> {
     });
   });
 }
-
-afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 describe("auni demo --at a moment", () => {
   let demo: ChildProcessByStdio<null, Readable, Readable>;
@@ -75,7 +74,7 @@ describe("auni demo --at a moment", () => {
   }, 180_000);
 
   afterAll(async () => {
-    if (demo.exitCode !== null) return;
+    if (!demo || demo.exitCode !== null || demo.signalCode !== null) return;
     demo.kill("SIGTERM");
     await new Promise((exited) => demo.once("exit", exited));
   });

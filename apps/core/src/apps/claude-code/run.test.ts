@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Options, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 import type { Box } from "../../agent/box.ts";
 import type { BrainTurn } from "../contract.ts";
 
@@ -27,10 +27,9 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 
 const { claudeFrames } = await import("./run.ts");
 
-let data: string;
+const data = tempDir("auni-mcp-", afterAll);
 const before = process.env.AUNI_HOME;
 beforeAll(() => {
-  data = mkdtempSync(join(tmpdir(), "auni-mcp-"));
   process.env.AUNI_HOME = data;
 });
 afterAll(() => {

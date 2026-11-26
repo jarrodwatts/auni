@@ -1,9 +1,9 @@
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { tempDir } from "../../test/temp-dir.ts";
 /**
  * A stand-in for the Claude Code Auni bundles, whose `auth status --json` says what the real one
  * did (2.1.316): the same JSON either way, and exit 1 when no one is signed in.
@@ -14,7 +14,7 @@ vi.mock("./cli.ts", () => ({ claudeCli: () => cli.path }));
 const { check } = await import("./check.ts");
 
 function claudeThatSays(status: Record<string, unknown>): string {
-  const dir = mkdtempSync(join(tmpdir(), "auni-claude-"));
+  const dir = tempDir("auni-claude-");
   const file = join(dir, "claude");
   writeFileSync(
     file,
@@ -26,7 +26,7 @@ function claudeThatSays(status: Record<string, unknown>): string {
 
 /** A PATH holding only these commands. */
 function pathWith(...commands: string[]): string {
-  const dir = mkdtempSync(join(tmpdir(), "auni-path-"));
+  const dir = tempDir("auni-path-");
   for (const command of commands) {
     writeFileSync(join(dir, command), "#!/bin/sh\n");
     chmodSync(join(dir, command), 0o755);

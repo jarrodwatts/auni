@@ -139,14 +139,7 @@ export const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     description: "Display intermediate reasoning steps in chat",
     keywords: ["thinking", "reasoning", "steps", "chat", "verbose"],
   },
-  {
-    id: "general-wizard",
-    section: "general",
-    targetId: "setting-wizard",
-    title: "Re-run setup wizard",
-    description: "Open the local onboarding wizard again",
-    keywords: ["onboarding", "wizard", "welcome", "first run", "setup"],
-  },
+
   {
     id: "appearance-theme",
     section: "appearance",

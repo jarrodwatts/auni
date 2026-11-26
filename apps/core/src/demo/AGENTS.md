@@ -78,6 +78,7 @@ walks every stop through core. A new stop is an entry in `STOPS`, and a scene fo
 `auni demo --first-run` (`first-run.ts`) is a new owner's instead: no past and no money, first
 run's question, and its one take (peptides, `take` in `scenes.ts`) played through: its first
 picks on one card, money sent in while the card's Add money is open, the buy, and the spare key.
+With `--no-wallet` it has no wallet until that take's chat makes one, as most new owners.
 
 Not shown yet: a Polymarket buy or its cash coming home (both need its
 relayer, which has no stand-in; a sale needs only its book), a market pulse (it needs Elfa), a

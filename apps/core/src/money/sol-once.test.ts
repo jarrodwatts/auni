@@ -14,6 +14,7 @@ vi.mock(import("./wallets.ts"), async (original) => ({
     solana: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
   }),
   paysOwnGas: async () => true,
+  makeWalletIfNone: async () => {},
 }));
 vi.mock(import("./chains.ts"), async (original) => ({
   ...(await original()),

@@ -122,11 +122,9 @@ describe("auni demo", () => {
   /** Waits until a thread says `said`, which may take a move landing or a watch firing. */
   const says = (thread: string, said: RegExp) =>
     expect.poll(() => words(thread), { timeout: 60_000, interval: 250 }).toMatch(said);
-  /** Says `text` in a thread, as a tap on a reply does, and waits until its answer is over. */
-  const say = async (thread: string, text: string) => {
-    const id = randomUUID();
-    await ask(`/threads/${thread}/messages`, { id, text });
-    await expect
+  /** Waits until the turn answering message `id` in a thread is over. */
+  const answered = (thread: string, id: string) =>
+    expect
       .poll(
         async () => {
           const read = await ask<{ running: boolean; messages: { id: string; role: string }[] }>(
@@ -138,12 +136,18 @@ describe("auni demo", () => {
         { timeout: 30_000, interval: 200 },
       )
       .toBe(true);
+  /** Says `text` in a thread, as a tap on a reply does, and waits until its answer is over. */
+  const say = async (thread: string, text: string) => {
+    const id = randomUUID();
+    await ask(`/threads/${thread}/messages`, { id, text });
+    await answered(thread, id);
   };
-  /** Types `text` in a new chat, and waits until its turn is over: the chat's id. */
+  /** Types `text` in a new chat, which starts with it, and waits until its turn is over: the chat's id. */
   const type = async (text: string) => {
-    const { thread } = await ask<{ thread: { id: string } }>("/places/chat", { text });
-    await say(thread.id, text);
-    return thread.id;
+    const [id, messageId] = [randomUUID(), randomUUID()];
+    await ask("/places/chat", { id, messageId, text });
+    await answered(id, messageId);
+    return id;
   };
   /** Taps Allow on every card waiting in a thread, and waits until each has ended as `ends`. */
   const allowAll = async (thread: string, ends = "done") => {

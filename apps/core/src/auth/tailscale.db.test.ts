@@ -241,7 +241,11 @@ describe("core's own port, always on", () => {
     });
     expect(me).toMatchObject({
       status: 401,
-      body: JSON.stringify({ error: "tailscale_owner_only" }),
+      // With where it does open, for the page to say.
+      body: JSON.stringify({
+        error: "tailscale_owner_only",
+        at: "https://box.tailnet-example.ts.net",
+      }),
     });
   });
 

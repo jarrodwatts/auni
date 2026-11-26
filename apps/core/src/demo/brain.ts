@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-import type { Brain, BrainEvent, BrainTurn } from "../apps/contract.ts";
+import type { Brain, BrainCheck, BrainEvent, BrainTurn } from "../apps/contract.ts";
 import { sceneFor } from "./scenes.ts";
 import { demoPoints } from "./points.ts";
 import { tour } from "./tour.ts";
@@ -152,26 +152,49 @@ function textOf(content: unknown): string {
     .join("\n");
 }
 
+/** The demo's brain, signed in: on no login, with the models it says it has. */
+const signedIn: BrainCheck = {
+  ready: true,
+  login: "the demo, which needs no login",
+  models: [
+    {
+      id: "opus",
+      name: "Claude Opus",
+      efforts: ["low", "medium", "high", "xhigh", "max"],
+      defaultEffort: "high",
+      isDefault: true,
+    },
+    {
+      id: "sonnet",
+      name: "Claude Sonnet",
+      efforts: ["low", "medium", "high"],
+      defaultEffort: "medium",
+    },
+  ],
+};
+
+/**
+ * `auni demo --first-run --signed-out`: its brain waits to be signed in, as a new owner's AI may,
+ * so first run asks for it. Its sign-in is a stand-in: a page and a code, and it's in a moment
+ * later as if the code was entered.
+ */
+const login = { signedOut: false };
+
+export function startSignedOut(): void {
+  login.signedOut = true;
+}
+
+/** How long the stand-in sign-in waits for its code to be "entered". */
+const SIGN_IN_MS = 10_000;
+
 export const demoBrain: Brain = {
-  check: async () => ({
-    ready: true,
-    login: "the demo, which needs no login",
-    models: [
-      {
-        id: "opus",
-        name: "Claude Opus",
-        efforts: ["low", "medium", "high", "xhigh", "max"],
-        defaultEffort: "high",
-        isDefault: true,
-      },
-      {
-        id: "sonnet",
-        name: "Claude Sonnet",
-        efforts: ["low", "medium", "high"],
-        defaultEffort: "medium",
-      },
-    ],
-  }),
+  check: async () =>
+    login.signedOut ? { ready: false, why: "signed-out", fix: "sign in from the app" } : signedIn,
+  signIn: async ({ show, signal }) => {
+    show({ kind: "code", url: "https://example.com/demo-sign-in", code: "AUNI-DEMO" });
+    await sleep(SIGN_IN_MS, undefined, { signal });
+    login.signedOut = false;
+  },
   run,
   // It has no login, so there is nothing of its own for a box to hide.
   secrets: () => [],

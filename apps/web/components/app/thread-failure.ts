@@ -1,3 +1,4 @@
+import { StartUnconfirmed } from "@/lib/data/places";
 import type { SendFailure } from "@/lib/data/thread-session";
 
 /**
@@ -51,4 +52,12 @@ export const HISTORY_FAILURE: ThreadFailure = {
   action: "reload",
 };
 
-export const START_FAILURE = "Couldn't start this chat, so nothing was sent. Try again.";
+/**
+ * Why a chat didn't start, for the line under the box its words went back to. Core refused it, or
+ * its answers were lost, when it may have started: then only the same words sent again can say.
+ */
+export function startFailure(error: unknown): string {
+  return error instanceof StartUnconfirmed
+    ? "Auni couldn't confirm this chat started. Your words are back in the box: send them again to open it."
+    : "Auni couldn't start this chat. Your words are back in the box to send again.";
+}

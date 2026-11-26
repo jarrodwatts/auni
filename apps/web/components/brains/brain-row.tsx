@@ -5,7 +5,7 @@ import { ArrowUpRight, Check, LoaderCircle, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 
 import { AppMark } from "@/components/apps/app-mark";
-import { MoneyButton } from "@/components/cards/money/money-card-parts";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { CopyLine } from "@/components/ui/copy-line";
 import { useBrainAsk, typeIntoSignIn } from "@/lib/data/brains";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ type Item = BrainsWire["rows"][number];
 const NOT_READY: Record<"not-installed" | "signed-out" | "expired" | "broken", string> = {
   "not-installed": "Not installed",
   "signed-out": "Not signed in",
-  expired: "Sign-in has expired",
+  expired: "Sign-in expired",
   broken: "Can't start",
 };
 
@@ -52,7 +52,7 @@ export function BrainRow({
     setAsking(true);
     setError(null);
     ask({ id: row.id, kind })
-      .catch(() => setError("That didn't reach Auni. Try again."))
+      .catch(() => setError("Couldn't reach Auni. Try again."))
       .finally(() => setAsking(false));
   };
 
@@ -69,17 +69,15 @@ export function BrainRow({
         ? `Signed in as ${row.signedInAs}`
         : `Ready on ${row.login}`
       : row.state === "resting"
-        ? `Resting until ${time(row.until)}`
+        ? `Limit resets at ${time(row.until)}`
         : NOT_READY[row.state];
   const under =
     task?.kind === "installing"
-      ? `Into Auni's own tools on ${machine}`
-      : row.state === "ready"
-        ? row.signedInAs
-          ? `${asStart(row.login)}, on ${machine}`
-          : `On ${machine}`
+      ? `On ${machine}`
+      : row.state === "ready" && row.signedInAs
+        ? asStart(row.login)
         : row.state === "resting"
-          ? `Then ready on ${row.login}`
+          ? asStart(row.login)
           : null;
   // The one thing to do, by the row's right edge: never while Auni is already doing something.
   const action =
@@ -101,12 +99,7 @@ export function BrainRow({
     <li
       data-testid="brain-row"
       data-brain={row.id}
-      className={cn(
-        "rounded-card border p-3.5 transition-colors duration-300",
-        ready && !task
-          ? "border-positive/25 bg-positive/[0.06]"
-          : "border-foreground/[0.08] bg-card",
-      )}
+      className="rounded-card border border-border bg-card p-3.5"
     >
       <div className="flex items-center gap-3">
         {named ? <AppMark id={row.id} name={row.name} size={36} /> : null}
@@ -117,7 +110,7 @@ export function BrainRow({
           <span
             aria-live="polite"
             className={cn(
-              "block truncate",
+              "block",
               named
                 ? "text-meta leading-[18px] text-muted-foreground"
                 : "text-body leading-5 font-medium text-ink",
@@ -125,16 +118,14 @@ export function BrainRow({
           >
             {says}
           </span>
-          {under ? (
-            <span className="block truncate text-meta leading-[17px] text-faint">{under}</span>
-          ) : null}
+          {under ? <span className="block text-meta text-faint">{under}</span> : null}
         </span>
         {ready && !task ? (
           <span
             aria-hidden
-            className="grid size-7 flex-none place-items-center rounded-full bg-positive text-background"
+            className="auni-onb-mascot grid size-6 flex-none place-items-center rounded-full bg-ink text-paper"
           >
-            <Check className="size-4" strokeWidth={2.6} />
+            <Check className="size-3.5" strokeWidth={2.8} />
           </span>
         ) : task && task.kind !== "failed" && task.kind !== "signing-in" ? (
           <LoaderCircle
@@ -142,15 +133,17 @@ export function BrainRow({
             className="size-5 flex-none animate-spin text-muted-foreground motion-reduce:animate-none"
           />
         ) : action ? (
-          <MoneyButton
-            tone="primary"
-            className="h-9 flex-none px-4 text-ui"
-            busy={asking}
-            busyLabel={`${action.label}…`}
+          <Button
+            className="flex-none"
+            disabled={asking}
+            aria-busy={asking}
             onClick={() => run(action.kind)}
           >
+            {asking ? (
+              <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />
+            ) : null}
             {action.label}
-          </MoneyButton>
+          </Button>
         ) : null}
       </div>
 
@@ -162,7 +155,7 @@ export function BrainRow({
                 aria-hidden
                 className="size-3.5 animate-spin motion-reduce:animate-none"
               />
-              Starting {row.name}&apos;s own sign-in on {machine}
+              Starting {row.name} sign-in on {machine}
             </p>
           ) : task.view.kind === "code" ? (
             <CodeSteps view={task.view} />
@@ -170,14 +163,9 @@ export function BrainRow({
             <SignInPrompt view={task.view} name={row.name} machine={machine} />
           )}
           <div className="mt-3 flex items-center justify-end">
-            <button
-              type="button"
-              disabled={asking}
-              onClick={() => run("stop")}
-              className="flex-none rounded-full px-3 py-1.5 text-meta font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink"
-            >
+            <Button variant="ghost" size="sm" disabled={asking} onClick={() => run("stop")}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : task?.kind === "failed" ? (
@@ -211,11 +199,14 @@ function shortUrl(url: string): string {
   return `${host}${pathname === "/" ? "" : pathname}${search ? "…" : ""}`;
 }
 
-/** Codex's device sign-in: the page to open on any device, and the code to enter there. */
+/**
+ * Codex's device sign-in: the page to open on any device, and the code to enter there. Two steps
+ * split by a hairline inside the row's own card, so only the code sits in a box of its own.
+ */
 function CodeSteps({ view }: { readonly view: Extract<SignInView, { kind: "code" }> }) {
   return (
-    <ol className="flex flex-col gap-2.5">
-      <li className="flex items-center gap-3 rounded-control bg-surface py-2 pr-2 pl-3.5">
+    <ol className="divide-y divide-border border-t border-border">
+      <li className="flex items-center gap-3 py-3">
         <Step n={1} />
         <span className="min-w-0 flex-1">
           <span className="block text-ui font-medium text-ink">Open this page</span>
@@ -227,19 +218,19 @@ function CodeSteps({ view }: { readonly view: Extract<SignInView, { kind: "code"
           href={view.url}
           target="_blank"
           rel="noreferrer"
-          className="flex h-9 flex-none items-center gap-1 rounded-full bg-foreground px-3.5 text-meta font-semibold text-background transition-colors hover:bg-foreground/85"
+          className={buttonVariants({ size: "sm", className: "flex-none" })}
         >
           Open
           <ArrowUpRight aria-hidden className="size-3.5" strokeWidth={2.4} />
         </a>
       </li>
-      <li className="flex items-start gap-3 rounded-control bg-surface py-2.5 pr-2 pl-3.5">
+      <li className="flex items-start gap-3 pt-3">
         <Step n={2} />
         <span className="min-w-0 flex-1">
           <span className="block text-ui font-medium text-ink">Enter this code there</span>
           <CopyLine
             value={view.code}
-            className="mt-1.5 [&_code]:text-reading [&_code]:tracking-[0.12em] [&>div]:bg-card"
+            className="mt-1.5 [&_code]:text-reading [&_code]:tracking-[0.12em]"
           />
         </span>
       </li>
@@ -251,7 +242,7 @@ function Step({ n }: { readonly n: number }) {
   return (
     <span
       aria-hidden
-      className="grid size-6 flex-none place-items-center rounded-full bg-card text-caption font-semibold text-muted-foreground"
+      className="grid size-6 flex-none place-items-center rounded-full bg-surface text-caption font-semibold text-muted-foreground tabular-nums"
     >
       {n}
     </span>
@@ -284,7 +275,7 @@ function SignInPrompt({
     setError(null);
     typeIntoSignIn(view.field, line)
       .then(() => setLine(""))
-      .catch(() => setError(`That didn't reach ${name}'s sign-in. Try again.`))
+      .catch(() => setError(`Couldn't send the code to ${name}. Try again.`))
       .finally(() => setSending(false));
   };
 
@@ -295,7 +286,7 @@ function SignInPrompt({
           href={page}
           target="_blank"
           rel="noreferrer"
-          className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-foreground px-5 text-ui font-semibold text-background transition-colors outline-none hover:bg-foreground/85 focus-visible:ring-[3px] focus-visible:ring-ring/35"
+          className={buttonVariants({ size: "lg", className: "w-full" })}
         >
           Open {name} sign-in
           <ArrowUpRight aria-hidden className="size-4" strokeWidth={2.4} />
@@ -303,21 +294,21 @@ function SignInPrompt({
       ) : (
         <p className="flex h-11 items-center justify-center gap-2 text-meta text-muted-foreground">
           <LoaderCircle aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
-          Opening {name}&apos;s sign-in
+          Opening {name} sign-in
         </p>
       )}
       <form
-        className="flex items-center gap-1.5 rounded-full border border-foreground/[0.1] bg-card py-1 pr-1 pl-4 focus-within:border-ring/50"
+        className="flex items-center gap-1.5 rounded-control border border-input bg-card py-1 pr-1 pl-3.5 focus-within:border-ring/50"
         onSubmit={(event) => {
           event.preventDefault();
           send();
         }}
       >
-        <LockKeyhole aria-hidden className="size-3.5 flex-none text-positive" />
+        <LockKeyhole aria-hidden className="size-3.5 flex-none text-muted-foreground" />
         <input
           type="password"
           value={line}
-          aria-label={`The code from ${name}'s sign-in`}
+          aria-label={`Code from ${name} sign-in`}
           placeholder="Paste the code"
           disabled={sending}
           autoComplete="off"
@@ -329,13 +320,9 @@ function SignInPrompt({
           onChange={(event) => setLine(event.target.value)}
           className="h-9 min-w-0 flex-1 bg-transparent text-ui text-ink outline-none placeholder:text-faint"
         />
-        <button
-          type="submit"
-          disabled={!line.trim() || sending}
-          className="h-9 flex-none rounded-full bg-foreground px-4 text-meta font-semibold text-background transition-opacity disabled:opacity-30"
-        >
+        <Button type="submit" size="sm" disabled={!line.trim() || sending}>
           Send
-        </button>
+        </Button>
       </form>
       <p className="text-center text-meta text-muted-foreground">
         Only {name} on {machine} sees it.
@@ -346,7 +333,7 @@ function SignInPrompt({
         </p>
       ) : null}
       <details className="group text-meta text-muted-foreground">
-        <summary className="w-fit cursor-pointer rounded-full px-1 outline-none hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/35">
+        <summary className="w-fit cursor-pointer rounded-control px-1 outline-none hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/35">
           What {name} printed
         </summary>
         {/* A few lines of it, fading at the foot and scrolling for the rest, so a long link it

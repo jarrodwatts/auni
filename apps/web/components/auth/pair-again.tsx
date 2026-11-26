@@ -2,10 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
-import { CopyLine } from "@/components/ui/copy-line";
+import { PairSteps } from "@/components/auth/gate-screen";
 import { CoreApiError } from "@/lib/core";
 import { noteTerminalTrip } from "@/lib/terminal-trip";
 import { cn } from "@/lib/utils";
+import { useRemoteMachine } from "@/lib/where-auni-runs";
 
 /**
  * Core's answer that a step takes proof the owner is there and this browser has none to give: it
@@ -36,23 +37,18 @@ export function PairAgain({
     // It appears where the owner tapped; in a pane that scrolls, all of it comes into view.
     note.current?.scrollIntoView({ block: "nearest" });
   }, []);
+  const machine = useRemoteMachine();
   return (
     <div
       ref={note}
       role="alert"
-      className={cn(
-        "rounded-card border border-foreground/[0.08] px-4 py-3.5 text-left",
-        className,
-      )}
+      className={cn("rounded-card border border-border px-4 py-4 text-left", className)}
     >
-      <p className="text-ui leading-5 font-semibold tracking-[-0.01em] text-ink">
-        Show Auni it&apos;s you
+      <p className="text-ui font-medium text-ink">Confirm it&apos;s you</p>
+      <p className="mt-1 text-meta text-pretty text-muted-foreground">
+        This browser paired over 15 minutes ago. Pair it again to continue.
       </p>
-      <p className="mt-1 text-meta leading-[1.5] text-pretty text-muted-foreground">
-        This browser signed in a while ago. Run this in the terminal where Auni runs and open the
-        link it prints. {then}
-      </p>
-      <CopyLine value="auni pair" command className="mt-3" />
+      <PairSteps machine={machine} then={then} className="mt-4" />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 
 import { mustPairAgain } from "@/components/auth/pair-again";
-import { MoneyButton, MoneyButtons } from "@/components/cards/money/money-card-parts";
+import { Button } from "@/components/ui/button";
 import { WalletKeyList } from "@/components/settings/wallet-keys-dialog";
 import { CopyLine } from "@/components/ui/copy-line";
 import { revealWalletKeys } from "@/lib/data/me";
@@ -94,9 +94,9 @@ export function SpareKey() {
 
   const later = async () => {
     try {
-      await save.mutateAsync({ path: "setup/backup/later", body: {} });
+      await save.mutateAsync({ path: "setup/backup/later" });
     } catch {
-      setError("That didn't reach Auni, so try again.");
+      setError("That didn't reach me. Nothing changed, so try again.");
     }
   };
 
@@ -113,7 +113,7 @@ export function SpareKey() {
         // So the tab the pairing link opens comes back to this chat (lib/terminal-trip.ts).
         noteTerminalTrip(window.location.pathname + window.location.search);
         setStage({ kind: "pair-again" });
-      } else setError("That didn't reach Auni. Nothing was shown, so try again.");
+      } else setError("That didn't reach me. No keys were shown, so try again.");
     } finally {
       setRevealing(false);
     }
@@ -145,10 +145,10 @@ export function SpareKey() {
 
   const keep = async () => {
     try {
-      await save.mutateAsync({ path: "setup/backup", body: {} });
+      await save.mutateAsync({ path: "setup/backup" });
       setStage({ kind: "saved" });
     } catch {
-      setError("That didn't reach Auni. Your key is still here, so try again.");
+      setError("That didn't reach me. Your keys are still here, so try again.");
     }
   };
 
@@ -156,7 +156,7 @@ export function SpareKey() {
     return (
       <p className={styles.keySaved} role="status">
         <Check aria-hidden className="size-4" />
-        Saved. You can see it again in Settings.
+        Saved. You can see your keys again any time in Settings.
       </p>
     );
 
@@ -177,50 +177,55 @@ export function SpareKey() {
       <div className={styles.keyWords}>
         <h2 ref={title} tabIndex={-1} className={styles.keyTitle}>
           {showing
-            ? "Your spare key"
+            ? "Your wallet keys"
             : stage.kind === "pair-again"
-              ? "First, show me it's you"
-              : "Now there's money worth keeping"}
+              ? "Confirm it's you"
+              : "Your money's worth a spare key"}
         </h2>
         <p className={styles.keyLine}>
           {showing
-            ? "Keep it with your passwords. Anyone with it can take everything."
+            ? "Keep them with your passwords. Anyone who has them can move all your money."
             : stage.kind === "pair-again"
-              ? "Run this in my terminal and open the link it prints. I'll pick up right here."
-              : "I cut you a spare key. If this computer is ever lost, it gets your money back."}
+              ? "Run this in your terminal and open the link it prints. I'll show your keys right here."
+              : "Let me show you your wallet's keys. If this computer is ever lost, they get your money back."}
         </p>
         {showing ? (
           <>
             <WalletKeyList keys={stage.keys} className="mt-4" />
-            <MoneyButton
-              tone="primary"
+            <Button
+              size="lg"
               className="mt-4 w-full"
-              busy={save.isPending}
-              busyLabel="Saving"
+              disabled={save.isPending}
+              aria-busy={save.isPending}
               onClick={() => void keep()}
             >
-              I saved it
-            </MoneyButton>
+              {save.isPending ? "Saving" : "I've saved them"}
+            </Button>
           </>
         ) : stage.kind === "pair-again" ? (
           <div role="status" aria-busy className="mt-4">
             <CopyLine value="auni pair" command focused />
           </div>
         ) : (
-          <div className="mt-4">
-            <MoneyButtons>
-              <MoneyButton tone="quiet" disabled={save.isPending} onClick={() => void later()}>
-                Later
-              </MoneyButton>
-              <MoneyButton
-                tone="primary"
-                busy={revealing}
-                busyLabel="Checking it's you"
-                onClick={() => void show()}
-              >
-                Save it
-              </MoneyButton>
-            </MoneyButtons>
+          <div className="mt-4 flex gap-2">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              disabled={save.isPending}
+              onClick={() => void later()}
+            >
+              Later
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              disabled={revealing}
+              aria-busy={revealing}
+              onClick={() => void show()}
+            >
+              {revealing ? "Checking it's you" : "Show keys"}
+            </Button>
           </div>
         )}
         {error ? (

@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { ConversationLaunchStage } from "@/components/app/conversation-launch-stage";
 import { useFirstRun } from "@/components/first-run/use-first-run";
-import { WelcomeWizard } from "@/components/onboarding/welcome-wizard";
 import { CloseMobileThreadMenuContext } from "@/components/app/mobile-thread-menu";
 import { useLiveThreadRows, useThreads } from "@/components/app/use-threads";
 import { AuniSheet } from "@/components/ui/auni-sheet";
@@ -34,8 +33,6 @@ export function PlaceWorkspace({ children }: { readonly children: ReactNode }) {
           <ConversationLaunchStage />
         </div>
       </PlaceShell>
-      {/* First run's local-first onboarding wizard, over the app until completed or skipped. */}
-      <WelcomeWizard />
     </SearchProvider>
   );
 }

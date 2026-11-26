@@ -59,7 +59,7 @@ import {
 } from "./record.ts";
 import { dollars } from "./summaries.ts";
 import { normalizeUsd, parseUnits } from "./usd.ts";
-import { signerFor } from "./wallets.ts";
+import { makeWalletIfNone, signerFor } from "./wallets.ts";
 import { chainKey, placeName } from "./chains.ts";
 
 export interface ActionContext {
@@ -109,6 +109,14 @@ export async function prepareLeg(
   { heldTo }: { readonly heldTo?: Pick<ActionRow, "details"> } = {},
 ): Promise<PreparedLeg> {
   const input = toolInput(recipe.input).parse(rawInput);
+  // Every move needs the wallet: one not made yet, because it couldn't be as the owner's first
+  // take started, is made by the first move.
+  await makeWalletIfNone().catch((error: unknown) => {
+    console.error("The owner's wallet couldn't be made:", error);
+    throw new Error(
+      "The owner's wallet couldn't be made just now, so there's no card and nothing moved.",
+    );
+  });
   const closed = await buyClosedHere(recipe, input);
   if (closed) throw new Error(closed);
   const described = await recipe.describe(input, { heldTo });

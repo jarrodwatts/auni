@@ -14,8 +14,10 @@ const { CASH_LOGO, NVIDIA_LOGO } = vi.hoisted(() => ({
 }));
 const read = vi.hoisted(() => ({
   portfolio: null as Portfolio | null,
+  wallet: true,
   seen: [] as unknown[],
 }));
+vi.mock("./money/wallets.ts", () => ({ hasWallet: async () => read.wallet }));
 vi.mock("./conversation/context.ts", () => ({ promptPortfolio: async () => read.portfolio }));
 vi.mock("./money/holdings.ts", () => ({
   holdingFaces: async (holdings: readonly Holding[]) =>
@@ -79,6 +81,7 @@ beforeEach(async () => {
   await wipe();
   await setOwner();
   read.portfolio = null;
+  read.wallet = true;
   read.seen = [];
 });
 
@@ -100,6 +103,17 @@ describe("readFacts", () => {
       },
     ]);
     expect(read.seen).toEqual([{ holdings: [] }]);
+  });
+
+  it("never calls a wallet empty before there is one, as first run makes it with the first take", async () => {
+    read.wallet = false;
+    read.portfolio = portfolio([]);
+    const [money] = await readFacts();
+    expect(money!.text).toBe(
+      "The owner has no wallet yet: Auni makes one with their first take, or with the first move if it couldn't then.",
+    );
+    expect(money!.starts.map(({ statement }) => statement)).not.toContain("Your wallet is empty.");
+    expect(money!.starts).toHaveLength(STARTING_POINTS);
   });
 
   it("says so when their money can't be read", async () => {

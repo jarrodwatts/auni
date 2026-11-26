@@ -11,6 +11,7 @@ import { dayMoves } from "./money/day-moves.ts";
 import { holdingFaces, LOGOS, paysFees } from "./money/holdings.ts";
 import type { Holding, Portfolio } from "./money/portfolio.ts";
 import { dollars } from "./money/summaries.ts";
+import { hasWallet } from "./money/wallets.ts";
 import { within } from "./money/swaps/shared.ts";
 import { centsToUsd, signedUsdToCents, usdToCents } from "./money/usd.ts";
 import { startOfDay } from "./money/value-history.ts";
@@ -51,7 +52,8 @@ const FACTS_PORTFOLIO_WAIT_MS = 30_000;
 
 /** Everything Auni sees now: their money first, which is always there, then their signals & the rest. */
 export async function readFacts(): Promise<Fact[]> {
-  const [portfolio, activeThreads, me] = await Promise.all([
+  const [wallet, portfolio, activeThreads, me] = await Promise.all([
+    hasWallet().catch(() => true),
     promptPortfolio(FACTS_PORTFOLIO_WAIT_MS),
     db
       .select()
@@ -86,7 +88,7 @@ export async function readFacts(): Promise<Fact[]> {
     })),
   };
   return [
-    ...moneyFacts(portfolio),
+    ...(wallet ? moneyFacts(portfolio) : [NO_WALLET_YET]),
     ...activeThreads.map(activeThreadFact),
     ...held.slice(0, HOLDINGS_TOLD).map(holdingFact),
     ...personalFacts(me),
@@ -235,6 +237,24 @@ const FIRST_MONEY: FactStart = {
   statement: "Your wallet is empty.",
   action: "Get started",
   prompt: "How much money do I need to start with Auni, and what's the easiest way to add it?",
+};
+
+const START_SMALL: FactStart = {
+  statement: "Starting small?",
+  action: "Try $50",
+  prompt: "I'd like to start small. What could a first take look like with $50?",
+};
+
+/**
+ * Before the owner's first take there is no wallet to be empty: it's made as that take is sent,
+ * unless they bring their own first (routes/setup.ts), so first run's line under the box and
+ * these never say two things. One that couldn't be made then is made by the first move.
+ */
+const NO_WALLET_YET: Fact = {
+  text: "The owner has no wallet yet: Auni makes one with their first take, or with the first move if it couldn't then.",
+  source: { app: AUNI, label: "Your money", link: "/app" },
+  image: null,
+  starts: [NEW_HERE, A_BELIEF, START_SMALL, MOVING],
 };
 
 /** A look over their money, by its total when that could be read. */

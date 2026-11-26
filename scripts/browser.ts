@@ -44,6 +44,8 @@ export interface Page {
   look(look: "light" | "dark"): Promise<void>;
   /** Has every page opened from here on tell the time as `at`, in `timeZone`, and never later. */
   standAt(at: number, timeZone: string): Promise<void>;
+  /** Runs `source` in every page opened from here on, before the page's own scripts. */
+  beforeEachPage(source: string): Promise<void>;
   /** The page as a PNG at `width` by `height` CSS pixels, drawn at twice that for sharpness. */
   picture(width: number, height: number): Promise<Buffer>;
 }
@@ -212,6 +214,9 @@ export async function launch(keptProfile?: string): Promise<Browser> {
             key === "now" ? () => ${at} : Reflect.get(target, key, receiver),
         });`,
       });
+    },
+    async beforeEachPage(source) {
+      await send("Page.addScriptToEvaluateOnNewDocument", { source });
     },
     async picture(width, height) {
       await send("Emulation.setDeviceMetricsOverride", {

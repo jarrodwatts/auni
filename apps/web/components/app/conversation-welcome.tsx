@@ -13,6 +13,7 @@ import {
   type MascotReadingTarget,
 } from "@/components/brand/interactive-mascot";
 import { useConversationLaunch } from "@/components/app/conversation-launch-context";
+import { FirstTake } from "@/components/first-run/first-take";
 import { useFirstRun } from "@/components/first-run/use-first-run";
 import { useMe } from "@/components/personalization/use-me";
 import { useArriving } from "@/components/places/arriving";
@@ -31,9 +32,9 @@ export function ConversationWelcome({ preview = false }: { readonly preview?: bo
   const firstRun = useFirstRun();
   const { launch } = useConversationLaunch();
   const arriving = useArriving();
-  // First run is the landing, over the app (PlaceWorkspace), until the first take's chat starts
-  // from it: nothing here is drawn under it meanwhile.
-  if (firstRun || (arriving && launch)) return null;
+  // First run asks for the first take here, until its chat starts from it.
+  if (firstRun) return preview ? null : <FirstTake />;
+  if (arriving && launch) return null;
   return <NewChat preview={preview} />;
 }
 

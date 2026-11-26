@@ -18,11 +18,13 @@ network on purpose, as a later `-H` wins.
 
 - Pages: `app/`. Whose browser this is: `components/auth/owner-provider.tsx`, which spends the
   pairing link's code (`/app#pair=<code>`) as the app loads, and `owner-gate.tsx` (the honest
-  states: link used, still starting, no database).
-- First run is a skippable 3-step local wizard (`components/onboarding/welcome-wizard.tsx`):
-  AI brain (`GET /brains`), local wallet creation or key import (`GET /setup`), and optional
-  read-only signals (X handle, watch-only wallet). Chat fallbacks stay in `components/first-run/`
-  (`brain-needed.tsx`, `spare-key.tsx`).
+  states: not paired, link used, Tailscale only, starting, no database), each read again by
+  itself until the app can open.
+- First run is the owner's first take (`components/first-run/first-take.tsx`, at `/app/new`):
+  one question with the starting points and a line saying which AI is ready. Only an AI that
+  can't think stops it (`pick-your-ai.tsx`). The take's chat finishes it (core's
+  `POST /places/chat`, which makes the wallet, else the first move; `finish.ts` mirrors it); one
+  the owner already has comes in before that (`bring-wallet.tsx`). Chat fallbacks: `brain-needed.tsx`, `spare-key.tsx`.
 - Settings (`components/settings/`): grouped searchable modal over `/me`, `/brains`, `/apps`, and
   `/system/*` (`lib/data/system.ts`) for General, Appearance, Personalization, AI Brains, Wallet,
   Channels, Remote access (Tailscale, service, sessions, handover), Network/RPCs, Diagnostics, About.

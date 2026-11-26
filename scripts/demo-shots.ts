@@ -8,9 +8,9 @@
 // state the demo's owner has one in, and one Auni itself runs on), a new chat, each pane of
 // Settings, every conversation the demo's owner has, and the states between them (the search
 // palette, a thread's details pane, Needs you, a phone's Chats and More, a turn's work opened up,
-// a message that may not have reached Auni, a page that isn't there, and a browser that isn't
-// paired, or brings a link already used), and first run as a new
-// owner meets it (each step of its setup), each at a desktop and a phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
+// a message that may not have reached Auni, a page that isn't there, a browser that isn't
+// paired, or brings a link already used, and one Auni can't answer yet), and first run as a new
+// owner meets it (the take, and the ask for an AI), each at a desktop and a phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
 // A screen longer than the window is taken a window at a time: a conversation from its end back
 // to its start, a page from its top down. The demo makes the same owner every time (apps/core/src/demo), and here its clock
 // and the browser's both stand at one moment in one time zone, so two runs of one build give the
@@ -191,6 +191,31 @@ const OPEN_RECEIPT: Opener = {
   shows: `document.querySelector('[role="dialog"]')`,
 };
 
+/** What core answers a browser that isn't let in, by the picture it makes: null is no answer. */
+const CORE_ANSWERS: Record<string, { status: number; body: Record<string, string> } | null> = {
+  "gate-starting": null,
+  "gate-database": { status: 503, body: { error: "database_unreachable" } },
+  "gate-tailscale-only": {
+    status: 401,
+    body: { error: "tailscale_owner_only", at: "https://evo-t1.tailnet-example.ts.net" },
+  },
+};
+
+/** A page whose every request to core gets `answer`, or never reaches it. */
+const answerCore = (answer: (typeof CORE_ANSWERS)[string]) => `(() => {
+  const real = globalThis.fetch;
+  globalThis.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (!new URL(url, location.href).pathname.startsWith("/core/")) return real(input, init);
+    const answer = ${JSON.stringify(answer)};
+    if (!answer) return Promise.reject(new TypeError("Failed to fetch"));
+    return Promise.resolve(new Response(JSON.stringify(answer.body), {
+      status: answer.status,
+      headers: { "content-type": "application/json" },
+    }));
+  };
+})()`;
+
 /** Opens the search palette, as its shortcut does. */
 const SEARCH: Opener = {
   does: `void window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`,
@@ -207,11 +232,44 @@ const OPEN_WORK: Opener = {
   shows: `document.querySelector('.auni-steps-line[aria-expanded="true"]')`,
 };
 
-/** A step of first run's wizard, by the words on its button. */
-const STEP = (label: string): Opener => ({
-  does: PRESS(label),
-  shows: `document.querySelector('[aria-current="step"]')?.textContent.includes(${JSON.stringify(label)})`,
-});
+/** First run's dialog for a wallet the owner already has, from the line under the question. */
+const BRING_WALLET: Opener = {
+  does: PRESS("Bring an existing wallet"),
+  shows: `document.querySelector('[role="dialog"]')`,
+};
+
+/**
+ * A first take whose start is asked for twice and both answers are lost (neither reaches core
+ * here), sent from the first starting point, which puts its words in the box: its words back in
+ * the box, and the line under it.
+ */
+const START_LOST: Opener = {
+  does: `(async () => {
+  const real = globalThis.fetch;
+  globalThis.fetch = (input, init) =>
+    new URL(typeof input === "string" ? input : input.url, location.href).pathname === "/core/places/chat"
+      ? Promise.reject(new TypeError("Failed to fetch"))
+      : real(input, init);
+  const point = [...document.querySelectorAll("li > button")].find((el) => el.getClientRects().length > 0);
+  point?.click();
+  await new Promise((done) => setTimeout(done, 300));
+  document.querySelector("textarea")?.form?.requestSubmit();
+  return Boolean(point);
+})()`,
+  shows: `[...document.querySelectorAll('[role="alert"]')].some((el) => el.textContent?.includes("couldn't confirm"))`,
+};
+
+/** The AI's sign-in under way, as its Cancel shows. */
+const SIGNING_IN = `[...document.querySelectorAll("button")].some((el) => el.textContent?.trim() === "Cancel")`;
+
+/**
+ * Starts the AI's own sign-in from first run's ask for one; at the next width it's still under
+ * way (core keeps it), so there's nothing to press.
+ */
+const SIGN_IN: Opener = {
+  does: `(${SIGNING_IN}) || ${PRESS("Sign in")}`,
+  shows: SIGNING_IN,
+};
 
 /**
  * Sends a message core never confirms: the page's own fetch answers the send with a server fault,
@@ -261,6 +319,19 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       await take(stranger.page, out, "pairing-link-used", link, "top");
     } finally {
       await stranger.close();
+    }
+    // The same browser while Auni can't answer it: still starting, its database down, or always
+    // on and opening only through Tailscale.
+    for (const [name, answer] of Object.entries(CORE_ANSWERS)) {
+      const waiting = await launch();
+      try {
+        await waiting.page.look(look);
+        await waiting.page.standAt(Date.parse(AT), TIME_ZONE);
+        await waiting.page.beforeEachPage(answerCore(answer));
+        await take(waiting.page, out, name, `${origin}/app`, "top");
+      } finally {
+        await waiting.close();
+      }
     }
     const core = <T>(path: string) =>
       page.evaluate<T>(`fetch("/core/${path}").then((response) => response.json())`);
@@ -396,26 +467,48 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
 }
 
 /**
- * First run, as a new owner meets it (`auni demo --first-run`): the local setup wizard, each of
- * its steps.
+ * First run, as a new owner meets it (`auni demo --first-run`): their first take's question (and
+ * what it says when both answers to its start are lost), as one who made a wallet already sees it
+ * and as one with none yet does (`--no-wallet`, with the dialog to bring one), and, with their AI
+ * not yet signed in (`--signed-out`), its ask for one and the sign-in it starts.
  */
 async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
-  const browser = await launch();
-  const demo = startDemo("--first-run");
-  try {
-    const { page } = browser;
-    await page.look(look);
-    await page.standAt(Date.parse(AT), TIME_ZONE);
-    const link = await demo.link;
-    const origin = new URL(link).origin;
-    await page.open(link);
-    await page.until("location.pathname.startsWith('/app') && !location.hash");
-    await take(page, out, "first-run", `${origin}/app/new`, "top");
-    await take(page, out, "first-run-wallet", `${origin}/app/new`, "top", STEP("Wallet"));
-    await take(page, out, "first-run-yours", `${origin}/app/new`, "top", STEP("Make it yours"));
-  } finally {
-    await browser.close();
-    await demo.stop();
+  for (const mode of ["wallet", "no-wallet", "signed-out"] as const) {
+    const browser = await launch();
+    const demo = startDemo(
+      "--first-run",
+      ...(mode === "no-wallet" ? ["--no-wallet"] : mode === "signed-out" ? ["--signed-out"] : []),
+    );
+    try {
+      const { page } = browser;
+      await page.look(look);
+      await page.standAt(Date.parse(AT), TIME_ZONE);
+      const link = await demo.link;
+      const origin = new URL(link).origin;
+      await page.open(link);
+      await page.until("location.pathname.startsWith('/app') && !location.hash");
+      if (mode === "wallet") {
+        await take(page, out, "first-run", `${origin}/app/new`, "top");
+        await take(page, out, "first-run-start-lost", `${origin}/app/new`, "top", START_LOST, {
+          once: true,
+        });
+        continue;
+      }
+      if (mode === "no-wallet") {
+        await take(page, out, "first-run-no-wallet", `${origin}/app/new`, "top");
+        await take(page, out, "first-run-bring-wallet", `${origin}/app/new`, "top", BRING_WALLET, {
+          once: true,
+        });
+        continue;
+      }
+      await take(page, out, "first-run-pick-your-ai", `${origin}/app/new`, "top");
+      await take(page, out, "first-run-signing-in", `${origin}/app/new`, "top", SIGN_IN, {
+        once: true,
+      });
+    } finally {
+      await browser.close();
+      await demo.stop();
+    }
   }
 }
 

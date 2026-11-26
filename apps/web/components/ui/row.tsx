@@ -22,6 +22,8 @@ type RowParts = {
   readonly mark?: React.ReactNode;
   readonly title: React.ReactNode;
   readonly meta?: React.ReactNode;
+  /** The meta line wraps rather than cuts off, for one whose end matters: a card's condition. */
+  readonly wrapMeta?: boolean;
   /** A figure, a badge, a switch or a chevron. A figure here is set tabular. */
   readonly end?: React.ReactNode;
 };
@@ -55,14 +57,21 @@ const PRESSES =
 
 /** One row: a mark (a logo, an icon), its title and a line under it, and what ends it. */
 function Row(props: StillRow | PressedRow) {
-  const { mark, title, meta, end, className, asChild, children, ...rest } = props;
+  const { mark, title, meta, wrapMeta, end, className, asChild, children, ...rest } = props;
   const body = (under: React.ReactNode) => (
     <>
       {mark ? <span className="flex flex-none items-center">{mark}</span> : null}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-ui font-medium text-ink">{title}</span>
         {meta ? (
-          <span className="block truncate text-meta text-muted-foreground">{meta}</span>
+          <span
+            className={cn(
+              "block text-meta text-muted-foreground",
+              wrapMeta ? "text-pretty" : "truncate",
+            )}
+          >
+            {meta}
+          </span>
         ) : null}
         {under}
       </span>

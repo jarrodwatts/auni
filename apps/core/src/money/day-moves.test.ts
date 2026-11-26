@@ -111,17 +111,18 @@ describe("dayMoveUsd", () => {
 });
 
 describe("dayMoves", () => {
+  const fill = (side: "buy" | "sell", quantity: string, usdValue: string, at: number) => ({
+    chain: "solana",
+    instrument: "native",
+    side,
+    quantity,
+    usdValue,
+    createdAt: new Date(at),
+  });
+
   it("counts only the fills that added to a holding since the day began", async () => {
     paths.prices = [100, 100, 102];
     const two = holding({ quantity: "2", usdValue: "204.00" });
-    const fill = (side: "buy" | "sell", quantity: string, usdValue: string, at: number) => ({
-      chain: "solana",
-      instrument: "native",
-      side,
-      quantity,
-      usdValue,
-      createdAt: new Date(at),
-    });
     const moves = await dayMoves([two], MIDNIGHT, [
       fill("buy", "1", "90.00", MIDNIGHT - 5 * HOUR),
       // Sold and bought back today: what was bought back moves from its cost.
@@ -131,5 +132,31 @@ describe("dayMoves", () => {
       { ...fill("buy", "5", "5.00", MIDNIGHT + 2 * HOUR), instrument: "other" },
     ]);
     expect(moves).toEqual(["3.00"]);
+  });
+
+  it("moves what was sold and bought back today from what it cost when bought back", async () => {
+    paths.prices = [100, 100, 101.54];
+    // Nothing at midnight; $1,700 bought and sold even this morning, then $1,800 bought back,
+    // worth $1,798.20 now: down $1.80 today, as the trade before it made nothing.
+    const nvidia = holding({ quantity: "9.5", usdValue: "1798.20" });
+    const moves = await dayMoves([nvidia], MIDNIGHT, [
+      // Out of order, as a read may give them: they are walked by when they filled.
+      fill("buy", "9.5", "1800.00", MIDNIGHT + 3 * HOUR),
+      fill("buy", "10", "1700.00", MIDNIGHT + HOUR),
+      fill("sell", "10", "1700.00", MIDNIGHT + 2 * HOUR),
+    ]);
+    expect(moves).toEqual(["-1.80"]);
+  });
+
+  it("never counts a sale's own gain as a move of what is still held", async () => {
+    paths.prices = [100, 100, 102];
+    // One held at $100 at midnight, one bought at $101, then one sold at $110, $10 over cost: the
+    // sale closes half of each, so what's left moves from half of each cost, $100.50.
+    const one = holding({ quantity: "1", usdValue: "102.00" });
+    const moves = await dayMoves([one], MIDNIGHT, [
+      fill("buy", "1", "101.00", MIDNIGHT + HOUR),
+      fill("sell", "1", "110.00", MIDNIGHT + 2 * HOUR),
+    ]);
+    expect(moves).toEqual(["1.50"]);
   });
 });

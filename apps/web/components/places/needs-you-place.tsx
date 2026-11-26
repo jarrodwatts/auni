@@ -40,6 +40,7 @@ export function NeedsYouPlace() {
                     asChild
                     title={place.thread.title}
                     meta={<span className="text-waiting">{askOf(place)}</span>}
+                    wrapMeta
                     end={<ChevronRight aria-hidden className="size-4 text-faint" />}
                   >
                     <PlaceLink href={chatHref(place.thread.id)} thread={place.thread.id} />

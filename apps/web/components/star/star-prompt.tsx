@@ -27,11 +27,12 @@ const ASKED_KEY = "auni:star-prompt:asked";
 // What the owner's hand starts: a click or tap, a key, a scroll, coming back to the window.
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "focus"] as const;
 
-let askedThisSession = false;
+/** One page load asks at most once, even when sessionStorage is unavailable. */
+const askedInWindow = new WeakSet<object>();
 
 function firstAskThisSession(): boolean {
-  if (askedThisSession) return false;
-  askedThisSession = true;
+  if (askedInWindow.has(window)) return false;
+  askedInWindow.add(window);
   try {
     if (sessionStorage.getItem(ASKED_KEY)) return false;
     sessionStorage.setItem(ASKED_KEY, "1");

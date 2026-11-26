@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { approvedEffect, assertStillAsShown } from "./approved.ts";
 import { fitted, tooMuchToWarn, withPermissions } from "./card-face.ts";
-import { approval as approvalOf } from "./effect.ts";
+import { approval as approvalOf, pinnedApproval } from "./effect.ts";
 import { rawEffect } from "./raw-transaction.ts";
 import { revertOf } from "./refused.ts";
 import { FACE } from "../test/recipe.ts";
@@ -53,6 +53,7 @@ const POSITIONS: Address = "0x5555555555555555555555555555555555555555";
 const DISTRIBUTOR: Address = "0x6666666666666666666666666666666666666666";
 const FRIEND: Address = "0x7777777777777777777777777777777777777777";
 const DELEGATED: Address = "0x8888888888888888888888888888888888888888";
+const PERMIT2: Address = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 const names = new Map([
   [USDC, { symbol: "USDC", decimals: 6, usd: 1 }],
   [TOKEN, { symbol: "PRL", decimals: 0, usd: 1 }],
@@ -67,6 +68,22 @@ const transfer = (token: Address, from: Address, to: Address, amount: bigint) =>
   log(token, "Transfer(address,address,uint256)", [pad(from), pad(to)], word(amount));
 const approval = (spender: Address, amount = 5_000_000n) =>
   log(USDC, "Approval(address,address,uint256)", [pad(OWNER), pad(spender)], word(amount));
+// Permit2 indexes the owner, the token and the spender, and keeps the allowance itself.
+const permit2 = (spender: Address, keeper = PERMIT2) =>
+  log(
+    keeper,
+    "Approval(address,address,address,uint160,uint48)",
+    [pad(OWNER), pad(USDC), pad(spender)],
+    encodeAbiParameters([{ type: "uint160" }, { type: "uint48" }], [5_000_000n, 1]),
+  );
+// A lending market's debt token (LENDER) logs a credit delegation: who may borrow, and what.
+const delegation = (to: Address) =>
+  log(
+    LENDER,
+    "BorrowAllowanceDelegated(address,address,address,uint256)",
+    [pad(OWNER), pad(to), pad(USDC)],
+    word(5_000_000n),
+  );
 // ERC-777 indexes the operator before the holder.
 const erc777 = (operator: Address, authorized: boolean) =>
   log(TOKEN, `${authorized ? "Authorized" : "Revoked"}Operator(address,address)`, [
@@ -128,6 +145,33 @@ describe("the approval ladder for a raw batch", () => {
         log(TOKEN, "Approval(address,address,uint256)", [pad(OWNER), pad(ROUTER), pad("0x7")]),
       ]),
       "proof: lets 0x2222222222222222222222222222222222222222 move your PRL #7",
+    ],
+    [
+      "a Permit2 allowance takes the owner's proof, naming it as Permit2's",
+      effect([permit2(ROUTER)]),
+      "proof: lets 0x2222222222222222222222222222222222222222 spend your USDC through Permit2",
+    ],
+    [
+      "an allowance another such keeper keeps names that keeper",
+      effect([permit2(ROUTER, FAKE)]),
+      "proof: lets 0x2222222222222222222222222222222222222222 spend your USDC through 0x3333…3333",
+    ],
+    [
+      "a credit delegation takes the owner's proof, saying it borrows against their position",
+      effect([delegation(ROUTER)]),
+      "proof: lets 0x2222222222222222222222222222222222222222 borrow USDC against your lending position",
+    ],
+    [
+      "a Morpho authorization takes the owner's proof, saying what it reaches",
+      effect([
+        log(
+          POSITIONS,
+          "SetAuthorization(address,address,address,bool)",
+          [pad(OWNER), pad(OWNER), pad(ROUTER)],
+          word(true),
+        ),
+      ]),
+      "proof: lets 0x2222222222222222222222222222222222222222 borrow against and withdraw your positions at 0x5555…5555",
     ],
     [
       "authorizing an ERC-777 operator takes the owner's proof",
@@ -325,6 +369,37 @@ describe("walletEffect", () => {
     expect(moved.out).toEqual([{ token: FAKE, amount: 10n ** 18n + 1n }]);
     const approved = { amountUsd: "0", details: approvedEffect(moved) };
     expect(() => assertStillAsShown(approved, rawEffect(moved, names), moved)).not.toThrow();
+  });
+
+  it("keeps a token's allowance, Permit2's and a credit delegation apart, each by the contract that keeps it", () => {
+    const { grants } = walletEffect([approval(ROUTER), permit2(ROUTER), delegation(ROUTER)], OWNER);
+    expect(grants.map(({ kind, contract, token, to }) => ({ kind, contract, token, to }))).toEqual([
+      { kind: "spend", contract: USDC, token: USDC, to: ROUTER },
+      { kind: "permit", contract: PERMIT2, token: USDC, to: ROUTER },
+      { kind: "borrow", contract: LENDER, token: USDC, to: ROUTER },
+    ]);
+  });
+
+  // Found in review: each became `spend`, pinned by its token and holder alone, so the bytes
+  // signed could leave Permit2's allowance or a credit delegation where the card showed the
+  // token's own allowance to the same spender, and pass.
+  it("sends nothing that now leaves another kind of permission, or one another contract keeps, than its card showed", () => {
+    const allowed = (logs: Log[]) => {
+      const shown = walletEffect(logs, OWNER);
+      const card = rawEffect(shown, names);
+      return { amountUsd: "0", details: { ...approvedEffect(shown), ...pinnedApproval(card) } };
+    };
+    const now = (logs: Log[]) => () => {
+      const fresh = walletEffect(logs, OWNER);
+      return assertStillAsShown(token, rawEffect(fresh, names), fresh);
+    };
+    const token = allowed([approval(ROUTER)]);
+    expect(now([approval(ROUTER)])).not.toThrow();
+    expect(now([permit2(ROUTER)])).toThrow(/now lets .* through Permit2/u);
+    expect(now([delegation(ROUTER)])).toThrow(/now lets .* borrow USDC/u);
+    const keeper = allowed([permit2(ROUTER)]);
+    const fresh = walletEffect([permit2(ROUTER, FAKE)], OWNER);
+    expect(() => assertStillAsShown(keeper, rawEffect(fresh, names), fresh)).toThrow(/now lets/u);
   });
 });
 

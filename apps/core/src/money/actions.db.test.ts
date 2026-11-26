@@ -210,6 +210,13 @@ describe("executeAction", () => {
           card: null,
           details: { ...words, grantsExactly: "spend:0x1:0x2" },
         }),
+        // Found in review: pinned before each kept the contract that keeps it, so a token's own
+        // allowance, Permit2's and a credit delegation over it were pinned alike.
+        await raw({
+          cardFormat: CARD_FORMAT,
+          card: null,
+          details: { ...words, grantsExactly: "spend:0x1:0x2::" },
+        }),
       ];
       for (const { id } of rows)
         expect(await executeAction(id)).toMatchObject({
@@ -224,7 +231,7 @@ describe("executeAction", () => {
       const pinned = await raw({
         cardFormat: CARD_FORMAT,
         card: null,
-        details: { ...words, grantsExactly: "spend:0x1:0x2::" },
+        details: { ...words, grantsExactly: "spend:0x1:0x1:0x2::" },
       });
       expect(await executeAction(pinned.id)).toMatchObject({
         status: "failed",

@@ -139,7 +139,7 @@ describe("send_evm_transaction", () => {
 
   it("names a permission it leaves as what it lets, and takes the owner's proof for it", async () => {
     vi.mocked(simulateEffect).mockResolvedValue(
-      seen({ grants: [{ kind: "spend", token: USDC, to: ROUTER }] }),
+      seen({ grants: [{ kind: "spend", contract: USDC, token: USDC, to: ROUTER }] }),
     );
     const { effect } = await sendEvmTransaction.describe(
       { chain: "base", calls: [{ to: USDC, data: "0x" }], summary: "Approve" },
@@ -297,7 +297,11 @@ describe("send_evm_transaction", () => {
       ["sends money where Auni can't say", seen({ out: [sends], sentTo: undefined })],
       [
         "leaves a permission behind",
-        seen({ out: [sends], in: [gets], grants: [{ kind: "spend", token: USDC, to: ROUTER }] }),
+        seen({
+          out: [sends],
+          in: [gets],
+          grants: [{ kind: "spend", contract: USDC, token: USDC, to: ROUTER }],
+        }),
       ],
       ["has a call Auni can't see", seen({ out: [sends], in: [gets], blind: true })],
       ["gets back under half", seen({ out: [sends], in: [{ token: WETH, amount: 10n ** 13n }] })],
@@ -472,7 +476,11 @@ describe("send_evm_transaction", () => {
       vi.mocked(simulateEffect).mockResolvedValue(seen({ out: [sends], in: [gets] }));
       const action = await recorded();
       vi.mocked(simulateEffect).mockResolvedValue(
-        seen({ out: [sends], in: [gets], grants: [{ kind: "spend", token: USDC, to: ROUTER }] }),
+        seen({
+          out: [sends],
+          in: [gets],
+          grants: [{ kind: "spend", contract: USDC, token: USDC, to: ROUTER }],
+        }),
       );
       const send = vi.fn();
       await expect(run(action, send)).rejects.toThrow(

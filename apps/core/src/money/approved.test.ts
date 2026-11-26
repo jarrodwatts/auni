@@ -188,7 +188,7 @@ describe("assertStillAsShown", () => {
   const spends = (exact: Partial<TokenGrant> = {}): Grant => ({
     lets: "0xAbCd…1234 spend your USDC",
     reach: "wallet",
-    exact: { kind: "spend", token: USDC, to: SPENDER, ...exact },
+    exact: { kind: "spend", contract: USDC, token: USDC, to: SPENDER, ...exact },
   });
 
   it("lets a raw transaction go while it sends no more and gets about what its card showed", () => {
@@ -232,6 +232,21 @@ describe("assertStillAsShown", () => {
     expect(other({ kind: "operator" })).toThrow(/now lets/u);
   });
 
+  // Found in review: a token's allowance, Permit2's allowance over it and a credit delegation to
+  // borrow it were pinned alike, by their token and holder, so one passed as another.
+  it("refuses a permission over the same token and holder that is another kind, or another contract keeps", () => {
+    const now = simulated(5_000_000n, 100n);
+    const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+    const shown = { ...trade, grants: [spends({ kind: "permit", contract: PERMIT2 })] };
+    const vouched = { ...approved, details: { ...approved.details, ...pinnedApproval(shown) } };
+    const fresh = (exact: Partial<TokenGrant>) => () =>
+      assertStillAsShown(vouched, { ...trade, grants: [spends(exact)] }, now);
+    expect(fresh({ kind: "permit", contract: PERMIT2.toLowerCase() })).not.toThrow();
+    expect(fresh({ kind: "permit", contract: TOKEN })).toThrow(/now lets/u);
+    expect(fresh({})).toThrow(/now lets/u);
+    expect(fresh({ kind: "borrow", contract: PERMIT2 })).toThrow(/now lets/u);
+  });
+
   // Found in review: it pinned a permission by its kind, token and holder alone, so one over
   // another NFT of the same collection, or another of the owner's token accounts for the same
   // mint, passed as the one the card showed.
@@ -264,9 +279,12 @@ describe("assertStillAsShown", () => {
       needsStepUp: `lets ${spends().lets}`,
       grantsExactly: `spend:${USDC}:${SPENDER}`,
     };
-    expect(() =>
-      assertStillAsShown({ ...approved, details }, { ...trade, grants: [spends()] }, now),
-    ).toThrow(/now lets/u);
+    // As each was pinned before it kept the contract that keeps it.
+    const unkept = { ...details, grantsExactly: `spend:${USDC}:${SPENDER}::` };
+    for (const each of [details, unkept])
+      expect(() =>
+        assertStillAsShown({ ...approved, details: each }, { ...trade, grants: [spends()] }, now),
+      ).toThrow(/now lets/u);
   });
 
   it("refuses a permission a card pinned only in words, as cards were before", () => {

@@ -47,10 +47,10 @@ export type Grant = {
     }
   | {
       /**
-       * It reaches the owner's main wallet, so it is named `exact`ly: its kind, the token's whole
-       * address or mint, whoever holds it, and the one token account or NFT it reaches. That,
-       * never its words, is what its card pins and what is checked again before signing (see
-       * pinnedApproval).
+       * It reaches the owner's main wallet, so it is named `exact`ly: its kind, the contract that
+       * keeps it, the token's whole address or mint, whoever holds it, and the one token account
+       * or NFT it reaches. That, never its words, is what its card pins and what is checked again
+       * before signing (see pinnedApproval).
        */
       readonly reach: "wallet";
       readonly exact: TokenGrant;
@@ -100,24 +100,26 @@ const walletGrants = (effect: Pick<Effect, "grants">) =>
 
 /**
  * Under this details key, each lasting power over the main wallet a card showed, exactly:
- * "kind:token:holder:account:id,…", a part it doesn't name left empty (see TokenGrant).
+ * "kind:contract:token:holder:account:id,…", a part it doesn't name left empty (see TokenGrant).
  */
 const GRANTS_EXACTLY = "grantsExactly";
 
-const pinned = ({ kind, token, to, account = "", id = "" }: TokenGrant) =>
-  [kind, token, to, account, id].join(":");
+const pinned = ({ kind, contract = "", token, to, account = "", id = "" }: TokenGrant) =>
+  [kind, contract, token, to, account, id].join(":");
 
 /**
  * The powers over the main wallet an action pinned exactly; null when it pinned none, or pinned
- * them before each was kept whole (fewer parts), which says less than its card is now held to.
+ * them before each was kept whole (fewer parts: before the contract that keeps it, or which
+ * token account or NFT it reaches), which says less than its card is now held to.
  */
 function pinnedGrants(details: Record<string, string>): TokenGrant[] | null {
   const each = details[GRANTS_EXACTLY]?.split(",").map((grant) => grant.split(":"));
-  if (!each?.every((parts) => parts.length === 5)) return null;
-  return each.map(([kind, token, to, account, id]) => ({
+  if (!each?.every((parts) => parts.length === 6)) return null;
+  return each.map(([kind, contract, token, to, account, id]) => ({
     kind: kind as TokenGrant["kind"],
     token: token!,
     to: to!,
+    ...(contract ? { contract } : {}),
     ...(account ? { account } : {}),
     ...(id ? { id } : {}),
   }));
@@ -140,10 +142,14 @@ export function pinnedApproval(effect: Effect): Record<string, string> {
   };
 }
 
-/** The same permission: its kind, its token, who holds it and what of it it reaches, each whole. */
+/**
+ * The same permission: its kind, the contract that keeps it, its token, who holds it and what of
+ * it it reaches, each whole.
+ */
 function samePermission(left: TokenGrant, right: TokenGrant): boolean {
   return (
     left.kind === right.kind &&
+    sameDestination(left.contract ?? "", right.contract ?? "") &&
     sameDestination(left.token, right.token) &&
     sameDestination(left.to, right.to) &&
     // A Solana account, whose base58 is exact, and an NFT's id, in decimal.

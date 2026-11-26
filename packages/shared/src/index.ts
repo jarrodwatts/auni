@@ -219,6 +219,7 @@ export {
 } from "./apps.generated.ts";
 export { formatExactUsd, type UsdcMoneyWire, usdcMoneyWireSchema } from "./money.ts";
 export { textAsMeant } from "./tool-input.ts";
+export { secretTitle } from "./secret-title.ts";
 export { clip, listed, withArticle } from "./words.ts";
 export { splitKeys } from "./wallet-keys.ts";
 export { type StartChatRequest, startChatRequestSchema, startedChatWireSchema } from "./places.ts";

@@ -266,6 +266,14 @@ describe("readStands", () => {
     expect(await readStands(readAgo(1, ["hyperliquid"]))).toBe(false);
   });
 
+  // The demo's clock stands still, so a move it ran finished at the very moment of every read
+  // after it, and Money went on showing the cash it had spent (2026-11-26).
+  it("lets no read stand that began the instant a move finished", async () => {
+    const at = minutesAgo(5);
+    await insertAction({ status: "done", updatedAt: at });
+    expect(await readStands(read({ observedAt: at.toISOString() }))).toBe(false);
+  });
+
   it("lets no read stand once they add a token, which it left out", async () => {
     const token = "0x5555555555555555555555555555555555555555";
     await seeTokens(db, "base", [token]);

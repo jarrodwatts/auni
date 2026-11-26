@@ -43,7 +43,9 @@ export const startingPointsJob = defineJob({
   // Writing them again only replaces what was saved.
   retries: 1,
   async run(_data, job) {
-    await save(await writePoints(await readFacts()), job.id);
+    // Saved as of when the facts were read, which the new chat shows beside each point.
+    const readAt = new Date();
+    await save(await writePoints(await readFacts()), job.id, readAt);
   },
   // One that threw past its retry, as when the portfolio couldn't be read, is saved as none: the
   // next is asked for under the key of when these were saved, so saving nothing would leave every
@@ -54,8 +56,10 @@ export const startingPointsJob = defineJob({
   },
 });
 
-const save = async (points: StartingPoint[], jobId?: string) => {
-  await db.update(owner).set({ startingPoints: points, startingPointsAt: sql`clock_timestamp()` });
+const save = async (points: StartingPoint[], jobId?: string, readAt?: Date) => {
+  await db
+    .update(owner)
+    .set({ startingPoints: points, startingPointsAt: readAt ?? sql`clock_timestamp()` });
   if (jobId) markStartingPointsJobSaved(jobId);
   publishStartingPoints();
 };

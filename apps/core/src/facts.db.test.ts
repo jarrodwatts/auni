@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STARTING_POINTS } from "@auni/shared";
 
-import { insertThread, setOwner, wipe } from "./test/db.ts";
+import { db } from "./db/client.ts";
+import { fills } from "./db/schema.ts";
+import { insertAction, insertThread, setOwner, wipe } from "./test/db.ts";
 import { readFacts } from "./facts.ts";
 import type { Holding, Portfolio } from "./money/portfolio.ts";
 
@@ -34,7 +36,8 @@ vi.mock("./money/day-moves.ts", () => ({
   dayMoves: async (holdings: readonly Holding[]) =>
     holdings.map((holding) => (holding.symbol === "NVDAx" ? "-4.10" : null)),
 }));
-vi.mock("./apps/registry.ts", () => ({
+vi.mock("./apps/registry.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   factSources: () => [
     {
       about: { id: "prices", name: "Prices" },
@@ -179,5 +182,25 @@ describe("readFacts", () => {
         ],
       },
     ]);
+  });
+
+  it("counts as cash only what Money does: savings a take bought are already at work", async () => {
+    const aave = { ...holding("aUSDC", "4000.00", true), venue: "aave" };
+    read.portfolio = portfolio([holding("USDC", "310.50", true), aave]);
+    const earning = await insertThread({ title: "Keep my idle cash earning" });
+    const action = await insertAction({ status: "done", threadId: earning.id });
+    await db.insert(fills).values({
+      actionId: action.id,
+      threadId: earning.id,
+      chain: aave.chain,
+      instrument: aave.instrument,
+      side: "buy",
+      quantity: aave.quantity,
+      usdValue: "4000.00",
+    });
+
+    const [whole, cash] = await readFacts();
+    expect(whole!.text).toBe("The owner has $4,310.50 in all, $310.50 of it cash.");
+    expect(cash!.starts.map(({ statement }) => statement)).toEqual(["$310.50 is in cash."]);
   });
 });

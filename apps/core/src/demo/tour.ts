@@ -91,10 +91,10 @@ const STOPS: readonly Stop[] = [
     ],
   },
   {
-    title: "This thread's panel",
+    title: "This take's details",
     follows: true,
-    does: "Everything tied to this thread sits beside the chat: the positions opened here, its notes, watches, and its record. You can also switch any thread between **Ask first** and **Auto** within a dollar budget from the strip under the box.",
-    reply: "I see the panel",
+    does: "Open this take's details from the top of the chat: the positions opened here, its notes, watches, and its record. Under **Spending** you switch it between **Ask first** and **Auto**, which buys and sells on its own within a dollar budget you set.",
+    reply: "I see the details",
     looked: true,
   },
   {
@@ -208,7 +208,7 @@ const AFTER: readonly { readonly reply: string; readonly says: string }[] = [
   },
   {
     reply: "Show me an Auto thread",
-    says: "Open **AI buildout** in the sidebar. It is set to act on its own within a $4,000 budget, with its positions, notes and budget bar right in the panel beside the chat.",
+    says: "Open **AI buildout** in the sidebar. It is set to act on its own within a $4,000 budget, with its positions, notes and what's left of that budget in its details.",
   },
   {
     reply: "How do I run it for real?",

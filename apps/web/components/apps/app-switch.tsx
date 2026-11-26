@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { CoreApiError } from "@/lib/core";
 import { useSwitchApp } from "@/lib/data/apps";
 
-import { waitingFor } from "./app-standing";
+import { keysFirst, waitingFor } from "./app-standing";
 import { turningOff } from "./turning-off";
 
 /**
@@ -68,6 +68,8 @@ export function AppSwitch({
         ? off
         : null;
 
+  // Waiting on keys with nothing there, the key form above is the one thing to do.
+  if (keysFirst(app)) return null;
   return (
     <AutoHeight className="mt-9">
       {refused ? (

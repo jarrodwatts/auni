@@ -33,6 +33,7 @@ import { feeCoinsSaid, feeCoinTold } from "./fee-coin-said.ts";
 import { fillIdentity } from "./fill-key.ts";
 import { findInstruments } from "./instruments.ts";
 import { namesLabel } from "./format.ts";
+import { heldByTakes, takeRecords } from "./takes.ts";
 import { recognisedHow } from "./recognised.ts";
 import { idleBridges, largestShortfall, uncoveredAccounts, walletCash } from "./funding.ts";
 import { placeName } from "./chains.ts";
@@ -114,7 +115,10 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
         "cash held for open orders `heldForOrders`, which is theirs but not free until those orders " +
         "fill or are cancelled), `cash` (dollar stablecoins, including savings and free margin: the " +
         "Cash Portfolio and Withdraw show; each holding's `venue` says where it is, `wallet` being " +
-        "what a withdrawal sends and an app's id cash kept there), and `onTheWay`, money bridged or " +
+        "what a withdrawal sends and an app's id cash kept there), `idleCashUsd`, the Cash Money shows " +
+        "and the figure to tell the owner as their cash: `cash` less savings a take bought, which are " +
+        "that take's (so `cash.usdValue` is their buying power, savings they could take out included), " +
+        "and `onTheWay`, money bridged or " +
         "moved into or out of a venue's account that hasn't landed yet. Sources listed under " +
         "`unavailable` could not be read and are missing from the totals. `looking` lists the " +
         "networks whose wallet Auni is still looking through for the first time: more may show up " +
@@ -125,21 +129,23 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
         "owner's other threads count on: plan with that.",
       inputSchema: {},
       async handler() {
-        const [portfolio, waiting] = await Promise.all([
+        const [portfolio, records, waiting] = await Promise.all([
           readPortfolio(),
+          takeRecords(),
           waitingElsewhere(context.threadId),
         ]);
+        const read = { ...portfolio, idleCashUsd: heldByTakes(portfolio, records).cashUsd };
         // Cash a card in another thread still counts on isn't offered again as free.
         const promised = usdToCents(waiting.countsOnUsd);
         const free = usdToCents(portfolio.cash.usdValue) - promised;
         const told =
           promised > 0n
             ? {
-                ...portfolio,
+                ...read,
                 cashPromisedToWaitingCardsUsd: waiting.countsOnUsd,
                 cashFreeUsd: centsToUsd(free > 0n ? free : 0n),
               }
-            : portfolio;
+            : read;
         // Text alone: as structuredContent too, the brain would show the agent the whole portfolio twice.
         return result(
           [

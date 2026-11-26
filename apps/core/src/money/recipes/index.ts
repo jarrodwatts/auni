@@ -55,18 +55,21 @@ export function recipeForTool(tool: string): Recipe | undefined {
   return everyRecipe().find((recipe) => recipe.tool === tool);
 }
 
-type MoneyRow = Pick<ActionRow, "tool" | "input" | "details" | "run" | "amountUsd">;
+type MoneyRow = Pick<ActionRow, "tool" | "input" | "details" | "run" | "amountUsd" | "card">;
 
 /**
  * The money a recorded move moves, and which way: cash it readies without
  * selling anything (a bridge, savings back to the wallet) moves rather than
- * goes in.
+ * goes in. What a sale's card promises at least ("at least, if all 310 sell")
+ * stays a floor until it has come back.
  */
 export function rowMoney(row: MoneyRow): Money | null {
   const money = moneyOf(row);
-  return money?.flow === "in" && recipeForTool(row.tool)?.readies?.(row.input as never)
-    ? { ...money, flow: "move" }
-    : money;
+  if (money?.flow === "in" && recipeForTool(row.tool)?.readies?.(row.input as never))
+    return { ...money, flow: "move" };
+  if (money?.flow === "back" && !row.run.returnedUsd && row.card?.note?.startsWith("at least"))
+    return { ...money, least: true };
+  return money;
 }
 
 /**

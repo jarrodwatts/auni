@@ -19,8 +19,8 @@ export const APP_ABOUTS = {
         prompt: "What does Aave pay on cash right now, on each chain I could use?",
       },
       {
-        title: "Take it all back out",
-        prompt: "Take everything I have in Aave back out to cash.",
+        title: "Bring it all back",
+        prompt: "Bring everything I have in Aave back to cash.",
         moves: true,
       },
     ],

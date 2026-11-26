@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { timestampSchema } from "./shared.ts";
 import { TEXT_WIDTHS } from "./text-widths.ts";
 
 /** Where a fact came from: the app that saw it ("auni" for Auni's own), and what it was. */
@@ -101,5 +102,7 @@ export type StartingPoint = z.infer<typeof startingPointSchema>;
 export const startingPointsWireSchema = z.object({
   points: z.array(startingPointSchema),
   pending: z.boolean(),
+  /** When the facts the points rest on were read; null with no points. */
+  observedAt: timestampSchema.nullable(),
 });
 export type StartingPointsWire = z.infer<typeof startingPointsWireSchema>;

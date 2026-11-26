@@ -369,8 +369,8 @@ describe("the faces of cash into and out of Hyperliquid", () => {
     const face = withdrawFace({ to: "Arbitrum", arrives: "$499", fee: "$1", all: false });
     expect(fillFace(face, usdc("500000000"))).toMatchObject({
       title: "Bring cash back from Hyperliquid",
-      note: "to withdraw",
-      action: "Withdraw $500",
+      note: "to bring back",
+      action: "Bring back $500",
       context: "To Arbitrum, after a $1 fee",
       figures: [
         { label: "Leaves Hyperliquid", value: "$500", role: "pays" },
@@ -380,7 +380,7 @@ describe("the faces of cash into and out of Hyperliquid", () => {
       ],
       finePrint: "What your open positions hold as margin stays with them.",
       receipt: {
-        title: "Withdrew from Hyperliquid",
+        title: "Brought cash back from Hyperliquid",
         detail: "$499 to your wallet on Arbitrum, after Hyperliquid's $1 fee",
         amount: null,
       },

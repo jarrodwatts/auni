@@ -149,7 +149,7 @@ export const aaveWithdraw: Recipe<typeof savingsInput> = {
   async describe({ chain, amount_usd }) {
     const amount = normalizeUsd(amount_usd);
     return {
-      summary: `Withdraw ${dollars(amount)} from Aave savings on ${NETWORKS[chain].name}`,
+      summary: `Bring ${dollars(amount)} back from Aave savings on ${NETWORKS[chain].name}`,
       amountUsd: amount,
       effect: {
         gives: [{ text: `${dollars(amount)} of Aave savings on ${NETWORKS[chain].name}` }],

@@ -157,7 +157,7 @@ const SCENES: readonly Scene[] = [
       yield* say(
         // A failed move would only fail the same way again, so the reply offers another way, never it.
         /\bpaused\b/u.test(heard)
-          ? "The pool is paused, so the same buy would fail again. I can route it another way, or pick a different stock."
+          ? "The same buy would fail the same way until that clears. I can route it another way, or pick a different stock."
           : "I can find another way to do it.",
       );
     },
@@ -198,9 +198,9 @@ const SCENES: readonly Scene[] = [
     async *play({ heard, say }) {
       yield* say(
         /friday-check/u.test(heard)
-          ? "It's Friday at 5pm, time for the week's check. Your positions are where they were on Monday, give or take a few dollars, and nothing is waiting on you."
+          ? "It's Friday at 5pm, time for the week's check. Your positions are where they were on Monday, give or take a few dollars, so I'd leave them be."
           : /as Clock watches it/u.test(heard)
-            ? "It's the time you asked me to remind you: your portfolio is where you left it, and nothing is waiting on you."
+            ? "It's the time you asked me to remind you: your money is where you left it."
             : /Solana/u.test(heard)
               ? "Solana just dropped more than 5% in a few minutes, which is what you asked me to watch for. It came straight back, so I'd leave your Solana as it is."
               : "Bitcoin just crossed the level you asked me to watch. Nothing needs doing yet, but it's worth a look.",
@@ -320,7 +320,7 @@ const SCENES: readonly Scene[] = [
         note: "Sam holds Solana and wants to know if it dips into an add zone.",
         repeat: "once",
       });
-      yield* say("I've saved your Solana take in the notes and set a watch if it dips below $140.");
+      yield* say("I've noted why you hold Solana and set a watch if it dips below $140.");
     },
   },
   {
@@ -547,7 +547,7 @@ const SCENES: readonly Scene[] = [
     async *play({ say, call }) {
       yield* call("get_portfolio", {});
       yield* say(
-        "You hold one bet: Yes on the Fed cutting rates in December. What it's worth moves with the odds, and its row in your portfolio shows it as it stands. It settles after the Fed's December meeting.",
+        "You hold one bet: Yes on the Fed cutting rates in December. What it's worth moves with the odds, and Money shows it as it stands. It settles after the Fed's December meeting.",
       );
     },
   },
@@ -631,9 +631,7 @@ const SCENES: readonly Scene[] = [
       yield* think(
         "I have no app for Kintsu, so there is no tool for this. I can still build the staking call myself, run it first and show exactly what it does.",
       );
-      yield* say(
-        "I have no app for Kintsu yet, so I built this one myself. Stake only MON you mean to hold for a while.",
-      );
+      yield* say("Stake only MON you mean to hold for a while.");
       yield* call("send_evm_transaction", {
         chain: "monad",
         calls: [stakeMon(parseEther(String(mon)))],
@@ -846,7 +844,7 @@ const SCENES: readonly Scene[] = [
     hears: /act on (its|your) own/iu,
     async *play({ say, call }) {
       yield* say(
-        "With that on, I can buy and sell here inside your $4,000 budget without asking each time. I'll still ask for perps, bridges, and withdrawals.",
+        "With it on, I can add to the buildout on dips and take some off after a big run without waiting for you. You can put it back to Ask first from this take's details.",
       );
       yield* call("set_thread_autonomy", { act_mode: "within_limits", budget_usd: 4_000 });
     },
@@ -1102,7 +1100,7 @@ const SCENES: readonly Scene[] = [
         "You're in good shape. Most of your money is working: Nvidia and Tesla from your AI buildout take, your idle cash earning in Aave, and a bitcoin long open on Hyperliquid.",
       );
       yield* say(
-        "Nothing needs you right now. The one thing I'd keep an eye on is the long: it's 3x, so a bad week matters more there than anywhere else.",
+        "The one thing I'd keep an eye on is the long: it's 3x, so a bad week matters more there than anywhere else. Anything waiting on your tap is in Needs you.",
       );
     },
   },

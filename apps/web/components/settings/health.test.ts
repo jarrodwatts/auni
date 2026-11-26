@@ -19,9 +19,9 @@ describe("Health, as the owner reads it", () => {
       needs: [],
     });
     const two = healthOf([finding("runner", "fix"), finding("rpc", "ok"), finding("brain", "fix")]);
-    expect(two.headline).toBe("2 things need you");
+    expect(two.headline).toBe("2 things to fix");
     expect(two.needs.map(({ check }) => check)).toEqual(["runner", "brain"]);
-    expect(healthOf([finding("brain", "fix")]).headline).toBe("1 thing needs you");
+    expect(healthOf([finding("brain", "fix")]).headline).toBe("1 thing to fix");
   });
 
   it("names each part in the owner's words", () => {

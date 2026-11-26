@@ -29,6 +29,30 @@ export function keysNeeded(app: AppWire): readonly AppSettingWire[] {
 }
 
 /**
+ * What the owner is asked to paste, in a phrase: its one field's own name without the app's
+ * ("bot token" for Telegram's bot token; an API key is just a key), or "keys".
+ */
+export function keysWord(app: Pick<AppWire, "name">, needed: readonly AppSettingWire[]): string {
+  const [only] = needed;
+  if (!only || needed.length > 1) return "keys";
+  const own = only.label.startsWith(`${app.name} `)
+    ? only.label.slice(app.name.length)
+    : only.label;
+  const word = own.replace(/\bAPI key\b/u, "key").trim();
+  return word.charAt(0).toLowerCase() + word.slice(1);
+}
+
+/**
+ * Whether an app shows only its key form, with no switch: it waits for keys and holds nothing of
+ * the owner's, so saving them is the one thing to do. One holding money (or whose balance can't
+ * be read) keeps its switch, the way to turn it off without giving the keys first.
+ */
+export function keysFirst(app: AppWire): boolean {
+  if (keysNeeded(app).length === 0) return false;
+  return app.account === null || (app.account.usd !== null && dollarsThere(app) === null);
+}
+
+/**
  * Which of an app's ways to try it work now, and which wait for what it still needs. With
  * nothing missing, all work. With something missing, none do, but for money already there:
  * Auni can read that, though a way that moves money still waits.

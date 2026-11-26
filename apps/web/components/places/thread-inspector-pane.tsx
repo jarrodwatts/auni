@@ -149,7 +149,7 @@ function SpendingLine({
             while {me.reach.machine} sleeps.{" "}
             <button
               type="button"
-              onClick={() => openSettings("remote")}
+              onClick={() => openSettings("machine")}
               className="auni-text-link font-medium"
             >
               Keep running 24/7

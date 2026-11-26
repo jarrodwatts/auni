@@ -49,8 +49,8 @@ describe("doneTitle", () => {
       "Replaced your routine: Friday check",
     );
     expect(doneTitle("Turn Elfa on")).toBe("Turned Elfa on");
-    expect(doneTitle("Let this thread trade on its own up to $500")).toBe(
-      "This thread can now trade on its own up to $500",
+    expect(doneTitle("Let this take trade on its own up to $500")).toBe(
+      "This take can now trade on its own up to $500",
     );
     expect(doneTitle("Let Peptides trade on its own up to $1,500")).toBe(
       "Peptides can now trade on its own up to $1,500",

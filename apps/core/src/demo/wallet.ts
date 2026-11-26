@@ -37,7 +37,8 @@ export function startWithoutWallet(): void {
 }
 
 /** The demo reads nothing of the owner's, so its field to bring a wallet takes no keys. */
-const TAKES_NO_KEYS = "This is the demo, so it takes no keys: its wallet is made up. Nothing was saved.";
+const TAKES_NO_KEYS =
+  "This is the demo, so it takes no keys: its wallet is made up. Nothing was saved.";
 
 export const demoWallet: WalletProvider = {
   addresses: async () => (wallet.made ? WALLET : { evm: null, solana: null }),
@@ -49,7 +50,7 @@ export const demoWallet: WalletProvider = {
   bring: {
     id: "wallet-keys",
     label: "Wallet keys",
-    goes: "It goes straight to Auni's wallet on this computer. Auni's AI never sees it.",
+    goes: "Saved to your wallet, only on this computer. Your AI never sees it.",
     app: "demo-wallet",
     link: null,
     confirms: true,

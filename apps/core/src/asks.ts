@@ -5,6 +5,7 @@ import {
   isAsk,
   listed,
   threadActModeSchema,
+  secretTitle,
 } from "@auni/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -263,7 +264,8 @@ function whatItAsksFor(row: ActionRow): Pick<AskCard, "app" | "field"> {
  */
 export function askWaits(row: Pick<ActionRow, "tool" | "input" | "summary">): string {
   if (!isAsk(row.tool)) throw new Error(`${row.tool} is not an ask.`);
-  if (row.tool === "request_secret") return `Paste your ${row.summary}`;
+  // As the card heads it, so the two never read differently side by side.
+  if (row.tool === "request_secret") return secretTitle(row.summary);
   const ask = ASKS[row.tool] as Ask<unknown>;
   return ask.action(ask.input.parse(row.input));
 }

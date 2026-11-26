@@ -308,6 +308,8 @@ export function subjectOf(
 export interface Money {
   readonly flow: MoneyFlow;
   readonly usd: string;
+  /** What comes back is at least this, as its card promises, rather than a quote. */
+  readonly least?: true;
 }
 
 /**

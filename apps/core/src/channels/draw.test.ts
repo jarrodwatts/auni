@@ -135,7 +135,7 @@ describe("drawCard", () => {
     });
     const legs = [leg(), sell];
     const drawn = drawCard(view(legs), "g");
-    expect(drawn.text).toContain(`**${literal("2 moves, $15 total")}**`);
+    expect(drawn.text).toContain(`**${literal("2 moves, $15 to put in")}**`);
     expect(drawn.text).toContain("> You give: 10 USDC");
     expect(drawn.text).toContain("> Price cap: $50 per share");
     expect(drawn.buttons?.flat()).toContainEqual({ label: "Buy both for $15", press: "allow:g" });
@@ -342,12 +342,12 @@ describe("drawCard", () => {
     // Twelve fit while they wait, and still do taken back, saying why once.
     expect(fitsHere(plan(12))).toBe(true);
     const twelve = drawCard(view(takenBack(plan(12))), null);
-    expect(twelve.text).toContain(`moves, $120 total**\n\n${why}\n\n**1. Sell 1 Yes shares**`);
+    expect(twelve.text).toContain(`moves, $120 to put in**\n\n${why}\n\n**1. Sell 1 Yes shares**`);
     expect(twelve.text.split(why)).toHaveLength(2);
     expect(twelve.buttons).toBeUndefined();
     // Too long to show whole, it still says why.
     expect(drawCard(view(takenBack(plan(200))), null)).toEqual({
-      text: `**200 moves, $2,000 total**\n${why}`,
+      text: `**200 moves, $2,000 to put in**\n${why}`,
     });
   });
 

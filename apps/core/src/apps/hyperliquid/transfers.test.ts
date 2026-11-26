@@ -98,7 +98,7 @@ describe("hyperliquidWithdraw", () => {
   it("shows all that is free on the card when no amount is given", async () => {
     spot = { total: "10.802", hold: "0" };
     const card = await hyperliquidWithdraw.describe({}, {});
-    expect(card.summary).toBe("Withdraw all free cash ($10.80) from Hyperliquid to Arbitrum");
+    expect(card.summary).toBe("Bring all free cash ($10.80) back from Hyperliquid to Arbitrum");
     expect(card.amountUsd).toBe("10.80");
   });
 

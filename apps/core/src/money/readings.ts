@@ -1,4 +1,4 @@
-import { and, eq, gt, max, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, gt, gte, max, or, sql, type SQL } from "drizzle-orm";
 
 import { db, type Tx } from "../db/client.ts";
 import { actions, arrivals, firstLooks, otherTokens, valueSnapshots } from "../db/schema.ts";
@@ -167,7 +167,8 @@ async function finishedSince(q: Pick<Tx, "select">, since: Date): Promise<boolea
     q
       .select({ id: actions.id })
       .from(actions)
-      .where(and(eq(actions.status, "done"), gt(actions.updatedAt, since)))
+      // At or after: a read begun the instant a move finished may not show it.
+      .where(and(eq(actions.status, "done"), gte(actions.updatedAt, since)))
       .limit(1),
     // Money recorded moving since, by when Auni recorded it: a read begun before then
     // may leave out a token only its arrival has Auni read. Only what is told changes

@@ -42,7 +42,7 @@ const DONE_TITLES: readonly (readonly [RegExp, string])[] = [
   [/^Save a routine: /u, "Saved routine: "],
   [/^Replace your routine: /u, "Replaced your routine: "],
   [/^Turn (.+) on$/u, "Turned $1 on"],
-  [/^Let this thread /u, "This thread can now "],
+  [/^Let this take /u, "This take can now "],
   [/^Let (.+?) trade /u, "$1 can now trade "],
 ];
 

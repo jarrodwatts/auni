@@ -64,8 +64,6 @@ export const portfolioWireSchema = z.object({
   looking: z.array(z.string()),
   /** Money on its way between networks first ("On the way"), then every non-cash holding, largest first. */
   holdings: z.array(holdingWireSchema),
-  /** Free cash across wallets, savings, and venue accounts. */
-  cashUsd: dollarsSchema,
   /**
    * How many tokens in their wallets Auni neither recognises nor was told are
    * theirs: never counted, priced or named, and listed only when they open them

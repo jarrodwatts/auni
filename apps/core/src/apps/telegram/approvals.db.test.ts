@@ -321,7 +321,7 @@ describe("pairing", () => {
     expect(await deliveryOf(held.id)).toMatchObject({ grantHash: null });
     expect(await deliveryOf(proof.id)).toMatchObject({ grantHash: null });
     expect(replies.at(-1)).toMatchObject({
-      text: `1 more waiting. Open Auni on ${hostname().split(".")[0]} to see them.`,
+      text: `1 more waiting. Open Needs you in Auni on ${hostname().split(".")[0]} to see them.`,
     });
     expect(replies.at(-1)?.reply_markup).toBeUndefined();
     expect(replies.some(({ text }) => String(text).includes("Status unknown"))).toBe(true);
@@ -415,7 +415,9 @@ describe("pairing", () => {
       });
       expect(replies.at(-1)).toMatchObject({
         text: "1 more waiting in Auni",
-        reply_markup: { inline_keyboard: [[{ text: "Open Money", url: `${origin}/app` }]] },
+        reply_markup: {
+          inline_keyboard: [[{ text: "Needs you", url: `${origin}/app/needs-you` }]],
+        },
       });
     } finally {
       Object.assign(env, saved);
@@ -435,22 +437,52 @@ describe("pairing", () => {
       priceId: null,
     };
     const loose = { ...position, chain: "monad", symbol: "MON", usdValue: "20.00" };
+    const usdc: Holding = {
+      ...position,
+      instrument: "0x00000000000000000000000000000000000000cc",
+      symbol: "USDC",
+      quantity: "25",
+      decimals: 6,
+      usdValue: "25.00",
+      cash: true,
+    };
+    // Savings a take bought are that take's, as Money shows them, never Cash.
+    const aave: Holding = {
+      ...usdc,
+      venue: "aave",
+      chain: "monad",
+      instrument: "0x35a73BAcb179d3740395A3ceCc87FF2e581d6042",
+      symbol: "aUSDC",
+      quantity: "40",
+      usdValue: "40.00",
+    };
     vi.mocked(portfolioNow).mockResolvedValue({
-      totalUsd: "255.00",
+      totalUsd: "295.00",
       observedAt: new Date().toISOString(),
       unavailable: [],
       looking: [],
       assets: { usdValue: "220.00", holdings: [position, loose] },
-      cash: { usdValue: "25.00", holdings: [] },
+      cash: { usdValue: "65.00", holdings: [usdc, aave] },
       onTheWay: {
         usdValue: "10.00",
         moves: [{ actionId: crypto.randomUUID(), lands: "Base", usdValue: "10.00" }],
       },
-      holdings: [position, loose],
+      holdings: [position, loose, usdc, aave],
     });
     await db.update(threads).set({ title: "ETH take" }).where(eq(threads.id, thread.id));
     const other = await insertThread({ title: "Other ETH take" });
     const now = Date.now();
+    const earning = await insertThread({ title: "Keep my idle cash earning" });
+    const savedAction = await waiting({ threadId: earning.id, status: "done" });
+    await db.insert(fills).values({
+      actionId: savedAction.id,
+      threadId: earning.id,
+      chain: aave.chain,
+      instrument: aave.instrument,
+      side: "buy",
+      quantity: "40",
+      usdValue: "40",
+    });
     for (const [threadId, quantity] of [
       [thread.id, "1.5"],
       [other.id, "1"],
@@ -478,7 +510,7 @@ describe("pairing", () => {
     expect(fake.sent("sendMessage")).toMatchObject([
       {
         chat_id: String(OWNER),
-        text: "<b>Money</b>\n\n<blockquote>Total: $255 (+$12 today)\nCash: $25\nETH take: $150\nOther ETH take: $50\nOther holdings: $20\nOn the way: $10</blockquote>",
+        text: "<b>Money</b>\n\n<blockquote>Total: $295 (+$12 today)\nCash: $25\nETH take: $150\nOther ETH take: $50\nKeep my idle cash earning: $40\nOther holdings: $20\nOn the way: $10</blockquote>",
       },
     ]);
     expect(fake.sent("sendMessage")[0]?.reply_markup).toBeUndefined();

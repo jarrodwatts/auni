@@ -43,8 +43,8 @@ describe("GET /starting-points", () => {
   });
 
   it("asks for them once while there are none", async () => {
-    expect(await read()).toEqual({ points: [], pending: true });
-    expect(await read()).toEqual({ points: [], pending: true });
+    expect(await read()).toEqual({ points: [], pending: true, observedAt: null });
+    expect(await read()).toEqual({ points: [], pending: true, observedAt: null });
     expect(await queued("starting-points")).toEqual([
       {
         kind: "starting-points",
@@ -59,7 +59,7 @@ describe("GET /starting-points", () => {
   it("shows none past an hour old, and asks for new ones once", async () => {
     const writtenAt = new Date(Date.now() - 61 * 60_000);
     await setOwner({ startingPoints: [POINT], startingPointsAt: writtenAt });
-    expect(await read()).toEqual({ points: [], pending: true });
+    expect(await read()).toEqual({ points: [], pending: true, observedAt: null });
     await read();
     expect(await queued("starting-points")).toMatchObject([
       { key: `starting-points:${writtenAt.toISOString()}` },
@@ -67,11 +67,14 @@ describe("GET /starting-points", () => {
   });
 
   it("shows those saved at once, and asks for nothing, while they're fresh", async () => {
-    await setOwner({
-      startingPoints: [POINT],
-      startingPointsAt: new Date(Date.now() - 59 * 60_000),
+    const readAt = new Date(Date.now() - 59 * 60_000);
+    await setOwner({ startingPoints: [POINT], startingPointsAt: readAt });
+    // With when what they rest on was read, which the new chat shows beside each.
+    expect(await read()).toEqual({
+      points: [POINT],
+      pending: false,
+      observedAt: readAt.toISOString(),
     });
-    expect(await read()).toEqual({ points: [POINT], pending: false });
     expect(await queued("starting-points")).toEqual([]);
   });
 });

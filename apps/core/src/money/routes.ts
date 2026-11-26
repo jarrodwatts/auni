@@ -285,7 +285,6 @@ portfolioRouter.get("/", async (req, res) => {
       ...onTheWay(portfolio.onTheWay.usdValue),
       ...(await holdingViews(portfolio.assets.holdings, startOfDay(timeZone))),
     ],
-    cashUsd: portfolio.cash.usdValue,
     otherTokens: others.length,
     deposits: deposits.map(depositWire),
     feesPayable: feesNow,

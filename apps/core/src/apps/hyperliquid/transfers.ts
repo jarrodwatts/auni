@@ -148,8 +148,8 @@ export const hyperliquidWithdraw: Recipe<typeof withdrawInput> = {
     const amount = dollars(centsToUsd(cents));
     return {
       summary: all
-        ? `Withdraw all free cash (${amount}) from Hyperliquid to Arbitrum`
-        : `Withdraw ${amount} from Hyperliquid to Arbitrum`,
+        ? `Bring all free cash (${amount}) back from Hyperliquid to Arbitrum`
+        : `Bring ${amount} back from Hyperliquid to Arbitrum`,
       amountUsd: centsToUsd(cents),
       // Signed to the owner's own address, which Hyperliquid pays on Arbitrum (see landed).
       effect: {

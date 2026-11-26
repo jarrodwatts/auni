@@ -612,6 +612,18 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       ],
     ];
     for (const [name, url, opener] of shots) await take(page, out, name, url, "top", opener, once);
+    // The README's one take, from its card to Money: Double down on AI waits on its card (its
+    // chat-... picture); the owner taps it, it settles in place, and Money holds it as a take.
+    // Late, as it changes Money for every picture after it.
+    const story = threads.find((thread) => /double down on ai/iu.test(thread.title ?? ""));
+    if (story && (!ONLY || ONLY.test("readme"))) {
+      const chat = `${origin}/app/chat/${story.id}`;
+      await page.open(chat);
+      await page.until(PRESS("Buy both"), 10_000);
+      await page.until(`document.body.innerText.includes("Both went through")`, 60_000);
+      await take(page, out, "readme-allowed", chat, "end");
+      await take(page, out, "readme-money", `${origin}/app?take=${story.id}`, "top");
+    }
     if (busiest) {
       const chat = `${origin}/app/chat/${busiest.id}`;
       // Last, as the pane stays open once opened (on this device) for every thread after it.

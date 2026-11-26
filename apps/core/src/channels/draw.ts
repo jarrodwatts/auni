@@ -103,8 +103,7 @@ function faceWords(leg: ActionRow, text: string): string {
 
 function planName(legs: readonly ActionRow[]): string {
   const money = moneyLine(cardMoneys(legs));
-  const amount = money?.endsWith(" in") ? `${money.slice(0, -3)} total` : money;
-  return `${legs.length} moves${amount ? `, ${amount}` : ""}`;
+  return `${legs.length} moves${money ? `, ${money}` : ""}`;
 }
 
 function actionLabel(legs: readonly ActionRow[]): string {

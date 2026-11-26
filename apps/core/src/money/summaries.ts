@@ -21,19 +21,25 @@ export function differenceUsd(current: string, baseline: string): string {
 }
 
 /**
- * What some moves do with money, in a phrase: "$50 in", "about $82 back",
- * "$25 in, about $41 back". What comes back is a quote, so it's "about". Cash
- * only moved between their own places has no one honest total (savings out,
- * then bridged, is one sum moved twice), so it isn't said. Null when they move
- * none of the rest.
+ * What some moves do with money, in a phrase, as their card says it under its amount: "$50 to
+ * put in", "about $82 back", "$25 to put in, about $41 back". What comes back is a quote, so it's
+ * "about", unless every card it comes from promises at least that ("at least $191.68 back"), as a
+ * sell that may fill in part does. Cash only moved between their own places has no one honest
+ * total (savings out, then bridged, is one sum moved twice), so it isn't said. Null when they
+ * move none of the rest. Needs you, the sidebar, Telegram's cards and the agent all say a card's
+ * money with this, so none reads it another way.
  */
 export function moneyLine(moneys: readonly (Money | null)[]): string | null {
-  const total = (flow: Money["flow"]) =>
-    sumUsd(moneys.flatMap((money) => (money?.flow === flow ? [money.usd] : [])));
-  const [going, back] = [total("in"), total("back")];
+  const flowing = (flow: Money["flow"]) =>
+    moneys.flatMap((money) => (money?.flow === flow ? [money] : []));
+  const total = (some: readonly Money[]) => sumUsd(some.map(({ usd }) => usd));
+  const [going, back] = [flowing("in"), flowing("back")];
+  const least = back.length > 0 && back.every((money) => money.least);
   const parts = [
-    usdToCents(going) > 0n ? `${dollars(going)} in` : null,
-    usdToCents(back) > 0n ? `about ${dollars(back)} back` : null,
+    usdToCents(total(going)) > 0n ? `${dollars(total(going))} to put in` : null,
+    usdToCents(total(back)) > 0n
+      ? `${least ? "at least" : "about"} ${dollars(total(back))} back`
+      : null,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
 }

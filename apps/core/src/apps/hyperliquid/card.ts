@@ -389,9 +389,9 @@ export function withdrawFace(withdraw: WithdrawWords): CardFace {
   const { to, arrives, fee } = withdraw;
   return {
     title: `Bring cash back from ${about.name}`,
-    note: "to withdraw",
-    action: `Withdraw ${AMOUNT}`,
-    working: `Withdrawing from ${about.name}`,
+    note: "to bring back",
+    action: `Bring back ${AMOUNT}`,
+    working: `Bringing it back from ${about.name}`,
     // What leaves is the card's amount; the line under it says why less lands.
     context: `To ${to}, after a ${fee} fee`,
     figures: figures(
@@ -402,7 +402,7 @@ export function withdrawFace(withdraw: WithdrawWords): CardFace {
     ),
     finePrint: `${withdraw.all ? "That is all the cash free there now. " : ""}What your open positions hold as margin stays with them.`,
     receipt: {
-      title: `Withdrew from ${about.name}`,
+      title: `Brought cash back from ${about.name}`,
       detail: `${arrives} to your wallet on ${to}, after ${about.name}'s ${fee} fee`,
       amount: null,
     },

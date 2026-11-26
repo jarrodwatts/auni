@@ -141,9 +141,9 @@ const CASH_ORDER: readonly CashMove["kind"][] = [
 function cashStep(move: CashMove): string {
   switch (move.kind) {
     case "from_savings":
-      return "Took cash out of savings";
+      return "Brought cash back from savings";
     case "from_account":
-      return `Took cash out of ${placeName(move.place)}`;
+      return `Brought cash back from ${placeName(move.place)}`;
     case "between_wallets":
       return `Moved cash from ${placeName(move.from)} to ${placeName(move.to)}`;
     case "to_account":
@@ -539,11 +539,7 @@ async function legsOf(row: ActionRow, own: readonly FillRow[], names: Namer): Pr
  * can't read shows as it was told then, and is reported, rather than taking
  * the rest of activity down with it.
  */
-async function readLeg(
-  row: ActionRow,
-  names: Namer,
-  filled: readonly FillRow[],
-): Promise<LegDoes> {
+async function readLeg(row: ActionRow, names: Namer, filled: readonly FillRow[]): Promise<LegDoes> {
   const recipe = recipeForTool(row.tool);
   try {
     return await doesOf(row, recipe, recipe ? subjectOf(recipe, row) : null, names, filled);
@@ -1021,9 +1017,7 @@ function outsideOf(row: ActionRow, own: readonly FillRow[]) {
 }
 
 function touchesOf(threadId: string | null, own: readonly FillRow[]): string[] {
-  return [
-    ...new Set([threadId, ...own.map((fill) => fill.threadId)].filter((id) => id !== null)),
-  ];
+  return [...new Set([threadId, ...own.map((fill) => fill.threadId)].filter((id) => id !== null))];
 }
 
 /** What a move at `venue` (an app id) is about, as the portfolio names it. */

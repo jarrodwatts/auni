@@ -7,7 +7,12 @@
 
 <p align="center">
   <b>An AI agent for your own money, running on your own computer.</b><br>
-  Tell it a take. It researches it and builds the position. Nothing moves until you tap.
+  Tell it a take. It researches it and builds the position. Nothing moves until you tap,<br>
+  unless you turn on Auto for a take, with a budget you set.
+</p>
+
+<p align="center">
+  <a href="#try-it"><b>Try it with fake money</b></a>
 </p>
 
 <p align="center">
@@ -158,7 +163,8 @@ there, or says how to add WSL first.
   computer's network. Only Auni's own tools, which run outside the box, can do anything that
   matters.
 - **Risky moves check it's you.** A first withdrawal to a new address, a raw transaction a card
-  can't vouch for, and showing your keys all ask you to confirm it's you first.
+  can't vouch for, showing your keys, and moving Auni to another computer all ask you to confirm
+  it's you first.
 - **Only you.** Auni answers only on this computer, to browsers you paired, and to a Telegram
   chat you paired. To reach it from your phone, `auni up --always-on` puts it behind your own
   Tailscale account.
@@ -189,12 +195,16 @@ there, or says how to add WSL first.
 | `auni uninstall`       | Remove Auni and keep your data and keys                             |
 
 `auni <command> --help` says more. Everything Auni keeps is in `~/.auni`, and your settings are
-in `~/.auni/.env` ([apps/core/.env.example](apps/core/.env.example) lists them all).
+in `~/.auni/.env` ([apps/core/.env.example](apps/core/.env.example) lists them all). The one
+exception is your wallet's keys, which sit in your OS keychain when there is one, so backing up
+`~/.auni` alone doesn't back them up: open **Settings › Your wallet › Show your keys** and keep
+them somewhere safe.
 
 - **Adding money.** Add money in the app shows your address and a QR code. Auni spends USDC; send
-  some MON with it on Monad for network fees, and Auni tops that up from your USDC as it runs low.
-- **Telegram.** Make a bot with Telegram's BotFather, paste its token into Telegram under Apps, and pair
-  your chat there.
+  some MON with it on Monad for network fees. When a move is short of fees, its card buys a
+  little more with your USDC first.
+- **Telegram.** Make a bot with Telegram's BotFather, paste its bot token under **Settings › Your
+  devices**, and pair your chat there.
 - **Keys for data.** Some apps do more with a key of your own, such as Elfa's market news. Paste it
   into that app under Apps; it works at once. Auni runs fine without any.
 - **Other wallets.** To use keys you already have, pick "Bring an existing wallet" before your

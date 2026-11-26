@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { secretTitle } from "./secret-title";
+import { secretTitle } from "@auni/shared";
 
 describe("secretTitle", () => {
   it("asks for a service's key by its name, not its plumbing", () => {

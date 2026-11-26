@@ -59,10 +59,10 @@ function readJson<T>(text: string, schema: z.ZodType<T>, tag?: string): T | null
 function portfolioResult(text: string): string | null {
   const portfolio = readJson(text, portfolioSchema, "portfolio");
   if (!portfolio) return null;
-  const cash = portfolio.cash?.usdValue;
+  const cash = portfolio.idleCashUsd;
   if (cash === undefined || Number(cash) <= 0) return `${formatUsd(portfolio.totalUsd)} in total`;
-  // The portfolio's Cash, as the screens say it; and, where the agent was told less is free for
-  // what's waiting on cards, how much those count on, so neither figure reads as the other.
+  // Cash as Money shows it, savings a take holds left out; and, where the agent was told less is
+  // free for what's waiting on cards, how much those count on, so neither figure reads as the other.
   const promised = portfolio.cashPromisedToWaitingCardsUsd;
   return promised !== undefined && Number(promised) > 0
     ? `${formatUsd(cash)} in cash, ${formatUsd(promised)} for waiting cards`
@@ -84,7 +84,7 @@ const usdSchema = z.string().regex(/^-?\d+(\.\d+)?$/u);
 
 const portfolioSchema = z.object({
   totalUsd: usdSchema,
-  cash: z.object({ usdValue: usdSchema }).optional(),
+  idleCashUsd: usdSchema.optional(),
   cashPromisedToWaitingCardsUsd: usdSchema.optional(),
 });
 

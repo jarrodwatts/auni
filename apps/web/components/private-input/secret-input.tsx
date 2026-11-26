@@ -106,8 +106,7 @@ export function SecretNote({ says }: { readonly says?: string }) {
   return (
     <p className="flex items-start gap-2 text-left text-meta leading-[18px] text-muted-foreground">
       <LockKeyhole aria-hidden className="mt-px size-3.5 flex-none" />
-      {says ??
-        "What you paste goes straight to Auni on this computer, and from there only to the service it is for. Its AI never sees it."}
+      {says ?? "Saved only on this computer. Your AI never sees it."}
     </p>
   );
 }

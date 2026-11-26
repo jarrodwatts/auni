@@ -41,7 +41,7 @@ const ROW_SPACING = { paddingLeft: INSET, gap: GAP } as const;
  * wearing a picture of what it's about. Picking one puts its words in the box (pickStartingPoint).
  */
 export function StartingPoints() {
-  const { points, waiting } = useStartingPoints();
+  const { points, observedAt, waiting } = useStartingPoints();
   const { portfolio } = useMoney();
   const me = useMe();
   const { addMoneyHref, settingsHref } = useAppDialogs();
@@ -75,18 +75,25 @@ export function StartingPoints() {
               <button
                 type="button"
                 onClick={() => pickStartingPoint(point)}
-                title={point.sources.map(cited).join("\n")}
                 style={ROW_SPACING}
                 className={`${ROW} text-body tracking-[-0.01em] transition-colors sm:text-reading duration-150 hover:bg-foreground/[0.04] focus-ring-inset`}
               >
                 {/* 15px on a phone, PHONE_TEXT_PX, which core measures each line at (lineFits). */}
                 <PointImage image={point.image} />
-                {/* Should a line still run long, what's true shortens; what to do never does. */}
-                <span className="flex min-w-0 flex-1 items-baseline gap-[0.25em]">
-                  <span className="min-w-0 truncate text-ink">{point.statement}</span>
-                  <span className="flex-none whitespace-nowrap text-muted-foreground">
-                    {point.action}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  {/* Should a line still run long, what's true shortens; what to do never does. */}
+                  <span className="flex min-w-0 items-baseline gap-[0.25em]">
+                    <span className="min-w-0 truncate text-ink">{point.statement}</span>
+                    <span className="flex-none whitespace-nowrap text-muted-foreground">
+                      {point.action}
+                    </span>
                   </span>
+                  {/* What a claim about the markets rests on, before it becomes the owner's words. */}
+                  {seenOn(point.sources, observedAt) && (
+                    <span className="truncate text-caption text-faint">
+                      {seenOn(point.sources, observedAt)}
+                    </span>
+                  )}
                 </span>
                 <ArrowRight
                   aria-hidden
@@ -165,8 +172,26 @@ function PointImage({ image }: { readonly image: string | null }) {
   );
 }
 
-/** Where a source came from, as its row's tooltip says it: the app's name, then what it saw. */
-function cited(source: FactSource): string {
-  const from = source.app === "auni" ? "Auni" : (appListing(source.app)?.name ?? source.app);
-  return `${from}: ${source.label}`;
+/**
+ * Where a point's claim about the markets came from, and when it was read: the app's name, or
+ * for a part of Auni with no brand of its own (Prices) where it read, as its source says ("BTC on
+ * the exchange it read"), then the time. Null for one resting only on the owner's own money and
+ * takes, which Auni reads itself.
+ */
+export function seenOn(sources: readonly FactSource[], observedAt: string | null): string | null {
+  const names = [
+    ...new Set(
+      sources.flatMap(({ app, label }) => {
+        if (app === "auni") return [];
+        const listing = appListing(app);
+        return [listing?.glyph ? label : (listing?.name ?? app)];
+      }),
+    ),
+  ];
+  if (names.length === 0) return null;
+  const from =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  if (!observedAt) return from!;
+  const at = new Date(observedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${from} at ${at}`;
 }

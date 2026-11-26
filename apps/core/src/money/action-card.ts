@@ -1,7 +1,6 @@
 import {
   AMOUNT,
   appListing,
-  fillFace,
   listed,
   type ActionCardWire,
   type actionCardSchema,
@@ -22,10 +21,9 @@ import { tokenKey } from "./fill-key.ts";
 import { withdrawalFeeUsd } from "./funding.ts";
 import { LOGOS, perpFace, tokenArt, tokenCalled } from "./holdings.ts";
 import { stagedLeg } from "./proposal-order.ts";
-import { subjectOf, type Money, type Recipe, type Subject } from "./recipe.ts";
-import { recipeForTool, rowMoney } from "./recipes/index.ts";
+import { subjectOf, type Recipe, type Subject } from "./recipe.ts";
+import { cardMoney, filledFace, recipeForTool, rowMoney } from "./recipes/index.ts";
 import { dollars } from "./summaries.ts";
-import { parseUnits } from "./usd.ts";
 import { stepUpSays } from "./step-up.ts";
 
 type CardVenue = ActionCardWire["venue"];
@@ -113,11 +111,7 @@ export function pricedLater(rows: readonly ActionRow[]): string | null {
       PRICED.some((key) => details[key] !== undefined),
   );
   if (waiting.length === 0) return null;
-  const names = listed(
-    waiting.map((row) =>
-      row.card ? fillFace(row.card, cardMoney(rowMoney(row)).amount).title : row.summary,
-    ),
-  );
+  const names = listed(waiting.map((row) => filledFace(row)?.title ?? row.summary));
   return waiting.length === 1
     ? `${names} waits for the moves before it to land and is priced again then. If its price has moved past what this card allows, it doesn't go, and Auni tells you.`
     : `${names} wait for the moves before them to land and are priced again then. Any whose price has moved past what this card allows doesn't go, and Auni tells you.`;
@@ -174,17 +168,6 @@ function fromSavings(row: ActionRow): boolean {
   const recipe = recipeForTool(row.tool);
   const subject = recipe && subjectOf(recipe, row);
   return subject?.kind === "cash" && isSavings(subject.at);
-}
-
-/** A move's money as its card carries it, which way it goes included; zero for none. */
-function cardMoney(money: Money | null): Pick<ActionCardWire, "amount" | "flow"> {
-  return {
-    amount: {
-      baseUnits: parseUnits(money?.usd ?? "0", 6).toString(),
-      currency: { code: "USDC", decimals: 6 },
-    },
-    flow: money?.flow ?? "in",
-  };
 }
 
 /** A move's picture, and what it shows by name, for a card to draw its initials without one. */

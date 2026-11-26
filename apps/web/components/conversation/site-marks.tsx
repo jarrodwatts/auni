@@ -1,5 +1,7 @@
 "use client";
 
+import "./site-marks.css";
+
 import { Globe } from "lucide-react";
 import Image from "next/image";
 import { useState, type CSSProperties } from "react";
@@ -29,13 +31,7 @@ export function SiteMarks({ sites }: { readonly sites: readonly string[] }) {
  * A site's own mark in a circle, or a plain globe for a site core found none for. Drawn as core
  * sends it, not through the image optimizer, which would ask core without the owner's session.
  */
-function SiteMark({
-  site,
-  size,
-}: {
-  readonly site: string;
-  readonly size: number;
-}) {
+function SiteMark({ site, size }: { readonly site: string; readonly size: number }) {
   const [failed, setFailed] = useState<string | null>(null);
   const missing = failed === site;
   return (

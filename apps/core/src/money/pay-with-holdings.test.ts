@@ -25,6 +25,12 @@ import type { Grant } from "./effect.ts";
 import { toBaseUnits } from "./swaps/shared.ts";
 import { formatUnits } from "./usd.ts";
 
+// Cards are prepared for a wallet that's there.
+vi.mock(import("./wallets.ts"), async (original) => ({
+  ...(await original()),
+  makeWalletIfNone: async () => {},
+}));
+
 const ETH = 10n ** 18n;
 const USDT = "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9";
 const JUP = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";

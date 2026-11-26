@@ -8,7 +8,7 @@ const back = (usd: string) => ({ flow: "back" as const, usd });
 const moving = (usd: string) => ({ flow: "move" as const, usd });
 const leg = (money: Money | null) => ({
   money,
-  summary: "Buy about $50 of Eli Lilly",
+  says: "Buy about $50 of Eli Lilly",
 });
 
 describe("money math for the portfolio and the sidebar", () => {
@@ -28,14 +28,39 @@ describe("money math for the portfolio and the sidebar", () => {
   });
 
   it("says what a waiting card asks", () => {
-    expect(askLine([leg(going("100.10")), leg(going("49.90"))])).toBe("2 moves, $150 in");
+    expect(askLine([leg(going("100.10")), leg(going("49.90"))])).toBe("2 moves, $150 to put in");
     expect(askLine([leg(going("50"))])).toBe("Buy about $50 of Eli Lilly");
     expect(askLine([])).toBeNull();
+    // A move whose words carry no dollars has its money said beside them.
+    expect(askLine([{ says: "Sell Yes", money: back("201.50") }])).toBe(
+      "Sell Yes, about $201.50 back",
+    );
+    expect(askLine([{ says: "Stake 60 MON", money: null }])).toBe("Stake 60 MON");
+  });
+
+  it("keeps a card's floor a floor on its card's condition, never softening it to a quote", () => {
+    const least = (usd: string, condition = "if all 310 sell") => ({
+      ...back(usd),
+      least: condition,
+    });
+    expect(askLine([{ says: "Sell up to 310 shares", money: least("191.68") }])).toBe(
+      "Sell up to 310 shares, at least $191.68 back if all 310 sell",
+    );
+    expect(moneyLine([going("25"), least("191.68")])).toBe(
+      "$25 to put in, at least $191.68 back if all 310 sell",
+    );
+    // A floor that holds as it is needs no condition, alone or added up.
+    expect(moneyLine([least("50", ""), least("20", "")])).toBe("at least $70 back");
+    // Floors on conditions of their own add up to no honest figure, so it isn't said.
+    expect(askLine([leg(least("191.68")), leg(least("12", "if all 10 sell"))])).toBe("2 moves");
+    expect(moneyLine([least("191.68"), least("12")])).toBeNull();
+    // A floor beside a quote adds up to a quote.
+    expect(moneyLine([least("191.68"), back("10")])).toBe("about $201.68 back");
   });
 
   it("never adds what sells bring back to what buys put in", () => {
     expect(moneyLine([back("41.20"), back("41.20")])).toBe("about $82.40 back");
-    expect(moneyLine([going("25"), back("41.20"), null])).toBe("$25 in, about $41.20 back");
+    expect(moneyLine([going("25"), back("41.20"), null])).toBe("$25 to put in, about $41.20 back");
     expect(moneyLine([null])).toBeNull();
     expect(askLine([leg(back("41.20")), leg(back("12"))])).toBe("2 moves, about $53.20 back");
     expect(askLine([leg(null), leg(null)])).toBe("2 moves");

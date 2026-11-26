@@ -10,7 +10,7 @@ export function Section({
 }) {
   return (
     <section aria-label={title} className="mt-8">
-      <h3 className="mb-2.5 text-[13px] font-medium text-faint">{title}</h3>
+      <h3 className="mb-2.5 text-meta font-medium text-faint">{title}</h3>
       {children}
     </section>
   );

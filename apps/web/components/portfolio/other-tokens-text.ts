@@ -15,7 +15,7 @@ export function otherTokenLine(
   token: Pick<OtherTokensWire["tokens"][number], "amount" | "usdValue">,
   network: string,
 ): string {
-  if (token.amount === null) return `On ${network}. Couldn't read it just now`;
+  if (token.amount === null) return `On ${network}. Balance unavailable`;
   const amount = Number(token.amount).toLocaleString("en-US", { maximumSignificantDigits: 6 });
   const held = `${amount} on ${network}`;
   return token.usdValue === null

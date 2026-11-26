@@ -17,7 +17,7 @@ import {
   pricedLater,
   subjectLogo,
 } from "./action-card.ts";
-import { fitted, tooMuchToWarn, withPermissions } from "./card-face.ts";
+import { fitted, tooMuchToShow, withLeaves } from "./card-face.ts";
 import { effectLines, letsSaid, type Grant } from "./effect.ts";
 import { recipeForTool } from "./recipes/index.ts";
 import { xStockCatalog, type XStock } from "./swaps/xstocks.ts";
@@ -484,38 +484,40 @@ describe("actionCard", () => {
         ),
         spend(18, "USDC"),
       ],
-      // Its warning 496 characters, and its Lets line, said with "and" between each, 504.
+      // Said in one sentence 496 characters, and its Lets line, said with "and" between each, 504.
       twelve: twelve("USDC".padEnd(19, "C")),
-      // Its warning the whole 500 a card takes, before the face's own warning.
+      // Said in one sentence, the whole 500 a card takes.
       whole: twelve("USDC".padEnd(23, "C")),
     };
     const draw = (grants: Grant[], face: typeof FACE | null) =>
       actionCard(
         row({
           lines: effectLines({ gives: [], gets: [], grants }),
-          card: face && fitted(withPermissions(face, { grants })),
+          card: face && fitted(withLeaves(face, { grants })),
         }),
         stubRecipe(),
       );
 
     it.each(Object.entries(cases))("%s: shows every permission whole", async (_, grants) => {
-      expect(tooMuchToWarn({ grants }, null)).toBeNull();
+      expect(tooMuchToShow({ grants })).toBeNull();
       const lets = grants.map((grant) => grant.lets);
-      // No face of its own: its Lets line, which a plan shows too.
+      // No face of its own: its Lets line, which a plan and a channel show too, in one sentence.
       const plain = await draw(grants, null);
-      const line = plain.card.figures.find(({ label }) => label === "Lets")?.value;
+      const line = plain.lines.find(({ label }) => label === "Lets")?.value;
       expect(line).toBe(letsSaid(grants));
       for (const each of lets) expect(line).toContain(each);
-      expect(plain.lines.find(({ label }) => label === "Lets")?.value).toBe(line);
-      // A face its app wrote, with a warning of its own after core's.
+      expect(plain.card.leaves).toEqual([{ says: permissionsSaid(lets) }]);
+      expect(actionCardSchema.safeParse(plain).success).toBe(true);
+      // A face its app wrote, with a warning of its own: each permission its own entry beside it.
       const faced = await draw(grants, { ...FACE, warning: "Its own words." });
-      expect(faced.card.warning?.startsWith(permissionsSaid(lets))).toBe(true);
+      expect(faced.card.leaves).toEqual(lets.map((each) => ({ says: permissionsSaid([each]) })));
+      expect(faced.card.warning).toBe("Its own words.");
       expect(actionCardSchema.safeParse(faced).success).toBe(true);
     });
 
     it("is refused one more character on, rather than cut", () => {
       expect(permissionsSaid(cases.whole.map((grant) => grant.lets))).toHaveLength(500);
-      expect(tooMuchToWarn({ grants: twelve("USDC".padEnd(24, "C")) }, null)).toMatch(
+      expect(tooMuchToShow({ grants: twelve("USDC".padEnd(24, "C")) })).toMatch(
         /^It leaves 12 permissions/u,
       );
     });

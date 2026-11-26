@@ -27,7 +27,7 @@ import { amountLabel, closeResult, perpLine, perpTag } from "./pick-money";
 export type Words = Readonly<Record<Status, string>>;
 
 /** A small word beside a row's name: a prediction's side, a perp's bet, or on a mixed card what it does. */
-export interface Tag {
+interface Tag {
   readonly text: string;
   readonly tone: "in" | "back" | "plain";
 }
@@ -240,7 +240,8 @@ export function planLeg(
   const content = actionCardContent(leg);
   const { pick } = content;
   const named = leg.name !== undefined;
-  const name = leg.name ?? (pick ? (pick.tag ? `${pick.name}: ${pick.tag}` : pick.name) : content.title);
+  const name =
+    leg.name ?? (pick ? (pick.tag ? `${pick.name}: ${pick.tag}` : pick.name) : content.title);
   const why = leg.why ?? (pick ? content.title : (leg.line ?? ""));
   const note = leg.note ?? (leg.perp && leg.why ? leg.why : undefined);
   const verbs = leg.verbs ?? (!named && pick ? pick.verbs : undefined);
@@ -314,7 +315,7 @@ export function actionRows(
   const sent = landed || !!tx || live.phase === "landing";
   const tracked = SENDS.has(card.tool);
   const steps: { readonly key: string; readonly label: string; readonly done: boolean }[] = [
-    { key: "allowed", label: allowed ? "Approved" : "Approving", done: allowed },
+    { key: "allowed", label: allowed ? "Allowed" : "Allowing", done: allowed },
   ];
   if (tracked) {
     const chain = tx ? chainName(tx.chain) : null;
@@ -425,7 +426,7 @@ export function headerLine({
     return { text, working: true };
   }
   if (held > 0) {
-    const waits = total === 1 ? "Not confirmed" : `${held} not confirmed`;
+    const waits = total === 1 ? "Status unknown" : `${held} with status unknown`;
     return {
       text: done > 0 ? `${done} of ${total} went through, ${waits}` : waits,
       working: false,

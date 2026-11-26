@@ -1,0 +1,121 @@
+@keyframes auni-spotlight-sweep {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes auni-spotlight-counter {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/*
+ * Dual-layer spotlight sweep: clips a crisp foreground copy behind a soft
+ * moving mask while counter-translating it so icon and text stay pixel-locked.
+ * Pure compositor transforms, paused off-screen via observeVisibleAnimation.
+ */
+.auni-spotlight {
+  --auni-spotlight-width: 4.5rem;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 100%;
+  min-width: 0;
+  margin-block: -4px;
+  padding-block: 4px;
+  overflow-x: clip;
+  overflow-y: visible;
+  vertical-align: bottom;
+}
+
+.auni-spotlight-base {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+}
+
+.auni-spotlight-overlay {
+  pointer-events: none;
+  user-select: none;
+  position: absolute;
+  inset-block: 0;
+  right: auto;
+  left: calc(-1 * var(--auni-spotlight-width));
+  width: calc(100% + var(--auni-spotlight-width) + var(--auni-spotlight-width));
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0 / 0.2) 0.75rem,
+    rgb(0 0 0 / 0.5) 1.5rem,
+    #000 2.25rem,
+    rgb(0 0 0 / 0.5) 3rem,
+    rgb(0 0 0 / 0.2) 3.75rem,
+    transparent var(--auni-spotlight-width),
+    transparent 100%
+  );
+  -webkit-mask-repeat: no-repeat;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0 / 0.2) 0.75rem,
+    rgb(0 0 0 / 0.5) 1.5rem,
+    #000 2.25rem,
+    rgb(0 0 0 / 0.5) 3rem,
+    rgb(0 0 0 / 0.2) 3.75rem,
+    transparent var(--auni-spotlight-width),
+    transparent 100%
+  );
+  mask-repeat: no-repeat;
+  animation: auni-spotlight-sweep 2.1s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+
+.auni-spotlight-counter {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: auni-spotlight-counter 2.1s linear infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+
+.auni-spotlight-aligned {
+  display: inline-flex;
+  width: calc(100% - var(--auni-spotlight-width) - var(--auni-spotlight-width));
+  height: 100%;
+  min-width: 0;
+  margin-left: var(--auni-spotlight-width);
+  padding-block: 4px;
+  align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-spotlight-overlay,
+  .auni-spotlight-counter {
+    animation: none;
+    will-change: auto;
+  }
+  .auni-spotlight-overlay {
+    opacity: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .auni-spotlight-overlay,
+  .auni-spotlight-counter {
+    animation: none;
+    will-change: auto;
+  }
+  .auni-spotlight-overlay {
+    opacity: 0;
+  }
+}

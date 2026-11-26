@@ -18,7 +18,7 @@ describe("otherTokenLine", () => {
       "5.12346 on Base, no price",
     );
     expect(otherTokenLine({ amount: null, usdValue: null }, "Base")).toBe(
-      "On Base. Couldn't read it just now",
+      "On Base. Balance unavailable",
     );
   });
 });

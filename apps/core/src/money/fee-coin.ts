@@ -1,13 +1,15 @@
 import {
   EVM_CHAIN_KEYS,
+  NETWORK_KEYS,
   NETWORKS,
   isCash,
   listed,
   type EvmCashKey,
   type EvmChainKey,
+  type NetworkKey,
 } from "@auni/shared";
 import { and, gte } from "drizzle-orm";
-import { erc20Abi, formatEther, getAddress, type Address, type Hex } from "viem";
+import { erc20Abi, formatEther, getAddress, parseUnits, type Address, type Hex } from "viem";
 
 import { db } from "../db/client.ts";
 import { actions, type ActionRow } from "../db/schema.ts";
@@ -24,7 +26,7 @@ import {
 import { EVM_NATIVE } from "./fill-key.ts";
 import { movesCharge, ownGas, runwayLacks } from "./gas.ts";
 import { payInCalls, payInQuote, payInSettled, payInStanding, type PayInQuote } from "./pay-in.ts";
-import { readPortfolioShared } from "./portfolio.ts";
+import { readPortfolioShared, type Holding } from "./portfolio.ts";
 import { STUCK_AFTER_MS } from "./readings.ts";
 import {
   FeesUnpaid,
@@ -37,6 +39,7 @@ import {
 } from "./recipe.ts";
 import { keepTxs, LANDING_WINDOW_MS } from "./record.ts";
 import { swapCalls, type EvmQuoteRequest, type EvmRoute } from "./swaps/evm.ts";
+import { LEAST_PAY_IN_USDC } from "./sol-top-up.ts";
 import { quoteSwap } from "./swaps/routes.ts";
 import { feedListing } from "./token-feeds.ts";
 import { evmAddress, paysOwnGas, type SignerOptions } from "./wallets.ts";
@@ -555,6 +558,41 @@ export async function feeCoinPaidBy(
     if (recent && (!standing || standing.status === "pending")) unknown = true;
   }
   return unknown ? "unknown" : null;
+}
+
+/**
+ * The networks where a move can pay its network fee now, by what the top says each purchase of
+ * the coin spends: where a sponsor pays or the wallet holds the chain's own coin; any other EVM
+ * chain once one that can send holds the USDC for a purchase (LEAST_USD) or coin past what it
+ * keeps (RESERVES) to pay with (purchaseFrom); and Solana once Monad can send and holds the USDC
+ * its SOL is bought with (sol-top-up.ts). Money on any other network can't move until some of a
+ * chain's coin, or that USDC, arrives.
+ */
+export async function feesPayable(holdings: readonly Holding[]): Promise<NetworkKey[]> {
+  const sponsored = await Promise.all(
+    NETWORK_KEYS.map(async (key) => !(await paysOwnGas(NETWORKS[key].viem?.id ?? "solana"))),
+  );
+  const inWallet = holdings.filter((holding) => holding.venue === "wallet");
+  const amountOf = (chain: NetworkKey, instrument: string | null) =>
+    inWallet
+      .filter(
+        (each) =>
+          each.chain === chain && each.instrument.toLowerCase() === instrument?.toLowerCase(),
+      )
+      .reduce((sum, each) => sum + parseUnits(each.quantity, each.decimals), 0n);
+  const usdc = (chain: NetworkKey) => amountOf(chain, NETWORKS[chain].usdc);
+  const ready = new Set(
+    NETWORK_KEYS.filter((key, index) => sponsored[index] || amountOf(key, "native") > 0n),
+  );
+  const buysCoin = (from: EvmChainKey) =>
+    ready.has(from) &&
+    (usdc(from) >= BigInt(Math.ceil(LEAST_USD * 1e6)) ||
+      amountOf(from, "native") > (RESERVES[from] ?? 0n));
+  return NETWORK_KEYS.filter((key) => {
+    if (ready.has(key)) return true;
+    if (key === "solana") return ready.has("monad") && usdc("monad") >= LEAST_PAY_IN_USDC;
+    return EVM_CHAIN_KEYS.some((from) => from !== key && buysCoin(from));
+  });
 }
 
 /**

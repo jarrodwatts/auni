@@ -12,7 +12,7 @@
   }
 }
 
-/* A digit rolls to its new value rather than swapping. */
+/* A digit's column of 0 to 9, rolling to its new value rather than swapping. */
 .roll {
   display: flex;
   flex-direction: column;

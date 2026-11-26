@@ -5,15 +5,17 @@ import { useEffect, useState } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import type { AskAgentHandler } from "@/components/cards/ask-agent";
+import { CardFrame, CardHead, CardReceipt } from "@/components/cards/card-parts";
 import { TextSwap } from "@/components/motion/text-swap";
 import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { formatExactUsd } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
-import { planPermissions } from "./action-card-content";
 import { ArrivedLine } from "./arrived-line";
 import { edgeScene } from "./edge-scene";
 import { needingYou } from "./failed-step";
-import { MoneyCardFrame, MoneyMark, NeedsYou } from "./money-card-parts";
+import { cardMark, planPermissions } from "./action-card-content";
+import { MoneyMark, NeedsYou, PairMark } from "./money-card-parts";
 import styles from "./money-card.module.css";
 import { MoveList } from "./move-list";
 import { amountNote, headerLine, moveRows, planLeg } from "./move-rows";
@@ -24,7 +26,6 @@ import {
   FooterMorph,
   FundStep,
   PaysWith,
-  ProposalReceipt,
   ReadyStep,
   RollingNumber,
   wholeDollars,
@@ -65,6 +66,12 @@ export function ActionPlanCard({
   );
   const moves: readonly Move[] = card.moves.map((move) => withLive(move, live.data?.legs));
   // One venue's moves wear its mark; a mix wears Auni's.
+  // Picks of their own (a basket) wear their own logos; a plan of one venue's moves its mark.
+  const picks = card.legs.map((leg) => cardMark(leg));
+  const pair =
+    picks.length > 1 && picks.every((pick) => pick.kind === "image")
+      ? ([picks[0]!, picks[1]!] as const)
+      : null;
   const venues = new Set(card.legs.map((leg) => leg.venue));
   const mark = {
     kind: "integration",
@@ -72,9 +79,10 @@ export function ActionPlanCard({
   } as const;
   const count = (status: ActionStatus) => legs.filter((leg) => leg.status === status).length;
   const waiting = count("awaiting_permission");
-  // A held leg has stopped: it waits on the person, as one that didn't go through does.
-  const held = legs.filter((leg) => leg.held).length;
-  const running = count("running") - held;
+  // A held leg or money move has stopped: it waits on the person, as one that didn't go through does.
+  const heldLegs = legs.filter((leg) => leg.held).length;
+  const held = heldLegs + moves.filter((move) => move.held).length;
+  const running = count("running") - heldLegs;
   const done = count("done");
   // Only a finish watched happening refreshes balances and makes Auni hop.
   const [watched, setWatched] = useState(false);
@@ -104,13 +112,19 @@ export function ActionPlanCard({
 
   if (ended) {
     return (
-      <MoneyCardFrame label={card.title} phase="expired">
-        <ProposalReceipt
-          mark={<MoneyMark muted mark={mark} size={38} />}
-          name={card.title}
-          status={ended}
+      <CardFrame label={card.title} phase="expired">
+        <CardReceipt
+          mark={
+            pair ? (
+              <PairMark muted marks={pair} size={38} />
+            ) : (
+              <MoneyMark muted mark={mark} size={38} />
+            )
+          }
+          title={card.title}
+          detail={ended}
         />
-      </MoneyCardFrame>
+      </CardFrame>
     );
   }
 
@@ -133,48 +147,56 @@ export function ActionPlanCard({
   const needsYou = step === "settled" ? needingYou(failed.steps.values()) : 0;
 
   return (
-    <MoneyCardFrame
+    <CardFrame
       auni={step === "loading" ? null : edgeScene({ phase, retry: needsYou > 0, rows })}
-      flat={finished}
       label={card.title}
       phase="open"
+      // Amber while it waits on the owner: for the tap, for money to land, or for a held row.
+      // Red once it settled with steps that didn't go through.
+      tone={
+        step === "ready" || step === "fund" || held > 0
+          ? "waiting"
+          : step === "settled"
+            ? "failed"
+            : null
+      }
     >
-      <div className="flex items-center gap-3">
-        <MoneyMark mark={mark} />
-        <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
-            {card.title}
-          </h3>
-          {line.text ? (
-            <p className="mt-0.5 flex items-center gap-2 text-[13px] leading-[18px] text-muted-foreground">
+      <CardHead
+        mark={pair ? <PairMark marks={pair} /> : <MoneyMark mark={mark} />}
+        title={card.title}
+        line={
+          line.text ? (
+            <span className="flex items-center gap-2">
               <span className="flex min-w-0">
                 <TextSwap className={line.working ? styles.shimmer : undefined} text={line.text} />
               </span>
               <NeedsYou count={needsYou} />
-            </p>
-          ) : null}
-        </div>
-        {units > 0n ? (
-          <div className="flex-none pl-1 text-right">
-            <p className="text-[26px] leading-[1.1] font-semibold tracking-[-0.035em] text-ink tabular-nums">
-              <RollingNumber value={total} />
-            </p>
-            <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">
-              <TextSwap text={amountNote(phase, flow, done === 0)} />
-            </p>
-          </div>
-        ) : null}
-      </div>
-      <div className="mt-5 border-t border-foreground/[0.06] pt-5 pb-1.5">
+            </span>
+          ) : null
+        }
+        figure={
+          units > 0n
+            ? {
+                value: <RollingNumber value={total} />,
+                note: <TextSwap text={amountNote(phase, flow, done === 0)} />,
+              }
+            : null
+        }
+      />
+      <div className="mt-5 border-t border-border pt-5 pb-1.5">
         <MoveList rows={rows} failed={step === "settled" ? failed : null} />
         {finished ? null : <PaysWith lines={card.paysWith ?? []} />}
-        {step === "ready" || step === "fund" ? <Costs costs={card.costs} /> : null}
-        {/* Everything its moves leave able to act on the money, since one tap grants it all. */}
+        {step === "ready" || step === "fund" ? <Costs costs={card.costFigures} /> : null}
+        {/* Everything its moves leave behind, in core's words, since one tap agrees to it all: each
+            permission in red, and each order it leaves resting, which its rows don't show. */}
         {step === "ready" || step === "fund"
-          ? permissions.map((says, index) => (
+          ? permissions.map(({ says, order }, index) => (
               <p
                 key={index}
-                className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive"
+                className={cn(
+                  "mt-3 text-meta leading-[1.45] font-medium",
+                  order ? "text-muted-foreground" : "text-destructive",
+                )}
               >
                 {says}
               </p>
@@ -182,7 +204,7 @@ export function ActionPlanCard({
           : null}
         {step === "ready" || step === "fund" ? <CardNote says={card.buysFirst} /> : null}
         {step === "ready" || step === "fund" ? <CardNote says={card.pricedLater} /> : null}
-        <ArrivedLine />
+        <ArrivedLine proposalId={card.proposalId} />
       </div>
       {/* Once it runs, the list and the header say it all. */}
       {step === "loading" || step === "fund" || step === "ready" ? (
@@ -197,7 +219,10 @@ export function ActionPlanCard({
               watching={watchingFor === funding.needUsd}
               onAdd={() => {
                 setWatchingFor(funding.needUsd);
-                openAddMoney(wholeDollars(funding.needUsd));
+                openAddMoney({
+                  usd: String(wholeDollars(funding.needUsd)),
+                  chain: funding.chain,
+                });
               }}
               onDecline={() => void decide("decline")}
             />
@@ -213,6 +238,6 @@ export function ActionPlanCard({
           )}
         </FooterMorph>
       ) : null}
-    </MoneyCardFrame>
+    </CardFrame>
   );
 }

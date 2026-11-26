@@ -182,7 +182,7 @@ describe("send_evm_transaction", () => {
       .catch((error: unknown) => error);
     expect(refused).toMatchObject({
       message:
-        "Auni ran this first and it would have failed, so it wasn't sent. The call that failed is 2 of 2.",
+        "A simulation showed it would fail, so Auni didn't send it. The call that failed is 2 of 2.",
       cause,
     });
   });
@@ -239,8 +239,10 @@ describe("send_evm_transaction", () => {
       title: "Buy WETH",
       context: "Uniswap on Base",
       price: "$4,000.00",
-      finePrint: "It goes through 0x2222…2222.",
+      finePrint: null,
     });
+    // No app vouches for it, so the contract it calls is said whole, for the owner to check.
+    expect(figureOf(bought, "Contract")).toBe(ROUTER);
     expect(figureOf(bought, "You get, about")).toBe("0.00125 WETH");
     expect(figureOf(bought, "Vs market")).toBe("About even");
     // A move that stays on the chain it leaves isn't one, so it draws the plain card.
@@ -248,8 +250,9 @@ describe("send_evm_transaction", () => {
       title: "Buy WETH",
       context: "app.uniswap.org on Base",
       figures: [
-        { label: "You send", value: "5 USDC", note: "$5" },
-        { label: "You get", value: "0.00125 WETH", note: "$5" },
+        { label: "You send", value: "5 USDC", note: "$5", role: "pays" },
+        { label: "You get", value: "0.00125 WETH", note: "$5", role: "gets" },
+        { label: "Contract", value: ROUTER },
       ],
     });
   });
@@ -271,9 +274,9 @@ describe("send_evm_transaction", () => {
     it("says what it checked by running it, the agent's sentence apart, and that no app covers it", async () => {
       vi.mocked(simulateEffect).mockResolvedValue(seen({ out: [sends], in: [gets] }));
       expect((await stake(NOTE)).card?.checks).toEqual({
-        checked: "Checked by running it first",
-        unchecked: { heading: "Not checked: what Auni says about it", says: NOTE },
-        why: "No app for Lido yet, so Auni read this by running it first.",
+        checked: "Observed in simulation",
+        unchecked: { heading: "Auni's note (unverified)", says: NOTE },
+        why: "No app for Lido yet, so Auni simulated it to show what it does.",
       });
       expect((await stake()).card?.checks?.unchecked).toBeNull();
     });
@@ -311,7 +314,7 @@ describe("send_evm_transaction", () => {
         vi.mocked(simulateEffect).mockResolvedValue(simulated);
         const card = await stake(NOTE);
         expect(approval(card.effect, [])).toMatchObject({ kind: "proof" });
-        expect(card.card?.checks).toMatchObject({ checked: "Checked by running it first" });
+        expect(card.card?.checks).toMatchObject({ checked: "Observed in simulation" });
         expect(card.card?.checks?.unchecked).toBeNull();
         expect(JSON.stringify(card)).not.toContain("stETH earns");
       },
@@ -346,13 +349,13 @@ describe("send_evm_transaction", () => {
           {},
         );
       const why =
-        "Auni's Hyperliquid app doesn't know this contract, so Auni read this by running it first.";
+        "Auni's Hyperliquid app doesn't know this contract, so Auni simulated it to show what it does.";
       // By its name, however it is written, or by its site's.
       expect((await named("Hyperliquid", "kintsu.xyz")).card?.checks?.why).toBe(why);
       expect((await named("Hyper Liquid", "kintsu.xyz")).card?.checks?.why).toBe(why);
       expect((await named("Kintsu", "app.hyperliquid.xyz")).card?.checks?.why).toBe(why);
       expect((await named("Kintsu", "kintsu.xyz")).card?.checks?.why).toBe(
-        "No app for Kintsu yet, so Auni read this by running it first.",
+        "No app for Kintsu yet, so Auni simulated it to show what it does.",
       );
     });
 

@@ -1,5 +1,7 @@
 "use client";
 
+import "./conversation.css";
+
 import { ArrowDownIcon } from "lucide-react";
 import { useEffect, useState, type ComponentProps } from "react";
 import {
@@ -203,7 +205,7 @@ export function ConversationScrollButton({
     <button
       aria-hidden={atEnd || undefined}
       className={cn(
-        "absolute inset-s-1/2 bottom-4 flex h-9 -translate-x-1/2 items-center rounded-full border border-foreground/[0.09] bg-popover text-muted-foreground shadow-[0_10px_26px_--alpha(var(--color-shade)/16%)] transition-[opacity,translate,scale] duration-200 ease-out hover:bg-surface hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-95 data-[at-bottom=true]:pointer-events-none data-[at-bottom=true]:translate-y-2 data-[at-bottom=true]:scale-95 data-[at-bottom=true]:opacity-0 rtl:translate-x-1/2",
+        "absolute inset-s-1/2 bottom-4 flex h-9 -translate-x-1/2 items-center rounded-full border border-foreground/[0.09] bg-popover text-muted-foreground shadow-float transition-[opacity,translate,scale] duration-200 ease-out hover:bg-surface hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-95 data-[at-bottom=true]:pointer-events-none data-[at-bottom=true]:translate-y-2 data-[at-bottom=true]:scale-95 data-[at-bottom=true]:opacity-0 rtl:translate-x-1/2",
         // Include the border when extending the 36px circle's hit area to 40px.
         "before:absolute before:-inset-[3px] before:rounded-full",
         className,
@@ -227,7 +229,7 @@ export function ConversationScrollButton({
       >
         <span className="min-w-0 overflow-hidden">
           {shown ? (
-            <span className="flex items-center gap-2 ps-3 text-[13px] font-medium whitespace-nowrap text-ink">
+            <span className="flex items-center gap-2 ps-3 text-meta font-medium whitespace-nowrap text-ink">
               <ProgressRing done={shown.done} total={shown.total} status="now" size={18} />
               Moving your money
             </span>

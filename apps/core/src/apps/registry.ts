@@ -163,6 +163,12 @@ export function savingsTokens(
   });
 }
 
+/** Whether `key` is savings, an account's savings token, which the portfolio counts as cash. */
+export function isSavingsToken(key: FillKey): boolean {
+  const instrument = key.instrument.toLowerCase();
+  return savingsTokens(key.chain).some(({ token }) => token.toLowerCase() === instrument);
+}
+
 /** Every account whose cash is dollar tokens on a chain, which a buy there spends (see AccountCash). */
 export function chainCash(): readonly {
   readonly about: AppAbout;

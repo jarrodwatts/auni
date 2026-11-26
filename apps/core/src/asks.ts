@@ -5,6 +5,7 @@ import {
   isAsk,
   listed,
   threadActModeSchema,
+  secretTitle,
 } from "@auni/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -83,8 +84,8 @@ const setThreadAutonomy = defineAsk({
       .from(threads)
       .where(eq(threads.id, input.thread_id))
       .for("update");
-    if (!current) return "That thread is gone.";
-    if (current.archivedAt) return "That thread was archived before you allowed this.";
+    if (!current) return "That chat is gone.";
+    if (current.archivedAt) return "That chat was archived before you allowed this.";
     await tx
       .update(threads)
       .set({ actMode: input.act_mode, budgetUsd: input.budget_usd })
@@ -254,6 +255,19 @@ function whatItAsksFor(row: ActionRow): Pick<AskCard, "app" | "field"> {
   if (row.tool !== "request_secret") return {};
   const { field, app } = requestSecret.input.parse(row.input);
   return { field, app };
+}
+
+/**
+ * What an ask waits on the owner to do, in a few words, for a list of what needs them: its
+ * button's words ("Auto up to $500", "Connect Elfa"), or, for a secret, the field to paste, since
+ * its button says only "Save".
+ */
+export function askWaits(row: Pick<ActionRow, "tool" | "input" | "summary">): string {
+  if (!isAsk(row.tool)) throw new Error(`${row.tool} is not an ask.`);
+  // As the card heads it, so the two never read differently side by side.
+  if (row.tool === "request_secret") return secretTitle(row.summary);
+  const ask = ASKS[row.tool] as Ask<unknown>;
+  return ask.action(ask.input.parse(row.input));
 }
 
 /** An ask no card was recorded for; its message says why, for the agent. */

@@ -1,11 +1,16 @@
 import type { ModelSelectionWire, ThreadActMode } from "@auni/shared";
 import { and, asc, desc, eq, exists, isNull, sql } from "drizzle-orm";
 
-import { theOwner } from "../auth/owner.ts";
+import { lockOwner } from "../auth/owner.ts";
 import { db, type Tx } from "../db/client.ts";
 import { messages, owner, threads, type ThreadRow } from "../db/schema.ts";
+import { refreshStartingPoints } from "../jobs/kinds.ts";
 import { normalizeUsd } from "../money/usd.ts";
 import { messageText } from "./history.ts";
+import { keepKeyOut, pastedKey } from "./pasted-key.ts";
+import { storeOwnerMessage } from "./send.ts";
+import { publishMe } from "./stream.ts";
+import { publishThread } from "./threads.ts";
 
 const TITLE_CHARS = 48;
 
@@ -27,35 +32,59 @@ export interface StartChatOptions {
   readonly budgetUsd?: string;
 }
 
+/** A new chat: the id its starter chose, and the owner's first message in it. */
+interface NewChat {
+  readonly id: string;
+  readonly firstMessage: { readonly id: string; readonly text: string };
+}
+
 /**
- * A new thread with Auni, titled by its first message, optionally carrying the
- * model selection and autonomy budget picked in the composer.
+ * A new thread with Auni, made with the owner's first message in it and that message's turn
+ * queued, in one transaction: a chat is never there without the words that started it, so a reload
+ * always finds them. It's titled by those words (unless they hold a private key, which, as in any
+ * send, is kept out and answered in its place: see sendMessage) and carries any model selection
+ * and autonomy budget picked in the composer. The owner's first chat ends first run in the same
+ * transaction: from then they're welcomed, and their starting points are on their way. A retried
+ * start (the same id) makes nothing twice.
  */
 export async function startChat(
-  firstMessage: string,
+  chat: NewChat,
   options: StartChatOptions = {},
-): Promise<ThreadRow> {
-  const me = await theOwner();
-  const selection =
-    options.modelSelection !== undefined ? options.modelSelection : me.defaultModelSelection;
-  const actMode: ThreadActMode = options.actMode ?? "ask_first";
-  const budgetUsd =
-    options.budgetUsd !== undefined ? normalizeUsd(options.budgetUsd) : "0.00";
-  const [created] = await db
-    .insert(threads)
-    .values({
-      title: chatTitle(firstMessage),
-      actMode,
-      budgetUsd,
-      modelSelection: selection,
-    })
-    .returning();
-  if (!created) throw new Error("Failed to start the chat.");
-  // Remember an explicit choice as the default for the next new thread.
-  if (options.modelSelection !== undefined) {
-    await db.update(owner).set({ defaultModelSelection: options.modelSelection });
-  }
-  return created;
+): Promise<{ readonly thread: ThreadRow; readonly keyKeptOut: boolean }> {
+  const { firstMessage } = chat;
+  const key = await pastedKey(firstMessage.text);
+  const { thread, welcomed } = await db.transaction(async (tx) => {
+    const me = await lockOwner(tx);
+    const selection =
+      options.modelSelection !== undefined ? options.modelSelection : me.defaultModelSelection;
+    const actMode: ThreadActMode = options.actMode ?? "ask_first";
+    const budgetUsd = options.budgetUsd !== undefined ? normalizeUsd(options.budgetUsd) : "0.00";
+    const [made] = await tx
+      .insert(threads)
+      .values({
+        id: chat.id,
+        title: key ? MAIN_TITLE : chatTitle(firstMessage.text),
+        actMode,
+        budgetUsd,
+        modelSelection: selection,
+      })
+      .onConflictDoNothing()
+      .returning();
+    const row = made ?? (await tx.select().from(threads).where(eq(threads.id, chat.id)))[0];
+    if (!row) throw new Error("Failed to start the chat.");
+    if (!key) await storeOwnerMessage(tx, row.id, firstMessage);
+    // Remember an explicit choice as the default for the next new thread.
+    if (made && options.modelSelection !== undefined)
+      await tx.update(owner).set({ defaultModelSelection: options.modelSelection });
+    if (me.welcomedAt !== null) return { thread: row, welcomed: false };
+    await tx.update(owner).set({ welcomedAt: sql`now()` });
+    await refreshStartingPoints(tx, me.startingPointsAt);
+    return { thread: row, welcomed: true };
+  });
+  if (welcomed) publishMe();
+  if (key) await keepKeyOut(thread, { id: firstMessage.id }, key);
+  else void publishThread(thread.id);
+  return { thread, keyKeptOut: key !== null };
 }
 
 /**

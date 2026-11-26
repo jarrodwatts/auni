@@ -15,7 +15,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { approvedEffect, assertStillAsShown } from "./approved.ts";
-import { fitted, tooMuchToWarn, withPermissions } from "./card-face.ts";
+import { fitted, tooMuchToShow, withLeaves } from "./card-face.ts";
 import { approval as approvalOf, pinnedApproval } from "./effect.ts";
 import { rawEffect } from "./raw-transaction.ts";
 import { revertOf } from "./refused.ts";
@@ -351,12 +351,13 @@ describe("a raw batch's permissions on its card", () => {
         { kind: "spend" as const, token: USDC, to: FRIEND },
       ],
     });
-    expect(tooMuchToWarn(rawEffect(spends(junk), long), null)).toMatch(/^It leaves 2 permissions/u);
+    expect(tooMuchToShow(rawEffect(spends(junk), long))).toMatch(/^It leaves 2 permissions/u);
     const fits = rawEffect(spends(TOKEN), long);
-    expect(tooMuchToWarn(fits, null)).toBeNull();
-    expect(fitted(withPermissions(FACE, fits)).warning).toBe(
-      "From now on, it lets 0x4444444444444444444444444444444444444444 spend your PRL and 0x7777777777777777777777777777777777777777 spend your USDC.",
-    );
+    expect(tooMuchToShow(fits)).toBeNull();
+    expect(fitted(withLeaves(FACE, fits)).leaves).toEqual([
+      { says: "From now on, it lets 0x4444444444444444444444444444444444444444 spend your PRL." },
+      { says: "From now on, it lets 0x7777777777777777777777777777777777777777 spend your USDC." },
+    ]);
   });
 });
 
@@ -477,7 +478,7 @@ describe("simulateEffect on a call that reverts", () => {
       simulateBlocks: async () => [{ calls: [{ status: "failure", data: "0x", logs: [], error }] }],
     };
     const thrown = await simulateEffect(8453, OWNER, [{ to: ROUTER }]).catch((caught) => caught);
-    expect(thrown.message).toBe("Auni ran this first and it would have failed, so it wasn't sent.");
+    expect(thrown.message).toBe("A simulation showed it would fail, so Auni didn't send it.");
     expect(revertOf(thrown)).toBe("0xf722177f");
   });
 
@@ -498,7 +499,7 @@ describe("simulateEffect on a call that reverts", () => {
     const thrown = await simulateEffect(8453, OWNER, [{ to: ROUTER }, { to: ROUTER }]).catch(
       (caught) => caught,
     );
-    expect(thrown.message).toBe("Auni ran this first and it would have failed, so it wasn't sent.");
+    expect(thrown.message).toBe("A simulation showed it would fail, so Auni didn't send it.");
     expect(thrown).toMatchObject({ step: 2, of: 2 });
   });
 });

@@ -11,8 +11,10 @@ import { dayMoves } from "./money/day-moves.ts";
 import { holdingFaces, LOGOS, paysFees } from "./money/holdings.ts";
 import type { Holding, Portfolio } from "./money/portfolio.ts";
 import { dollars } from "./money/summaries.ts";
+import { hasWallet } from "./money/wallets.ts";
 import { within } from "./money/swaps/shared.ts";
 import { centsToUsd, signedUsdToCents, usdToCents } from "./money/usd.ts";
+import { heldByTakes, takeRecords, type TakeRecords } from "./money/takes.ts";
 import { startOfDay } from "./money/value-history.ts";
 
 // What Auni sees that matters to the owner now: their own money, active threads, and what each app
@@ -51,8 +53,10 @@ const FACTS_PORTFOLIO_WAIT_MS = 30_000;
 
 /** Everything Auni sees now: their money first, which is always there, then their signals & the rest. */
 export async function readFacts(): Promise<Fact[]> {
-  const [portfolio, activeThreads, me] = await Promise.all([
+  const [wallet, portfolio, records, activeThreads, me] = await Promise.all([
+    hasWallet().catch(() => true),
     promptPortfolio(FACTS_PORTFOLIO_WAIT_MS),
+    takeRecords(),
     db
       .select()
       .from(threads)
@@ -65,9 +69,7 @@ export async function readFacts(): Promise<Fact[]> {
               db
                 .select({ one: sql`1` })
                 .from(automations)
-                .where(
-                  and(eq(automations.threadId, threads.id), eq(automations.status, "active")),
-                ),
+                .where(and(eq(automations.threadId, threads.id), eq(automations.status, "active"))),
             ),
           ),
         ),
@@ -76,7 +78,7 @@ export async function readFacts(): Promise<Fact[]> {
       .limit(ACTIVE_THREADS_TOLD),
     theOwner(),
   ]);
-  const held = await heldNow(portfolio);
+  const held = await heldNow(portfolio, records);
   const seen: OwnerSeen = {
     holdings: held.map(({ holding, name, image }) => ({
       symbol: holding.symbol,
@@ -86,7 +88,7 @@ export async function readFacts(): Promise<Fact[]> {
     })),
   };
   return [
-    ...moneyFacts(portfolio),
+    ...(wallet ? moneyFacts(portfolio, records) : [NO_WALLET_YET]),
     ...activeThreads.map(activeThreadFact),
     ...held.slice(0, HOLDINGS_TOLD).map(holdingFact),
     ...personalFacts(me),
@@ -106,7 +108,7 @@ function personalFacts(
     const asset = knownAsset(h.symbol);
     out.push({
       text: `A watched external wallet holds ${value} of ${h.name} (${h.symbol}) on ${h.chain} (watch-only; not in Auni's wallet).`,
-      source: { app: AUNI, label: `Watched ${h.symbol}`, link: "/app?settings=personalization" },
+      source: { app: AUNI, label: `Watched ${h.symbol}`, link: "/app?settings=you" },
       image: asset?.logoUrl ?? null,
       starts: startFrom(
         `A wallet I'm watching holds about ${value} of ${h.name} on ${h.chain}. What's your take on ${h.name} right now, and are there smart angles around it?`,
@@ -127,7 +129,7 @@ function personalFacts(
     const firstTopic = topics[0];
     out.push({
       text: parts.join(" "),
-      source: { app: AUNI, label: "Your profile", link: "/app?settings=personalization" },
+      source: { app: AUNI, label: "Your profile", link: "/app?settings=you" },
       image: null,
       starts: firstTopic
         ? startFrom(
@@ -190,7 +192,7 @@ interface Held {
  * Their largest holdings besides cash and the coin their fees are paid in, which is no holding
  * to talk about selling (see paysFees), each with its name and its move today.
  */
-async function heldNow(portfolio: Portfolio | null): Promise<Held[]> {
+async function heldNow(portfolio: Portfolio | null, records: TakeRecords): Promise<Held[]> {
   const candidates = (portfolio?.holdings ?? []).filter(
     (holding) => !holding.cash && usdToCents(holding.usdValue ?? "0") > 0n,
   );
@@ -204,7 +206,7 @@ async function heldNow(portfolio: Portfolio | null): Promise<Held[]> {
   const [faces, moves] = await Promise.all([
     // Names and logos are a nicety: a slow stock catalog leaves each its symbol.
     within(holdingFaces(holdings), FACT_WAIT_MS).catch(() => null),
-    dayMoves(holdings, startOfDay(timeZone)),
+    dayMoves(holdings, startOfDay(timeZone), records.fills),
   ]);
   return holdings.map((holding, index) => ({
     holding,
@@ -237,6 +239,24 @@ const FIRST_MONEY: FactStart = {
   prompt: "How much money do I need to start with Auni, and what's the easiest way to add it?",
 };
 
+const START_SMALL: FactStart = {
+  statement: "Starting small?",
+  action: "Try $50",
+  prompt: "I'd like to start small. What could a first take look like with $50?",
+};
+
+/**
+ * Before the owner's first take there is no wallet to be empty: it's made as that take is sent,
+ * unless they bring their own first (routes/setup.ts), so first run's line under the box and
+ * these never say two things. One that couldn't be made then is made by the first move.
+ */
+const NO_WALLET_YET: Fact = {
+  text: "The owner has no wallet yet: Auni makes one with their first take, or with the first move if it couldn't then.",
+  source: { app: AUNI, label: "Your money", link: "/app" },
+  image: null,
+  starts: [NEW_HERE, A_BELIEF, START_SMALL, MOVING],
+};
+
 /** A look over their money, by its total when that could be read. */
 function checkIn(total: string | null): FactStart[] {
   return startFrom("Look over my portfolio. How is it doing, and what stands out to you?", [
@@ -249,7 +269,7 @@ function checkIn(total: string | null): FactStart[] {
  * Their money as a whole, there even when it's empty or can't be read, and their cash as a fact
  * of its own, which wears cash's own mark as the portfolio shows it.
  */
-function moneyFacts(portfolio: Portfolio | null): Fact[] {
+function moneyFacts(portfolio: Portfolio | null, records: TakeRecords): Fact[] {
   const source = { app: AUNI, label: "Your money", link: "/app" };
   if (!portfolio)
     return [
@@ -269,7 +289,8 @@ function moneyFacts(portfolio: Portfolio | null): Fact[] {
         starts: [FIRST_MONEY, NEW_HERE, A_BELIEF, MOVING],
       },
     ];
-  const cash = portfolio.cash.usdValue;
+  // Cash as Money shows it: savings a take bought ("Keep my idle cash earning") are already at work.
+  const cash = heldByTakes(portfolio, records).cashUsd;
   const whole: Fact = {
     text: `The owner has ${dollars(portfolio.totalUsd)} in all, ${dollars(cash)} of it cash.`,
     source,

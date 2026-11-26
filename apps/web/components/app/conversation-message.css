@@ -1,0 +1,10 @@
+.auni-message-enter {
+  transform-origin: right bottom;
+  animation: auni-message-enter 240ms var(--motion-settle) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-message-enter {
+    animation: auni-fade-in 200ms ease-out both;
+  }
+}

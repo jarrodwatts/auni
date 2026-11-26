@@ -98,7 +98,7 @@ describe("hyperliquidWithdraw", () => {
   it("shows all that is free on the card when no amount is given", async () => {
     spot = { total: "10.802", hold: "0" };
     const card = await hyperliquidWithdraw.describe({}, {});
-    expect(card.summary).toBe("Withdraw all free cash ($10.80) from Hyperliquid to Arbitrum");
+    expect(card.summary).toBe("Bring all free cash ($10.80) back from Hyperliquid to Arbitrum");
     expect(card.amountUsd).toBe("10.80");
   });
 
@@ -112,7 +112,7 @@ describe("hyperliquidWithdraw", () => {
     mode = "default";
     spot = { total: "10.795", hold: "0" };
     await expect(withdraw("10.80", 10.8)).rejects.toThrow(
-      "Hyperliquid has $10.79 free to withdraw; open positions hold the rest as margin.",
+      "Hyperliquid has $10.79 free to bring back; open positions hold the rest as margin.",
     );
     expect(sendUserSigned).not.toHaveBeenCalled();
   });
@@ -120,7 +120,7 @@ describe("hyperliquidWithdraw", () => {
   it("refuses withdrawing all when the fee would leave a dollar or less", async () => {
     spot = { total: "1.50", hold: "0" };
     await expect(hyperliquidWithdraw.describe({}, {})).rejects.toThrow(
-      "a withdrawal has to be over $2",
+      "bringing cash back has to be over $2",
     );
   });
 });

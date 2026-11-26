@@ -170,6 +170,8 @@ describe("a second venue of each kind", () => {
         bridge: BRIDGE,
         arrives: "In about a minute",
         fee: "$0.10",
+        // What lands, which the receipt says arrived, never the $20 that left.
+        landsUsd: "19.90",
       });
       expect(appById(BRIDGE)?.bridge).toBeDefined();
     });

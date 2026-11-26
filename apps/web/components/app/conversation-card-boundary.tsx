@@ -35,8 +35,8 @@ export class ConversationCardBoundary extends Component<
   override render(): ReactNode {
     if (!this.state.failed) return this.props.children;
     return (
-      <div className="my-2 rounded-2xl bg-foreground/[0.027] px-4 py-3 ring-1 ring-foreground/[0.055] ring-inset">
-        <p className="text-sm text-muted-foreground">This card couldn&apos;t load.</p>
+      <div className="my-2 rounded-card bg-foreground/[0.027] px-4 py-3 ring-1 ring-foreground/[0.055] ring-inset">
+        <p className="text-ui text-muted-foreground">This card couldn&apos;t load.</p>
       </div>
     );
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { askFace } from "./ask-face";
+import { askFace, doneTitle } from "./ask-face";
 
 describe("askFace", () => {
   it("draws a thread's budget as the figure and how it acts under the title", () => {
@@ -23,6 +23,19 @@ describe("askFace", () => {
     });
   });
 
+  it("heads an Auto card recorded while a take was called a thread in today's words", () => {
+    const lines = [{ label: "Budget", value: "$4,000" }];
+    const face = askFace({
+      summary: "Let this thread trade on its own up to $4,000",
+      lines,
+      action: "Allow auto up to $4,000",
+    });
+    expect(face.title).toBe("Let this take trade on its own up to $4,000");
+    // What the tap allows stays as it was recorded.
+    expect(face.figure).toEqual({ value: "$4,000", label: "budget" });
+    expect(face.action).toBe("Allow auto up to $4,000");
+  });
+
   it("leaves out no line of an ask it knows nothing of", () => {
     const lines = [
       { label: "Thread", value: "AI buildout" },
@@ -38,5 +51,30 @@ describe("askFace", () => {
       details: lines,
       action,
     });
+  });
+});
+
+// A finished money card reads in the past tense; a finished ask read as the command it was.
+describe("doneTitle", () => {
+  it("says a finished ask in the past tense", () => {
+    expect(doneTitle("Save a routine: Friday check")).toBe("Saved routine: Friday check");
+    expect(doneTitle("Replace your routine: Friday check")).toBe(
+      "Replaced your routine: Friday check",
+    );
+    expect(doneTitle("Turn Elfa on")).toBe("Turned Elfa on");
+    expect(doneTitle("Let this take trade on its own up to $500")).toBe(
+      "This take can now trade on its own up to $500",
+    );
+    // One recorded while a take was called a thread reads in today's words.
+    expect(doneTitle("Let this thread trade on its own up to $500")).toBe(
+      "This take can now trade on its own up to $500",
+    );
+    expect(doneTitle("Let Peptides trade on its own up to $1,500")).toBe(
+      "Peptides can now trade on its own up to $1,500",
+    );
+  });
+
+  it("leaves one it has no past tense for to its own words", () => {
+    expect(doneTitle("Your Solana key")).toBeNull();
   });
 });

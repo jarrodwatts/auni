@@ -5,10 +5,12 @@ import { useEffect, useEffectEvent, useRef } from "react";
 import { AppMark } from "@/components/apps/app-mark";
 import { BrainRow } from "@/components/brains/brain-row";
 import { MascotArt } from "@/components/brand/mascot-art";
+import { useMe } from "@/components/personalization/use-me";
 import { useBrains, useBrainsSeen } from "@/lib/data/brains";
 
 import { nothingThinks, readyBrain } from "./first-run";
 import styles from "./first-run.module.css";
+import { whereAuniRuns } from "./where";
 
 /** How long "Now I can think" shows before the take goes again. */
 const CARRY_ON_MS = 1_400;
@@ -28,6 +30,7 @@ export function BrainNeeded({
   readonly onReady: () => void;
 }) {
   const rows = useBrains().data?.rows ?? [];
+  const machine = whereAuniRuns(useMe().reach);
   const ready = readyBrain(rows);
   const carried = useRef(false);
   const carryOn = useEffectEvent(() => {
@@ -68,13 +71,13 @@ export function BrainNeeded({
           <h2 className={styles.brainTitle}>Now I can think with {ready.name}</h2>
         ) : (
           <>
-            <h2 className={styles.brainTitle}>Lend me a brain?</h2>
+            <h2 className={styles.brainTitle}>Lend me your AI?</h2>
             <p className={styles.brainLine}>
-              Sign in your AI on this computer and I&apos;ll pick your take straight back up.
+              Set one up on {machine} below, and I&apos;ll pick your take right back up.
             </p>
             <ul className={styles.brainRows}>
               {rows.map((item) => (
-                <BrainRow key={item.row.id} item={item} machine="this computer" />
+                <BrainRow key={item.row.id} item={item} machine={machine} />
               ))}
             </ul>
           </>

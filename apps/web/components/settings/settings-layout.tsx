@@ -1,143 +1,250 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Check, ChevronRight } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { buttonVariants } from "@/components/ui/button";
+import { cardClass } from "@/components/ui/card";
+import { inputClass } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
- * T3 Code-inspired Settings section: clear heading + short subtitle above a crisp bordered card,
- * with optional highlight ring when jumped to from Settings search.
+ * Settings is built from three things: a group (a quiet heading over one card of rows), a
+ * setting (one row: what it is, a line on what it does, and its control), and a disclosure (a
+ * row that opens to show what most owners never need, such as the developer's detail). A
+ * search result lands on a group, a setting or a disclosure by its id: it scrolls into view and
+ * flashes, and a disclosure it lands on or in opens, and stays open until the owner closes it.
  */
-export function SettingsSection({
+
+/**
+ * Where a search landed: the id it went to, and whether its flash still shows. Each search is a
+ * new landing (`n`), so the flash fading never closes or scrolls anything again.
+ */
+export interface Jump {
+  readonly n: number;
+  readonly target: string;
+  readonly lit: boolean;
+}
+
+export const JumpedTo = createContext<Jump | null>(null);
+
+/**
+ * For whatever has the id a search (or a link naming it) went to: it scrolls into view once it's
+ * drawn (a pane may draw it only once its data is in), and whether it's still flashing.
+ */
+export function useJumpTarget<T extends HTMLElement>(id: string | undefined) {
+  const jump = useContext(JumpedTo);
+  const ref = useRef<T>(null);
+  const landing = jump !== null && id !== undefined && jump.target === id ? jump.n : null;
+  useEffect(() => {
+    const target = ref.current;
+    if (landing === null || !target) return;
+    // A short one sits mid-view; one taller than half the view shows from its heading down.
+    const tall = target.offsetHeight > window.innerHeight / 2;
+    target.scrollIntoView({ behavior: "smooth", block: tall ? "start" : "center" });
+  }, [landing]);
+  return { ref, lit: landing !== null && jump!.lit };
+}
+
+/** A group of settings: a quiet heading (or none), one card of rows, and a line under it. */
+export function SettingsGroup({
   id,
   title,
-  description,
-  action,
-  highlighted = false,
+  note,
   children,
 }: {
   readonly id?: string;
-  readonly title: string;
-  readonly description?: string;
-  readonly action?: ReactNode;
-  readonly highlighted?: boolean;
+  readonly title?: string;
+  /** A line under the card, for what's true of every row in it. */
+  readonly note?: ReactNode;
   readonly children: ReactNode;
 }) {
+  const { ref, lit } = useJumpTarget<HTMLElement>(id);
   return (
-    <section
-      id={id}
-      data-highlighted={highlighted ? "true" : undefined}
-      className={cn(
-        "scroll-mt-4 rounded-[16px] border bg-card transition-[border-color,box-shadow] duration-300",
-        highlighted ? "border-primary/50 ring-[3px] ring-ring/25" : "border-foreground/[0.08]",
-      )}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-foreground/[0.06] px-4 py-3.5 sm:px-5">
-        <div className="min-w-0 flex-1">
-          <h4 className="text-[14.5px] leading-5 font-semibold tracking-[-0.015em] text-ink">
-            {title}
-          </h4>
-          {description ? (
-            <p className="mt-0.5 text-[12.5px] leading-[1.45] text-pretty text-muted-foreground">
-              {description}
-            </p>
-          ) : null}
-        </div>
-        {action ? <div className="flex-none">{action}</div> : null}
+    <section ref={ref} id={id} aria-label={title} className="scroll-mt-6">
+      {title ? (
+        <h3 className="mb-2 px-1 text-meta font-medium text-muted-foreground">{title}</h3>
+      ) : null}
+      <div
+        className={cn(
+          cardClass,
+          "divide-y divide-border transition-[box-shadow] duration-500",
+          lit && "ring-[3px] ring-ring/25",
+        )}
+      >
+        {children}
       </div>
-      <div className="divide-y divide-foreground/[0.06]">{children}</div>
+      {note ? (
+        <p className="mt-2 px-1 text-meta leading-[1.5] text-muted-foreground">{note}</p>
+      ) : null}
     </section>
   );
 }
 
-/** One structured setting row inside a SettingsSection. */
-export function SettingsRow({
+/**
+ * One setting: its name, a line on what it does, and its control at the end, or under it
+ * (`stacked`) where the control needs the width.
+ */
+export function Setting({
   id,
   label,
-  description,
-  highlighted = false,
+  hint,
   stacked = false,
+  inline = false,
   children,
-  className,
 }: {
   readonly id?: string;
-  readonly label?: ReactNode;
-  readonly description?: ReactNode;
-  readonly highlighted?: boolean;
+  readonly label: ReactNode;
+  readonly hint?: ReactNode;
   readonly stacked?: boolean;
+  /** A control small enough to stay beside its words even on a phone: a switch. */
+  readonly inline?: boolean;
   readonly children?: ReactNode;
-  readonly className?: string;
 }) {
+  const { ref, lit } = useJumpTarget<HTMLDivElement>(id);
   return (
     <div
+      ref={ref}
       id={id}
       className={cn(
-        "scroll-mt-4 px-4 py-3.5 transition-colors duration-300 sm:px-5",
-        stacked
-          ? "flex flex-col gap-3"
-          : "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4",
-        highlighted && "bg-primary/[0.06]",
-        className,
+        "flex scroll-mt-6 flex-col gap-3 px-4 py-3.5 transition-colors duration-500 sm:px-5",
+        !stacked && "sm:flex-row sm:items-center sm:justify-between sm:gap-5",
+        inline && "flex-row items-center justify-between gap-5",
+        lit && "bg-primary/[0.06]",
       )}
     >
-      {label || description ? (
-        <div className="min-w-0 flex-1">
-          {label ? (
-            <div className="text-[13.5px] leading-5 font-medium text-ink">{label}</div>
-          ) : null}
-          {description ? (
-            <div className="mt-0.5 text-[12.5px] leading-[1.45] text-pretty text-muted-foreground">
-              {description}
-            </div>
-          ) : null}
-        </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-ui font-medium text-ink">{label}</div>
+        {hint ? (
+          <div className="mt-0.5 text-meta leading-[1.45] text-pretty text-muted-foreground">
+            {hint}
+          </div>
+        ) : null}
+      </div>
+      {children ? (
+        <div className={cn("min-w-0", !stacked && "sm:flex-none")}>{children}</div>
       ) : null}
-      {children ? <div className={cn("flex-none", stacked && "w-full")}>{children}</div> : null}
     </div>
   );
 }
 
-export type BadgeTone = "ok" | "warn" | "error" | "accent" | "neutral";
-
-const BADGE_STYLES: Record<BadgeTone, string> = {
-  ok: "bg-positive/[0.12] text-positive",
-  warn: "bg-warning-surface text-warning",
-  error: "bg-destructive/[0.12] text-destructive",
-  accent: "bg-primary/[0.12] text-primary",
-  neutral: "bg-surface text-muted-foreground",
-};
-
-/** Compact semantic status pill, always derived from Auni's design tokens. */
-export function SettingsBadge({
-  tone = "neutral",
-  children,
-  className,
+/** A row that does one thing when pressed: open a dialog, go to another pane. */
+export function SettingLink({
+  icon,
+  label,
+  hint,
+  disabled = false,
+  onClick,
 }: {
-  readonly tone?: BadgeTone;
-  readonly children: ReactNode;
-  readonly className?: string;
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly hint?: string;
+  readonly disabled?: boolean;
+  readonly onClick: () => void;
 }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11.5px] leading-4 font-medium whitespace-nowrap",
-        BADGE_STYLES[tone],
-        className,
-      )}
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-150 focus-ring-inset hover:bg-foreground/[0.03] disabled:cursor-not-allowed disabled:opacity-50 sm:px-5"
     >
+      <span className="flex size-8 flex-none items-center justify-center rounded-control bg-surface text-ink-soft [&_svg]:size-4">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-ui font-medium text-ink">{label}</span>
+        {hint ? <span className="mt-0.5 block text-meta text-muted-foreground">{hint}</span> : null}
+      </span>
+      <ChevronRight aria-hidden className="size-4 flex-none text-faint" />
+    </button>
+  );
+}
+
+/**
+ * What most owners never need, folded under one quiet line ("For developers", "Show every
+ * check"): opened by a tap, or by a search that lands on it or on anything inside (`holds`).
+ */
+export function Disclosure({
+  id,
+  title,
+  hint,
+  holds = [],
+  children,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly hint?: string;
+  /** Ids of what sits inside it, which a search may land on. */
+  readonly holds?: readonly string[];
+  readonly children: ReactNode;
+}) {
+  const jump = useContext(JumpedTo);
+  const { ref } = useJumpTarget<HTMLElement>(id);
+  // A search that lands on it or inside opens it, once: what's typed inside outlives the flash.
+  const landing =
+    jump !== null && (jump.target === id || holds.includes(jump.target)) ? jump.n : null;
+  const [shown, setShown] = useState(landing !== null);
+  const [landed, setLanded] = useState(landing);
+  if (landing !== landed) {
+    setLanded(landing);
+    if (landing !== null) setShown(true);
+  }
+  return (
+    <section ref={ref} id={id} className="scroll-mt-6">
+      <button
+        type="button"
+        aria-expanded={shown}
+        onClick={() => setShown(!shown)}
+        className="group flex w-full items-center gap-2 rounded-control px-1 py-1.5 text-left focus-ring"
+      >
+        <ChevronRight
+          aria-hidden
+          className={cn(
+            "size-4 flex-none text-faint transition-transform duration-200 ease-settle",
+            shown && "rotate-90",
+          )}
+        />
+        <span className="text-meta font-medium text-muted-foreground group-hover:text-ink">
+          {title}
+        </span>
+        {hint && !shown ? <span className="truncate text-meta text-faint">{hint}</span> : null}
+      </button>
+      {shown ? <div className="auni-field-in mt-3 flex flex-col gap-6">{children}</div> : null}
+    </section>
+  );
+}
+
+/** "Saved", for a moment, beside what was just saved. */
+export function Saved({ children = "Saved" }: { readonly children?: string }) {
+  return (
+    <span
+      role="status"
+      className="inline-flex items-center gap-1 text-caption text-muted-foreground"
+    >
+      <Check aria-hidden className="size-3.5" />
       {children}
     </span>
   );
 }
 
-/** Shared input class matching Auni's calm rounded control style. */
-export const SETTINGS_INPUT =
-  "h-9 rounded-[10px] border border-foreground/[0.1] bg-background px-3 text-[13.5px] text-ink outline-none transition-[border-color,box-shadow] placeholder:text-faint focus-visible:border-foreground/25 focus-visible:ring-[3px] focus-visible:ring-ring/25 disabled:opacity-60";
+/** A line saying what went wrong, in place of what it was about. */
+export function Refusal({ children }: { readonly children: ReactNode }) {
+  return (
+    <p role="alert" className="text-meta leading-[1.45] text-destructive">
+      {children}
+    </p>
+  );
+}
 
-/** Shared secondary pill button for Settings actions. */
-export const SETTINGS_BUTTON =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] border border-foreground/[0.1] bg-background px-3 text-[12.5px] font-medium text-ink transition-colors hover:bg-foreground/[0.04] focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
+/** A field in Settings: the Input primitive's, a row's height. */
+export const SETTINGS_INPUT = cn(inputClass, "h-9 w-auto");
 
-/** Shared primary pill button for Settings actions. */
-export const SETTINGS_PRIMARY_BUTTON =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-medium text-background transition-colors hover:bg-foreground/85 focus-visible:ring-[3px] focus-visible:ring-ring/30 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
+/** A lesser action in Settings. */
+export const SETTINGS_BUTTON = buttonVariants({ variant: "outline", size: "sm" });
+
+/** The one strong action in a Settings group. */
+export const SETTINGS_PRIMARY_BUTTON = buttonVariants({ variant: "primary", size: "sm" });
+
+/** How long "Saved" stays beside what was saved. */
+export const SAVED_MS = 2_000;

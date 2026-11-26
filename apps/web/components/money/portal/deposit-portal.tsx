@@ -1,44 +1,69 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
-import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
+import { ME_KEY } from "@/components/personalization/use-me";
+import {
+  UNTIL_ANSWERED,
+  useDepositWatch,
+  useRefreshMoney,
+} from "@/components/portfolio/use-portfolio";
 import { useMoney } from "@/components/money/money-provider";
+import type { FundingNeed } from "@/lib/app-links";
 import { markActivitySeen } from "@/lib/data/activity";
+import { makeWallet } from "@/lib/data/me";
 
-import { watchRead, type DepositWatch } from "../deposit-watch";
 import { Portal } from "./portal";
 
 /**
- * The Portal on the account's own addresses, reading the money more often for as long as it's
- * open, and showing the newest deposit core records after it opened. `need` is the whole dollars
- * a card asked for, when one opened it.
+ * The ask that makes the owner's wallet while there's none to send to, as when their first take
+ * couldn't make it: one ask however many sheets are open, asked until it's made, and core makes
+ * one wallet however many ask (see makeWalletIfNone). Its answer is the owner as they are now,
+ * so the address shows the moment it's made.
  */
-export function DepositPortal({ need }: { readonly need: string | null }) {
-  const { depositNetworks: networks, portfolio, watchDeposits } = useMoney();
-  useEffect(() => watchDeposits(), [watchDeposits]);
+export const walletMadeQuery = queryOptions({
+  queryKey: ["wallet-made"],
+  // Closing the sheet doesn't stop a wallet being made.
+  queryFn: async ({ client }) => {
+    const me = await makeWallet();
+    client.setQueryData(ME_KEY, me);
+    return me;
+  },
+  ...UNTIL_ANSWERED,
+});
 
-  // Deposits recorded already are old news, taken as seen from the money as it was last read.
-  const [watch, setWatch] = useState<DepositWatch>({ seen: null, landed: null });
-  if (portfolio) {
-    const read = watchRead(watch, portfolio.deposits);
-    if (read !== watch) setWatch(read);
-  }
+/**
+ * The Portal on the account's own addresses, showing every deposit core records after it opened
+ * (never one from before), a test send and the real one after it alike. `need` is what a card is
+ * short of, when one opened it.
+ */
+export function DepositPortal({ need }: { readonly need: FundingNeed | null }) {
+  const { depositNetworks, portfolio } = useMoney();
+  const { watching, landed } = useDepositWatch();
+  useQuery({ ...walletMadeQuery, enabled: depositNetworks.length === 0 });
 
-  // The portfolio read already holds what landed; the reads around it, such as history, don't.
-  // The owner watched it land, so Activity has nothing new to tell them about it.
+  // The money is read again to show what landed. The owner watched it land, so Activity has
+  // nothing new to tell them about it.
   const refreshMoney = useRefreshMoney();
   const queryClient = useQueryClient();
-  const { landed } = watch;
+  const latest = landed[0]?.id ?? null;
   useEffect(() => {
-    if (!landed) return;
+    if (!latest) return;
     refreshMoney();
     void markActivitySeen().then(
       () => queryClient.invalidateQueries({ queryKey: ["activity"] }),
       () => undefined,
     );
-  }, [landed, refreshMoney, queryClient]);
+  }, [latest, refreshMoney, queryClient]);
 
-  return <Portal landed={landed} need={need} networks={networks} />;
+  return (
+    <Portal
+      feesPayable={portfolio?.feesPayable ?? null}
+      landed={landed}
+      need={need}
+      networks={depositNetworks}
+      watching={watching}
+    />
+  );
 }

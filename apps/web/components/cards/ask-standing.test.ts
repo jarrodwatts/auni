@@ -21,13 +21,17 @@ describe("askStanding", () => {
 
   it("says why one couldn't apply, and when it was declined, replaced or taken back", () => {
     expect(
-      askStanding("set_thread_autonomy", "failed", "The thread was archived before you allowed this."),
+      askStanding(
+        "set_thread_autonomy",
+        "failed",
+        "The thread was archived before you allowed this.",
+      ),
     ).toMatchObject({
       label: "The thread was archived before you allowed this.",
       tone: "quiet",
     });
     expect(askStanding("set_thread_autonomy", "cancelled", null)).toMatchObject({
-      label: "You said not now",
+      label: "Declined",
     });
     expect(askStanding("set_thread_autonomy", "replaced", null)).toMatchObject({
       label: "Replaced by a newer card",

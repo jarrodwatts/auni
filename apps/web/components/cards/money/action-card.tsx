@@ -1,38 +1,38 @@
 "use client";
 
-import {
-  ETHEREUM,
-  filledUsd,
-  NETWORK_KEYS,
-  NETWORKS,
-  type ActionCardWire,
-  type ActionWire,
-} from "@auni/shared";
+import { appListing, filledUsd, type ActionCardWire, type ActionWire } from "@auni/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, CircleCheck, MessageCircle } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { mustPairAgain, PairAgain } from "@/components/auth/pair-again";
 import type { EdgeScene } from "@/components/brand/edge-pose";
 import type { AskAgentHandler } from "@/components/cards/ask-agent";
-import { LogoImage } from "@/components/brand/marks";
+import {
+  CardActions,
+  CardButton,
+  CardFrame,
+  CardHead,
+  CardReceipt,
+} from "@/components/cards/card-parts";
 import { TextSwap } from "@/components/motion/text-swap";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { WithdrawReviewDialog } from "@/components/withdraw/withdraw-review-dialog";
 import { actionKey, decideAction, tapFailed, retryAction, useLiveAction } from "@/lib/data/actions";
-import { cn } from "@/lib/utils";
-
-import { actionCardContent, figureWidth, withFilled } from "./action-card-content";
-import { FooterMorph, StepError } from "./plan-funnel";
-import { FullAddress, isAddress } from "./full-address";
-import { edgeScene } from "./edge-scene";
-import { MoneyButton, MoneyButtons, MoneyCardFrame, MoneyMark } from "./money-card-parts";
-import { FailedActions, MoveList } from "./move-list";
-import { ProofNote } from "./proof-note";
-import { reportable } from "./failed-step";
-import { actionRows, didnt, failureOf, headerLine, STAYED } from "./move-rows";
 import { formatExactUsd } from "@/lib/money";
+
+import { actionCardContent, withFilled } from "./action-card-content";
+import { edgeScene } from "./edge-scene";
+import { exchangeOf } from "./exchange";
+import { heldHeading, onlyWhileNewest, reportable } from "./failed-step";
+import { MoneyMark } from "./money-card-parts";
 import styles from "./money-card.module.css";
+import { MoveBody } from "./move-body";
+import { FailedActions, MoveList } from "./move-list";
+import { actionRows, didnt, failureOf, headerLine, STAYED } from "./move-rows";
+import { FooterMorph, StepError } from "./plan-funnel";
+import { ProofNote } from "./proof-note";
 import { untapped } from "./untapped";
 import { useFailed } from "./use-failed";
 
@@ -40,10 +40,15 @@ import { useFailed } from "./use-failed";
 const LANDED_MS = 1_400;
 
 /**
- * One money action the agent took on its own, drawn where it took it. The
- * header and figures stay put while the foot of the card moves from the ask
- * to on its way to done. It reads the action live; the card's own fields are
- * only where it started.
+ * One money move, drawn where Auni proposed it, as one object that changes in place:
+ *
+ *   waiting on you  ->  working  ->  done (a calm receipt)
+ *        |                  |
+ *        |                  +->  status unknown (held: Check status, Dismiss card)
+ *        +->  declined                    +->  didn't go through (why, and whether money moved)
+ *
+ * The head and its figure stay put while the foot moves from the tap to the steps to the
+ * receipt. It reads the move live; the card's own fields are only where it started.
  */
 export function ActionCard({
   card,
@@ -84,7 +89,6 @@ export function ActionCard({
   // Once it fills, it says what it really moved rather than what the card priced.
   const shown = withFilled(card, filledUsd(state.run));
   const content = actionCardContent(shown);
-  const context = content.context ?? "";
   const landed = watched && state.status === "done";
   useEffect(() => {
     if (!landed) return undefined;
@@ -127,13 +131,13 @@ export function ActionCard({
   const ended = untapped([state]);
   if (ended) {
     return (
-      <MoneyCardFrame label={content.title} phase="expired">
-        <Receipt
+      <CardFrame label={content.title} phase="expired">
+        <CardReceipt
           mark={<MoneyMark muted mark={content.mark} size={38} />}
           title={content.title}
           detail={ended}
         />
-      </MoneyCardFrame>
+      </CardFrame>
     );
   }
 
@@ -153,11 +157,11 @@ export function ActionCard({
           : "ready";
 
   if (step === "done" || step === "failed") {
-    // One the owner closed while it was held says so, whichever way it ended (core's CLOSED).
+    // One the owner dismissed while it was held says so, whichever way it ended (core's CLOSED).
     const closed = state.run.settledBy === "owner";
     const done = step === "done" && !closed;
     const title = closed
-      ? `Closed: ${content.title}`
+      ? `Dismissed: ${content.title}`
       : done
         ? content.receipt.title
         : didnt(content.title);
@@ -166,9 +170,15 @@ export function ActionCard({
       : onAskAgent && !closed
         ? { kind: "attention", row: null, settled: true }
         : { kind: "failed" };
+    const report = !done && !closed && reportable(state.failureKind);
     return (
-      <MoneyCardFrame auni={live.data ? auni : null} label={title} phase="confirmed">
-        <Receipt
+      <CardFrame
+        auni={live.data ? auni : null}
+        label={title}
+        phase="confirmed"
+        tone={!done && !closed ? "failed" : null}
+      >
+        <CardReceipt
           mark={
             <MoneyMark
               done={done}
@@ -189,8 +199,8 @@ export function ActionCard({
           whole={!done}
           amount={done ? content.receipt.amount : null}
           trailing={
-            !done && !closed ? (
-              <span className="flex flex-wrap items-center gap-2">
+            !done && !closed && (failed?.actions.length || report) ? (
+              <div className="flex flex-wrap items-center gap-2">
                 {failed ? (
                   <FailedActions
                     actions={failed.actions}
@@ -199,40 +209,54 @@ export function ActionCard({
                   />
                 ) : null}
                 {/* Written up for Auni's maintainers, which the owner posts themselves. */}
-                {reportable(state.failureKind) ? (
-                  <button
-                    type="button"
+                {report ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    // Alone, its words line up with the reason above, not its padding: always with
+                    // no other way on, and once the conversation moves past the ones that go then.
+                    className={
+                      !failed?.actions.length
+                        ? "-ml-3"
+                        : failed.actions.every(onlyWhileNewest)
+                          ? styles.aloneOnceMovedOn
+                          : undefined
+                    }
                     onClick={() => openReport({ action: card.actionReference })}
-                    className="h-8 flex-none rounded-full bg-foreground/[0.06] px-3.5 text-[13px] font-semibold text-ink transition-[background-color,transform] hover:bg-foreground/[0.09] active:scale-[.98]"
                     data-testid="report-it"
                   >
-                    Report it
-                  </button>
+                    Report a problem
+                  </Button>
                 ) : null}
-              </span>
+              </div>
             ) : null
           }
         />
-      </MoneyCardFrame>
+      </CardFrame>
     );
   }
 
   const moves = shown.amount.baseUnits !== "0";
-  const detail = content.figures.filter((figure) => figure.value !== amount);
   // A held move keeps its card as it was asked, so what it was stays in view; only its foot
   // changes, from steps that turn to where it stands and the owner's two taps.
   const phase = landing ? "after" : step === "running" ? "running" : "before";
   const line = headerLine({
     done: landing ? 1 : 0,
     flow: moves ? card.flow : null,
-    own: context || null,
+    own: content.context || null,
     phase,
     total: 1,
   });
   const rows = actionRows(card, state, { working: content.working, done: content.receipt.title });
+  // The amount is said once, in the head; what it gets for it goes under the title.
+  const exchange = exchangeOf(content.figures, amount);
+  const venue = appListing(card.venue)?.name ?? null;
+  const heading = heldHeading(state.run.held, venue);
 
   return (
-    <MoneyCardFrame
+    <CardFrame
+      // Auni peeks over a card only while it waits on the owner: for the tap, or for a held
+      // move's check. Once tapped it ducks away, and comes back up only to cheer a landing.
       auni={
         !live.data
           ? null
@@ -240,133 +264,55 @@ export function ActionCard({
             ? { kind: "attention", row: null, settled: true }
             : edgeScene({ phase, retry: false, rows })
       }
-      label={step === "held" ? `Not confirmed: ${content.title}` : content.title}
+      label={step === "held" ? `${heading.badge}: ${content.title}` : content.title}
       phase="open"
+      tone={step === "ready" || step === "held" ? "waiting" : null}
     >
-      {/* One header, read like a holding: what it is on the left, the money on the right. */}
-      <div className="flex items-center gap-3">
-        <MoneyMark
-          done={landing}
-          mark={content.mark}
-          ring={landing ? "landed" : step === "running" ? "working" : null}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
-            {moves && !content.note ? subject(content.title) : content.title}
-          </p>
-          {line.text ? (
-            <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">
+      <CardHead
+        mark={
+          <MoneyMark
+            done={landing}
+            mark={content.mark}
+            ring={landing ? "landed" : step === "running" ? "working" : null}
+          />
+        }
+        title={moves && !content.note ? subject(content.title) : content.title}
+        line={
+          exchange.result || line.text ? (
+            <>
+              {exchange.result ? (
+                <span className="block text-ui leading-5 font-medium text-ink tabular-nums">
+                  {exchange.result}
+                </span>
+              ) : null}
               {/* Its own line can be all that names what's bought (a prediction's question), so it wraps. */}
-              <TextSwap
-                className={line.working ? styles.shimmer : undefined}
-                text={line.text}
-                wrap
-              />
-            </p>
-          ) : null}
-        </div>
-        {moves ? (
-          <div className="flex-none pl-1 text-right">
-            <p className="text-[26px] leading-[1.1] font-semibold tracking-[-0.035em] text-ink tabular-nums">
-              {amount}
-            </p>
-            <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">
-              {landing
-                ? "done"
-                : step === "held"
-                  ? "not confirmed"
-                  : step === "running"
-                    ? "on its way"
-                    : card.flow === "back"
-                      ? "coming back"
-                      : (content.note ?? amountNote(content.title))}
-            </p>
-          </div>
-        ) : null}
-      </div>
-      {/* A card no app vouches for says first that what follows is what Auni saw by running it. */}
-      {content.checks ? (
-        <CheckHeading checked className="mt-5 border-t border-foreground/[0.06] pt-5">
-          {content.checks.checked}
-        </CheckHeading>
-      ) : null}
-      {detail.length > 0 ? (
-        <dl
-          className={cn(
-            // Dense, so short figures still pair up around one that takes a row of its own.
-            "grid grid-flow-row-dense grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3",
-            content.checks ? "mt-3.5" : "mt-5 border-t border-foreground/[0.06] pt-5",
-          )}
-        >
-          {detail.map((figure) => {
-            const address = isAddress(figure.value);
-            const width = figureWidth(figure, address);
-            return (
-              <div
-                key={`${figure.label}:${figure.value}`}
-                className={cn(
-                  "min-w-0",
-                  width === "wide" && "col-span-2 sm:col-span-1",
-                  width === "row" && "col-span-full",
-                )}
-              >
-                <dt className="text-[12px] text-muted-foreground">{figure.label}</dt>
-                {/* Every value is read whole: it wraps, and a whole address is drawn to be checked. */}
-                <dd className="mt-0.5 text-[15px] leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
-                  {address ? (
-                    <FullAddress
-                      address={figure.value}
-                      className="text-[14px] font-normal tracking-normal"
-                      split="narrow"
-                    />
-                  ) : (
-                    figure.value
-                  )}
-                  {figure.note ? (
-                    <span className="ml-1.5 text-[12.5px] font-normal tracking-normal text-muted-foreground">
-                      {figure.note}
-                    </span>
-                  ) : null}
-                </dd>
-              </div>
-            );
-          })}
-        </dl>
-      ) : null}
-      {content.scene?.kind === "route" ? <Route {...content.scene} /> : null}
-      {content.finePrint ? (
-        <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">
-          {content.finePrint}
-        </p>
-      ) : null}
-      {/* What Allow signs before the move itself, in core's words, until it has been allowed. */}
-      {content.buysFirst && step === "ready" ? (
-        <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">
-          {content.buysFirst}
-        </p>
-      ) : null}
-      {content.warning ? (
-        // A token's name is its maker's, unbroken at any length: it wraps, never runs off the card.
-        <p className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive">
-          {content.warning}
-        </p>
-      ) : null}
-      {/* Below everything checked: the agent's own sentence, named unchecked before it is read. */}
-      {content.checks?.unchecked ? (
-        <figure className="mt-5 border-t border-foreground/[0.06] pt-5">
-          <figcaption>
-            <CheckHeading>{content.checks.unchecked.heading}</CheckHeading>
-          </figcaption>
-          <blockquote className="mt-2 text-[15px] leading-[1.5] text-pretty text-ink">
-            {content.checks.unchecked.says}
-          </blockquote>
-        </figure>
-      ) : null}
-      {content.checks ? (
-        <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">
-          {content.checks.why}
-        </p>
-      ) : null}
+              {line.text ? (
+                <TextSwap
+                  className={line.working ? styles.shimmer : undefined}
+                  text={line.text}
+                  wrap
+                />
+              ) : null}
+            </>
+          ) : null
+        }
+        figure={
+          moves
+            ? {
+                value: amount,
+                note: landing
+                  ? "done"
+                  : step === "held"
+                    ? heading.note
+                    : step === "running"
+                      ? "on its way"
+                      : (content.note ??
+                        (card.flow === "back" ? "coming back" : amountNote(content.title))),
+              }
+            : null
+        }
+      />
+      <MoveBody exchange={exchange} face={content} ready={step === "ready"} />
       <FooterMorph stepKey={step}>
         {step === "ready" ? (
           <>
@@ -377,36 +323,37 @@ export function ActionCard({
               />
             ) : takesProof ? (
               <ProofNote className="mb-4">
-                {card.proofWhy ?? "Auni can't vouch for this one on a tap, so it checks it's you."}
+                {card.proofWhy ??
+                  "Nothing vouches for this one but its simulation, so confirm it's you first."}
               </ProofNote>
             ) : null}
             <StepError>{failure}</StepError>
-            <MoneyButtons>
-              <MoneyButton
-                busy={pending === "decline"}
-                disabled={pending !== null}
-                tone="quiet"
-                onClick={() => void decide("decline")}
-              >
-                Not now
-              </MoneyButton>
-              <MoneyButton
+            <CardActions
+              decline={{
+                busy: pending === "decline",
+                disabled: pending !== null,
+                onClick: () => void decide("decline"),
+              }}
+            >
+              <CardButton
                 disabled={pending !== null}
                 tone="primary"
                 onClick={() => (withdraws ? setReviewing(true) : void decide("allow"))}
               >
-                {content.action}
-              </MoneyButton>
-            </MoneyButtons>
+                <span className="truncate">{content.action}</span>
+              </CardButton>
+            </CardActions>
           </>
         ) : step === "held" && failed ? (
-          <div className="rounded-[14px] border border-foreground/[0.08] px-4 py-3.5">
-            <p className="text-[14px] leading-5 font-semibold tracking-[-0.01em] text-ink">
-              Not confirmed
+          // Held is no failure: it says calmly where it stands, and that nothing is sent again.
+          <div className="border-t border-border pt-4">
+            <p className="flex flex-wrap items-center gap-2 text-ui leading-5 font-semibold text-ink">
+              {heading.title}
+              <Badge tone="waiting">{heading.badge}</Badge>
             </p>
             <p
               aria-live="polite"
-              className="mt-1 text-[13px] leading-[1.5] text-pretty text-muted-foreground"
+              className="mt-1 text-meta leading-[1.5] text-pretty text-muted-foreground"
             >
               {problem ?? failed.reason}
             </p>
@@ -416,7 +363,7 @@ export function ActionCard({
                 busy={busy}
                 onAct={act({
                   key: card.actionReference,
-                  label: `Not confirmed: ${content.title}`,
+                  label: `${heading.badge}: ${content.title}`,
                   reason: failed.reason,
                 })}
               />
@@ -434,7 +381,7 @@ export function ActionCard({
           onSent={(action) => queryClient.setQueryData(queryKey, action)}
         />
       ) : null}
-    </MoneyCardFrame>
+    </CardFrame>
   );
 }
 
@@ -459,126 +406,4 @@ const MOVES = new Set(["buy", "sell", "withdraw", "deposit", "send", "move", "ad
 function amountNote(title: string): string {
   const verb = title.split(" ")[0] ?? "";
   return MOVES.has(verb.toLowerCase()) ? `to ${verb.toLowerCase()}` : verb;
-}
-
-/**
- * What the words under it are, on a card no app vouches for: what Auni saw by running the
- * transaction, or what the agent says of it, which nobody checked. The two read as a pair.
- */
-function CheckHeading({
-  checked = false,
-  children,
-  className,
-}: {
-  readonly checked?: boolean;
-  readonly children: ReactNode;
-  readonly className?: string;
-}) {
-  const Icon = checked ? CircleCheck : MessageCircle;
-  return (
-    <p
-      className={cn(
-        "flex items-center gap-1.5 text-[13px] leading-[18px] font-medium",
-        checked ? "text-ink" : "text-muted-foreground",
-        className,
-      )}
-    >
-      <Icon
-        aria-hidden
-        className={cn("size-4 flex-none", checked && "text-primary")}
-        strokeWidth={2.2}
-      />
-      {children}
-    </p>
-  );
-}
-
-/** The chains Auni has artwork for, by name: its networks', and Ethereum's coin; any other is named without a mark. */
-const CHAIN_LOGOS: Readonly<Record<string, string | null>> = {
-  ...Object.fromEntries(NETWORK_KEYS.map((key) => [NETWORKS[key].name, NETWORKS[key].logo])),
-  Ethereum: ETHEREUM.logoUrl,
-};
-
-/** A move between chains: where it leaves with what, and where it lands. */
-function Route({
-  from,
-  sends,
-  to,
-}: {
-  readonly from: string;
-  readonly sends: string;
-  readonly to: string;
-}) {
-  const end = (chain: string, label: string, value: string, right = false) => (
-    <div
-      className={cn(
-        "flex min-w-0 flex-1 items-center gap-2.5",
-        right && "flex-row-reverse text-right",
-      )}
-    >
-      <LogoImage fallback={null} size={26} src={CHAIN_LOGOS[chain] ?? null} />
-      <div className="min-w-0">
-        <p className="truncate text-[12px] text-muted-foreground">{label}</p>
-        <p className="mt-0.5 truncate text-[15px] font-semibold tracking-[-0.01em] text-ink tabular-nums">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-  return (
-    <div className="mt-5 flex items-center gap-3 border-t border-foreground/[0.06] pt-5">
-      {end(from, `Leaves ${from}`, sends)}
-      <ArrowRight aria-hidden className="size-4 flex-none text-muted-foreground" />
-      {end(to, "Arrives on", to, true)}
-    </div>
-  );
-}
-
-/** A settled move: its mark, what happened in past tense, and what it means now. */
-function Receipt({
-  mark,
-  title,
-  detail,
-  whole = false,
-  amount,
-  trailing,
-}: {
-  readonly mark: ReactNode;
-  readonly title: string;
-  readonly detail: string;
-  /** Why a move failed is read to its end, where what a done one means now keeps to two lines. */
-  readonly whole?: boolean;
-  /** What it spent or brought back, drawn as the receipt's figure, as a plan's row draws its own. */
-  readonly amount?: string | null;
-  readonly trailing?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-3 sm:flex-nowrap">
-      {mark}
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-pretty text-ink">
-          {title}
-        </p>
-        {detail ? (
-          <p
-            className={cn(
-              "mt-0.5 text-[13px] leading-[1.4] text-pretty text-muted-foreground tabular-nums",
-              !whole && "line-clamp-2",
-            )}
-          >
-            {detail}
-          </p>
-        ) : null}
-      </div>
-      {amount ? (
-        <span className="flex-none self-center text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink tabular-nums">
-          {amount}
-        </span>
-      ) : null}
-      {/* On a phone the next step drops under the words, so they keep the width. */}
-      {trailing ? (
-        <span className="flex-none max-sm:basis-full max-sm:pl-[52px]">{trailing}</span>
-      ) : null}
-    </div>
-  );
 }

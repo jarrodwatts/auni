@@ -11,7 +11,6 @@ import {
   quoteHoldingProceeds,
   type Approved,
 } from "../approved.ts";
-import { costsLabel } from "../effect.ts";
 import { solanaMintKey } from "../fill-key.ts";
 import {
   tradedToken,
@@ -63,7 +62,9 @@ const input = {
     .number()
     .positive()
     .optional()
-    .describe("Tokens to buy or sell, as the portfolio shows them. Leave this and amountUsd out to sell everything."),
+    .describe(
+      "Tokens to buy or sell, as the portfolio shows them. Leave this and amountUsd out to sell everything.",
+    ),
   slippageBps: z.number().int().min(10).max(500).optional().describe("Defaults to 100 (1%)."),
 };
 
@@ -172,10 +173,7 @@ interface SwapPlan {
  * `owner` is the wallet a sell naming no amount sells from, null while there is
  * none to hold anything.
  */
-async function plan(
-  swap: SolanaSwapInput,
-  owner: () => Promise<string | null>,
-): Promise<SwapPlan> {
+async function plan(swap: SolanaSwapInput, owner: () => Promise<string | null>): Promise<SwapPlan> {
   const sellsAll =
     swap.side === "sell" && swap.amountUsd === undefined && swap.tokenAmount === undefined;
   if (!sellsAll && (swap.amountUsd === undefined) === (swap.tokenAmount === undefined)) {
@@ -288,7 +286,7 @@ function preview(
     selling: swap.side === "sell" ? `${formatAmount(tokens)} ${symbol}` : null,
     atLeast: swap.side === "sell" ? usdLabel(least) : null,
     price: priceLabel(swap.usdPrice),
-    costs: costsLabel(costs),
+    costs,
   };
   const made: ActionPreview = {
     ...(lostPct(swap, quote) > limit ? { unpriced: "loses on fill" as const } : {}),

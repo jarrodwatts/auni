@@ -1,11 +1,12 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
-
-import type { ThreadFailure } from "@/components/app/thread-failure";
+import { FAILURE_ACTIONS, type ThreadFailure } from "@/components/app/thread-failure";
 import { Button } from "@/components/ui/button";
 
-/** The one place a conversation admits something went wrong: one sentence, one Try again. */
+/**
+ * Where something admits it didn't work: what happened, what it means for the owner's money,
+ * and the one thing to do. Calm and plain: nothing here is an alarm.
+ */
 export function ThreadFailureNotice({
   failure,
   onRetry,
@@ -15,14 +16,18 @@ export function ThreadFailureNotice({
 }) {
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border border-primary/[0.14] bg-card/60 py-2.5 pr-2.5 pl-4"
+      className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-card border border-border bg-card px-4 py-3"
       role="alert"
     >
-      <p className="min-w-0 flex-1 text-sm leading-5 text-foreground">{failure.message}</p>
+      <div className="min-w-0 flex-[1_1_16rem]">
+        <p className="text-ui font-medium text-ink">{failure.message}</p>
+        {failure.money ? (
+          <p className="mt-0.5 text-meta text-muted-foreground">{failure.money}</p>
+        ) : null}
+      </div>
       {failure.action ? (
         <Button onClick={onRetry} size="sm" type="button" variant="outline" className="flex-none">
-          <RefreshCw aria-hidden />
-          Try again
+          {FAILURE_ACTIONS[failure.action]}
         </Button>
       ) : null}
     </div>

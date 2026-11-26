@@ -1,17 +1,26 @@
 "use client";
 
+import "./chat-row.css";
+
 import { Eye, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { Thread } from "@/lib/data/views";
+import { inputClass } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import type { ChatStatus } from "./attention";
 import { ChatMenu, MAX_TITLE_CHARS, useTidyChat } from "./chat-menu";
 import { useLongPress } from "./long-press";
 import { PlaceLink } from "./open-place";
-import { ATTENTION_LABEL, ChatStatusMark } from "./place-marks";
-import { ROW_ACTIVE_CLASS_NAME, ROW_CLASS_NAME, ROW_LINE_CLASS_NAME } from "./sidebar-rows";
+import { MoneyRing } from "./place-marks";
+import {
+  ROW_ACTIVE_CLASS_NAME,
+  ROW_CLASS_NAME,
+  ROW_DETAIL_CLASS_NAME,
+  ROW_LINE_CLASS_NAME,
+  ROW_WRAP_CLASS_NAME,
+} from "./sidebar-rows";
 
 const REVEAL_ACTIONS =
   "group-hover/chat:opacity-100 group-hover/chat:pointer-events-auto group-focus-within/chat:opacity-100 group-focus-within/chat:pointer-events-auto group-data-menu/chat:opacity-100 group-data-menu/chat:pointer-events-auto pointer-coarse:group-data-active/chat:opacity-100 pointer-coarse:group-data-active/chat:pointer-events-auto";
@@ -25,19 +34,25 @@ const WORKING_TITLE =
   "shimmer shimmer-color-ink/50 motion-reduce:shimmer-none motion-reduce:text-muted-foreground";
 
 /**
- * One thread row in the sidebar: title, subtle active badge (Your turn, money
- * ring, Auto zap, or Watching eye), and inline rename / pin / archive / delete.
+ * One thread in the sidebar: its title, a second line when its group has one to say (what it
+ * asks, what it holds), one quiet mark after it (its money's ring, Auto, or a watch), and inline
+ * rename, pin, archive and delete.
  */
 export function ChatRow({
   active,
   href,
   thread,
   status,
+  detail,
+  wrapDetail = false,
 }: {
   readonly active: boolean;
   readonly href: string;
   readonly thread: Thread;
   readonly status: ChatStatus;
+  readonly detail?: ReactNode;
+  /** The second line wraps rather than fades, for one whose end matters: a card's amount. */
+  readonly wrapDetail?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -81,41 +96,51 @@ export function ChatRow({
             className={cn(
               ROW_CLASS_NAME,
               ROW_LINE_CLASS_NAME,
+              detail !== undefined && ROW_DETAIL_CLASS_NAME,
+              wrapDetail && ROW_WRAP_CLASS_NAME,
               "select-none [-webkit-touch-callout:none] group-hover/chat:before:bg-foreground/[0.04]",
               MAKE_ROOM,
               active && [ROW_ACTIVE_CLASS_NAME, "group-hover/chat:before:bg-foreground/[0.06]"],
             )}
           >
-            <span
-              className={cn(
-                "auni-row-fade min-w-0 flex-1 overflow-hidden whitespace-nowrap text-ink",
-                status.unread && "font-semibold",
-                status.working && WORKING_TITLE,
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span
+                className={cn(
+                  "auni-row-fade min-w-0 overflow-hidden whitespace-nowrap text-ink",
+                  status.unread && "font-semibold",
+                  status.working && WORKING_TITLE,
+                )}
+              >
+                {thread.title}
+              </span>
+              {detail === undefined ? null : (
+                <span
+                  className={cn(
+                    "min-w-0 text-meta text-muted-foreground group-data-mobile/sidebar:text-ui",
+                    wrapDetail ? "text-pretty" : "auni-row-fade overflow-hidden whitespace-nowrap",
+                  )}
+                >
+                  {detail}
+                </span>
               )}
-            >
-              {thread.title}
             </span>
             {status.working ? <span className="sr-only">Working</span> : null}
-            {status.unread ? <span className="sr-only">{ATTENTION_LABEL.unread}</span> : null}
-            {status.mark ? (
-              <ChatStatusMark mark={status.mark} className={STEP_ASIDE} />
-            ) : auto ? (
-              <span
-                title="Auto within budget"
-                className={cn("flex flex-none items-center text-primary", STEP_ASIDE)}
-              >
-                <Zap aria-hidden className="size-3.5" />
-                <span className="sr-only">Auto within budget</span>
-              </span>
-            ) : watching ? (
-              <span
-                title="Watching"
-                className={cn("flex flex-none items-center text-faint", STEP_ASIDE)}
-              >
-                <Eye aria-hidden className="size-3.5" />
-                <span className="sr-only">Watching</span>
-              </span>
-            ) : null}
+            {status.unread ? <span className="sr-only">New reply</span> : null}
+            <span className={cn("flex flex-none items-center", STEP_ASIDE)}>
+              {status.money ? (
+                <MoneyRing money={status.money} />
+              ) : auto ? (
+                <span title="Auto" className="flex text-ink-soft">
+                  <Zap aria-hidden className="size-3.5" />
+                  <span className="sr-only">Auto</span>
+                </span>
+              ) : watching ? (
+                <span title="Watching" className="flex text-faint">
+                  <Eye aria-hidden className="size-3.5" />
+                  <span className="sr-only">Watching</span>
+                </span>
+              ) : null}
+            </span>
           </PlaceLink>
           <div
             className={cn(
@@ -161,7 +186,7 @@ function TitleField({
   return (
     <input
       ref={inputRef}
-      aria-label="Thread title"
+      aria-label="Chat title"
       defaultValue={title}
       maxLength={MAX_TITLE_CHARS}
       spellCheck={false}
@@ -174,10 +199,7 @@ function TitleField({
         }
       }}
       onBlur={(event) => finish(event.currentTarget.value, false)}
-      className={cn(
-        ROW_LINE_CLASS_NAME,
-        "flex w-full rounded-control bg-background text-ink ring-1 ring-foreground/[0.14] outline-none ring-inset focus:ring-ring/70",
-      )}
+      className={cn(inputClass, ROW_LINE_CLASS_NAME, "flex")}
     />
   );
 }

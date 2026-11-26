@@ -1,73 +1,72 @@
 "use client";
 
-import type { MascotState } from "@/components/brand/mascot";
-import { OnboardingBackdrop } from "@/components/auth/onboarding-backdrop";
-import { MoneyButton } from "@/components/cards/money/money-card-parts";
-import { Card, NoticeCard } from "@/components/auth/notice-card";
+import { Button } from "@/components/ui/button";
+import { useRemoteMachine } from "@/lib/where-auni-runs";
 
-type Reason = "unpaired" | "link-used" | "starting" | "database";
+import type { OwnerState } from "./owner-provider";
+import { DoctorSteps, GateScreen, PairSteps, TailnetSteps } from "./gate-screen";
 
-const SAYS: Record<
-  Reason,
-  {
-    readonly mascot: MascotState;
-    readonly title: string;
-    readonly body: string;
-    readonly command?: string;
+/** Why core won't open the app to this browser, or can't yet; each re-read by itself. */
+type Refusal = Extract<
+  OwnerState,
+  { readonly status: "unpaired" | "link-used" | "tailscale-only" | "database" }
+>;
+
+/** What a browser sees when it isn't the owner's, or Auni can't answer, and the way on. */
+export function OwnerNotice({ refusal }: { readonly refusal: Refusal }) {
+  const machine = useRemoteMachine();
+  switch (refusal.status) {
+    case "unpaired":
+      return (
+        <GateScreen
+          pose="listening"
+          waiting
+          title="Pair this browser"
+          body="Auni only opens in browsers paired from your terminal."
+        >
+          <PairSteps machine={machine} then="This page opens automatically once paired." />
+        </GateScreen>
+      );
+    case "link-used":
+      return (
+        <GateScreen
+          pose="sad"
+          waiting
+          title="This link no longer works"
+          body="Pairing links work once and expire after 15 minutes."
+        >
+          <PairSteps machine={machine} then="This page opens automatically once paired." />
+        </GateScreen>
+      );
+    case "tailscale-only":
+      return (
+        <GateScreen
+          pose="listening"
+          title="Open Auni through Tailscale"
+          body={`${machine ? `Auni on ${machine}` : "This Auni"} stays on for you, and opens only at its Tailscale address.`}
+        >
+          <TailnetSteps at={refusal.at} />
+        </GateScreen>
+      );
+    case "database":
+      return (
+        <GateScreen
+          pose="sad"
+          waiting
+          title="Auni can't reach its database"
+          body="Auni can't start any move while it's down. Orders already waiting in your apps, like a stop-loss, can still fill there."
+        >
+          <DoctorSteps
+            machine={machine}
+            then="Auni opens automatically once the database is back."
+          />
+        </GateScreen>
+      );
   }
-> = {
-  unpaired: {
-    mascot: "listening",
-    title: "This browser isn't signed in",
-    body: "Run this where Auni runs, and open the link it prints here.",
-    command: "auni pair",
-  },
-  "link-used": {
-    mascot: "sad",
-    title: "This link was already used",
-    body: "A link works once, for 15 minutes. Run this where Auni runs for a new one.",
-    command: "auni pair",
-  },
-  starting: {
-    mascot: "thinking",
-    title: "Auni is still starting",
-    body: "This page carries on by itself as soon as it's up. The first start takes about a minute.",
-  },
-  database: {
-    mascot: "sad",
-    title: "Can't reach the database",
-    body: "Auni is running, but its database isn't answering. Run this where Auni runs to see why.",
-    command: "auni doctor",
-  },
-};
-
-/** What a browser sees when it isn't the owner's, or Auni can't answer yet, and what to do. */
-export function OwnerNotice({
-  reason,
-  onRetry,
-}: {
-  readonly reason: Reason;
-  readonly onRetry: () => void;
-}) {
-  const says = SAYS[reason];
-  return (
-    <OnboardingBackdrop>
-      <div className="w-full max-w-[480px] self-center px-4">
-        <NoticeCard
-          pose={says.mascot}
-          waiting={reason === "starting"}
-          title={says.title}
-          body={says.body}
-          {...(says.command ? { command: says.command } : {})}
-          {...(reason === "database" ? { onRetry } : {})}
-        />
-      </div>
-    </OnboardingBackdrop>
-  );
 }
 
 /**
- * What this laptop's Auni shows once it was handed over: where it runs now, and the way there.
+ * What this computer's Auni shows once it was handed over: where it runs now, and the way there.
  * Nothing here was removed, and nothing here runs.
  */
 export function HandedOverNotice({
@@ -78,24 +77,16 @@ export function HandedOverNotice({
   readonly machine: string;
 }) {
   return (
-    <OnboardingBackdrop>
-      <div className="w-full max-w-[480px] self-center px-4">
-        <Card
-          pose="color"
-          title={`Auni runs on ${machine} now`}
-          body="So it keeps going when this computer sleeps. Open it there from any of your devices on Tailscale. Nothing was removed here, and nothing here runs: this copy stays until you remove it with auni uninstall."
-        >
-          {to ? (
-            <MoneyButton
-              tone="primary"
-              className="w-full"
-              onClick={() => window.location.assign(to)}
-            >
-              Open Auni on {machine}
-            </MoneyButton>
-          ) : null}
-        </Card>
-      </div>
-    </OnboardingBackdrop>
+    <GateScreen
+      pose="color"
+      title={`Auni runs on ${machine} now`}
+      body="Auni moved there so it stays online while this computer sleeps. Nothing runs here anymore, and this local copy stays until you run auni uninstall."
+    >
+      {to ? (
+        <Button size="lg" className="w-full" onClick={() => window.location.assign(to)}>
+          Open Auni on {machine}
+        </Button>
+      ) : null}
+    </GateScreen>
   );
 }

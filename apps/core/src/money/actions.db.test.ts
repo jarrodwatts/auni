@@ -26,16 +26,16 @@ import {
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
 import { MayHaveSent, NothingMoved, type Recipe } from "./recipe.ts";
+import { recipeForTool } from "./recipes/index.ts";
 import { PLAN_LEGS } from "./tools.ts";
 import { parseUnits } from "./usd.ts";
 import type { SignerOptions } from "./wallets.ts";
 
 // Every tool resolves to `buy`, so no venue is called, and wallets are a stub rather than a wallet app's read.
+// Spy mode, so every module that reads the registry sees the stub, whichever loads first.
 const lookup = vi.hoisted(() => ({ recipe: undefined as unknown }));
-vi.mock("./recipes/index.ts", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  recipeForTool: () => lookup.recipe,
-}));
+vi.mock("./recipes/index.ts", { spy: true });
+vi.mocked(recipeForTool).mockImplementation(() => lookup.recipe as Recipe);
 // What a sale's holding reads as just before it runs.
 const held = vi.hoisted(() => ({ units: null as bigint | null }));
 vi.mock("./portfolio.ts", async (importOriginal) => ({
@@ -204,6 +204,7 @@ describe("executeAction", () => {
         await raw({ card: null }),
         await raw({ card: { ...FACE, warning: `It lets ${lets.value} afterwards.` } }),
         await raw({ cardFormat: 2, card: null }),
+        await raw({ cardFormat: 3, card: null }),
         // Found in review: pinned before each permission kept which token account or NFT it reaches.
         await raw({
           cardFormat: CARD_FORMAT,
@@ -247,8 +248,12 @@ describe("executeAction", () => {
       const plain = await old({ card: null });
       const none = await old({ lines: [] });
       const now = await old({ cardFormat: CARD_FORMAT });
-      for (const { id } of [shown, plain, none, now]) await executeAction(id);
-      expect(executions).toBe(4);
+      // Found in review: allowed on a card at format 2, which showed every permission, before
+      // cards moved them to entries of their own (format 3): the owner saw them all.
+      const whole = await old({ cardFormat: 2 });
+      const wholePlan = await old({ cardFormat: 2, proposalId: PLAN });
+      for (const { id } of [shown, plain, none, now, whole, wholePlan]) await executeAction(id);
+      expect(executions).toBe(6);
     });
 
     it("takes back the whole plan while none of it has started, waking its thread once", async () => {
@@ -680,9 +685,12 @@ describe("recordActions", () => {
       }),
     });
     const { rows } = await recordActions({ threadId: null }, [await prepareLeg(sale, {})], null);
-    expect(rows[0]?.card?.warning).toBe(
-      "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
-    );
+    expect(rows[0]?.card?.leaves).toEqual([
+      {
+        says: "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
+      },
+    ]);
+    expect(rows[0]?.cardFormat).toBe(CARD_FORMAT);
   });
 
   it("acts on its own only in an active Auto thread with a positive budget", async () => {

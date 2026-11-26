@@ -94,8 +94,10 @@ export function orderFace(order: OrderWords): CardFace {
     working: limit ? "Placing your order" : `Opening your ${side}`,
     context: about.name,
     figures: figures(
-      { label: "You put in", value: AMOUNT },
-      { label: "Position", value: size },
+      { label: "You put in", value: AMOUNT, role: "pays" },
+      // About: it opens what fills at its worst price, and a size rounded to Hyperliquid's step
+      // (up to its $10 least) or a short filling higher can open a little more.
+      { label: "You open, about", value: `a ${size} position`, role: "gets" },
       { label: "Leverage", value: leverage },
       limit ? { label: "Opens at", value: `${limit} or better` } : null,
       stopLoss ? { label: "Stop-loss", value: movedFrom(stopLoss, order.stopLossWas) } : null,
@@ -144,8 +146,9 @@ export function closeFace(close: CloseWords): CardFace {
   const made = Math.round(close.pnlUsd * 100) / 100;
   return {
     title: `Close ${closed}`,
-    // What the position is worth comes back, which the card's amount says; the title is whole.
-    note: "coming back",
+    // What the position is worth comes back, which the card's amount says; the title is whole. It
+    // closes what it can at its worst price, so the amount is what all of it brings.
+    note: "back, if it all closes",
     action: all ? `Close ${side}` : `Close ${percent}%`,
     working: `Closing ${closed}`,
     context: about.name,
@@ -153,7 +156,9 @@ export function closeFace(close: CloseWords): CardFace {
       { label: "Closes", value: `${close.size} ${coin}` },
       made === 0
         ? null
-        : { label: made > 0 ? "Gain so far" : "Loss so far", value: usdLabel(Math.abs(made)) },
+        : made > 0
+          ? { label: "Gain so far", value: `+${usdLabel(made)}`, tone: "gain" }
+          : { label: "Loss so far", value: `-${usdLabel(-made)}`, tone: "loss" },
       {
         label: side === "long" ? "Sells at no less than" : "Buys back at no more than",
         value: close.worst,
@@ -353,7 +358,8 @@ export function depositFace({ from, arrives, fee }: DepositWords): CardFace {
     context: `From your wallet on ${from}`,
     figures: figures(
       // What leaves is the card's amount; Circle's fee makes what arrives less, so both are said.
-      { label: "You get", value: arrives },
+      { label: "You send", value: AMOUNT, role: "pays" },
+      { label: "You get", value: arrives, role: "gets" },
       { label: "Circle keeps", value: fee },
       { label: "Arrives", value: "In about a minute" },
     ),
@@ -383,19 +389,20 @@ export function withdrawFace(withdraw: WithdrawWords): CardFace {
   const { to, arrives, fee } = withdraw;
   return {
     title: `Bring cash back from ${about.name}`,
-    note: "to withdraw",
-    action: `Withdraw ${AMOUNT}`,
-    working: `Withdrawing from ${about.name}`,
+    note: "to bring back",
+    action: `Bring back ${AMOUNT}`,
+    working: `Bringing it back from ${about.name}`,
     // What leaves is the card's amount; the line under it says why less lands.
     context: `To ${to}, after a ${fee} fee`,
     figures: figures(
-      { label: "You get", value: arrives },
+      { label: `Leaves ${about.name}`, value: AMOUNT, role: "pays" },
+      { label: "You get", value: arrives, role: "gets" },
       { label: `${about.name} keeps`, value: fee },
       { label: "Arrives", value: "In a few minutes" },
     ),
     finePrint: `${withdraw.all ? "That is all the cash free there now. " : ""}What your open positions hold as margin stays with them.`,
     receipt: {
-      title: `Withdrew from ${about.name}`,
+      title: `Brought cash back from ${about.name}`,
       detail: `${arrives} to your wallet on ${to}, after ${about.name}'s ${fee} fee`,
       amount: null,
     },

@@ -244,7 +244,7 @@ export async function startTriage(
   let agent = how.named === null ? agents[0] : agents.find(({ id }) => id === how.named);
   if (how.named !== null && !agent) {
     console.error(
-      `No AI CLI "${how.named}" is installed here to triage with. Installed: ${agents.map(({ id }) => id).join(", ") || "none"}.`,
+      `No AI named "${how.named}" is installed here to triage with. Installed: ${agents.map(({ id }) => id).join(", ") || "none"}.`,
     );
     return 1;
   }

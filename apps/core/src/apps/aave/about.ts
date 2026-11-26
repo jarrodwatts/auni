@@ -8,14 +8,16 @@ export default {
     {
       title: "Put my idle cash to work",
       prompt: "Put my idle cash into Aave so it earns.",
+      moves: true,
     },
     {
       title: "What does it pay now?",
       prompt: "What does Aave pay on cash right now, on each chain I could use?",
     },
     {
-      title: "Take it all back out",
-      prompt: "Take everything I have in Aave back out to cash.",
+      title: "Bring it all back",
+      prompt: "Bring everything I have in Aave back to cash.",
+      moves: true,
     },
   ],
   mark: {
@@ -37,9 +39,9 @@ export default {
     aave_withdraw: {
       kind: "money",
       copy: [
-        "Preparing to take money out of savings",
-        "Prepared to take money out of savings",
-        "Couldn’t prepare that withdrawal",
+        "Preparing to bring your cash back",
+        "Prepared to bring your cash back",
+        "Couldn’t prepare that",
       ],
       sends: true,
     },

@@ -12,18 +12,22 @@ export class CoreApiError extends Error {
   readonly code: string | undefined;
   /** A sentence core wrote for the person, when the reason needs its specifics. */
   readonly detail: string | undefined;
+  /** Where the request would be answered instead, when core says (an always-on Auni's address). */
+  readonly at: string | undefined;
 
   constructor(input: {
     readonly message: string;
     readonly status: number;
     readonly code?: string;
     readonly detail?: string;
+    readonly at?: string;
   }) {
     super(input.message);
     this.name = "CoreApiError";
     this.status = input.status;
     this.code = input.code;
     this.detail = input.detail;
+    this.at = input.at;
   }
 }
 
@@ -52,10 +56,12 @@ async function parseCoreApiError(response: Response): Promise<CoreApiError> {
       : undefined;
   const error = field("error");
   const detail = field("message");
+  const at = field("at");
   return new CoreApiError({
     message: `Core request failed with status ${response.status}`,
     status: response.status,
     ...(typeof error === "string" ? { code: error } : {}),
     ...(typeof detail === "string" ? { detail } : {}),
+    ...(typeof at === "string" ? { at } : {}),
   });
 }

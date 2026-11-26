@@ -1,15 +1,15 @@
 "use client";
 
+import "./account-menu.css";
+
 import { ChevronsUpDown, Plus, Settings } from "lucide-react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { useCloseMobileThreadMenu } from "@/components/app/mobile-thread-menu";
 import { VaultArt } from "@/components/brand/vault-art";
-import { useMoney } from "@/components/money/money-provider";
 import { useMe } from "@/components/personalization/use-me";
 import { useArriving } from "@/components/places/arriving";
 import { FOLD_FADE, ROW_CLASS_NAME } from "@/components/places/sidebar-rows";
-import { ResolvingValue } from "@/components/settings/resolving-value";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,21 +17,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UNNAMED_OWNER } from "@/lib/account-display";
-import { formatUsdcBalance } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-const ITEM_CLASS_NAME = "h-9 gap-2.5 rounded-[8px] px-2.5 text-[13.5px] text-ink";
+const ITEM_CLASS_NAME = "h-9 gap-2.5 rounded-control px-2.5 text-ui text-ink";
 
 /**
- * The door to money-in and settings. It opens a short menu in place, so whatever sits
- * underneath stays put while a popup opens over it.
+ * The owner, and the computer Auni runs on: the door to money-in and settings. It opens a short
+ * menu in place, so whatever sits underneath stays put while a popup opens over it.
  */
 export function AccountMenu() {
   const closeMobileMenu = useCloseMobileThreadMenu();
-  const name = useMe().name ?? UNNAMED_OWNER;
-  const { loading: portfolioLoading, portfolio } = useMoney();
+  const me = useMe();
+  const name = me.name ?? UNNAMED_OWNER;
   const { openAddMoney, openSettings } = useAppDialogs();
-  const balance = portfolio ? formatUsdcBalance(BigInt(portfolio.totalUsd.baseUnits)) : null;
   const arriving = useArriving();
 
   return (
@@ -49,21 +47,9 @@ export function AccountMenu() {
               <VaultArt className="auni-account-mark absolute inset-0 size-8" />
             </span>
             <span className={cn("relative z-[1] min-w-0 flex-1", FOLD_FADE)}>
-              <span className="block truncate text-[14px] font-semibold text-ink">{name}</span>
-              <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground tabular-nums">
-                <ResolvingValue
-                  pending={portfolioLoading}
-                  placeholderClassName="my-[3px] h-[11px] w-20 rounded-full"
-                  className="truncate"
-                >
-                  <span
-                    key={balance}
-                    aria-live="polite"
-                    className="auni-account-balance-update inline-block"
-                  >
-                    {balance ?? "Balance unavailable"}
-                  </span>
-                </ResolvingValue>
+              <span className="block truncate text-ui font-semibold text-ink">{name}</span>
+              <span className="mt-0.5 block truncate text-caption text-muted-foreground">
+                On {me.reach.machine}
               </span>
             </span>
             <ChevronsUpDown
@@ -76,7 +62,7 @@ export function AccountMenu() {
           align="start"
           side="top"
           sideOffset={6}
-          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] rounded-[14px] p-1.5"
+          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] rounded-card p-1.5"
         >
           <DropdownMenuItem
             className={ITEM_CLASS_NAME}

@@ -308,8 +308,8 @@ describe("auniCapabilityTools", () => {
     const [inspect] = auniCapabilityTools();
     const out = await inspect!.handler({ include_health: true });
     const text = out.content.map((c) => (c.type === "text" ? c.text : "")).join("");
-    expect(text).toContain("/app?settings=remote");
-    expect(text).toContain("/app?settings=diagnostics");
+    expect(text).toContain("/app?settings=devices");
+    expect(text).toContain("/app?settings=health");
     expect(text).not.toContain("alc_never_leak_this_to_agent");
     expect(text).not.toContain(env.TURN_TOKEN_SECRET);
     const structured = out.structuredContent as {

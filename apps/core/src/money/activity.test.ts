@@ -97,6 +97,7 @@ describe("folding moves", () => {
     expect(items[0]).toEqual({
       kind: "move",
       id: PROPOSAL,
+      category: "trade",
       title: "Bought Pearl",
       subtitle: "Pearl bet, Oct 20 at 7:30pm",
       amount: { usd: "16.50", direction: null, tone: "neutral" },
@@ -106,9 +107,14 @@ describe("folding moves", () => {
       unread: false,
       receipt: {
         steps: [
-          { text: "Sold 4 things you held loose", amountUsd: "18.70", logoUrl: null },
+          { text: "Sold 4 other holdings", amountUsd: "18.70", logoUrl: null },
           // The bridge was only on its way into Hyperliquid, so the move in says it.
-          { text: "Moved cash to Hyperliquid", amountUsd: "17.00", logoUrl: null },
+          // Wearing the mark of where the cash went.
+          {
+            text: "Moved cash to Hyperliquid",
+            amountUsd: "17.00",
+            logoUrl: "/logos/hyperliquid.svg",
+          },
           {
             text: "Opened Pearl, 1x long",
             amountUsd: "16.50",
@@ -142,7 +148,7 @@ describe("folding moves", () => {
       null,
     );
     expect(items.map(({ title, amount }) => [title, amount])).toEqual([
-      ["Sold SOL you held loose", { usd: "3.00", direction: null, tone: "neutral" }],
+      ["Sold SOL", { usd: "3.00", direction: null, tone: "neutral" }],
       // A move between their own wallets says which networks, so a bridge reads as one.
       ["Moved cash from Monad to Arbitrum", { usd: "5.00", direction: null, tone: "neutral" }],
       ["Moved cash to Hyperliquid", { usd: "20.00", direction: null, tone: "neutral" }],
@@ -204,7 +210,7 @@ describe("folding moves", () => {
       ),
     ]);
     expect(steps.map(({ text, amountUsd }) => [text, amountUsd])).toEqual([
-      ["Sold SOL you held loose", "3.00"],
+      ["Sold SOL", "3.00"],
       ["Bought Pearl", "5.00"],
       ["Bought Micron", "5.00"],
       ["2 more moves", "10.00"],
@@ -227,6 +233,7 @@ describe("folding moves", () => {
     expect(item).toMatchObject({
       title: "Withdrew $40",
       subtitle: "Auni, Oct 20 at 7:30pm",
+      category: "transfer",
       amount: { usd: "40.00", direction: "out", tone: "neutral" },
     });
   });
@@ -254,7 +261,7 @@ describe("saying what a venue did", () => {
     expect(said(STRK, "STRK", -5.256182)).toEqual({
       title: "Hyperliquid closed your STRK long",
       why: "Its price moved against it until the margin behind it ran out.",
-      result: "You lost $5.26.",
+      result: "Realized loss: -$5.26.",
       fill: "193.1 STRK sold at $0.07855.",
       before: "193.1 STRK long, worth $15.17",
       after: "Closed",
@@ -269,7 +276,7 @@ describe("saying what a venue did", () => {
     );
     expect(words).toMatchObject({
       title: "Hyperliquid closed part of your STRK short",
-      result: "You made $2.50.",
+      result: "Realized gain: +$2.50.",
       before: "300 STRK short, worth $23.56",
       after: "100 STRK short, worth $7.85",
     });
@@ -286,12 +293,13 @@ describe("saying what a venue did", () => {
       why: "A limit order Auni placed earlier filled.",
     });
     expect(said({ ...STRK, cause: "exit" }, "STRK", 3, "take-profit")).toMatchObject({
-      title: "Your take-profit closed your STRK long",
-      why: "It reached a stop-loss or take-profit price Auni set.",
+      title: "Take-profit closed your STRK long",
+      why: "Hit your take-profit price on Hyperliquid.",
     });
     // A stop-loss moved past the entry closes at a gain, and is still the stop-loss.
     expect(said({ ...STRK, cause: "exit" }, "STRK", 0.01, "stop-loss")).toMatchObject({
-      title: "Your stop-loss closed your STRK long",
+      title: "Stop-loss closed your STRK long",
+      why: "Hit your stop price on Hyperliquid.",
     });
     expect(said({ ...STRK, cause: "exit" }, "STRK", -1)).toMatchObject({
       title: "Your stop closed your STRK long",

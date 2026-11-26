@@ -20,10 +20,10 @@ const AXIS: Record<Side, { readonly axis: "X" | "Y"; readonly sign: 1 | -1 }> = 
 
 const SIDE_CLASS_NAME: Record<Side, string> = {
   bottom:
-    "inset-x-0 bottom-0 max-h-[calc(100dvh-max(24px,env(safe-area-inset-top)))] rounded-t-[22px] shadow-[0_-12px_48px_--alpha(var(--color-shade)/14%)] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-  left: "inset-y-0 left-0 w-[min(86vw,340px)] touch-pan-y rounded-r-[22px] shadow-[18px_0_48px_--alpha(var(--color-shade)/12%)] data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+    "inset-x-0 bottom-0 max-h-[calc(100dvh-max(24px,env(safe-area-inset-top)))] rounded-t-sheet shadow-float data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+  left: "inset-y-0 left-0 w-[min(86vw,340px)] touch-pan-y rounded-r-sheet shadow-float data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
   right:
-    "inset-y-0 right-0 w-[392px] max-w-[calc(100vw-48px)] touch-pan-y border-l border-foreground/[0.07] shadow-[-18px_0_48px_--alpha(var(--color-shade)/10%)] data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+    "inset-y-0 right-0 w-[392px] max-w-[calc(100vw-48px)] touch-pan-y border-l border-border shadow-float data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
 };
 
 /**
@@ -38,7 +38,6 @@ export function AuniSheet({
   side,
   title,
   initialFocus,
-  wash,
   className,
   children,
 }: {
@@ -49,21 +48,13 @@ export function AuniSheet({
   readonly title: string;
   /** What takes focus as it opens, when that is better than the sheet itself: a field to type in. */
   readonly initialFocus?: RefObject<HTMLElement | null> | undefined;
-  /**
-   * A colour of the subject's own, as a very soft glow in the sheet's top corner. It is the
-   * sheet's own background, so the handle's strip, which wears that background, is one picture
-   * with it: a glow drawn by something inside the sheet would be cut where the strip covers it.
-   */
-  readonly wash?: string | undefined;
   readonly className?: string;
   readonly children: ReactNode;
 }) {
-  const sheet = useRef<HTMLDivElement>(null);
   // It opens from state, not from a trigger, so it keeps what had focus (the row or tile that
   // opened it) and hands focus back there as it closes: else a keyboard user loses their place.
   const opener = useRef<Element | null>(null);
-  const shade = useRef<HTMLDivElement>(null);
-  const drag = useSheetDrag(side, () => onOpenChange(false), sheet, shade);
+  const { sheet, shade, ...drag } = useSheetDrag(side, () => onOpenChange(false));
 
   return (
     <SheetPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -90,13 +81,6 @@ export function AuniSheet({
             from.focus();
           }}
           {...(side === "bottom" ? {} : drag)}
-          style={
-            wash
-              ? {
-                  background: `radial-gradient(circle 150px at 60px 60px, ${wash}, transparent), var(--popover)`,
-                }
-              : undefined
-          }
           className={cn(
             "fixed z-50 flex flex-col overflow-hidden bg-popover outline-none data-[state=closed]:animate-out data-[state=closed]:duration-[260ms] data-[state=closed]:ease-[var(--motion-settle)] data-[state=open]:animate-in data-[state=open]:duration-[420ms] data-[state=open]:ease-[var(--motion-drift)] motion-reduce:animate-none",
             SIDE_CLASS_NAME[side],
@@ -105,7 +89,7 @@ export function AuniSheet({
         >
           <SheetPrimitive.Title className="sr-only">{title}</SheetPrimitive.Title>
           {side === "bottom" ? (
-            // The strip wears the sheet's own background, washes and all, and fades out over what scrolls beneath.
+            // The strip wears the sheet's own background, and fades out over what scrolls beneath.
             <div
               {...drag}
               aria-hidden
@@ -116,7 +100,7 @@ export function AuniSheet({
           ) : null}
           <SheetPrimitive.Close
             className={cn(
-              "absolute z-10 flex size-8 items-center justify-center rounded-control text-faint transition-colors hover:bg-foreground/[0.05] hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none",
+              "absolute z-10 flex size-8 items-center justify-center rounded-control text-faint transition-colors hover:bg-foreground/[0.05] hover:text-ink focus-ring",
               // A phone closes by tapping out or dragging; the button stays for keyboards and screen readers.
               side === "right"
                 ? "top-5 right-4"
@@ -137,15 +121,13 @@ export function AuniSheet({
  * Dragging the sheet toward its edge: it follows the finger and the shade
  * thins with it, then it either closes or springs back. A gesture that
  * starts across the axis is a scroll and is left alone; a drag that moved
- * never also counts as a tap on what it started over.
+ * never also counts as a tap on what it started over. It holds the sheet's and the shade's refs
+ * itself, as it moves them.
  */
-function useSheetDrag(
-  side: Side,
-  onClose: () => void,
-  sheet: RefObject<HTMLDivElement | null>,
-  shade: RefObject<HTMLDivElement | null>,
-) {
+function useSheetDrag(side: Side, onClose: () => void) {
   const { axis, sign } = AXIS[side];
+  const sheet = useRef<HTMLDivElement>(null);
+  const shade = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; at: number; d: number; live: boolean } | null>(null);
   const dragged = useRef(false);
 
@@ -163,6 +145,8 @@ function useSheetDrag(
   };
 
   return {
+    sheet,
+    shade,
     onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
       // The edge panels follow a finger; a mouse is there to click, select, and scroll.
       if (event.button !== 0 || (side !== "bottom" && event.pointerType === "mouse")) return;

@@ -1,6 +1,5 @@
 import {
   fillFace,
-  LETS_LINE,
   permissionsSaid,
   type ActionCardWire,
   type ActionPlanCardWire,
@@ -87,34 +86,43 @@ export function withFilled<T extends { readonly amount?: ActionCardWire["amount"
  * How much of a card's grid of figures one takes, so a value is always read whole, never cut: a
  * column; the whole row at a phone's two columns but one of a wider card's three; or the whole
  * row anywhere. Measured in characters, as the grid can't measure words: a value of up to 16
- * fits a phone's column, of up to 24 a wider card's. An address takes a row of its own.
+ * fits a phone's column, of up to 32 a wider card's, so a medium one never leaves a gap beside
+ * it. An address takes a row of its own.
  */
 export function figureWidth(
   { value, note }: Pick<CardFace["figures"][number], "value" | "note">,
   address: boolean,
 ): "column" | "wide" | "row" {
   const length = value.length + (note ? note.length + 2 : 0);
-  if (address || length > 24) return "row";
+  if (address || length > 32) return "row";
   return length > 16 ? "wide" : "column";
 }
 
 /**
- * What each of a plan's moves leaves able to act on the owner's money, one sentence a move, under
- * its name, since one tap grants it all: the moves that bring its cash first, as they run, then
- * its legs. Read from each move's own recorded line, which says every permission and standing
- * order it leaves, whether its face says them (a stop-loss among its terms) or it has no face.
+ * What a plan's moves leave behind, since one tap agrees to it all, each entry whole and under the
+ * name of the move that leaves it, so two moves that leave alike are never read as one: what the
+ * moves that bring its cash first leave (its Lets line, as they run first), then each leg's, as
+ * its card says it (core's withLeaves): money it sends for good, every permission, and every
+ * order left resting, such as a stop on a position already held. Permissions come first, orders
+ * after.
  */
 export function planPermissions(plan: {
-  readonly legs: readonly Pick<ActionPlanCardWire["legs"][number], "summary" | "lines">[];
+  readonly legs: readonly Pick<ActionPlanCardWire["legs"][number], "summary" | "card">[];
   readonly moves: readonly Pick<ActionPlanCardWire["moves"][number], "name" | "lets">[];
-}): string[] {
+}): { readonly says: string; readonly order: boolean }[] {
   const named = [
-    ...plan.moves,
-    ...plan.legs.flatMap(({ summary, lines }) =>
-      lines
-        .filter(({ label }) => label === LETS_LINE)
-        .map(({ value }) => ({ name: summary, lets: value })),
+    ...plan.moves.flatMap(({ name, lets }) =>
+      lets ? [{ name, says: permissionsSaid([lets]), order: false }] : [],
     ),
+    ...plan.legs.flatMap(({ summary, card }) => [
+      ...(card.warning ? [{ name: summary, says: card.warning, order: false }] : []),
+      ...(card.leaves ?? []).map(({ says, order }) => ({
+        name: summary,
+        says,
+        order: order === true,
+      })),
+    ]),
   ];
-  return named.flatMap(({ name, lets }) => (lets ? [`${name}: ${permissionsSaid([lets])}`] : []));
+  const said = named.map(({ name, says, order }) => ({ says: `${name}: ${says}`, order }));
+  return [...said.filter(({ order }) => !order), ...said.filter(({ order }) => order)];
 }

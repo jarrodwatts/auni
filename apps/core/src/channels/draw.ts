@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   AMOUNT,
   ASK_DONE,
+  askSummary,
   HELD,
   LETS_LINE,
   RETRACTED,
@@ -96,6 +97,9 @@ const quote = (lines: readonly string[]) => lines.map((line) => `> ${line}`).joi
 /** A card title or keyboard label always occupies one line. */
 const singleLine = (text: string) => text.replace(/\s+/gu, " ").trim();
 
+/** A move's summary, or an ask's in today's words (see askSummary). */
+const said = (leg: ActionRow) => (isAsk(leg.tool) ? askSummary(leg.summary) : leg.summary);
+
 function faceWords(leg: ActionRow, text: string): string {
   const money = rowMoney(leg);
   return text.replaceAll(AMOUNT, dollars(money?.usd ?? "0"));
@@ -103,15 +107,14 @@ function faceWords(leg: ActionRow, text: string): string {
 
 function planName(legs: readonly ActionRow[]): string {
   const money = moneyLine(cardMoneys(legs));
-  const amount = money?.endsWith(" in") ? `${money.slice(0, -3)} total` : money;
-  return `${legs.length} moves${amount ? `, ${amount}` : ""}`;
+  return `${legs.length} moves${money ? `, ${money}` : ""}`;
 }
 
 function actionLabel(legs: readonly ActionRow[]): string {
   const [leg] = legs;
   if (legs.length === 1 && leg) {
     const action = leg.card?.action;
-    if (!action || action === "Confirm" || action === "Allow") return singleLine(leg.summary);
+    if (!action || action === "Confirm" || action === "Allow") return singleLine(said(leg));
     const money = rowMoney(leg);
     const label = faceWords(leg, action);
     return singleLine(
@@ -276,7 +279,7 @@ function cardText(legs: readonly ActionRow[], whole: boolean): string {
   const text = legs.map((leg, index) => {
     const filled = whole ? receipt(leg) : null;
     const [title, ...detail] = filled?.split("\n") ?? [];
-    const heading = title ?? (leg.card ? faceWords(leg, leg.card.title) : leg.summary);
+    const heading = title ?? (leg.card ? faceWords(leg, leg.card.title) : said(leg));
     const prefix = one ? "" : `${index + 1}. `;
     const facts =
       whole && !end
@@ -334,7 +337,7 @@ export function drawCard(view: CardView, grant: string | null): ChannelMessage {
   const { legs } = view;
   const waiting = waitingOn(legs);
   if (view.outOfDate) {
-    const name = legs.length === 1 ? legs[0]!.summary.slice(0, 250) : planName(legs);
+    const name = legs.length === 1 ? said(legs[0]!).slice(0, 250) : planName(legs);
     return { text: `**${literal(name)}**\n${RETRACTED.outOfDate}` };
   }
   const whole = fitsHere(legs);

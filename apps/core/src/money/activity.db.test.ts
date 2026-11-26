@@ -182,11 +182,12 @@ describe("GET /activity", () => {
     expect(status).toBe(200);
     const read = activityWireSchema.parse(body);
     expect(read.unread).toBe(2);
-    expect(read.items.map((item) => [item.kind, item.title, item.unread])).toEqual([
-      ["arrival", "Money arrived", true],
-      ["move", "Closed your PRL long", false],
-      ["move", "Opened a PRL long", false],
-      ["outside", "Hyperliquid closed your STRK long", true],
+    expect(read.items.map((item) => [item.kind, item.title, item.unread, item.category])).toEqual([
+      ["arrival", "Money arrived", true, "transfer"],
+      // A stop that lost money, and a liquidation, are trades all the same.
+      ["move", "Closed your PRL long", false, "trade"],
+      ["move", "Opened a PRL long", false, "trade"],
+      ["outside", "Hyperliquid closed your STRK long", true, "trade"],
     ]);
     const [, stop, card, outside] = read.items;
     expect(card).toMatchObject({
@@ -196,21 +197,20 @@ describe("GET /activity", () => {
       amount: { usd: "16.50", direction: null, tone: "neutral" },
       receipt: {
         steps: [
-          { text: "Sold 2 things you held loose", amountUsd: "8.80" },
+          { text: "Sold 2 other holdings", amountUsd: "8.80" },
           { text: "Moved cash to Hyperliquid", amountUsd: "17.00" },
           { text: "Opened PRL, 1x long", amountUsd: "16.50" },
         ],
       },
     });
-    // What it sold at isn't what came back: the fills don't say, so it shows no amount. What the
-    // venue said it locked in is its story.
+    // Its row shows what the venue said it locked in, as its story does.
     expect(stop).toMatchObject({
-      amount: null,
+      amount: { usd: "2.40", direction: "out", tone: "loss" },
       receipt: {
-        steps: [{ text: "It reached a stop-loss or take-profit price Auni set.", amountUsd: null }],
+        steps: [{ text: "Hit a stop price Auni set on Hyperliquid.", amountUsd: null }],
         story: {
           gave: { label: "Your 1x long", value: "$14.10" },
-          got: { label: "It lost", value: "$2.40", tone: "loss" },
+          got: { label: "Realized loss", value: "$2.40", tone: "loss" },
           levels: [{ label: "Closed at", price: "$0.3439", kind: "price" }],
           facts: [{ label: "Through", value: "Hyperliquid" }],
         },
@@ -520,7 +520,7 @@ describe("GET /activity", () => {
         "Closed your ETH short",
         {
           gave: { label: "Your 3x short", value: "$10.05", place: null, tone: "neutral" },
-          got: { label: "It lost", value: "$0.05", place: null, tone: "loss" },
+          got: { label: "Realized loss", value: "$0.05", place: null, tone: "loss" },
           // A short loses as the price rises: it closed above where it was entered.
           levels: [
             { label: "Closed at", price: "$3,350.00", kind: "price" },
@@ -558,6 +558,24 @@ describe("GET /activity", () => {
         },
       ],
     ]);
+  });
+
+  it("shows a close's result in its row, and savings with the mark of the app keeping them", async () => {
+    await insertAction({
+      status: "done",
+      tool: "aave_supply",
+      venue: "aave",
+      summary: "Save $4,000 on Aave",
+      input: { chain: "monad", amount_usd: "4000" },
+      amountUsd: "4000",
+      startedAt: started,
+    });
+    const [saved] = activityWireSchema.parse((await activity()).body).items;
+    expect(saved).toMatchObject({
+      title: "Saved $4,000",
+      category: "trade",
+      logo: { src: expect.stringContaining("aave"), name: "Aave" },
+    });
   });
 
   it("names a bet by its market's question, as its card's row does", async () => {

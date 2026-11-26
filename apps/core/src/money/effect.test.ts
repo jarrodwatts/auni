@@ -107,7 +107,7 @@ describe("stepUpReason", () => {
 
 // The card says one reason, in the owner's words; stepUpReason keeps every one for the agent.
 describe("stepUpWhy", () => {
-  const SO = ", so Auni checks it's you.";
+  const SO = ", so confirm it's you first.";
 
   it("says nothing where a tap will do", () => {
     expect(stepUpWhy(pinnedApproval(swap), [])).toBeNull();
@@ -128,7 +128,7 @@ describe("stepUpWhy", () => {
     const leaves = pinnedApproval({ ...swap, grants: [spends], blind: "it's blind" });
     expect(stepUpWhy(leaves, [])).toBe(`It leaves a permission over your wallet behind${SO}`);
     expect(stepUpWhy(pinnedApproval({ ...swap, blind: "it's blind" }), [])).toBe(
-      `Auni can't see everything it does by running it first${SO}`,
+      `Auni can't see everything it does in simulation${SO}`,
     );
   });
 });

@@ -11,12 +11,7 @@ export function BigMoney({
   readonly className?: string;
 }) {
   return (
-    <p
-      className={cn(
-        "text-[48px] leading-[1.1] font-medium tracking-[-0.055em] text-foreground sm:text-[60px]",
-        className,
-      )}
-    >
+    <p className={cn("text-hero-money text-foreground", className)}>
       <RollingNumber value={value} />
     </p>
   );

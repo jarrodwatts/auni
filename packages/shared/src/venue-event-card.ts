@@ -17,8 +17,17 @@ export const venueEventCardSchema = cardBaseSchema.extend({
   actionReference: actionRecordIdSchema,
   /** Whether no order of Auni's did it, which is what Auni asks them about. */
   outside: z.boolean(),
-  /** Why, and what it came to or what filled: "Its price moved against it until the margin behind it ran out. You lost $5.26." */
+  /** Why, or what filled when it locked in nothing: "Its price moved against it until the margin behind it ran out." */
   detail: z.string().trim().min(1).max(300),
+  /**
+   * What it locked in, in signed dollars ("-76.51", "12.00"): the card says it as a gain or a
+   * loss beside its title. Absent when it locked in nothing.
+   */
+  pnlUsd: z
+    .string()
+    .regex(/^-?\d+(\.\d+)?$/u)
+    .nullable()
+    .optional(),
   logoUrl: cardLogoUrlSchema.nullable(),
 });
 export type VenueEventCardWire = z.infer<typeof venueEventCardSchema>;

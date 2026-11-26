@@ -1,0 +1,129 @@
+.auni-orbit {
+  --rx: 136px;
+  --ry: 54px;
+  --cy: 34px;
+
+  position: absolute;
+  inset: 0;
+}
+
+/* The orbit's line: its far half behind Auni, its near half in front. */
+.auni-orbit-line {
+  position: absolute;
+  top: calc(50% + var(--cy));
+  left: 50%;
+  width: calc(var(--rx) * 2);
+  height: calc(var(--ry) * 2);
+  margin: calc(var(--ry) * -1) calc(var(--rx) * -1);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 14%, transparent);
+  transition:
+    opacity 500ms ease,
+    transform 700ms var(--motion-settle);
+}
+
+.auni-orbit-back {
+  z-index: 1;
+  clip-path: inset(0 0 50% 0);
+}
+
+.auni-orbit-front {
+  z-index: 4;
+  clip-path: inset(50% 0 0 0);
+}
+
+.auni-orbit-at {
+  --t: calc(var(--a) + var(--auni-orbit-spin));
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: calc(3 + 2 * sign(sin(var(--t))));
+  width: var(--mark);
+  height: var(--mark);
+  margin: calc(var(--mark) / -2);
+  opacity: calc(0.85 + 0.15 * sin(var(--t)));
+  cursor: default;
+  transform: translate(
+    calc(cos(var(--t)) * var(--rx)),
+    calc(var(--cy) + sin(var(--t)) * var(--ry))
+  );
+  transition: opacity 450ms ease;
+}
+
+.auni-orbit-mark {
+  display: block;
+  border-radius: 999px;
+  transition:
+    transform 350ms var(--motion-settle),
+    box-shadow 350ms ease,
+    opacity 350ms ease;
+}
+
+.auni-orbit-disc {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-shade) 6%, transparent),
+    0 4px 10px color-mix(in oklab, var(--color-shade) 8%, transparent);
+}
+
+/* A mark's name, quietly under it while pointed at or tapped. */
+.auni-orbit-name {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--color-popover);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--color-shade) 7%, transparent),
+    0 4px 12px color-mix(in oklab, var(--color-shade) 8%, transparent);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -3px);
+  transition:
+    opacity 200ms ease,
+    transform 300ms var(--motion-settle);
+}
+
+.auni-orbit-at[data-named] {
+  z-index: 9;
+  opacity: 1;
+}
+
+.auni-orbit-at[data-named] .auni-orbit-name {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.auni-orbit-at[data-named] .auni-orbit-mark {
+  transform: scale(1.12);
+}
+
+/* An address in hand: its networks lit, ringed in the accent, the others dimmed and smaller. */
+.auni-orbit[data-lit] .auni-orbit-at:not([data-lit]) .auni-orbit-mark {
+  opacity: 0.3;
+  transform: scale(0.82);
+}
+
+.auni-orbit[data-lit] .auni-orbit-at[data-lit] .auni-orbit-mark {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 22%, transparent);
+}
+
+.auni-orbit[data-lit] .auni-orbit-line {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 24%, transparent);
+}
+
+/*
+ * Money landed: its network's mark lights where it is on the orbit, every mark keeping its colour,
+ * as its coin flies into Auni (PortalHero); Auni hops as it arrives (ARRIVE_MS), and what landed
+ * shows after.
+ */
+.auni-orbit-at[data-arrive] .auni-orbit-mark {
+  transform: scale(1.22);
+  box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-primary) 18%, transparent);
+}

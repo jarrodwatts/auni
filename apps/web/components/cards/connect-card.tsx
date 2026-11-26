@@ -11,14 +11,24 @@ import { appHref } from "@/lib/app-links";
 import { actionKey, decideAction, useLiveAction } from "@/lib/data/actions";
 import { useApps, useRefreshApps } from "@/lib/data/apps";
 
+import { buttonVariants } from "@/components/ui/button";
+
 import { askStanding } from "./ask-standing";
-import { MoneyButton, MoneyButtons, MoneyCardFrame } from "./money/money-card-parts";
+import {
+  CardActions,
+  CardAlert,
+  CardButton,
+  CardFrame,
+  CardHead,
+  CardReceipt,
+  NOT_REACHED_TAP,
+} from "./card-parts";
 
 /**
  * Auni offering to turn back on an app the owner switched off, at the moment it would have
  * helped: the app's mark, the card's title in core's words ("Turn <app> on"), Auni's own sentence
  * on what it would add, and what turning it on changes. Allowing it turns the app on and wakes
- * Auni to carry on; Not now declines it, which Auni is told. A key an app needs is asked for on a
+ * Auni to carry on; Decline says no, which Auni is told. A key an app needs is asked for on a
  * card of its own (secret-card.tsx).
  */
 export function ConnectCard({ card }: { readonly card: AskCardWire & { readonly app: string } }) {
@@ -59,91 +69,79 @@ export function ConnectCard({ card }: { readonly card: AskCardWire & { readonly 
   if (standing.kind === "ended") {
     const done = standing.tone === "done";
     return (
-      <MoneyCardFrame
+      <CardFrame
         auni={live.data && done ? { kind: "landed" } : null}
         label={card.summary}
         phase={done ? "confirmed" : "expired"}
       >
-        <div className="flex items-center gap-3.5" data-testid="connect-card" data-standing="ended">
-          <span className={done ? undefined : "opacity-55 grayscale"}>
-            <AppMark id={card.app} name={name} size={38} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink">
-              {done ? `${name} is on` : card.summary}
-            </p>
-            <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.4] text-muted-foreground">
-              {done ? "Auni can use it from now on" : standing.label}
-            </p>
-          </div>
-          {done ? (
-            <Link
-              href={appHref(card.app)}
-              className="flex h-9 flex-none items-center gap-1 rounded-full bg-foreground/[0.05] px-4 text-[13.5px] font-semibold text-ink transition-colors duration-200 ease-settle hover:bg-foreground/[0.08]"
-            >
-              Open
-              <ArrowRight aria-hidden className="size-3.5" strokeWidth={2.4} />
-            </Link>
-          ) : null}
+        <div data-testid="connect-card" data-standing="ended">
+          <CardReceipt
+            mark={
+              <span className={done ? "flex" : "flex opacity-55 grayscale"}>
+                <AppMark id={card.app} name={name} size={38} />
+              </span>
+            }
+            title={done ? `${name} is on` : card.summary}
+            detail={done ? "Auni can use it from now on." : standing.label}
+            action={
+              done ? (
+                <Link
+                  href={appHref(card.app)}
+                  className={buttonVariants({ size: "sm", variant: "secondary" })}
+                >
+                  Open {name}
+                  <ArrowRight aria-hidden className="size-3.5" strokeWidth={2.4} />
+                </Link>
+              ) : null
+            }
+          />
         </div>
-      </MoneyCardFrame>
+      </CardFrame>
     );
   }
 
   const busy = pending !== null || standing.kind === "working";
   return (
-    <MoneyCardFrame auni={live.data ? { kind: "ready" } : null} label={card.summary} phase="open">
+    <CardFrame
+      auni={live.data ? { kind: "ready" } : null}
+      label={card.summary}
+      phase="open"
+      tone="waiting"
+    >
       <div data-testid="connect-card" data-standing="waiting">
-        <div className="flex items-center gap-3">
-          {mark}
-          <div className="min-w-0 flex-1">
-            <p className="text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
-              {card.summary}
-            </p>
-            {does ? (
-              <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{does}</p>
-            ) : null}
-          </div>
-        </div>
+        <CardHead mark={mark} title={card.summary} line={does} />
         {why ? (
-          <figure className="mt-5 border-t border-foreground/[0.06] pt-5">
-            <figcaption className="text-[12px] text-muted-foreground">Auni says</figcaption>
-            <blockquote className="mt-1 text-[15px] leading-[1.5] text-pretty text-ink">
+          <figure className="mt-5 border-t border-border pt-5">
+            <figcaption className="text-caption text-muted-foreground">Why Auni asks</figcaption>
+            <blockquote className="mt-1 text-body leading-[1.5] text-pretty text-ink">
               {why}
             </blockquote>
           </figure>
         ) : null}
         {changes ? (
-          <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">{changes}</p>
+          <p className="mt-4 text-meta leading-[1.45] text-muted-foreground">{changes}</p>
         ) : null}
-        {failed ? (
-          <p role="alert" className="mt-4 text-[13px] text-destructive">
-            That didn&apos;t reach Auni, so nothing changed. Try again.
-          </p>
-        ) : null}
+        {failed ? <CardAlert>{NOT_REACHED_TAP}</CardAlert> : null}
         <div className="mt-5">
-          <MoneyButtons>
-            <MoneyButton
-              tone="quiet"
-              busy={pending === "decline"}
-              busyLabel="Declining"
-              disabled={busy}
-              onClick={() => void decide("decline")}
-            >
-              Not now
-            </MoneyButton>
-            <MoneyButton
+          <CardActions
+            decline={{
+              busy: pending === "decline",
+              disabled: busy,
+              onClick: () => void decide("decline"),
+            }}
+          >
+            <CardButton
               tone="primary"
               busy={pending === "allow" || standing.kind === "working"}
               busyLabel="Turning on"
               disabled={busy}
               onClick={() => void decide("allow")}
             >
-              {card.action}
-            </MoneyButton>
-          </MoneyButtons>
+              <span className="truncate">{card.action}</span>
+            </CardButton>
+          </CardActions>
         </div>
       </div>
-    </MoneyCardFrame>
+    </CardFrame>
   );
 }

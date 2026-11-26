@@ -205,10 +205,7 @@ function updateThreadNotesTool(turn: ToolTurn) {
       notes: z.union([threadNotesSchema, z.literal("")]),
     },
     async handler({ notes }) {
-      await db
-        .update(threads)
-        .set({ notes: notes.trim() })
-        .where(eq(threads.id, turn.threadId));
+      await db.update(threads).set({ notes: notes.trim() }).where(eq(threads.id, turn.threadId));
       void publishThread(turn.threadId);
       return result(notes.trim() ? "Saved notes for this thread." : "Cleared thread notes.");
     },
@@ -241,9 +238,7 @@ function setThreadAutonomyTool(turn: ToolTurn) {
       const thread = await threadById(turn.threadId);
       if (!thread) return failure(new Error("Thread not found."));
       const nextBudget =
-        input.budget_usd !== undefined
-          ? normalizeUsd(String(input.budget_usd))
-          : thread.budgetUsd;
+        input.budget_usd !== undefined ? normalizeUsd(String(input.budget_usd)) : thread.budgetUsd;
       if (input.act_mode === "within_limits" && usdToCents(nextBudget) <= 0n) {
         return failure(new Error("Give a positive dollar budget_usd for Auto mode."));
       }
@@ -272,7 +267,7 @@ function setThreadAutonomyTool(turn: ToolTurn) {
           budget_usd: nextBudget,
         },
         {
-          summary: `Let this thread trade on its own up to ${dollars(nextBudget)}`,
+          summary: `Let this take trade on its own up to ${dollars(nextBudget)}`,
           lines: [
             { label: ASK_LINE.budget, value: dollars(nextBudget) },
             {

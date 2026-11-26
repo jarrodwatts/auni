@@ -5,7 +5,7 @@ import { z } from "zod";
 import { result, type AuniTool } from "../agent/tool.ts";
 import { publishThread } from "../conversation/threads.ts";
 import { db, type Tx } from "../db/client.ts";
-import { actions, type ActionRow } from "../db/schema.ts";
+import { actions, messages, threads, type ActionRow } from "../db/schema.ts";
 import { wakeThread } from "../jobs/kinds.ts";
 import { retract, step } from "./life.ts";
 
@@ -15,6 +15,38 @@ import { retract, step } from "./life.ts";
 
 /** Still waiting for the owner's tap. */
 const waitingNow = eq(actions.status, "awaiting_permission");
+
+/**
+ * Whether the owner's chat holds this move's card (its plan's, for a leg): kept in a message, or
+ * on the answer its turn is still giving. A move an Auto turn began just before it was cut off
+ * can have none, and the owner never saw it.
+ */
+export async function cardReached(
+  action: Pick<ActionRow, "id" | "threadId" | "proposalId">,
+  tx: Pick<typeof db, "select"> = db,
+): Promise<boolean> {
+  if (!action.threadId) return false;
+  const card = action.proposalId
+    ? { proposalId: action.proposalId }
+    : { actionReference: action.id };
+  const holds = JSON.stringify([{ type: "data-cards", data: { cards: [card] } }]);
+  const [kept] = await tx
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(messages.threadId, action.threadId), sql`${messages.parts} @> ${holds}::jsonb`))
+    .limit(1);
+  if (kept) return true;
+  const [giving] = await tx
+    .select({ id: threads.id })
+    .from(threads)
+    .where(
+      and(
+        eq(threads.id, action.threadId),
+        sql`${threads.answerSoFar} -> 'parts' @> ${holds}::jsonb`,
+      ),
+    );
+  return Boolean(giving);
+}
 
 /** A waiting card as the agent reads it: its id, and what it asks. */
 export interface WaitingCard {

@@ -2,12 +2,9 @@
 
 import { ArrowUp } from "lucide-react";
 
-/**
- * Floating rounded composer card with a quiet interior bar for model selection
- * and send, echoing T3 Code's layout in Auni's calm visual language.
- */
+/** The reply box: the words, then one quiet bar inside it with the AI on the left and Send on the right. */
 export const COMPOSER_SURFACE_CLASS_NAME =
-  "relative flex flex-none flex-col rounded-[22px] bg-card px-3 pt-2.5 pb-2 shadow-[0_6px_20px_--alpha(var(--color-shade)/8%),0_0_0_1px_--alpha(var(--foreground)/7%)]";
+  "relative flex flex-none flex-col rounded-sheet bg-card px-3 pt-2.5 pb-2 border border-border shadow-float";
 
 /** Where the composer rests under a conversation; the talk above dissolves into it rather than being cut. */
 export const COMPOSER_DOCK_CLASS_NAME =
@@ -38,7 +35,6 @@ export function ComposerStandin({ placeholder = "" }: { readonly placeholder?: s
           </div>
         </div>
       </div>
-      <div className="mt-1.5 h-7" />
     </div>
   );
 }

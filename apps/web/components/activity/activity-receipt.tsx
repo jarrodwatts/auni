@@ -7,8 +7,8 @@ import { Fragment, type MouseEvent, type ReactNode } from "react";
 
 import { useStartNew } from "@/components/app/use-start-conversation";
 import { AssetLogo, LogoImage } from "@/components/brand/marks";
-import { Mascot } from "@/components/brand/mascot";
 import { PlaceLink } from "@/components/places/open-place";
+import { buttonVariants } from "@/components/ui/button";
 import { chatHref } from "@/lib/app-links";
 import type { Thread } from "@/lib/data/views";
 import { formatUsd } from "@/lib/money";
@@ -20,6 +20,11 @@ type ThreadRef = Pick<Thread, "id" | "title"> | undefined;
 
 const OUTSIDE_RING = "flex rounded-full ring-2 ring-negative/70 ring-offset-1";
 
+/**
+ * What an item is about: its asset's logo, else for a move of cash alone the logo of where the
+ * cash went (the venue's, for cash taken out of it), else a neutral glyph. One a venue did
+ * that leaves the owner something to decide wears a ring in the loss colour.
+ */
 export function ItemMark({
   item,
   size,
@@ -27,24 +32,16 @@ export function ItemMark({
   readonly item: ActivityItemWire;
   readonly size: number;
 }) {
-  if (!item.logo) return <AuniMark size={size} />;
-  const logo = <AssetLogo holding={{ logoUrl: item.logo.src, name: item.logo.name }} size={size} />;
+  const src =
+    item.logo?.src ??
+    (item.kind === "move"
+      ? (item.receipt.steps.find((step) => step.logoUrl)?.logoUrl ?? null)
+      : null);
+  const logo = <AssetLogo holding={{ logoUrl: src }} size={size} />;
   return item.kind === "outside" && item.decision ? (
     <span className={OUTSIDE_RING}>{logo}</span>
   ) : (
     logo
-  );
-}
-
-function AuniMark({ size }: { readonly size: number }) {
-  return (
-    <span
-      aria-hidden
-      className="flex flex-none items-center justify-center rounded-full bg-muted"
-      style={{ width: size, height: size }}
-    >
-      <Mascot alt="" size={Math.round(size * 0.66)} />
-    </span>
   );
 }
 
@@ -60,25 +57,18 @@ export function ActivityReceipt({
       <div className="flex justify-center">
         <ItemMark item={item} size={60} />
       </div>
-      <h2 className="mt-3.5 text-center text-[18px] leading-6 font-semibold tracking-[-0.015em] text-ink">
-        {item.title}
-      </h2>
+      <h2 className="mt-3.5 text-center text-section text-ink">{item.title}</h2>
       <p className="mt-1 text-center text-meta text-muted-foreground">
         {item.kind === "outside" ? (
           <>
-            by {item.receipt.by}
+            By {item.receipt.by}
             <br />
           </>
         ) : null}
         {item.subtitle}
       </p>
       {item.amount ? (
-        <p
-          className={cn(
-            "mt-3 text-center text-[40px] leading-[1.15] font-semibold tracking-[-0.03em] tabular-nums",
-            TONE_CLASS_NAME[item.amount.tone],
-          )}
-        >
+        <p className={cn("mt-3 text-center text-hero-money", TONE_CLASS_NAME[item.amount.tone])}>
           {amountText(item.amount)}
         </p>
       ) : null}
@@ -105,11 +95,7 @@ function HowAuniDidIt({
   return (
     <>
       {receipt.story ? <Story story={receipt.story} /> : <Steps steps={receipt.steps} />}
-      {thread ? (
-        <PrimaryLink href={chatHref(thread.id)} thread={thread}>
-          Open {thread.title}
-        </PrimaryLink>
-      ) : null}
+      {thread ? <TakeLink thread={thread} /> : null}
     </>
   );
 }
@@ -139,8 +125,8 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
         <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3">
           {story.facts.map(({ label, value }) => (
             <div key={label} className={cn("min-w-0", value.length > 18 && "col-span-2")}>
-              <dt className="text-caption text-muted-foreground">{label}</dt>
-              <dd className="mt-0.5 text-[15px] leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
+              <dt className="text-caption font-medium text-muted-foreground">{label}</dt>
+              <dd className="mt-0.5 text-body leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
                 {value}
               </dd>
             </div>
@@ -152,7 +138,7 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
           {story.links.map(({ label, url }) => (
             <a
               key={url}
-              className="flex h-9 items-center gap-1.5 rounded-full border border-foreground/[0.08] px-4 text-meta font-medium text-ink transition-colors duration-150 hover:bg-surface focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
               href={url}
               rel="noreferrer"
               target="_blank"
@@ -173,7 +159,7 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
 
 function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
   return (
-    <ol className="mt-5 rounded-[16px] bg-surface px-4 py-1.5">
+    <ol className="mt-5 rounded-card border border-border bg-surface px-4 py-1.5">
       {levels.map(({ label, price, kind }) => (
         <li
           key={label}
@@ -186,8 +172,8 @@ function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
               kind === "price" ? "bg-ink" : "border-[1.5px] border-muted-foreground bg-surface",
             )}
           />
-          <span className="min-w-0 flex-1 text-[14px] text-muted-foreground">{label}</span>
-          <span className="flex-none text-[15px] font-semibold tracking-[-0.01em] text-ink tabular-nums">
+          <span className="min-w-0 flex-1 text-ui text-muted-foreground">{label}</span>
+          <span className="flex-none text-body font-semibold tracking-[-0.01em] text-ink tabular-nums">
             {price}
           </span>
         </li>
@@ -203,7 +189,7 @@ function Steps({
 }) {
   return (
     <>
-      <h3 className="text-meta font-medium text-faint">How Auni did it</h3>
+      <h3 className="text-meta font-medium text-faint">Steps</h3>
       <ol className="mt-2">
         {steps.map((step, index) => (
           <li
@@ -219,9 +205,9 @@ function Steps({
                 </span>
               }
             />
-            <span className="min-w-0 flex-1 text-[14px] leading-5 text-ink">{step.text}</span>
+            <span className="min-w-0 flex-1 text-ui leading-5 text-ink">{step.text}</span>
             {step.amountUsd ? (
-              <span className="flex-none text-[14px] text-muted-foreground tabular-nums">
+              <span className="flex-none text-ui text-muted-foreground tabular-nums">
                 {formatUsd(step.amountUsd)}
               </span>
             ) : null}
@@ -249,16 +235,18 @@ function WhatHappened({
         <ArrowRight aria-hidden className="size-4 flex-none text-faint" strokeWidth={2} />
         <Side label="After" value={receipt.after} />
       </div>
-      <p className="mt-4 text-center text-[14px] leading-[1.55] text-muted-foreground">
-        {receipt.why}
-      </p>
-      {!decision ? null : thread ? (
+      <p className="mt-4 text-center text-ui leading-[1.55] text-muted-foreground">{receipt.why}</p>
+      {!decision ? (
+        thread ? (
+          <TakeLink thread={thread} />
+        ) : null
+      ) : thread ? (
         <PrimaryLink href={chatHref(thread.id)} thread={thread}>
-          Ask Auni what now
+          Ask Auni
         </PrimaryLink>
       ) : (
         <PrimaryLink href="/app/new" onClick={startNew}>
-          Ask Auni what now
+          Ask Auni
         </PrimaryLink>
       )}
     </>
@@ -277,17 +265,19 @@ function Side({
   readonly tone?: keyof typeof TONE_CLASS_NAME;
 }) {
   return (
-    <div className="min-w-0 flex-1 rounded-[16px] bg-surface px-3 py-3 text-center">
-      <p className="text-caption text-faint">{label}</p>
+    <div className="min-w-0 flex-1 rounded-card border border-border bg-surface px-3 py-3 text-center">
+      <p className="text-caption font-medium text-faint">{label}</p>
       <p
         className={cn(
-          "mt-0.5 text-[15px] leading-5 font-semibold break-words tabular-nums",
+          "mt-0.5 text-body leading-5 font-semibold break-words tabular-nums",
           TONE_CLASS_NAME[tone],
         )}
       >
         {value}
       </p>
-      {place ? <p className="mt-0.5 text-caption text-muted-foreground">on {place}</p> : null}
+      {place ? (
+        <p className="mt-0.5 text-caption font-medium text-muted-foreground">on {place}</p>
+      ) : null}
     </div>
   );
 }
@@ -308,11 +298,11 @@ function WhatArrived({
   ];
   if (receipt.counterparty) facts.push([out ? "To" : "From", receipt.counterparty]);
   return (
-    <dl className="rounded-[16px] bg-surface px-4 py-1">
+    <dl className="rounded-card border border-border bg-surface px-4 py-1">
       {facts.map(([label, value]) => (
         <div
           key={label}
-          className="flex items-baseline gap-4 py-2.5 text-[14px] [&:not(:first-child)]:border-t [&:not(:first-child)]:border-foreground/[0.06]"
+          className="flex items-baseline gap-4 py-2.5 text-ui [&:not(:first-child)]:border-t [&:not(:first-child)]:border-foreground/[0.06]"
         >
           <dt className="flex-none text-muted-foreground">{label}</dt>
           <dd className="min-w-0 flex-1 text-right break-words text-ink tabular-nums">{value}</dd>
@@ -322,8 +312,26 @@ function WhatArrived({
   );
 }
 
-const PRIMARY =
-  "mt-6 flex h-10 w-full items-center justify-center rounded-full bg-foreground px-5 text-ui font-semibold text-background transition-[background-color,transform] duration-200 ease-settle hover:bg-foreground/85 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.97]";
+const PRIMARY = buttonVariants({ className: "mt-6 w-full" });
+
+/** The take a move belongs to, and the way to its chat. */
+function TakeLink({ thread }: { readonly thread: NonNullable<ThreadRef> }) {
+  return (
+    <div className="mt-6 flex items-center gap-3 border-t border-border pt-4">
+      <div className="min-w-0 flex-1">
+        <p className="text-caption text-muted-foreground">Take</p>
+        <p className="truncate text-ui font-medium text-ink">{thread.title}</p>
+      </div>
+      <PlaceLink
+        href={chatHref(thread.id)}
+        thread={thread.id}
+        className={buttonVariants({ variant: "secondary", size: "sm" })}
+      >
+        View chat
+      </PlaceLink>
+    </div>
+  );
+}
 
 function PrimaryLink({
   href,

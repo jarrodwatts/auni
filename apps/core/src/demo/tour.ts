@@ -74,7 +74,7 @@ const STOPS: readonly Stop[] = [
     title: "The plan card",
     follows: true,
     does:
-      "I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money. Before answering I looked both stocks up and read your cash. Scroll up and tap **3 steps** to see it.\n\n" +
+      "I can't write a card like this one: it is made from live quotes, and its button is the only thing that sends money. Before answering I looked both stocks up and read your cash. Scroll up and tap the line above my reply to see each step.\n\n" +
       "Tap a row to see why it is there. Then tap **Buy both for $1,350** and watch each buy land.",
     beats: [
       {
@@ -91,10 +91,10 @@ const STOPS: readonly Stop[] = [
     ],
   },
   {
-    title: "This thread's panel",
+    title: "This take's details",
     follows: true,
-    does: "Everything tied to this thread sits beside the chat: the positions opened here, its notes, watches, and its record. You can also switch any thread between **Ask first** and **Auto** within a dollar budget from the strip under the box.",
-    reply: "I see the panel",
+    does: "Open this take's details from the top of the chat: the positions opened here, its notes, watches, and its record. Under **Spending** you switch it between **Ask first** and **Auto**, which buys and sells on its own within a dollar budget you set.",
+    reply: "I see the details",
     looked: true,
   },
   {
@@ -124,7 +124,7 @@ const STOPS: readonly Stop[] = [
       {
         hears: event("finished as failed"),
         notice:
-          "I ran that buy first, saw it would fail, and never sent it, so your money stayed where it was. Nothing is sent a second time by itself: **Try again** is yours to tap.",
+          "I simulated that buy first, saw the pool was paused, and didn't send it, so your money stayed where it was. Running it again would meet the same pause, so the card offers no **Try again**, and my reply offers another way.",
         on: true,
       },
     ],
@@ -137,7 +137,7 @@ const STOPS: readonly Stop[] = [
       {
         hears: REPLY,
         notice:
-          "I ran that transaction before showing you anything. Under **Checked by running it first** is what the run did. My own sentence sits apart, under **Not checked**. Tap the card's button to stake.",
+          "I simulated that transaction before showing you anything. Under **Observed in simulation** is what the simulation showed. My own note sits apart, under **Auni's note (unverified)**. Tap the card's button to stake.",
       },
       { hears: event("finished as done[^]*No app for Kintsu"), on: true },
     ],
@@ -157,7 +157,7 @@ const STOPS: readonly Stop[] = [
       {
         hears: REPLY,
         notice:
-          "Read the line under the field: what you paste there never passes through me. This demo has no Jupiter to reach, so tap **Not now**.",
+          "Read the line under the field: what you paste there never passes through me. This demo has no Jupiter to reach, so tap **Decline**.",
       },
       // A key pasted after all connects it, which shows as much.
       { hears: event("The owner (declined|saved their)"), on: true },
@@ -177,13 +177,13 @@ const STOPS: readonly Stop[] = [
   },
   {
     title: "Your money",
-    does: "Open [Portfolio](/app). One number for everything, wherever it sits. **Needs you** lists every card still waiting for a tap, and Eli Lilly and Novo Nordisk sit right there in your holdings.",
+    does: "Open [Money](/app). Your total sits at the top, followed by each take with what it holds and what it has made. Eli Lilly and Novo Nordisk sit under the take that bought them, and every move is saved as a receipt.",
     reply: "I found them there",
     looked: true,
   },
   {
     title: "The look",
-    does: "Last one. Open [Settings](/app?settings=appearance) and pick **Dark**, or whichever look you are not in now. It opens over Portfolio, so you see the change at once. Then come back here.",
+    does: "Last one. Open [Settings](/app?settings=you) and pick **Dark** under Light or dark, or whichever look you are not in now. It opens over Money, so you see the change at once. Then come back here.",
     reply: "I've picked a look",
     looked: true,
   },
@@ -197,18 +197,18 @@ const WELCOME =
   `The tour has ${STOPS.length} stops and takes about ten minutes. The next step is always one tap, and you can wander off whenever you like: this chat keeps your place.`;
 
 const END =
-  `**${OVER}** Everything you tapped ran my real code: the cards, the moves, the portfolio. Only the AI, the wallet and the world outside were stood in for.\n\n` +
+  `**${OVER}** Everything you tapped ran my real code: the cards, the moves, your money. Only the AI, the wallet and the world outside were stood in for.\n\n` +
   "Thank you for walking it. Poke at anything from here: nothing in this demo can break.";
 
 /** What to try once the tour is over, as replies docked under its last words, and what each is answered. */
 const AFTER: readonly { readonly reply: string; readonly says: string }[] = [
   {
     reply: "What is still waiting for me?",
-    says: "Every card still waiting for your tap is under **Needs you** on [Portfolio](/app). Open one, read it, and allow it or turn it down: either way you see what a real one does.",
+    says: "Every card still waiting for your tap is under **Needs you**. Open one, read it, and allow or decline it. Either way, you'll see what a real one does.",
   },
   {
-    reply: "Show me an Auto thread",
-    says: "Open **AI buildout** in the sidebar. It is set to act on its own within a $4,000 budget, with its positions, notes and budget bar right in the panel beside the chat.",
+    reply: "Show me an Auto take",
+    says: "Open **AI buildout** in the sidebar. It is set to act on its own within a $4,000 budget, with its positions, notes and what's left of that budget in its details.",
   },
   {
     reply: "How do I run it for real?",

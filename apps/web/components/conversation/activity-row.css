@@ -1,0 +1,71 @@
+/*
+ * A step is one quiet line, flush with the answer's words. Rows align to their first line,
+ * so a long step that unfolds grows downward without its icon moving.
+ */
+.auni-activity-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  /* A step quieter than a quiet word. */
+  color: color-mix(in oklab, var(--muted-foreground) 88%, var(--background));
+  font-size: var(--text-ui);
+  font-weight: 400;
+  line-height: 20px;
+  text-align: left;
+  transition:
+    background-color 180ms var(--motion-settle),
+    color 180ms var(--motion-settle);
+}
+
+.auni-activity-control {
+  position: relative;
+  border-radius: var(--radius-control);
+}
+
+.auni-activity-control:hover {
+  color: var(--foreground);
+}
+
+.auni-activity-icon {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A tool's own icon; a status mark in the slot draws its glyphs at their own size. */
+.auni-activity-icon > svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.5;
+}
+
+/* What the step worked on reads a shade quieter than the step itself. */
+.auni-activity-detail {
+  opacity: 0.7;
+}
+
+/* A step that unfolds keeps a 40px target under a finger without spreading the list. */
+@media (pointer: coarse) {
+  .auni-activity-control::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: max(100%, 40px);
+    transform: translateY(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-activity-row,
+  .auni-activity-control {
+    transition: none;
+  }
+}

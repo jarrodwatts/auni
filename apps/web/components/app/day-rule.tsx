@@ -43,7 +43,7 @@ export function DayRule({ label }: { readonly label: string | null }) {
     <div
       role="separator"
       aria-label={label}
-      className="mb-7 flex items-center gap-4 text-[12.5px] font-medium text-faint"
+      className="mb-7 flex items-center gap-4 text-meta font-medium text-faint"
     >
       <span aria-hidden className="h-px flex-1 bg-foreground/[0.07]" />
       {label}

@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowUpRight, LayoutGrid, Plus, ReceiptText, Settings } from "lucide-react";
+import { ArrowUpRight, Hand, LayoutGrid, Plus, Settings } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { useStartNew } from "@/components/app/use-start-conversation";
-import { APPS_HREF } from "@/lib/app-links";
+import { APPS_HREF, NEEDS_YOU_HREF } from "@/lib/app-links";
 
 import { PortfolioMark } from "./place-marks";
 import type { SearchItem } from "./search-items";
@@ -23,25 +23,36 @@ interface Page {
 
 const PLACES: readonly (Page & { readonly href: string })[] = [
   {
-    key: "portfolio",
-    title: "Portfolio",
-    href: "/app",
-    mark: <PortfolioMark className={ICON_CLASS_NAME} />,
-    names: ["home", "money", "balance", "cash"],
-  },
-  {
     key: "new",
-    title: "New thread",
+    title: "New take",
     href: "/app/new",
     mark: <NewMark />,
-    names: ["start", "thread", "chat"],
+    names: ["start", "chat", "thread", "ask", "idea"],
   },
   {
-    key: "activity",
-    title: "Activity",
-    href: "/app/activity",
-    mark: <ReceiptText {...ICON} />,
-    names: ["history", "transactions", "receipts", "what happened"],
+    key: "money",
+    title: "Money",
+    href: "/app",
+    mark: <PortfolioMark className={ICON_CLASS_NAME} />,
+    names: [
+      "portfolio",
+      "home",
+      "balance",
+      "cash",
+      "holdings",
+      "positions",
+      "activity",
+      "history",
+      "transactions",
+      "receipts",
+    ],
+  },
+  {
+    key: "needs-you",
+    title: "Needs you",
+    href: NEEDS_YOU_HREF,
+    mark: <Hand {...ICON} />,
+    names: ["waiting", "cards", "approve", "allow", "inbox", "review"],
   },
   {
     key: "apps",

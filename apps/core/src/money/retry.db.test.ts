@@ -9,6 +9,7 @@ import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { queued } from "../test/jobs.ts";
 import { FACE, stubRecipe } from "../test/recipe.ts";
 import type { Recipe } from "./recipe.ts";
+import { recipeForTool } from "./recipes/index.ts";
 import { markCrashed } from "./record.ts";
 import { quoteAgain, retryAction, retryProposal } from "./retry.ts";
 
@@ -32,10 +33,8 @@ const RECIPES: Record<string, Recipe> = {
     }),
   }),
 };
-vi.mock("./recipes/index.ts", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  recipeForTool: (tool: string) => RECIPES[tool],
-}));
+vi.mock("./recipes/index.ts", { spy: true });
+vi.mocked(recipeForTool).mockImplementation((tool: string) => RECIPES[tool]);
 const cash = vi.hoisted(() => ({ short: null as string | null }));
 vi.mock("./funding.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),

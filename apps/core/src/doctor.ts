@@ -1,4 +1,4 @@
-import { EVM_CHAIN_KEYS, NETWORKS, type NetworkKey } from "@auni/shared";
+import { EVM_CHAIN_KEYS, HELD, NETWORKS, type NetworkKey } from "@auni/shared";
 import { and, count, gt, isNull, lt, sql } from "drizzle-orm";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -62,6 +62,13 @@ export interface Finding {
     | "migrates-on-start"
     | "restart-to-update";
   readonly repair?: { readonly id: RepairId; readonly recommended: boolean };
+  /** The chats holding the cards this is about, where the owner acts on them, oldest first. */
+  readonly chats?: readonly { readonly id: string; readonly title: string | null }[];
+  /**
+   * A held move in no chat, so with no card to open, which Health checks or dismisses in place:
+   * its id, what it was (its card's summary) and why it is held.
+   */
+  readonly heldMove?: { readonly id: string; readonly summary: string; readonly why: string };
 }
 
 const by = (id: RepairId, recommended = true): Finding["repair"] => ({ id, recommended });
@@ -260,18 +267,36 @@ const checkRunner: Check = async () => {
       status: "fix",
       says: `${overdue.jobs} jobs are over 5 minutes late: Auni's output says what holds them up`,
     });
-  if (held.length > 0)
+  // A held move's card is where the owner checks it. One in no chat (a withdrawal from
+  // Settings, or one whose chat was deleted) has no card to open, so Health checks it in place.
+  const inChats = held.filter(({ chat }) => chat !== null);
+  const heldIn = new Map(inChats.map(({ chat }) => [chat!.id, chat!]));
+  if (inChats.length > 0)
     findings.push({
       check: "runner",
       status: "fix",
       [terminalDetail]: {
         problem:
-          held.length === 1
+          inChats.length === 1
             ? "1 move needs checking. Open its card in Auni to check its status."
-            : `${held.length} moves need checking. Open their cards in Auni to check their status.`,
+            : `${inChats.length} moves need checking. Open their cards in Auni to check their status.`,
       },
-      says: `${held.length} moves are held, waiting on you (${held.join(", ")}): each card says why, with Check again and Close`,
+      says:
+        inChats.length === 1
+          ? "1 move needs checking. Open its card in chat for details"
+          : `${inChats.length} moves need checking. Open their cards in chat for details`,
+      chats: [...heldIn.values()],
     });
+  for (const { id, summary, why, chat } of held) {
+    if (chat !== null) continue;
+    const reason = why ? HELD[why] : "Auni couldn't confirm it.";
+    findings.push({
+      check: "runner",
+      status: "fix",
+      says: `${summary} needs checking. ${reason}`,
+      heldMove: { id, summary, why: reason },
+    });
+  }
   for (const { kind, jobs: many, error } of failed)
     findings.push({
       check: "runner",

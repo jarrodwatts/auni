@@ -1,28 +1,29 @@
 "use client";
 
+import "./conversation-welcome.css";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ComposerStandin } from "@/components/app/composer-shell";
-import { WelcomeComposer } from "@/components/app/welcome-composer";
+import { NEW_TAKE_PLACEHOLDER, WelcomeComposer } from "@/components/app/welcome-composer";
 import { StartingPoints } from "@/components/app/starting-points";
-import { Lockup } from "@/components/brand/lockup";
 import {
   InteractiveMascot,
   type InteractiveMascotHandle,
   type MascotReadingTarget,
 } from "@/components/brand/interactive-mascot";
 import { useConversationLaunch } from "@/components/app/conversation-launch-context";
+import { FirstTake } from "@/components/first-run/first-take";
 import { useFirstRun } from "@/components/first-run/use-first-run";
 import { useMe } from "@/components/personalization/use-me";
 import { useArriving } from "@/components/places/arriving";
-import { BackToPortfolio } from "@/components/places/place-header";
 import { cn } from "@/lib/utils";
 
 /** The preview is on screen, so the page taking its place has already made its entrance. */
 let previewShowing = false;
 
 /**
- * A new chat: Auni, one question, and a few places to start from what Auni sees of the owner.
+ * A new take: Auni, one question, and a few places to start from what Auni sees of the owner.
  * As a `preview` (the page's loading state) it looks the same but takes nothing in: the page
  * replacing it would drop a message sent from it, and would find a focus request already spent
  * on its box.
@@ -31,9 +32,9 @@ export function ConversationWelcome({ preview = false }: { readonly preview?: bo
   const firstRun = useFirstRun();
   const { launch } = useConversationLaunch();
   const arriving = useArriving();
-  // First run is the landing, over the app (PlaceWorkspace), until the first take's chat starts
-  // from it: nothing here is drawn under it meanwhile.
-  if (firstRun || (arriving && launch)) return null;
+  // First run asks for the first take here, until its chat starts from it.
+  if (firstRun) return preview ? null : <FirstTake />;
+  if (arriving && launch) return null;
   return <NewChat preview={preview} />;
 }
 
@@ -63,32 +64,24 @@ function NewChat({ preview }: { readonly preview: boolean }) {
       inert={preview}
       aria-busy={preview}
     >
-      <div className="flex h-[56px] flex-none items-center gap-2 border-b border-foreground/[0.06] px-3 lg:hidden">
-        <BackToPortfolio preview={false} />
-        <Lockup height={18} />
-      </div>
-      {/* On a phone the starting points sit just above the box, at the bottom where a thumb is,
-          and Auni fills the space above them; wider, all of it stands in the middle, the points
-          under the box. One set of points, moved by order. */}
-      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 pt-8 pb-4 sm:justify-center sm:px-8 sm:pb-20">
-        <div className="flex flex-1 flex-col items-center justify-center pb-6 sm:flex-none sm:pb-0">
-          <InteractiveMascot ref={mascotRef} size={104} className="size-22 sm:size-[104px]" />
-          <h1 className="mt-4 text-center text-[25px] font-bold tracking-[-0.025em] text-ink sm:text-[29px]">
-            {name ? `Where should we start, ${name}?` : "What do you want to explore?"}
+      {/* Wide, it all stands in the middle: Auni and the question, the box, then the points.
+          On a phone the question and the points sit up top and the box waits at the thumb,
+          over the tab bar: one set of points, moved by order. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 pt-10 pb-3 sm:justify-center sm:px-8 sm:pt-8 sm:pb-24">
+        <div className="flex flex-col items-center">
+          <InteractiveMascot ref={mascotRef} size={64} className="size-14 sm:size-16" />
+          <h1 className="mt-4 text-center text-title text-ink">
+            {name ? `What's the take, ${name}?` : "What's the take?"}
           </h1>
-          {/* On a phone the heading says it alone, and the points get the room. */}
-          <p className="mt-2 hidden max-w-[520px] text-center text-[15px] leading-[1.5] text-muted-foreground sm:block">
-            Ask a question, test a take, or start from one of the live ideas below.
-          </p>
         </div>
-        <div className="order-last mt-2 w-full max-w-[680px] sm:order-none sm:mt-8">
+        <div className="order-last mt-auto w-full max-w-[680px] pt-6 sm:order-none sm:mt-8 sm:pt-0">
           {preview ? (
-            <ComposerStandin placeholder="Peptides go mainstream by 2028" />
+            <ComposerStandin placeholder={NEW_TAKE_PLACEHOLDER} />
           ) : (
             <WelcomeComposer onCaretActivity={trackCaret} />
           )}
         </div>
-        <div className="w-full max-w-[680px] sm:mt-3">
+        <div className="mt-8 w-full max-w-[680px] sm:mt-4">
           <StartingPoints />
         </div>
       </div>

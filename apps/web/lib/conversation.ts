@@ -13,7 +13,10 @@ import type { z } from "zod";
 import { toolCopy } from "@/lib/tool-copy";
 
 interface AuniMessageMetadata {
-  readonly workDurationMs?: number;
+  /** A background answer Auni ended showing nothing (no words, no card), and why. */
+  readonly quiet?: string;
+  /** Money in that came while this plan waited on the owner, which its card tells. */
+  readonly forPlan?: string;
   /** Absent on an answer core started without the person (an automation, a finished action). */
   readonly origin?: "human";
   /** When the message was sent, for the timestamp under a user bubble. */
@@ -89,13 +92,14 @@ export function toAuniMetadata(raw: unknown): AuniMessageMetadata {
   const {
     createdAt,
     fires,
+    forPlan,
     noBrain,
     origin,
     posted,
     replyToId,
     stopped,
+    quiet,
     supersedesId,
-    workDurationMs,
   } = parsed.data;
   return {
     // An answer core started on its own is not the person's to regenerate.
@@ -106,7 +110,8 @@ export function toAuniMetadata(raw: unknown): AuniMessageMetadata {
     ...(stopped ? { stopped } : {}),
     ...(noBrain ? { noBrain } : {}),
     ...(posted ? { posted } : {}),
-    ...(workDurationMs !== undefined ? { workDurationMs } : {}),
+    ...(quiet ? { quiet } : {}),
+    ...(forPlan ? { forPlan } : {}),
     ...(fires?.length ? { fires } : {}),
   };
 }
@@ -172,10 +177,6 @@ export function joinPicks(labels: readonly string[]): string {
   return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
 }
 
-export function messageToolParts(message: AuniUiMessage): readonly AuniToolPart[] {
-  return message.parts.filter((part) => isToolUIPart(part)) as AuniToolPart[];
-}
-
 /** A tool call the timeline shows as a step. A failed call is the agent's own slip, not news. */
 export function isShownToolPart(parts: AuniUiMessage["parts"], index: number): boolean {
   const part = parts[index];
@@ -212,22 +213,13 @@ export function turnKeys(turns: readonly AuniUiMessage[]): string[] {
   });
 }
 
-export function answerStartedAt(
-  messages: readonly AuniUiMessage[],
-  index: number,
-): string | undefined {
-  const answer = messages[index];
-  const prompt = messages[index - 1];
-  const replyTo = answer?.metadata?.replyToMessageId;
-  if (
-    prompt?.role === "user" &&
-    prompt.metadata?.createdAt &&
-    (replyTo === undefined || replyTo === prompt.id)
-  )
-    return prompt.metadata.createdAt;
-  return answer?.metadata?.createdAt;
-}
-
+/**
+ * What a thread shows: each exchange as last asked, without the ones an edit replaced, and
+ * without an answer Auni settled quietly about a move (its card already says how it went). Only
+ * an answer with no words and no card hides, whatever its mark says, so a warning or a card is
+ * never lost (core marks quiet on the same terms, conversation/turn.ts). A watch's quiet answer
+ * stays, under its rule, as what came of the watch.
+ */
 export function visibleThreadMessages(
   messages: readonly AuniUiMessage[],
 ): readonly AuniUiMessage[] {
@@ -236,13 +228,16 @@ export function visibleThreadMessages(
     const replaced = message.metadata?.supersedesMessageId;
     if (replaced) superseded.add(replaced);
   }
-  if (superseded.size === 0) return messages;
-
-  return messages.filter((message) =>
+  const hidden = (message: AuniUiMessage) =>
     message.role === "user"
-      ? !superseded.has(message.id)
-      : !superseded.has(message.metadata?.replyToMessageId ?? ""),
-  );
+      ? superseded.has(message.id)
+      : superseded.has(message.metadata?.replyToMessageId ?? "") ||
+        (Boolean(message.metadata?.quiet) && !message.metadata?.fires && showsNothing(message));
+  return messages.some(hidden) ? messages.filter((message) => !hidden(message)) : messages;
+}
+
+function showsNothing(message: AuniUiMessage): boolean {
+  return !messageText(message) && !message.parts.some((part) => part.type === "data-cards");
 }
 
 /** The last exchange a person may regenerate or edit, when there is one. */

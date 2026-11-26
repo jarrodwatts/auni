@@ -1,5 +1,6 @@
 import { NETWORKS, type NetworkKey } from "@auni/shared";
 import { asc, eq } from "drizzle-orm";
+import express from "express";
 import { getAddress } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +9,7 @@ import { savingsTokens } from "../apps/registry.ts";
 import { actions, arrivalCursors, arrivals, fills, threads, otherTokens } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { queued } from "../test/jobs.ts";
+import { serve } from "../test/serve.ts";
 import { listingsOf } from "../test/recognised.ts";
 import { fakeWallet } from "../test/wallet.ts";
 import { depositWire, NotKnownYet, recentDeposits, recordArrivals } from "./arrivals.ts";
@@ -18,6 +20,7 @@ import { tokenPrices } from "./history.ts";
 import { madeUsd, walletFlows } from "./made.ts";
 import { payInStanding, type PayInStanding } from "./pay-in.ts";
 import { readPortfolio } from "./portfolio.ts";
+import { portfolioRouter } from "./routes.ts";
 import { solanaTokens } from "./chain-holdings.ts";
 import { listings } from "./recognised.ts";
 import { LANDING_WINDOW_MS } from "./record.ts";
@@ -37,6 +40,8 @@ vi.mock("./chains.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("./chains.ts")>();
   return { ...original, solanaRpc: vi.fn(original.solanaRpc) };
 });
+// A screen's ask sweeps in the background; the sweeps here run one network at a time.
+vi.mock("./sweep.ts", async (o) => ({ ...(await o<object>()), sweepSoon: () => undefined }));
 vi.mock("./transfers.ts", async (o) => (await import("../test/chain.ts")).transfers(await o()));
 vi.mock("./chain-holdings.ts", async (o) => (await import("../test/chain.ts")).holdings(await o()));
 // The lists recognise the network's coins and cash, and LINK, PEPE, the xStock and BONK; never spam.
@@ -792,22 +797,66 @@ describe("when an arrival counts", () => {
 });
 
 describe("deposits a waiting screen sees land", () => {
+  const row = (txHash: string, fields: Partial<typeof arrivals.$inferInsert> = {}) => ({
+    chain: "base",
+    txHash,
+    position: "log:0",
+    instrument: LINK,
+    baseUnits: String(81n * 10n ** 15n),
+    decimals: 18,
+    usdValue: "1.22",
+    symbol: "LINK",
+    kind: "deposit" as const,
+    at: daysAgo(3),
+    block: 1,
+    createdAt: minutesAgo(1),
+    ...fields,
+  });
+  const url = serve(express().use("/portfolio", portfolioRouter));
+  const landedFor = async (after?: string) =>
+    (await (
+      await fetch(url(`/portfolio/deposits${after ? `?after=${encodeURIComponent(after)}` : ""}`))
+    ).json()) as { deposits: { id: string; usdValue: string }[]; after: string };
+  const at = (mark: string, ms: number) => new Date(Date.parse(mark) + ms);
+
+  // A $50 Base USDC deposit recorded two seconds before Add money opened counted as landing
+  // while it watched, so a card short $50 could read Done (review of 2026-11-25).
+  it("lists every deposit recorded after the screen began waiting, and none from before", async () => {
+    const usdc = { instrument: NETWORKS.base.usdc, decimals: 6, symbol: "USDC" };
+    await db.insert(arrivals).values(
+      row("0xbefore", {
+        ...usdc,
+        baseUnits: "50000000",
+        usdValue: "50.00",
+        createdAt: new Date(Date.now() - 2_000),
+      }),
+    );
+
+    // Opening it lands nothing and marks where it began.
+    const { deposits: opened, after } = await landedFor();
+    expect(opened).toEqual([]);
+    expect((await landedFor(after)).deposits).toEqual([]);
+
+    await db.insert(arrivals).values([
+      // Recorded in the very millisecond it began, as records count them: before it was waiting.
+      row("0xat", { createdAt: at(after, 0) }),
+      // The next millisecond, and a burst of six between two reads: every one of them lands.
+      row("0xjustafter", { usdValue: "5.00", createdAt: at(after, 1) }),
+      ...[1, 2, 3, 4, 5, 6].map((n) =>
+        row(`0xburst${n}`, { usdValue: "10.00", createdAt: at(after, 1 + n) }),
+      ),
+    ]);
+    const { deposits } = await landedFor(after);
+    expect(deposits.map(({ usdValue }) => usdValue)).toEqual([...Array(6).fill("10.00"), "5.00"]);
+    // The portfolio still lists only the latest few.
+    expect(await recentDeposits()).toHaveLength(5);
+  });
+
+  it("asks after a mark core gave", async () => {
+    expect((await fetch(url("/portfolio/deposits?after=yesterday"))).status).toBe(400);
+  });
+
   it("lists their latest deposits told, a cent or more, recorded in the last hour, named as recorded", async () => {
-    const row = (txHash: string, fields: Partial<typeof arrivals.$inferInsert> = {}) => ({
-      chain: "base",
-      txHash,
-      position: "log:0",
-      instrument: LINK,
-      baseUnits: String(81n * 10n ** 15n),
-      decimals: 18,
-      usdValue: "1.22",
-      symbol: "LINK",
-      kind: "deposit" as const,
-      at: daysAgo(3),
-      block: 1,
-      createdAt: minutesAgo(1),
-      ...fields,
-    });
     await db
       .insert(arrivals)
       .values([
@@ -831,8 +880,11 @@ describe("deposits a waiting screen sees land", () => {
       amount: "0.081",
       network: "Base",
       usdValue: "1.22",
+      cash: null,
     });
-    expect(depositWire(eth!)).toMatchObject({ symbol: "ETH", usdValue: "210.60" });
+    expect(depositWire(eth!)).toMatchObject({ symbol: "ETH", usdValue: "210.60", cash: null });
+    // Base's USDC is cash there, which a card short on Base waits for.
+    expect(depositWire({ ...link!, instrument: NETWORKS.base.usdc }).cash).toBe("base");
     // One recorded with no name is named by its address.
     expect(depositWire({ ...link!, symbol: null }).symbol).toBe(shortAddress(LINK));
   });

@@ -58,7 +58,10 @@ function cookie(req: Request, name: string): string | undefined {
  */
 export async function requireOwner(req: Request, res: Response, next: NextFunction) {
   if (env.TAILSCALE_OWNER) {
-    if (!cameAsOwner(req)) return void res.status(401).json({ error: "tailscale_owner_only" });
+    // `at`: the tailnet address that does open, which `auni` prints too, so a page turned away
+    // here can say where to go.
+    if (!cameAsOwner(req))
+      return void res.status(401).json({ error: "tailscale_owner_only", at: env.WEB_ORIGIN });
     return fromTheApp(req, res, () => {
       req.ownerHere = true;
       next();

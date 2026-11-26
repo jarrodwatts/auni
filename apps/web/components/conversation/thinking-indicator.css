@@ -1,0 +1,28 @@
+/* Auni's mascot breathes while it thinks: its one sign of life, and only while it works. */
+@keyframes auni-thinking-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.auni-thinking-mascot {
+  display: inline-flex;
+  flex: none;
+}
+
+.auni-thinking-mascot[data-active] {
+  animation: auni-thinking-breathe 1.8s ease-in-out infinite;
+  animation-play-state: var(--visible-animation-state, paused);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-thinking-mascot[data-active] {
+    animation: none;
+  }
+}

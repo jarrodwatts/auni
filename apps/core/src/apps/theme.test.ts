@@ -11,12 +11,14 @@ const look = (body: string, id = "night") => `:root[data-theme="${id}"] {\n${bod
 
 describe("an app's theme", () => {
   it("knows the web's design tokens, colours and type among them", () => {
-    for (const token of ["--background", "--foreground", "--primary", "--color-ink", "--radius"])
+    for (const token of ["--background", "--foreground", "--primary", "--ink", "--radius-card"])
       expect(TOKENS.has(token), token).toBe(true);
+    // Tailwind's name for a token is read in place of it, so a theme can't set one.
+    expect(TOKENS.has("--color-ink")).toBe(false);
   });
 
   it("may give Auni's own tokens other values, under its own selector", () => {
-    const css = `/* Night: a darker Auni. */\n${look('--background: #0f1218;\n  --color-ink: rgb(240 242 248 / 96%);\n  --font-sans: "Inter", sans-serif;')}`;
+    const css = `/* Night: a darker Auni. */\n${look('--background: #0f1218;\n  --ink: rgb(240 242 248 / 96%);\n  --font-sans: "Inter", sans-serif;')}`;
     expect(themeProblem("night", css, TOKENS)).toBeNull();
   });
 

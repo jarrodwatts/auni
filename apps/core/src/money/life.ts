@@ -32,8 +32,9 @@ import { actions, type ActionRow } from "../db/schema.ts";
  *          |                       permission it leaves, once its plan has started (startRun)
  *          |- apply -> done        the Allow that decides an ask, in its own transaction
  *          |- recall -> retracted  the action job, in place of its claim: allowed on a card from
- *          |                       before (CARD_FORMAT) that didn't show a permission it leaves,
- *          |                       with every leg of its plan, while none has started (startRun)
+ *          |                       before that didn't show a permission it leaves
+ *          |                       (leftOutPermission), with every leg of its plan, while none
+ *          |                       has started (startRun)
  *          '- claim -> sending     the action job, once (executeAction)
  *               |- finish -> done        the run
  *               |- fail ---> failed      the run, when nothing moved
@@ -59,7 +60,7 @@ import { actions, type ActionRow } from "../db/schema.ts";
  * | sending | Its job claimed it and its recipe is sending. | Its job was cut off, so `cutShort` stops it: unsure if it kept a send, its receipts read once as a run that threw has them read, else failed as "sent", which a tap never runs again. The wallet then resends what it signed and never broadcast, the same bytes. |
  * | landing | Sent, and its money arrives later (a bridge, a deposit). | The `landing` job checks again; it only reads. |
  * | unsure | It stopped with something sent, or maybe sent. | Reconcile, every ten minutes, reads the receipts of a move started over 30 minutes ago (STUCK_AFTER_MS) and finishes or fails it; a trade whose sends confirmed is recorded from what its recipe reads back. It does the same for a move left sending that long, whose outcome couldn't be written. |
- * | needs_owner | Held: it sent, or may have, and nothing Auni can read says what it did (HELD in shared names the three ways: a confirmed trade with no way to read it back, a send its venue never answered, a send unconfirmed after a day). Its card says so with Check again and Close, its thread was woken once, and it counts against its specialist's pot as spent (money/pot.ts). | Reconcile reads it again every ten minutes and settles it if the world now answers. Nothing is ever sent again. |
+ * | needs_owner | Held: it sent, or may have, and nothing Auni can read says what it did (HELD in shared names the three ways: a confirmed trade with no way to read it back, a send its venue never answered, a send unconfirmed after a day). Its card says so with Check status and Dismiss card, its thread was woken once, and it counts against its specialist's pot as spent (money/pot.ts). | Reconcile reads it again every ten minutes and settles it if the world now answers. Nothing is ever sent again. |
  * | done | It went through. A venue's own doing (a payout, a liquidation) is recorded done too. | Nothing. |
  * | failed | Nothing moved, or what did is in its transactions. Try again may run it once more. | Nothing. |
  * | cancelled, replaced, retracted | Declined, a newer card took its place, or Auni took it back and its `error` says why. | Nothing. |

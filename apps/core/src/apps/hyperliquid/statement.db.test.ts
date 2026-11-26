@@ -235,7 +235,8 @@ describe("the Hyperliquid statement", () => {
       expect.objectContaining({
         kind: "venue_event",
         title: "Hyperliquid closed your STRK long",
-        detail: "Its price moved against it until the margin behind it ran out. You lost $5.26.",
+        detail: "Its price moved against it until the margin behind it ran out.",
+        pnlUsd: "-5.26",
         actionReference: outside[0]!.id,
         outside: true,
       }),
@@ -351,17 +352,18 @@ describe("the Hyperliquid statement", () => {
     ]);
     expect(await db.select().from(actions).where(eq(actions.tool, VENUE_FILL_TOOL))).toEqual([]);
     // Each thread is told of its share, and not woken: Auni's own stop did what it was set to.
-    const told = (share: string) => [
+    const told = (lost: string) => [
       expect.objectContaining({
         kind: "venue_event",
-        title: "Your stop-loss closed your ETH long",
-        detail: `It reached a stop-loss or take-profit price Auni set. You lost ${share}.`,
+        title: "Stop-loss closed your ETH long",
+        detail: "Hit your stop price on Hyperliquid.",
+        pnlUsd: `-${lost}`,
         actionReference: stops.id,
         outside: false,
       }),
     ];
-    expect(await cardsIn(second.id)).toEqual(told("$100"));
-    expect(await cardsIn(first.id)).toEqual(told("$200"));
+    expect(await cardsIn(second.id)).toEqual(told("100.00"));
+    expect(await cardsIn(first.id)).toEqual(told("200.00"));
     expect(await wakes()).toEqual([]);
   });
 
@@ -403,7 +405,7 @@ describe("the Hyperliquid statement", () => {
     const stop = (actionReference: string) => [
       expect.objectContaining({
         kind: "venue_event",
-        title: "Your stop-loss closed your ETH long",
+        title: "Stop-loss closed your ETH long",
         actionReference,
       }),
     ];
@@ -701,8 +703,9 @@ describe("the Hyperliquid statement", () => {
     // The move's own fill is told by its card; the stop is news.
     expect(await cardsIn(thread.id)).toEqual([
       expect.objectContaining({
-        title: "Your stop-loss closed your ETH long",
-        detail: "It reached a stop-loss or take-profit price Auni set. You lost $7.50.",
+        title: "Stop-loss closed your ETH long",
+        detail: "Hit your stop price on Hyperliquid.",
+        pnlUsd: "-7.50",
       }),
     ]);
   });
@@ -746,7 +749,7 @@ describe("the Hyperliquid statement", () => {
 
     // Its own fill is its card's to tell; the stop, though inside five minutes, is news.
     expect(await cardsIn(thread.id)).toEqual([
-      expect.objectContaining({ title: "Your stop-loss closed your ETH long" }),
+      expect.objectContaining({ title: "Stop-loss closed your ETH long" }),
     ]);
   });
 
@@ -782,7 +785,7 @@ describe("the Hyperliquid statement", () => {
     await readWhenDue();
 
     expect(await cardsInThread(chat.id)).toEqual([
-      expect.objectContaining({ title: "Your stop-loss closed your ETH long" }),
+      expect.objectContaining({ title: "Stop-loss closed your ETH long" }),
     ]);
   });
 

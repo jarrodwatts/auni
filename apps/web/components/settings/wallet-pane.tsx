@@ -1,169 +1,132 @@
 "use client";
 
 import {
+  ArrowDownLeft,
   ArrowUpRight,
   Check,
-  ChevronRight,
   Copy,
   KeyRound,
   Plus,
   ShieldCheck,
-  WalletMinimal,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
+import {
+  depositAddresses,
+  networksInBrief,
+  shortAddress,
+} from "@/components/money/portal/deposit-addresses";
+import { NetworkMark } from "@/components/money/portal/network-mark";
 import { useAddMissingKey, useMe, useRefreshMe } from "@/components/personalization/use-me";
 import { WithdrawDialog } from "@/components/withdraw/withdraw-dialog";
-import { cn } from "@/lib/utils";
+import { Row } from "@/components/ui/row";
+import { useApps } from "@/lib/data/apps";
+import { depositNetworks } from "@/lib/data/portfolio";
 
 import { BringSolanaDialog } from "./bring-solana-dialog";
-import { SETTINGS_BUTTON, SettingsRow, SettingsSection } from "./settings-layout";
+import { SETTINGS_BUTTON, SettingLink, SettingsGroup } from "./settings-layout";
 import { WalletKeysDialog } from "./wallet-keys-dialog";
 
-const ADDRESS_ON = { solana: "a Solana address", evm: "an EVM address" } as const;
+/** The most network marks shown beside one address. */
+const MARKS = 3;
 
-export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: string | null }) {
+/**
+ * Your wallet: the addresses it receives on (one for every EVM network, one for Solana), money
+ * in and out, and the keys: shown only after the owner proves it's them, added to where one
+ * network is missing, or a Solana key of their own brought in.
+ */
+export function WalletPane() {
   const { wallets, walletLacks, bringSolana } = useMe();
+  const apps = useApps();
   const refreshMe = useRefreshMe();
   const addKey = useAddMissingKey();
   const { openAddMoney } = useAppDialogs();
   const [open, setOpen] = useState<"withdraw" | "keys" | "bring" | null>(null);
-  const [brought, setBrought] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
-
-  const copy = (id: string, value: string) => {
-    void navigator.clipboard.writeText(value);
-    setCopied(id);
-    window.setTimeout(() => setCopied((prev) => (prev === id ? null : prev)), 1800);
-  };
+  const [added, setAdded] = useState(false);
+  const addresses = depositAddresses(depositNetworks(wallets));
+  const has = addresses.length > 0;
+  // Which wallet app keeps the keys, in its own words: "Keeps your keys on this computer".
+  const keeper = apps.data?.apps.find(({ jobs, inUse }) => inUse && jobs.includes("keys"));
 
   return (
-    <div className="flex flex-col gap-5">
-      <SettingsSection
-        id="setting-wallet-addresses"
-        highlighted={highlightedTarget === "setting-wallet-addresses"}
-        title="Local wallet addresses"
-        description="Self-custody keys stored on this machine (OS keychain or 0600 file). Only moves you approve are ever signed."
-        action={
-          <button type="button" onClick={() => openAddMoney()} className={SETTINGS_BUTTON}>
-            <Plus className="size-3.5" />
-            Add money
-          </button>
+    <>
+      <SettingsGroup
+        id="setting-addresses"
+        title="Your addresses"
+        note={
+          keeper?.does
+            ? `${keeper.does}. Auni signs only the moves you allow.`
+            : "Auni signs only the moves you allow."
         }
       >
-        {wallets?.evm ? (
-          <SettingsRow
-            label="EVM address"
-            description="Same address on Monad, Base, Arbitrum, Polygon, and Ethereum."
-          >
-            <div className="flex items-center gap-2">
-              <code className="rounded-[8px] bg-surface px-2.5 py-1 font-mono text-[12px] text-ink">
-                {wallets.evm.slice(0, 8)}…{wallets.evm.slice(-6)}
-              </code>
-              <button
-                type="button"
-                onClick={() => copy("evm", wallets.evm!)}
-                className={SETTINGS_BUTTON}
-              >
-                {copied === "evm" ? (
-                  <>
-                    <Check className="size-3.5 text-positive" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="size-3.5" />
-                    Copy
-                  </>
-                )}
-              </button>
-            </div>
-          </SettingsRow>
-        ) : null}
+        {has ? (
+          addresses.map(({ address, networks }) => (
+            <AddressRow key={address} address={address} networks={networks} />
+          ))
+        ) : (
+          <p className="px-4 py-4 text-meta leading-[1.5] text-muted-foreground sm:px-5">
+            No wallet yet. Auni makes one when you send your first take.
+          </p>
+        )}
+      </SettingsGroup>
 
-        {wallets?.solana ? (
-          <SettingsRow label="Solana address" description="Used for Solana tokens and stocks.">
-            <div className="flex items-center gap-2">
-              <code className="rounded-[8px] bg-surface px-2.5 py-1 font-mono text-[12px] text-ink">
-                {wallets.solana.slice(0, 8)}…{wallets.solana.slice(-6)}
-              </code>
-              <button
-                type="button"
-                onClick={() => copy("solana", wallets.solana!)}
-                className={SETTINGS_BUTTON}
-              >
-                {copied === "solana" ? (
-                  <>
-                    <Check className="size-3.5 text-positive" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="size-3.5" />
-                    Copy
-                  </>
-                )}
-              </button>
-            </div>
-          </SettingsRow>
-        ) : null}
-
-        {!wallets?.evm && !wallets?.solana ? (
-          <div className="px-4 py-4 text-[13px] text-muted-foreground sm:px-5">
-            No wallet created yet. Auni creates one when you finish the setup wizard or start your
-            first move.
-          </div>
-        ) : null}
-      </SettingsSection>
-
-      <SettingsSection
-        id="setting-wallet-actions"
-        highlighted={highlightedTarget === "setting-wallet-actions"}
-        title="Actions & key management"
-        description="Withdraw funds or export your private keys for safekeeping."
-      >
-        <ActionRow
-          disabled={!wallets?.evm}
-          icon={<ArrowUpRight aria-hidden className="size-4" />}
+      <SettingsGroup id="setting-wallet-moves">
+        <SettingLink
+          icon={<ArrowDownLeft />}
+          label="Add money"
+          hint="From an exchange or another wallet"
+          onClick={() => openAddMoney()}
+        />
+        <SettingLink
+          icon={<ArrowUpRight />}
           label="Withdraw"
-          hint="Send USDC out to any EVM or Solana address"
-          onSelect={() => setOpen("withdraw")}
+          hint="To an exchange or another wallet"
+          disabled={!has}
+          onClick={() => setOpen("withdraw")}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup
+        id="setting-keys"
+        title="Your keys"
+        note={
+          addKey.isSuccess || added
+            ? "Your new address is ready. Open Show your keys to back it up with the others."
+            : addKey.isError
+              ? "Couldn't create that address. Try again."
+              : undefined
+        }
+      >
+        <SettingLink
+          icon={<ShieldCheck />}
+          label="Show your keys"
+          hint="To back them up. Confirm it's you first."
+          disabled={!has}
+          onClick={() => setOpen("keys")}
         />
         {walletLacks ? (
-          <ActionRow
+          <SettingLink
+            icon={<Plus />}
+            label={
+              walletLacks === "solana"
+                ? "Add a Solana address"
+                : "Add an address for Monad, Base, and more"
+            }
+            hint="A new key, kept beside the one you have"
             disabled={addKey.isPending}
-            icon={<WalletMinimal aria-hidden className="size-4" />}
-            label={`Add ${ADDRESS_ON[walletLacks]}`}
-            hint="Generate a new local key beside your existing wallet"
-            onSelect={() => addKey.mutate()}
+            onClick={() => addKey.mutate()}
           />
         ) : null}
         {bringSolana ? (
-          <ActionRow
-            disabled={false}
-            icon={<KeyRound aria-hidden className="size-4" />}
-            label="Import an existing Solana key"
-            hint="Paste a Base58 private key into core's private field"
-            onSelect={() => setOpen("bring")}
+          <SettingLink
+            icon={<KeyRound />}
+            label="Use a Solana key you already have"
+            hint="Paste it into a private field. Your AI never sees it."
+            onClick={() => setOpen("bring")}
           />
         ) : null}
-        <ActionRow
-          disabled={!wallets?.evm && !wallets?.solana}
-          icon={<ShieldCheck aria-hidden className="size-4" />}
-          label="Show wallet keys"
-          hint="Requires owner step-up proof"
-          onSelect={() => setOpen("keys")}
-        />
-      </SettingsSection>
-
-      {addKey.isSuccess || addKey.isError || brought ? (
-        <p role="status" className="px-1 text-[12.5px] leading-[1.5] text-muted-foreground">
-          {addKey.isSuccess || brought
-            ? "Your new address is ready. Open Show wallet keys and save its key with your backup."
-            : "The address wasn't made. Try again."}
-        </p>
-      ) : null}
+      </SettingsGroup>
 
       {bringSolana ? (
         <BringSolanaDialog
@@ -172,7 +135,7 @@ export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: 
           onOpenChange={(next) => setOpen(next ? "bring" : null)}
           onDone={() => {
             setOpen(null);
-            setBrought(true);
+            setAdded(true);
             refreshMe();
           }}
         />
@@ -185,40 +148,51 @@ export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: 
         open={open === "keys"}
         onOpenChange={(next) => setOpen(next ? "keys" : null)}
       />
-    </div>
+    </>
   );
 }
 
-function ActionRow({
-  disabled,
-  icon,
-  label,
-  hint,
-  onSelect,
-}: {
-  readonly disabled: boolean;
-  readonly icon: ReactNode;
-  readonly label: string;
-  readonly hint?: string;
-  readonly onSelect: () => void;
-}) {
+/** One address, the networks it receives on by their marks, and a way to copy it whole. */
+function AddressRow({ address, networks }: ReturnType<typeof depositAddresses>[number]) {
+  const [copied, setCopied] = useState(false);
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onSelect}
-      className={cn(
-        "flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-foreground/[0.025] disabled:cursor-not-allowed disabled:opacity-55 sm:px-5",
-      )}
-    >
-      <span className="text-muted-foreground">{icon}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13.5px] font-medium text-ink">{label}</span>
-        {hint ? (
-          <span className="mt-0.5 block text-[12.5px] text-muted-foreground">{hint}</span>
-        ) : null}
-      </span>
-      <ChevronRight aria-hidden className="-mr-1 size-4 text-faint" />
-    </button>
+    <div className="px-4 sm:px-5">
+      <Row
+        mark={
+          <span className="flex items-center">
+            {networks.slice(0, MARKS).map((network, index) => (
+              <NetworkMark
+                key={network.key}
+                network={network}
+                size={24}
+                className="ring-2 ring-card"
+                style={{ marginLeft: index === 0 ? 0 : -8, zIndex: MARKS - index }}
+              />
+            ))}
+          </span>
+        }
+        title={<span className="font-mono font-normal">{shortAddress(address)}</span>}
+        meta={networksInBrief(networks)}
+        end={
+          <button
+            type="button"
+            aria-label={`Copy your ${networks[0]?.networkName ?? ""} address`}
+            onClick={() => {
+              void navigator.clipboard.writeText(address);
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1_800);
+            }}
+            className={SETTINGS_BUTTON}
+          >
+            {copied ? (
+              <Check aria-hidden className="size-3.5" />
+            ) : (
+              <Copy aria-hidden className="size-3.5" />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        }
+      />
+    </div>
   );
 }

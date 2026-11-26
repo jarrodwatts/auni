@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AuniUiMessage } from "@/lib/conversation";
 
-import { answerWorkingLabel, firstSentence } from "./tool-working-status";
+import { answerWorkingLabel } from "./tool-working-status";
 
 type Part = AuniUiMessage["parts"][number];
 
@@ -62,18 +62,5 @@ describe("answerWorkingLabel", () => {
 
   it("says nothing before anything has happened", () => {
     expect(answerWorkingLabel(turn(), shown)).toBeNull();
-  });
-});
-
-describe("firstSentence", () => {
-  it("is what a thought set out to do, whole, however long the rest", () => {
-    expect(
-      firstSentence(
-        "I'm searching first, then checking picks. The candidates so far are GE Vernova and EQT.",
-      ),
-    ).toBe("I'm searching first, then checking picks.");
-    expect(firstSentence("Prices at $4.5 a share look fine")).toBe(
-      "Prices at $4.5 a share look fine",
-    );
   });
 });

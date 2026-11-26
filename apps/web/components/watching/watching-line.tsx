@@ -45,7 +45,7 @@ export function WatchingLine({
         type="button"
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
-        className="flex h-10 max-w-full items-center gap-[7px] self-start rounded-full border border-foreground/[0.08] bg-card pr-3 pl-2.5 text-[14px] font-medium text-ink transition-colors hover:bg-foreground/[0.03] focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+        className="flex h-10 max-w-full items-center gap-[7px] self-start rounded-full border border-foreground/[0.08] bg-card pr-3 pl-2.5 text-ui font-medium text-ink transition-colors hover:bg-foreground/[0.03] focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
       >
         <Mascot
           alt=""

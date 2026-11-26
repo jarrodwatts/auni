@@ -15,11 +15,16 @@ export const startingPointsRouter = Router();
 startingPointsRouter.get("/", async (_req, res) => {
   const { startingPoints, startingPointsAt } = await theOwner();
   const pending = await refreshStartingPoints(db, startingPointsAt);
-  res.json({ points: pending ? [] : (startingPoints ?? []), pending } satisfies StartingPointsWire);
+  const points = pending ? [] : (startingPoints ?? []);
+  res.json({
+    points,
+    pending,
+    observedAt: points.length > 0 && startingPointsAt ? startingPointsAt.toISOString() : null,
+  } satisfies StartingPointsWire);
 });
 
 /** Queues a fresh starting-points generation right now, reusing an in-flight run if one is pending. */
 startingPointsRouter.post("/refresh", async (_req, res) => {
   await forceRefreshStartingPoints(db, { reusePending: true });
-  res.json({ points: [], pending: true } satisfies StartingPointsWire);
+  res.json({ points: [], pending: true, observedAt: null } satisfies StartingPointsWire);
 });

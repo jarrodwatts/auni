@@ -109,7 +109,7 @@ export function LevelLabels({
           key={level.label}
           aria-hidden
           className={cn(
-            "absolute -translate-y-1/2 rounded-full px-2 text-[10.5px] leading-[18px] font-semibold whitespace-nowrap tabular-nums ring-2 ring-background",
+            "absolute -translate-y-1/2 rounded-full px-2 text-caption leading-[18px] font-semibold whitespace-nowrap ring-2 ring-background tabular-nums",
             INK[level.tone],
             WASH[level.tone],
             level.faint && "opacity-60",

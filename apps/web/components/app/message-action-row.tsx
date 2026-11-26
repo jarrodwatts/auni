@@ -57,7 +57,7 @@ export function MessageTimestamp({
     // The server renders in its own time zone; only the browser knows the
     // person's. The mismatch is expected, so hydration must not warn about it.
     <time
-      className={cn("text-xs tabular-nums text-muted-foreground/70", className)}
+      className={cn("text-caption text-muted-foreground/70 tabular-nums", className)}
       dateTime={createdAt}
       suppressHydrationWarning
     >

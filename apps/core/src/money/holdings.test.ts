@@ -112,7 +112,7 @@ describe("holdingViews", () => {
       heldForOrders: true,
       priceId: null,
     };
-    const [view] = await holdingViews([held], Date.now());
+    const [view] = await holdingViews([held], Date.now(), []);
     expect(view).toMatchObject({
       name: "Held for orders",
       detail: "Waiting on Hyperliquid",
@@ -126,6 +126,7 @@ describe("holdingViews", () => {
     const views = await holdingViews(
       [wallet("eip155:1", "ETH", "0.86"), wallet("eip155:10", "ETH", "0.48")],
       Date.now(),
+      [],
     );
     expect(views.map((view) => view.name)).toEqual([
       "Ethereum on Ethereum",
@@ -146,6 +147,7 @@ describe("holdingViews", () => {
     const views = await holdingViews(
       [wallet("monad", "MON", "1.10"), wrapped, bridged],
       Date.now(),
+      [],
     );
     expect(views.map(({ name, detail }) => [name, detail])).toEqual([
       ["Ethereum", "0.0003 ETH"],
@@ -157,22 +159,23 @@ describe("holdingViews", () => {
   // Real use showed a new chat offering "Is my $0.01 of MON worth keeping?" of the coin that
   // pays every fee there.
   it("says the coin the wallet pays a chain's fees in is for that, and only where nobody pays them for it", async () => {
-    const [mon] = await holdingViews([wallet("monad", "MON", "0.01")], Date.now());
+    const [mon] = await holdingViews([wallet("monad", "MON", "0.01")], Date.now(), []);
     expect(mon).toMatchObject({ name: "Monad", detail: "0.0003 MON for network fees" });
     sponsor.sponsored = true;
-    const [paid] = await holdingViews([wallet("monad", "MON", "0.01")], Date.now());
+    const [paid] = await holdingViews([wallet("monad", "MON", "0.01")], Date.now(), []);
     expect(paid).toMatchObject({ name: "Monad", detail: "0.0003 MON" });
     sponsor.sponsored = false;
     // Held at a venue, it is the venue's to say.
     const [away] = await holdingViews(
       [{ ...wallet("monad", "MON", "0.01"), venue: "hyperliquid" }],
       Date.now(),
+      [],
     );
     expect(away?.detail).not.toContain("for network fees");
   });
 
   it("shows a chain's own coin as its coin wherever it's held", async () => {
-    const [op] = await holdingViews([wallet("eip155:10", "ETH", "0.48")], Date.now());
+    const [op] = await holdingViews([wallet("eip155:10", "ETH", "0.48")], Date.now(), []);
     expect(op).toMatchObject({ name: "Ethereum", detail: "0.0003 ETH", logoUrl: ETHEREUM.logoUrl });
   });
 
@@ -180,6 +183,7 @@ describe("holdingViews", () => {
     const views = await holdingViews(
       [wallet("eip155:1", "ETH", "0.86"), wallet("eip155:137", "USDT", "0.00")],
       Date.now(),
+      [],
     );
     expect(views.map((view) => view.name)).toEqual(["Ethereum"]);
   });
@@ -190,7 +194,7 @@ describe("holdingViews", () => {
       instrument: "0x7777777777777777777777777777777777777777",
       usdValue: null,
     };
-    const views = await holdingViews([wallet("eip155:1", "ETH", "0.86"), unpriced], Date.now());
+    const views = await holdingViews([wallet("eip155:1", "ETH", "0.86"), unpriced], Date.now(), []);
     expect(views.map((view) => view.name)).toEqual(["Ethereum", "TRENCH"]);
   });
 
@@ -205,7 +209,7 @@ describe("holdingViews", () => {
     };
     const vault: Holding = { ...wallet("monad", "AVLT", "2.00"), instrument: VAULT };
     const goldToken: Holding = { ...wallet("monad", "GLDT", "1.00"), instrument: GOLD_TOKEN };
-    const views = await holdingViews([gold, vault, goldToken], Date.now());
+    const views = await holdingViews([gold, vault, goldToken], Date.now(), []);
     expect(views.map(({ name, detail }) => [name, detail])).toEqual([
       ["Tether Gold", "0.000775 XAUt0"],
       ["Altura Vault", "0.0003 AVLT"],

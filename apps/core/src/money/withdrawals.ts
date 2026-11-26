@@ -3,13 +3,15 @@ import {
   EVM_CHAIN_KEYS,
   isEvmChain,
   NETWORKS,
+  WITHDRAW_NETWORKS,
   type EvmCashKey,
   type WithdrawNetwork,
   withArticle,
 } from "@auni/shared";
 import { isAddress as isSolanaAddress, address as solanaAddress } from "@solana/kit";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { erc20Abi, getAddress, isAddress as isEvmAddress, type Address } from "viem";
+import { z } from "zod";
 
 import { db } from "../db/client.ts";
 import { actions } from "../db/schema.ts";
@@ -53,7 +55,7 @@ const SOLANA_PROGRAMS = new Set([
 
 /** Why a withdrawal to a burn address is refused: the owner reads it, and so does the agent. */
 const BURNS =
-  "That's a burn address: nobody can ever spend from it, so money sent there is gone for good. Use a real one.";
+  "That's a burn address: nobody can ever spend from it, so money sent there is gone for good. Use a wallet or exchange address instead.";
 
 /**
  * The destination as it will be sent to, or a plain sentence saying why not:
@@ -101,7 +103,9 @@ export async function refuseTokenDestination(
   try {
     token = await isToken(network, destination);
   } catch {
-    throw new Error("That address couldn't be checked right now. Try again in a moment.");
+    throw new Error(
+      "That address couldn't be checked right now. Nothing was sent. Try again in a moment.",
+    );
   }
   if (token)
     throw new Error("That's a token's own address, not a wallet. Money sent there is lost.");
@@ -155,6 +159,60 @@ export async function pastDestinations(): Promise<string[]> {
     .from(actions)
     .where(and(eq(actions.status, "done"), sql`${actions.details} ? 'leavesTo'`));
   return rows.flatMap((row) => row.to?.split(",").filter(Boolean) ?? []);
+}
+
+/** A place the owner withdrew to, which Withdraw offers again: sent there before, it takes no proof. */
+export interface RecentWithdrawal {
+  readonly address: string;
+  readonly network: WithdrawNetwork;
+  readonly destination: "exchange" | "wallet" | null;
+  /** When it last arrived there. */
+  readonly at: Date;
+}
+
+/** How many past places Withdraw offers. */
+const RECENT_PLACES = 4;
+
+const sentInput = z.object({
+  network: z.enum(WITHDRAW_NETWORKS),
+  destination: z.enum(["exchange", "wallet"]).optional(),
+});
+
+/**
+ * The places these finished withdrawals (newest first) went, newest first and each once: the
+ * address it went to as sent (`leavesTo`), on its network. A row whose record doesn't say is
+ * left out.
+ */
+export function recentPlaces(
+  rows: readonly {
+    readonly input: unknown;
+    readonly details: Readonly<Record<string, string>>;
+    readonly at: Date;
+  }[],
+): RecentWithdrawal[] {
+  const places = new Map<string, RecentWithdrawal>();
+  for (const { input, details, at } of rows) {
+    const parsed = sentInput.safeParse(input);
+    const address = details.leavesTo;
+    if (!parsed.success || !address) continue;
+    const { network, destination } = parsed.data;
+    const key = `${network}:${address}`;
+    if (!places.has(key))
+      places.set(key, { address, network, destination: destination ?? null, at });
+    if (places.size === RECENT_PLACES) break;
+  }
+  return [...places.values()];
+}
+
+/** Where the owner's last few withdrawals went (see recentPlaces). */
+export async function recentWithdrawals(): Promise<RecentWithdrawal[]> {
+  const rows = await db
+    .select({ input: actions.input, details: actions.details, at: actions.updatedAt })
+    .from(actions)
+    .where(and(eq(actions.tool, WITHDRAW_TOOL), eq(actions.status, "done")))
+    .orderBy(desc(actions.updatedAt))
+    .limit(50);
+  return recentPlaces(rows);
 }
 
 /** USDC resting in each of the owner's own wallets, in base units. Unreadable networks are left out. */

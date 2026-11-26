@@ -1,22 +1,36 @@
 "use client";
 
-import { appListing, ASK_LINE, SOLANA_BRING_FIELD, type AskCardWire } from "@auni/shared";
+import {
+  appListing,
+  ASK_LINE,
+  secretTitle,
+  SOLANA_BRING_FIELD,
+  type AskCardWire,
+} from "@auni/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { ArrowUpRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { quietPillClass } from "@/components/apps/app-keys";
 import { AppMark } from "@/components/apps/app-mark";
 import { PairAgain } from "@/components/auth/pair-again";
 import { PrivateInput } from "@/components/private-input/private-input";
 import { usePrivateField } from "@/components/private-input/use-private-field";
+import { buttonVariants } from "@/components/ui/button";
 import { settingsDialogHref } from "@/lib/app-links";
 import { actionKey, decideAction, useLiveAction } from "@/lib/data/actions";
 import { useRefreshApps } from "@/lib/data/apps";
 
 import { askStanding } from "./ask-standing";
-import { MoneyButton, MoneyCardFrame } from "./money/money-card-parts";
+import {
+  CardAlert,
+  CardButton,
+  CardFrame,
+  CardHead,
+  CardReceipt,
+  NOT_REACHED_TAP,
+} from "./card-parts";
 
 /** The address that opens a secret's card with its field ready, as a chat app's link does. */
 const CARD_PARAM = "card";
@@ -59,7 +73,8 @@ export function SecretCard({
 
   const name = appListing(card.app)?.name ?? card.app;
   const why = card.lines.find(({ label }) => label === ASK_LINE.why)?.value;
-  const mark = <AppMark id={card.app} name={name} size={40} />;
+  const mark = <AppMark id={card.app} name={name} size={44} />;
+  const title = secretTitle(card.summary);
   const wallet = loaded.kind === "ready" && loaded.field.confirms;
   // A key added to the wallet isn't in the backup the owner saved before it.
   const backsUp = card.field === SOLANA_BRING_FIELD;
@@ -83,52 +98,65 @@ export function SecretCard({
   if (standing.kind === "ended") {
     const done = standing.tone === "done";
     return (
-      <MoneyCardFrame
+      <CardFrame
         auni={live.data && done ? { kind: "landed" } : null}
         label={card.summary}
         phase={done ? "confirmed" : "expired"}
       >
-        <div className="flex items-center gap-3.5" data-testid="secret-card" data-standing="ended">
-          <span className={done ? undefined : "opacity-55 grayscale"}>{mark}</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink">
-              {card.summary}
-            </p>
-            <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.4] text-muted-foreground">
-              {done && backsUp
-                ? "Saved. Back up your keys again, as your last backup doesn't have it"
-                : standing.label}
-            </p>
-          </div>
-          {done && backsUp ? (
-            <Link
-              href={settingsDialogHref(pathname, search.toString(), "wallet")}
-              className={quietPillClass}
-            >
-              Back up
-            </Link>
-          ) : null}
+        <div data-testid="secret-card" data-standing="ended">
+          <CardReceipt
+            mark={<span className={done ? "flex" : "flex opacity-55 grayscale"}>{mark}</span>}
+            title={card.summary}
+            detail={
+              done && backsUp
+                ? "Back up your keys again: your last backup doesn't have this one."
+                : done
+                  ? "Received on this computer."
+                  : standing.label
+            }
+            action={
+              done && backsUp ? (
+                <Link
+                  href={settingsDialogHref(pathname, search.toString(), "wallet")}
+                  className={buttonVariants({ size: "sm", variant: "secondary" })}
+                >
+                  Back up
+                </Link>
+              ) : null
+            }
+          />
         </div>
-      </MoneyCardFrame>
+      </CardFrame>
     );
   }
 
   const link = loaded.kind === "ready" ? loaded.field.link : null;
   return (
-    <MoneyCardFrame auni={live.data ? { kind: "ready" } : null} label={card.summary} phase="open">
+    <CardFrame
+      auni={live.data ? { kind: "ready" } : null}
+      label={title}
+      phase="open"
+      tone="waiting"
+    >
       <div ref={frame} data-testid="secret-card" data-standing="waiting">
-        <div className="flex items-center gap-3">
-          {mark}
-          <p className="min-w-0 flex-1 text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
-            {card.summary}
-          </p>
-          {link ? (
-            <a href={link} target="_blank" rel="noopener noreferrer" className={quietPillClass}>
-              Get a key
-            </a>
-          ) : null}
-        </div>
-        {why ? <p className="mt-4 text-[15px] leading-[1.5] text-pretty text-ink">{why}</p> : null}
+        <CardHead
+          mark={mark}
+          title={title}
+          line={why}
+          action={
+            link ? (
+              <a
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonVariants({ size: "sm", variant: "secondary" })}
+              >
+                Get a key
+                <ArrowUpRight aria-hidden className="size-3.5" strokeWidth={2.4} />
+              </a>
+            ) : null
+          }
+        />
         <div className="mt-5">
           {loaded.kind === "ready" ? (
             <PrivateInput
@@ -139,7 +167,7 @@ export function SecretCard({
                 preview: "This key signs for",
                 confirm: wallet ? "Add to wallet" : card.action,
               }}
-              secondary={{ label: "Not now", busy: declining, onClick: () => void decline() }}
+              secondary={{ label: "Decline", busy: declining, onClick: () => void decline() }}
               inputRef={input}
               onDone={() => {
                 void read();
@@ -153,29 +181,25 @@ export function SecretCard({
               {loaded.kind === "pair_again" ? (
                 <PairAgain then="Then paste it here." />
               ) : (
-                <p className="text-[13px] leading-[18px] text-muted-foreground">
+                <p className="text-meta leading-[18px] text-muted-foreground">
                   {loaded.kind === "gone"
-                    ? "There's nothing to paste here any more."
-                    : "That didn't reach Auni. Try again."}
+                    ? "There's nothing to paste here anymore."
+                    : "Couldn't reach Auni. Try again."}
                 </p>
               )}
-              <MoneyButton
+              <CardButton
                 tone="quiet"
                 busy={declining}
-                busyLabel="Not now"
+                busyLabel="Declining"
                 onClick={() => void decline()}
               >
-                Not now
-              </MoneyButton>
+                Decline
+              </CardButton>
             </div>
           )}
         </div>
-        {failed ? (
-          <p role="alert" className="mt-3 text-[13px] text-destructive">
-            That didn&apos;t reach Auni, so nothing changed. Try again.
-          </p>
-        ) : null}
+        {failed ? <CardAlert>{NOT_REACHED_TAP}</CardAlert> : null}
       </div>
-    </MoneyCardFrame>
+    </CardFrame>
   );
 }

@@ -308,6 +308,8 @@ describe("a held move", () => {
     expect(data.reason).toContain(HELD.unrecorded);
     expect(data.reason).toContain("0xsent on monad");
     expect(data.reason).toContain("Its run stopped with: socket hang up");
+    // Its card never reached a chat here, so the agent isn't told the owner sees it.
+    expect(data.reason).toContain("No card for it reached the owner's chat");
     // The row itself is as it was held: reading it again changed nothing.
     expect(await rowOf(held.id)).toEqual(held);
   });
@@ -537,6 +539,7 @@ describe("a run cut off after its order went out with no answer", () => {
   const sale = {
     ...order,
     input: { market: "fed-cuts-in-december", outcome: "Yes", side: "sell" },
+    details: { returnsUsd: "24.80" },
   };
   afterEach(() => execute.mockReset());
 
@@ -572,7 +575,8 @@ describe("a run cut off after its order went out with no answer", () => {
     // The thread's row in the sidebar: it needs the owner, and nothing is said to be moving.
     expect(await readThreadWire(thread.id)).toMatchObject({
       status: "needs_user",
-      moneyLine: "Not confirmed: Sell 40 Yes shares of Fed cuts in December",
+      // Said with what it was to bring back, since the order's words don't say it.
+      moneyLine: "Status unknown: Sell 40 Yes shares of Fed cuts in December, about $24.80 back",
       moving: null,
     });
     // A channel's copy gives the known outcome and a way to check it in the app.

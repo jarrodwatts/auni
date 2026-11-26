@@ -18,14 +18,17 @@ network on purpose, as a later `-H` wins.
 
 - Pages: `app/`. Whose browser this is: `components/auth/owner-provider.tsx`, which spends the
   pairing link's code (`/app#pair=<code>`) as the app loads, and `owner-gate.tsx` (the honest
-  states: link used, still starting, no database).
-- First run is a skippable 3-step local wizard (`components/onboarding/welcome-wizard.tsx`):
-  AI brain (`GET /brains`), local wallet creation or key import (`GET /setup`), and optional
-  read-only signals (X handle, watch-only wallet). Chat fallbacks stay in `components/first-run/`
-  (`brain-needed.tsx`, `spare-key.tsx`).
-- Settings (`components/settings/`): grouped searchable modal over `/me`, `/brains`, `/apps`, and
-  `/system/*` (`lib/data/system.ts`) for General, Appearance, Personalization, AI Brains, Wallet,
-  Channels, Remote access (Tailscale, service, sessions, handover), Network/RPCs, Diagnostics, About.
+  states: not paired, link used, Tailscale only, starting, no database), each read again by
+  itself until the app can open.
+- First run is the owner's first take (`components/first-run/first-take.tsx`, at `/app/new`):
+  one question with the starting points and a line saying which AI is ready. Only an AI that
+  can't think stops it (`pick-your-ai.tsx`). The take's chat finishes it (core's
+  `POST /places/chat`, which makes the wallet, else the first move; `finish.ts` mirrors it); one
+  the owner already has comes in before that (`bring-wallet.tsx`). Chat fallbacks: `brain-needed.tsx`, `spare-key.tsx`.
+- Settings (`components/settings/`): five panes over `/me`, `/brains`, `/apps` and `/system/*`
+  (`lib/data/system.ts`), You, Your AI, Your wallet, Your devices (phone through Tailscale,
+  Telegram, service, browsers, handover) and Health (checks; networks, logs behind For
+  developers), searchable, a list then a pane on a phone; `?settings=<pane>` or `open`.
 - The owner's AI, made ready from any device: `components/brains/brain-row.tsx`, one row a brain
   on core's `GET /brains` (`lib/data/brains.ts`): installing its CLI, or its own sign-in (a page
   and code, or its prompt as a terminal, typed into by its private field). First run's ask for a
@@ -43,24 +46,31 @@ network on purpose, as a later `-H` wins.
   `components/feedback/` (`feedback-body.tsx`, shared by `feedback-card.tsx` and the report a
   failed card or an app's sheet opens, `report-dialog.tsx`).
 - Tool names the web knows: `packages/shared/src/tools.ts` (an app's from `apps.generated.ts`).
-- Threads sidebar and workspace (`/app/chat/<id>`): `components/places/place-list.tsx`,
-  `components/places/chat-place.tsx` (chat + on-demand right-hand inspector pane
-  `components/places/thread-inspector-pane.tsx`), and `components/places/pane-sections.tsx`
-  (Auto budget, positions, watches, working notes, record).
-- Composer controls: model and thinking effort picker (`components/app/model-picker.tsx`),
-  machine/environment status strip (`components/app/environment-picker.tsx`), and per-thread Auto
-  budget control (`components/app/autonomy-picker.tsx`).
+- The shell (`components/places/`): on a wide screen the sidebar (`sidebar.tsx`,
+  `place-list.tsx`): New take, Money, Apps, then each chat in one place (`use-places.ts`): Needs
+  you while a card or question waits on the owner, Your takes while core's `GET /takes` lists it, as
+  Money does (`use-takes.ts`), and Chats. On a phone a tab bar instead (`tab-bar.tsx`: Chats, Money,
+  Needs you, More), with `/app/chats` and `/app/needs-you` as pages. A chat (`/app/chat/<id>`,
+  `chat-place.tsx`) shows its take's value in its header and opens its inspector
+  (`thread-inspector-pane.tsx`, `pane-sections.tsx`): positions, watches, spending, notes, moves.
+- The composer holds one control, the AI and its effort (`components/app/model-picker.tsx`); what
+  a chat may spend on its own is set in its inspector (`components/app/autonomy-picker.tsx`).
 - Apps (`/app/apps`): `components/apps/`, on core's `GET /apps` (`lib/data/apps.ts`): the list
   (`apps-screen.tsx`) and each app's sheet (`app-sheet.tsx`): what is held there, its keys
   (`app-keys.tsx`, each a `SecretInput` to its private field), its switch, and for one Auni
   itself runs on, the job it does as a scene (`app-jobs.tsx`).
-- Settings: `components/settings/settings-dialog.tsx`, on core's `/me`.
-- Colours: every one a person sees is a token in `app/tokens.css`, which holds each as
-  `light-dark(light, dark)`; `app/tokens.test.ts` fails a hex value, a palette class
-  (`bg-white`) or a `dark:` class in a component. Add a token that says what it is for; never
-  write a colour in. A subject's own colour is its hue (`--hue`, the `hue-*` tokens).
+- The look is tokens (`app/tokens.css`), each colour `light-dark(light, dark)`: ink is the
+  strong action, blue is Auni (links, focus), amber only waits on the owner, green and red
+  only gain and loss; no gradients, glows or tinted tiles. Type is Inter and JetBrains Mono
+  (`app/fonts.ts`) on one role scale (`text-caption` ... `text-hero-money`); corners are
+  `rounded-control`, `-card`, `-sheet` or `-full`; one shadow, `shadow-float`, for what floats.
+  `app/tokens.test.ts` fails a colour, a font size or a radius written into a component.
+- Primitives (`components/ui/`): `Button`/`buttonVariants`, `Input`/`inputClass`, `Badge`,
+  `Card`/`CardSection`, `Row`/`Rows`, `Section`/`Eyebrow`, `AuniSheet`, `ConfirmDialog`. Build
+  from them; a logo with no mark is `NoMark`/`AppMark`'s neutral glyph, never initials.
 - The look: light, unless the owner picks another in Settings (Dark, or
   one an app brings, its theme, copied by `pnpm gen` into `app/app-themes.generated.css`).
   `lib/look.tsx` keeps the choice on the device and wears it as `data-theme`;
   `lib/look-first.ts` is the script `app/layout.tsx` runs before the first paint.
-- Add money: `components/money/portal/`.
+- Money in and out: Add money (`components/money/portal/`), Withdraw (`components/withdraw/`)
+  and the wallet's keys, each a `MoneySheet` (`components/money/money-sheet.tsx`).

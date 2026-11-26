@@ -10,8 +10,8 @@ export function EmptyThread({ className }: { readonly className?: string }) {
     >
       <Mascot state="listening" size={52} />
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-lg font-semibold tracking-tight">What should your money do?</h2>
-        <p className="max-w-sm text-sm text-muted-foreground">
+        <h2 className="text-section">What should your money do?</h2>
+        <p className="max-w-sm text-ui text-muted-foreground">
           Tell me what you want your money to do. I&apos;ll handle the how.
         </p>
       </div>

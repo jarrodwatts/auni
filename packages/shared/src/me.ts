@@ -105,7 +105,7 @@ export const meSchema = z.object({
    * web app alone, or null for wherever they last talked to Auni.
    */
   home: z.string().nullable(),
-  /** Onboarding is complete; until true, the app opens on the setup wizard. */
+  /** Their first take is sent; until then, the app opens on first run's question. */
   welcomed: z.boolean(),
   /** How the owner reaches Auni, and whether the machine it runs on keeps it running. */
   reach: z.object({

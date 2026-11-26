@@ -8,6 +8,7 @@ export default {
     {
       title: "Long BTC with $50",
       prompt: "Open a long on BTC with $50 on Hyperliquid.",
+      moves: true,
     },
     {
       title: "What is funding costing me?",
@@ -16,6 +17,7 @@ export default {
     {
       title: "Close everything",
       prompt: "Close every position I have open on Hyperliquid.",
+      moves: true,
     },
   ],
   // Each market's own logo.
@@ -57,7 +59,11 @@ export default {
     },
     hyperliquid_withdraw: {
       kind: "money",
-      copy: ["Preparing a withdrawal", "Prepared a withdrawal", "Couldn’t prepare that withdrawal"],
+      copy: [
+        "Preparing to bring your cash back",
+        "Prepared to bring your cash back",
+        "Couldn’t prepare that",
+      ],
       sends: true,
     },
     hyperliquid_markets: {

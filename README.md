@@ -34,21 +34,21 @@
     <td width="33%" valign="top">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screens/1-take-dark.webp">
-        <img src="docs/screens/1-take-light.webp" alt="Auni's new chat on a phone, asking: What's the take, Sam?">
+        <img src="docs/screens/1-take-light.webp" alt="A chat on a phone: the owner says the AI buildout has years to run, and Auni answers with its reasoning and a card to buy $1,800 of Nvidia and $900 of Tesla, $2,700 to put in.">
       </picture>
       <p><b>1. Say what you think.</b><br>"The AI buildout has years to run." Auni digs into it with your own AI.</p>
     </td>
     <td width="33%" valign="top">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screens/2-allowed-dark.webp">
-        <img src="docs/screens/2-allowed-light.webp" alt="The same take after the owner tapped: the card now reads Both went through, Bought Nvidia $1,800 and Bought Tesla $900.">
+        <img src="docs/screens/2-allowed-light.webp" alt="The same chat after the owner tapped: the card now reads Both went through, Bought Nvidia $1,800 and Bought Tesla $900.">
       </picture>
       <p><b>2. Tap the card.</b><br>Each move is a card with the exact amounts. It settles in place once it lands.</p>
     </td>
     <td width="33%" valign="top">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="docs/screens/3-money-dark.webp">
-        <img src="docs/screens/3-money-light.webp" alt="Auni's Money page on a phone: $19,149.95 account value, and each take with its value and change since entry.">
+        <img src="docs/screens/3-money-light.webp" alt="Money on a phone: the same take, Double down on AI, now a take worth $2,697.30 holding Nvidia and Tesla, beside the others with their change since entry.">
       </picture>
       <p><b>3. Watch it as a position.</b><br>Money shows every take, what it holds, and how it's doing.</p>
     </td>

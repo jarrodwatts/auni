@@ -121,7 +121,7 @@ export function PortalHero({
   readonly className?: string;
   /** The symbol of what arrived, while it does. */
   readonly coin?: string | null;
-  /** What useGaze sets Auni's eyes on. */
+  /** Where Auni stands in the scene. */
   readonly hero: RefObject<HTMLDivElement | null>;
   readonly orbit: OrbitProps;
   /**

@@ -3,19 +3,16 @@ import type { AppSettingWire, AppWire } from "@auni/shared";
 import { formatUsd } from "@/lib/money";
 
 /**
- * How an app stands, as its tile says it in two lines: one thing in words (the money the owner
- * has there, the one thing it still needs, or that it is off) over a quieter line.
+ * How an app stands, as its row in Apps says it: the money the owner has there, if any, and one
+ * word on what's in the way, if anything: something the owner has to give (amber, as everything
+ * waiting on them is), the service's own trouble, or that it's off.
  */
 export interface AppStanding {
-  /** money: dollars there. ready: nothing to do. needs: it waits on the owner. off: turned off. */
-  readonly tone: "money" | "ready" | "needs" | "off";
-  readonly says: string;
-  readonly under: string;
-  /**
-   * Whether the owner has something left to give it (a key, a pairing), which its tile offers
-   * as "Set up". A trouble is the service's own: there is nothing of theirs to set up for it.
-   */
-  readonly setUp: boolean;
+  readonly money: string | null;
+  readonly badge: {
+    readonly tone: "waiting" | "loss" | "neutral";
+    readonly says: string;
+  } | null;
 }
 
 /** Dollars at an app worth showing: a cent or more. */
@@ -32,6 +29,48 @@ export function keysNeeded(app: AppWire): readonly AppSettingWire[] {
 }
 
 /**
+ * Which of an app's ways to try it work now, and which wait for what it still needs. With
+ * nothing missing, all work. With something missing, none do, but for money already there:
+ * Auni can read that, though a way that moves money still waits.
+ */
+export function waysToTry<Way extends { readonly title: string; readonly moves?: true }>(
+  app: AppWire,
+  ways: readonly Way[],
+): { readonly now: readonly Way[]; readonly waiting: readonly Way[] } {
+  const works = (way: Way) => app.needs.length === 0 || (app.account !== null && !way.moves);
+  return { now: ways.filter(works), waiting: ways.filter((way) => !works(way)) };
+}
+
+/** One way money goes in or out: the app's own words, a tap asking Auni (which may wait), or nothing. */
+export type MoneyWay = { readonly words: string } | { readonly waits: boolean } | null;
+
+/**
+ * Money in and out of an app with an account there, as its sheet says it. The app's words for
+ * how money moves show only while it moves: until then the sheet says what's in the way instead,
+ * and never how a buy spends cash while buying waits for keys. A way Auni is asked for keeps its
+ * button, which waits too.
+ */
+export function moneyInOut(app: AppWire): {
+  readonly in: MoneyWay;
+  readonly out: MoneyWay;
+  readonly blocked: string | null;
+} | null {
+  if (!app.account) return null;
+  const keys = keysNeeded(app).length;
+  const blocked =
+    app.on && app.needs.length === 0
+      ? null
+      : !app.on
+        ? `Turn ${app.name} on to move money here.`
+        : keys > 0
+          ? `Add your ${keys === 1 ? "key" : "keys"} above to move money here.`
+          : `Auni can move money here once ${app.name} is set up.`;
+  const way = (words: string | null): MoneyWay =>
+    words === null ? { waits: blocked !== null } : blocked === null ? { words } : null;
+  return { in: way(app.account.moneyIn), out: way(app.account.moneyOut), blocked };
+}
+
+/**
  * What it waits on, short enough for a tile: "Needs a key", "Needs 3 keys", "Not paired yet", or
  * what keeps going wrong for it now, "Out of credits".
  */
@@ -42,52 +81,33 @@ export function needOf(app: AppWire): string | null {
 }
 
 /**
- * What an app that is on still waits for before Auni can use it, as its switch says it: "On, but
- * waiting for its key" over "Auni will use it once that is in." Null when it waits for nothing.
+ * What an app that is on still waits for before Auni can use it, said beside its switch: its
+ * keys (whose fields sit above), or to be paired. Null when it waits for nothing more.
  */
 export function waitingFor(app: AppWire): { readonly says: string; readonly under: string } | null {
   const keys = keysNeeded(app).length;
-  if (keys === 1)
-    return { says: "On, but waiting for its key", under: "Auni will use it once that is in." };
-  if (keys > 1)
+  if (keys > 0)
     return {
-      says: `On, but waiting for its ${keys} keys`,
-      under: "Auni will use it once they are in.",
+      says: keys === 1 ? "Waiting for your key" : "Waiting for your keys",
+      // One with an account there is in use already: its keys add what it can do.
+      under: `Auni ${app.account ? "can do more on" : "starts using"} ${app.name} once ${keys === 1 ? "it's" : "they're"} saved.`,
     };
   if (app.pairing === "ready")
     return {
-      says: "On, but waiting to be paired",
-      under: "Auni will answer you there once it is.",
+      says: "Waiting to pair",
+      under: "Pair it with your chat so Auni can answer you there.",
     };
-  return app.needs[0] ? { says: "On, but not ready yet", under: app.needs[0] } : null;
+  return app.needs[0] ? { says: "Not ready yet", under: app.needs[0] } : null;
 }
 
 export function appStanding(app: AppWire): AppStanding {
-  const there = dollarsThere(app);
-  const need = needOf(app);
-  // What it needs is the owner's to give; a trouble is the service's, said in its sheet.
-  const setUp = app.on && app.needs.length > 0;
-  if (!app.on)
-    return {
-      tone: "off",
-      says: "Off",
-      under: there ? `${there} still there` : "Auni doesn't use it",
-      setUp,
-    };
-  if (there) return { tone: "money", says: there, under: need ?? "there now", setUp };
-  if (need)
-    return {
-      tone: "needs",
-      says: need,
-      under: setUp ? "Open it to finish" : "Open it to see why",
-      setUp,
-    };
+  const money = dollarsThere(app);
+  if (!app.on) return { money, badge: { tone: "neutral", says: "Off" } };
+  // What it needs is the owner's to give; a trouble is the service's own.
+  if (app.needs.length > 0) return { money, badge: { tone: "waiting", says: needOf(app)! } };
+  const trouble = app.troubles[0];
+  if (trouble) return { money, badge: { tone: "loss", says: trouble.short } };
   if (app.account && app.account.usd === null)
-    return { tone: "ready", says: "On", under: "Couldn't read it just now", setUp };
-  return {
-    tone: "ready",
-    says: "Ready",
-    under: app.standing ?? (app.account ? "Nothing there yet" : "Auni can use it"),
-    setUp,
-  };
+    return { money, badge: { tone: "neutral", says: "Couldn't read balance" } };
+  return { money, badge: null };
 }

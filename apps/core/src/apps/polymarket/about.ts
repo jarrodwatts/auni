@@ -13,6 +13,7 @@ export default {
       title: "Bet $20 on something I believe",
       prompt:
         "I want to put $20 on a Polymarket market. Ask me what I believe will happen, then find the market for it.",
+      moves: true,
     },
     { title: "How are my bets doing?", prompt: "How are my Polymarket bets doing?" },
   ],

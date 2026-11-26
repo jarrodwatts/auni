@@ -6,10 +6,10 @@ import { useRef, useState, type ReactNode } from "react";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
 import { useStartConversation } from "@/components/app/use-start-conversation";
-import { Mascot } from "@/components/brand/mascot";
 import { AutoHeight } from "@/components/motion/auto-height";
 import { BrainRow } from "@/components/brains/brain-row";
 import { AssetLogo } from "@/components/brand/marks";
+import { Button } from "@/components/ui/button";
 import { AuniSheet } from "@/components/ui/auni-sheet";
 import { useBrains } from "@/lib/data/brains";
 import { formatUsd } from "@/lib/money";
@@ -17,16 +17,12 @@ import { useMediaQuery } from "@/lib/use-viewport";
 import { cn } from "@/lib/utils";
 
 import { AppJobs } from "./app-jobs";
-import { AppKeysNeeded, AppSettings } from "./app-keys";
+import { AppKeysNeeded, AppSettings, KeysSaved } from "./app-keys";
 import { AppMark } from "./app-mark";
 import { AppPairing } from "./app-pairing";
-import { keysNeeded } from "./app-standing";
+import { keysNeeded, moneyInOut, waysToTry, type MoneyWay } from "./app-standing";
 import { AppSwitch } from "./app-switch";
 import { Section } from "./sheet-section";
-
-/** A way to try an app, as a pill; one that can't be tapped yet is the same pill, pale. */
-const CHIP =
-  "flex h-10 max-w-full items-center rounded-full border px-4 text-ui font-medium tracking-[-0.01em]";
 
 /**
  * One app, opened from the Apps list: the keys it still needs, what the owner has there, ways
@@ -56,17 +52,18 @@ export function AppSheet({
   readonly onOpen: (id: string) => void;
 }) {
   const wide = useMediaQuery("(min-width: 640px)");
-  const starts = appListing(app.id)?.starts ?? [];
+  // Ways to try it show only while it's on.
+  const ways = waysToTry(app, app.on ? (appListing(app.id)?.starts ?? []) : []);
   const { name } = app;
   const holds = Number(app.account?.usd ?? 0) >= 0.01;
   // An app that only waits for a key opens with the cursor in its field, where there is a
   // keyboard already: on a phone that would throw one up over the sheet.
   const firstKey = useRef<HTMLInputElement>(null);
-  const asksKey = keysNeeded(app).length > 0;
+  const neededKeys = keysNeeded(app).length;
+  const asksKey = neededKeys > 0;
   // The moment its last key went in, said once, while this sheet stays open.
   const [connected, setConnected] = useState(false);
-  // What the owner could do with it is live once nothing is missing, or money is there already.
-  const ready = Boolean(app.account) || app.needs.length === 0;
+  const money = moneyInOut(app);
   const { busy, start } = useStartConversation();
   const { openReport } = useAppDialogs();
   // The chat a tap starts takes the place of this page, and the sheet goes with it.
@@ -115,52 +112,51 @@ export function AppSheet({
           {/* The owner's money comes first; with none there, what the app still needs does. */}
           {holds ? <Holdings app={app} /> : null}
           <AutoHeight>
-            {connected && !asksKey ? (
-              <div className="mt-8 flex items-center gap-3.5" data-testid="app-connected">
-                <Mascot className="auni-onb-mascot flex-none" size={44} state="celebrating" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-ui font-semibold text-ink">{name} is connected</span>
-                  <span className="mt-0.5 block text-meta text-muted-foreground">
-                    Auni can use it from its next step.
-                  </span>
-                </span>
-              </div>
-            ) : null}
+            {connected && !asksKey ? <KeysSaved app={app} /> : null}
             {/* What the key is for comes before the key: the same chips, waiting. */}
-            {app.on && starts.length > 0 && !ready ? (
-              <Section title={asksKey ? "With a key, Auni can" : "Once it is set up, Auni can"}>
+            {ways.waiting.length > 0 ? (
+              <Section
+                title={
+                  asksKey
+                    ? neededKeys === 1
+                      ? "With a key, Auni can"
+                      : "With your keys, Auni can"
+                    : "Once it's set up, Auni can"
+                }
+              >
                 <ul className="flex flex-wrap gap-2">
-                  {starts.map((way) => (
-                    <li
-                      key={way.title}
-                      className={cn(CHIP, "border-transparent bg-surface text-muted-foreground")}
-                    >
-                      <span className="truncate">{way.title}</span>
+                  {ways.waiting.map((way) => (
+                    <li key={way.title} className="max-w-full">
+                      <Button variant="secondary" disabled className="max-w-full">
+                        <span className="truncate">{way.title}</span>
+                      </Button>
                     </li>
                   ))}
                 </ul>
               </Section>
             ) : null}
-            <AppKeysNeeded app={app} focusRef={firstKey} onSaved={() => setConnected(true)} />
+            <AppKeysNeeded
+              app={app}
+              focusRef={firstKey}
+              holding={holds ? formatUsd(app.account!.usd!) : null}
+              onSaved={() => setConnected(true)}
+            />
           </AutoHeight>
           {app.pairing ? <AppPairing app={app} name={name} /> : null}
           {app.account && !holds ? <Holdings app={app} /> : null}
-          {app.on && starts.length > 0 && ready ? (
+          {ways.now.length > 0 ? (
             <Section title="Try it">
               <ul className={cn("flex flex-wrap gap-2", connected && "auni-stagger-in")}>
-                {starts.map((way) => (
+                {ways.now.map((way) => (
                   <li key={way.title} className="max-w-full">
-                    <button
-                      type="button"
+                    <Button
+                      variant="outline"
                       disabled={busy}
                       onClick={() => ask(way.prompt)}
-                      className={cn(
-                        CHIP,
-                        "border-foreground/[0.08] bg-card text-ink transition-[transform,box-shadow,border-color] duration-200 ease-settle hover:-translate-y-px hover:border-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
-                      )}
+                      className="max-w-full"
                     >
                       <span className="truncate">{way.title}</span>
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -170,37 +166,37 @@ export function AppSheet({
           {app.canSwitch ? null : (
             <AppJobs app={app} apps={apps} onOpen={onOpen} whichBrain={whichBrain} />
           )}
-          {app.account ? (
+          {money ? (
             <Section title="Money in and out">
               <div
                 className={cn(
                   "grid gap-2.5",
                   // Two moves sit side by side; words take the width they need.
-                  !app.account.moneyIn && !app.account.moneyOut && "grid-cols-2",
+                  money.in &&
+                    "waits" in money.in &&
+                    money.out &&
+                    "waits" in money.out &&
+                    "grid-cols-2",
                 )}
               >
                 <Way
-                  words={app.account.moneyIn}
-                  off={!app.on}
+                  way={money.in}
                   busy={busy}
                   icon={<ArrowDownLeft aria-hidden className="size-4" strokeWidth={2.2} />}
                   label="Put money in"
                   onAsk={() => ask(`I want to put money into ${name}.`)}
                 />
                 <Way
-                  words={app.account.moneyOut}
-                  off={!app.on}
+                  way={money.out}
                   busy={busy}
                   icon={<ArrowUpRight aria-hidden className="size-4" strokeWidth={2.2} />}
                   label="Take money out"
                   onAsk={() => ask(`I want to take money out of ${name}.`)}
                 />
               </div>
-              {app.on || (app.account.moneyIn && app.account.moneyOut) ? null : (
-                <p className="mt-2.5 text-meta text-muted-foreground">
-                  Turn it on to move money here.
-                </p>
-              )}
+              {money.blocked ? (
+                <p className="mt-2.5 text-meta text-muted-foreground">{money.blocked}</p>
+              ) : null}
             </Section>
           ) : null}
           <AppSettings app={app} settingsFile={settingsFile} />
@@ -209,12 +205,12 @@ export function AppSheet({
           ) : (
             <p className="mt-9 text-meta leading-[1.5] text-muted-foreground">
               {app.inUse
-                ? "Auni's own work runs on this, so it has no switch."
-                : "It has no switch: it does nothing until Auni's settings file names it."}
+                ? `Auni uses ${name} automatically, so there's no switch.`
+                : `${name} isn't active right now. Pick which service Auni uses in your settings file.`}
             </p>
           )}
           <p className="mt-6 text-meta leading-[1.5] text-muted-foreground">
-            Something wrong with it?{" "}
+            Something wrong with {name}?{" "}
             <button
               type="button"
               onClick={() => openReport({ app: app.id })}
@@ -237,21 +233,21 @@ function Holdings({ app }: { readonly app: AppWire }) {
     return (
       <Section title="You have">
         <p className="text-ui font-normal text-muted-foreground">
-          Auni couldn&apos;t read it just now. What you have there is still yours.
+          Couldn&apos;t read your {app.name} balance just now. Try again in a moment.
         </p>
       </Section>
     );
   if (account.holdings.length === 0)
     return (
       <Section title="You have">
-        <p className="text-ui font-normal text-muted-foreground">Nothing there yet.</p>
+        <p className="text-ui font-normal text-muted-foreground">No balance on {app.name} yet.</p>
       </Section>
     );
   const own = appListing(app.id)?.logo;
   return (
     <section aria-label="You have" className="mt-8">
       <p className="text-hero-money text-ink">{formatUsd(account.usd)}</p>
-      <p className="mt-1.5 text-meta text-muted-foreground">there now</p>
+      <p className="mt-1.5 text-meta text-muted-foreground">Yours at {app.name}</p>
       <ul className="mt-4 flex flex-col">
         {account.holdings.map((holding) => (
           <li key={holding.id} className="flex min-h-[60px] items-center gap-3">
@@ -286,41 +282,33 @@ function Holdings({ app }: { readonly app: AppWire }) {
  * else the app's own words on how it happens, so a gap is said and never hidden.
  */
 function Way({
-  words,
-  off,
+  way,
   busy,
   icon,
   label,
   onAsk,
 }: {
-  readonly words: string | null;
-  readonly off: boolean;
+  readonly way: MoneyWay;
   readonly busy: boolean;
   readonly icon: ReactNode;
   readonly label: string;
   readonly onAsk: () => void;
 }) {
-  if (words)
+  if (!way) return null;
+  if ("words" in way)
     return (
       <p className="flex gap-3 text-meta leading-[1.55] text-muted-foreground">
         <span className="mt-px flex size-[18px] flex-none items-center justify-center text-faint">
           {icon}
         </span>
-        <span className="min-w-0 flex-1">{words}</span>
+        <span className="min-w-0 flex-1">{way.words}</span>
       </p>
     );
   return (
-    <button
-      type="button"
-      disabled={busy || off}
-      onClick={onAsk}
-      className={cn(
-        "flex h-11 min-w-0 items-center justify-center gap-2 rounded-full bg-foreground/[0.05] px-4 text-body font-semibold text-ink transition-[background-color,scale] duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.985] disabled:pointer-events-none disabled:opacity-55",
-      )}
-    >
+    <Button variant="secondary" disabled={busy || way.waits} onClick={onAsk} className="min-w-0">
       {icon}
       {label}
-    </button>
+    </Button>
   );
 }
 

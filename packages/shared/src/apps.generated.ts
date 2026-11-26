@@ -9,12 +9,20 @@ export const APP_ABOUTS = {
     name: "Aave",
     does: "Earn on idle cash",
     starts: [
-      { title: "Put my idle cash to work", prompt: "Put my idle cash into Aave so it earns." },
+      {
+        title: "Put my idle cash to work",
+        prompt: "Put my idle cash into Aave so it earns.",
+        moves: true,
+      },
       {
         title: "What does it pay now?",
         prompt: "What does Aave pay on cash right now, on each chain I could use?",
       },
-      { title: "Take it all back out", prompt: "Take everything I have in Aave back out to cash." },
+      {
+        title: "Take it all back out",
+        prompt: "Take everything I have in Aave back out to cash.",
+        moves: true,
+      },
     ],
     mark: {
       background: "rgb(255 255 255 / 0.8)",
@@ -184,12 +192,20 @@ export const APP_ABOUTS = {
     name: "Hyperliquid",
     does: "Trade with leverage",
     starts: [
-      { title: "Long BTC with $50", prompt: "Open a long on BTC with $50 on Hyperliquid." },
+      {
+        title: "Long BTC with $50",
+        prompt: "Open a long on BTC with $50 on Hyperliquid.",
+        moves: true,
+      },
       {
         title: "What is funding costing me?",
         prompt: "What is funding costing me on my Hyperliquid positions?",
       },
-      { title: "Close everything", prompt: "Close every position I have open on Hyperliquid." },
+      {
+        title: "Close everything",
+        prompt: "Close every position I have open on Hyperliquid.",
+        moves: true,
+      },
     ],
     images: [{ hostname: "app.hyperliquid.xyz", pathname: "/coins/**" }],
     mark: { background: "#dff3ef", ring: "rgb(7 39 35 / 0.1)", fit: "contain", size: 0.68 },
@@ -314,6 +330,7 @@ export const APP_ABOUTS = {
         title: "Bet $20 on something I believe",
         prompt:
           "I want to put $20 on a Polymarket market. Ask me what I believe will happen, then find the market for it.",
+        moves: true,
       },
       { title: "How are my bets doing?", prompt: "How are my Polymarket bets doing?" },
     ],

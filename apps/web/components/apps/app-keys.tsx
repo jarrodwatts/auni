@@ -4,7 +4,9 @@ import type { AppSettingWire, AppWire } from "@auni/shared";
 import { Check } from "lucide-react";
 import { useState, type Ref } from "react";
 
+import { Mascot } from "@/components/brand/mascot";
 import { MoneyButton } from "@/components/cards/money/money-card-parts";
+import { buttonVariants } from "@/components/ui/button";
 import { AutoHeight } from "@/components/motion/auto-height";
 import { SecretInput, SecretNote, secretRefusal } from "@/components/private-input/secret-input";
 import { clearAppSecret, saveAppSecrets, useRefreshApps } from "@/lib/data/apps";
@@ -19,9 +21,12 @@ import { Section } from "./sheet-section";
 export function AppKeysNeeded({
   app,
   focusRef,
+  holding = null,
   onSaved,
 }: {
   readonly app: AppWire;
+  /** The money the owner has there already, which stays safe while the keys wait. */
+  readonly holding?: string | null;
   /** The first field, for a sheet that opens with the cursor in it. */
   readonly focusRef?: Ref<HTMLInputElement>;
   /** Told once every key it asked for is saved. */
@@ -29,10 +34,42 @@ export function AppKeysNeeded({
 }) {
   const needed = keysNeeded(app);
   if (needed.length === 0) return null;
+  const keys = needed.length === 1 ? "key" : "keys";
   return (
-    <Section title="To get it working">
+    <Section title={holding ? `Add your ${keys} to trade` : `Add your ${keys} to use ${app.name}`}>
+      {holding ? (
+        <p className="mb-3 text-ui leading-[1.5] text-ink">
+          Your {holding} is safe. Add your {app.name} {keys} to let Auni place orders.
+        </p>
+      ) : null}
       <KeyForm settings={needed} focusRef={focusRef} onSaved={onSaved} />
     </Section>
+  );
+}
+
+/**
+ * The moment an app's last key went in, as it now stands: connected only when it's on, since a
+ * key saved never turns on an app the owner turned off.
+ */
+export function KeysSaved({ app }: { readonly app: AppWire }) {
+  const many =
+    app.settings.filter(({ kind, required }) => kind === "secret" && required).length > 1;
+  return (
+    <div className="mt-8 flex items-center gap-3.5" data-testid="app-keys-saved">
+      {app.on ? (
+        <Mascot className="auni-onb-mascot flex-none" size={44} state="celebrating" />
+      ) : null}
+      <span className="min-w-0 flex-1">
+        <span className="block text-ui font-semibold text-ink">
+          {app.on ? `${app.name} is connected` : many ? "Keys saved" : "Key saved"}
+        </span>
+        <span className="mt-0.5 block text-meta text-muted-foreground">
+          {app.on
+            ? "Auni can use it right away."
+            : `${app.name} is off, so Auni won't use it until you turn it on below.`}
+        </span>
+      </span>
+    </div>
   );
 }
 
@@ -54,7 +91,7 @@ export function AppSettings({
   );
   if (rest.length === 0) return null;
   return (
-    <Section title={rest.every(({ kind }) => kind === "secret") ? "Its keys" : "Its settings"}>
+    <Section title={rest.every(({ kind }) => kind === "secret") ? "Keys" : "Settings"}>
       <ul className="flex flex-col gap-4">
         {rest.map((setting) => (
           <li key={setting.key}>
@@ -121,7 +158,9 @@ function KeyFields({
         {field(setting!, 0, false)}
         {refusal ??
           (setting!.help ? (
-            <p className="text-meta leading-[18px] text-muted-foreground">{setting!.help}</p>
+            <p className="text-meta leading-[18px] text-muted-foreground">
+              <Linked text={setting!.help} />
+            </p>
           ) : null)}
       </div>
     );
@@ -131,10 +170,10 @@ function KeyFields({
     <div className="flex flex-col gap-2">
       {help.map((line) => (
         <p key={line} className="text-meta leading-[18px] text-muted-foreground">
-          {line}
+          <Linked text={line} />
         </p>
       ))}
-      <div className="divide-y divide-foreground/[0.07] overflow-hidden rounded-card border border-foreground/[0.12] bg-background transition-[border-color,box-shadow] focus-within:border-foreground/25 focus-within:ring-[3px] focus-within:ring-ring/25">
+      <div className="divide-y divide-foreground/[0.07] overflow-hidden rounded-card border border-foreground/[0.12] bg-background transition-[border-color] focus-within:border-foreground/25">
         {settings.map((setting, index) => field(setting, index, true))}
       </div>
       {refusal}
@@ -249,12 +288,12 @@ function KeyRow({ setting }: { readonly setting: AppSettingWire }) {
             <span className="block truncate text-ui font-normal text-ink">{setting.label}</span>
             <span className="mt-0.5 flex items-center gap-1.5 text-meta text-muted-foreground">
               {setting.set && !setting.untried ? (
-                <Check aria-hidden className="size-3.5 flex-none text-positive" strokeWidth={2.6} />
+                <Check aria-hidden className="size-3.5 flex-none text-ink" strokeWidth={2.6} />
               ) : null}
               {setting.set === "environment"
-                ? "Set by this computer"
+                ? "Set on this computer"
                 : setting.set && setting.untried
-                  ? "Saved, not tried yet: the service couldn't be reached"
+                  ? "Saved, not verified yet (couldn't reach the service)"
                   : setting.set
                     ? "Saved"
                     : (setting.help ?? "Not set")}
@@ -302,10 +341,10 @@ function FileRow({
           <span className="block truncate text-ui font-normal text-ink">{setting.label}</span>
           <span className="mt-0.5 flex items-center gap-1.5 text-meta text-muted-foreground">
             {setting.set ? (
-              <Check aria-hidden className="size-3.5 flex-none text-positive" strokeWidth={2.6} />
+              <Check aria-hidden className="size-3.5 flex-none text-ink" strokeWidth={2.6} />
             ) : null}
             {setting.set === "environment"
-              ? "Set by this computer"
+              ? "Set on this computer"
               : setting.set
                 ? "Set in your settings file"
                 : "Not set yet"}
@@ -324,7 +363,7 @@ function FileRow({
       </div>
       {where ? (
         <p className="mt-1.5 text-meta leading-[1.55] text-muted-foreground">
-          It changes whom Auni trusts, so only your settings file sets it:{" "}
+          This controls what Auni trusts, so set it directly in your settings file:{" "}
           <code className="font-mono text-caption text-ink wrap-anywhere">{setting.env}</code> in{" "}
           <code className="font-mono text-caption text-ink wrap-anywhere">{settingsFile}</code>.
         </p>
@@ -334,5 +373,30 @@ function FileRow({
 }
 
 /** A small quiet action beside a row: "Replace", "Where?". */
-const quietPillClass =
-  "flex h-9 flex-none items-center rounded-full bg-foreground/[0.05] px-4 text-ui font-semibold text-ink transition-colors duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-55";
+const quietPillClass = buttonVariants({ variant: "secondary", size: "sm" });
+
+/** A site an app's help names ("example.com"), anywhere in its words. */
+const SITE = /\b((?:[a-z0-9-]+\.)+(?:com|io|ai|xyz|org|net|app|dev|fi|trade|exchange))\b/giu;
+
+/**
+ * An app's help line with the site it names as a link there: "From your profile on
+ * example.com" takes the owner to example.com.
+ */
+export function Linked({ text }: { readonly text: string }) {
+  const parts = text.split(SITE);
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
+      <a
+        key={index}
+        href={`https://${part}`}
+        target="_blank"
+        rel="noreferrer"
+        className="font-medium text-ink underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    ),
+  );
+}

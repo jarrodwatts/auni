@@ -1,10 +1,10 @@
 import { HELD, RAW_TRANSACTION_TOOLS, type HeldWhy } from "@auni/shared";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, sql } from "drizzle-orm";
 import { TransactionReceiptNotFoundError, type Address, type Hash } from "viem";
 
 import { publishThread } from "../conversation/threads.ts";
 import { db } from "../db/client.ts";
-import { actions, fills, type ActionRow } from "../db/schema.ts";
+import { actions, fills, threads, type ActionRow } from "../db/schema.ts";
 import { wakeThread } from "../jobs/kinds.ts";
 import { accountOf, ledgerAt, appById, theWallet } from "../apps/registry.ts";
 import { showedAssetsMoving } from "./approved.ts";
@@ -65,14 +65,38 @@ export async function reconcileStuckActions(): Promise<ActionRow[]> {
   return settled;
 }
 
-/** Up to 50 held moves, each waiting on the owner's Check again or Close (see hold). */
-export async function heldMoves(): Promise<string[]> {
+/**
+ * Up to 50 held moves, each waiting on the owner's Check again or Close (see hold), with what
+ * its card was for, why it is held, and the chat its card is in (none for one started outside a
+ * chat, or whose chat was deleted), the oldest first.
+ */
+export async function heldMoves(): Promise<
+  {
+    id: string;
+    summary: string;
+    why: HeldWhy | undefined;
+    chat: { id: string; title: string | null } | null;
+  }[]
+> {
   const rows = await db
-    .select({ id: actions.id })
+    .select({
+      id: actions.id,
+      summary: actions.summary,
+      run: actions.run,
+      threadId: threads.id,
+      title: threads.title,
+    })
     .from(actions)
+    .leftJoin(threads, eq(threads.id, actions.threadId))
     .where(eq(actions.phase, "needs_owner"))
+    .orderBy(asc(actions.createdAt))
     .limit(50);
-  return rows.map(({ id }) => id);
+  return rows.map(({ id, summary, run, threadId, title }) => ({
+    id,
+    summary,
+    why: run.held,
+    chat: threadId === null ? null : { id: threadId, title },
+  }));
 }
 
 /** What an action's transactions say about it, read in the order they were sent. */

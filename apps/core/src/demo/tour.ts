@@ -183,7 +183,7 @@ const STOPS: readonly Stop[] = [
   },
   {
     title: "The look",
-    does: "Last one. Open [Settings](/app?settings=appearance) and pick **Dark**, or whichever look you are not in now. It opens over Money, so you see the change at once. Then come back here.",
+    does: "Last one. Open [Settings](/app?settings=you) and pick **Dark** under Light or dark, or whichever look you are not in now. It opens over Money, so you see the change at once. Then come back here.",
     reply: "I've picked a look",
     looked: true,
   },

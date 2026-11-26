@@ -25,9 +25,10 @@ network on purpose, as a later `-H` wins.
   can't think stops it (`pick-your-ai.tsx`). The take's chat finishes it (core's
   `POST /places/chat`, which makes the wallet, else the first move; `finish.ts` mirrors it); one
   the owner already has comes in before that (`bring-wallet.tsx`). Chat fallbacks: `brain-needed.tsx`, `spare-key.tsx`.
-- Settings (`components/settings/`): grouped searchable modal over `/me`, `/brains`, `/apps`, and
-  `/system/*` (`lib/data/system.ts`) for General, Appearance, Personalization, AI Brains, Wallet,
-  Channels, Remote access (Tailscale, service, sessions, handover), Network/RPCs, Diagnostics, About.
+- Settings (`components/settings/`): five panes over `/me`, `/brains`, `/apps` and `/system/*`
+  (`lib/data/system.ts`), You, Your AI, Your wallet, Your devices (phone through Tailscale,
+  Telegram, service, browsers, handover) and Health (checks; networks, logs behind For
+  developers), searchable, a list then a pane on a phone; `?settings=<pane>` or `open`.
 - The owner's AI, made ready from any device: `components/brains/brain-row.tsx`, one row a brain
   on core's `GET /brains` (`lib/data/brains.ts`): installing its CLI, or its own sign-in (a page
   and code, or its prompt as a terminal, typed into by its private field). First run's ask for a
@@ -58,7 +59,6 @@ network on purpose, as a later `-H` wins.
   (`apps-screen.tsx`) and each app's sheet (`app-sheet.tsx`): what is held there, its keys
   (`app-keys.tsx`, each a `SecretInput` to its private field), its switch, and for one Auni
   itself runs on, the job it does as a scene (`app-jobs.tsx`).
-- Settings: `components/settings/settings-dialog.tsx`, on core's `/me`.
 - The look is tokens (`app/tokens.css`), each colour `light-dark(light, dark)`: ink is the
   strong action, blue is Auni (links, focus), amber only waits on the owner, green and red
   only gain and loss; no gradients, glows or tinted tiles. Type is Inter and JetBrains Mono

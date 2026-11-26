@@ -457,7 +457,7 @@ function howToFix({ id }: Named, why: BrainNotReady, fix: string): string {
   const app = fromTheApp(id, why);
   if (!app) return fix;
   const does = app === "sign-in" ? "sign it in" : "install it";
-  return `${does} from Settings → AI Brains, on any of your devices (or run \`${fix}\` where Auni runs)`;
+  return `${does} from Settings → Your AI, on any of your devices (or run \`${fix}\` where Auni runs)`;
 }
 
 interface Named {

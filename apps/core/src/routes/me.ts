@@ -31,7 +31,6 @@ import {
 import {
   appendWatchedWallet,
   normalizeXHandle,
-  refreshOwnerSignals,
   resolveWatchedWallet,
   sameWatchedWalletAddress,
 } from "../signals.ts";
@@ -193,12 +192,6 @@ meRouter.delete("/watched-wallets/:address", async (req, res) => {
     await enqueueSignalsRefresh(tx);
   });
   publishMe();
-  res.json(await meWire(ownerHere(req)));
-});
-
-/** Refreshes X + watch-only wallet signals while preserving any manually edited profile summary. */
-meRouter.post("/signals/refresh", async (req, res) => {
-  await refreshOwnerSignals().catch(() => null);
   res.json(await meWire(ownerHere(req)));
 });
 

@@ -1,98 +1,125 @@
 "use client";
 
-import { APP_JOBS, type AppWire } from "@auni/shared";
-import { Blocks } from "lucide-react";
+import type { AppJob, AppWire } from "@auni/shared";
 
+import { Badge } from "@/components/ui/badge";
+import { Row } from "@/components/ui/row";
+import { Eyebrow, Section } from "@/components/ui/section";
 import { cn } from "@/lib/utils";
 
 import { JOBS } from "./app-jobs";
 import { AppMark } from "./app-mark";
 import { needOf } from "./app-standing";
 
-/** One that needs something first, then the one in use, then by name. */
+/**
+ * The jobs Apps shows the services for. Thinking and keeping the keys are the owner's AI and
+ * wallet, which Settings holds.
+ */
+const SHOWN: readonly AppJob[] = ["trades", "moves", "prices", "watches"];
+
+/**
+ * An app the owner acts through, with a switch of its own: a venue, a research feed. Their AI,
+ * their wallet and their chats are in Settings.
+ */
+export function isYours(app: AppWire): boolean {
+  return app.canSwitch && app.pairing === null;
+}
+
+/** One that needs something first, then by name. */
 function inOrder(a: AppWire, b: AppWire): number {
-  const rank = (app: AppWire) => (needOf(app) ? 0 : app.inUse ? 1 : 2);
-  return rank(a) - rank(b) || a.name.localeCompare(b.name);
+  return Number(!needOf(a)) - Number(!needOf(b)) || a.name.localeCompare(b.name);
 }
 
 /**
- * The plumbing: the apps Auni's own work runs on, by the job each does. None has a switch,
- * since turning a price feed or a swap route off would quietly break what depends on it. One
- * that needs something says so and comes first; any of them opens its sheet.
+ * The services Auni uses on its own, each once: under the first of its jobs shown, with the
+ * others it does (`also`, by app id), so one that both routes trades and prices tokens is one row.
  */
-export function RunsOn({
+export function byJob(apps: readonly AppWire[]): readonly {
+  readonly job: AppJob;
+  readonly apps: readonly AppWire[];
+  readonly also: Readonly<Record<string, readonly AppJob[]>>;
+}[] {
+  const behind = apps.filter(({ canSwitch }) => !canSwitch);
+  const jobsOf = (app: AppWire) => SHOWN.filter((job) => app.jobs.includes(job));
+  return SHOWN.map((job) => {
+    const here = behind.filter((app) => jobsOf(app)[0] === job).toSorted(inOrder);
+    return {
+      job,
+      apps: here,
+      also: Object.fromEntries(here.map((app) => [app.id, jobsOf(app).slice(1)])),
+    };
+  }).filter((group) => group.apps.length > 0);
+}
+
+/**
+ * The services Auni uses on its own, by the job each does: routing a trade, moving cash across
+ * chains, pricing a token, watching the clock and the market. None has a switch, since turning
+ * one off would quietly break what depends on it. Any of them opens its sheet, which shows the
+ * job as a scene.
+ */
+export function BehindTheScenes({
   apps,
   onOpen,
 }: {
   readonly apps: readonly AppWire[];
   readonly onOpen: (id: string) => void;
 }) {
-  const rows = [
-    ...APP_JOBS.map((job) => ({
-      label: JOBS[job].label,
-      icon: JOBS[job].icon,
-      apps: apps.filter(({ jobs }) => jobs.includes(job)).toSorted(inOrder),
-    })),
-    // Whatever does none of those jobs is still part of this Auni.
-    {
-      label: "Also here",
-      icon: Blocks,
-      apps: apps.filter(({ jobs }) => jobs.length === 0).toSorted(inOrder),
-    },
-  ].filter((row) => row.apps.length > 0);
+  const groups = byJob(apps);
+  if (groups.length === 0) return null;
   return (
-    <dl className="flex flex-col gap-5 sm:gap-3">
-      {rows.map((row) => (
-        <div key={row.label} className="sm:flex sm:items-start sm:gap-4">
-          <dt className="flex items-center gap-2.5 text-ui font-normal text-ink sm:h-10 sm:w-[212px] sm:flex-none">
-            <row.icon
-              aria-hidden
-              className="size-[17px] flex-none text-muted-foreground"
-              strokeWidth={1.75}
-            />
-            {row.label}
-          </dt>
-          <dd className="mt-2 flex min-w-0 flex-1 flex-wrap gap-1.5 sm:mt-0">
-            {row.apps.map((app) => (
-              <Chip key={app.id} app={app} onOpen={() => onOpen(app.id)} />
-            ))}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <Section
+      heading="Behind the scenes"
+      description="What Auni uses on its own to find prices, route trades, and move cash."
+    >
+      <div className="mt-5 flex flex-col gap-6">
+        {groups.map((group) => (
+          <div key={group.job}>
+            <Eyebrow className="mb-1">{JOBS[group.job].label}</Eyebrow>
+            <ul className="grid gap-x-6 sm:grid-cols-2">
+              {group.apps.map((app) => (
+                <li key={app.id}>
+                  <Plumbing app={app} also={group.also[app.id]!} onOpen={() => onOpen(app.id)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 
-/** One app as a name to tap: its mark, its name, and in a quieter voice how it stands. */
-function Chip({ app, onOpen }: { readonly app: AppWire; readonly onOpen: () => void }) {
+/**
+ * One service Auni uses: its logo, its name, the other jobs it does, and what it needs, if
+ * anything.
+ */
+function Plumbing({
+  app,
+  also,
+  onOpen,
+}: {
+  readonly app: AppWire;
+  readonly also: readonly AppJob[];
+  readonly onOpen: () => void;
+}) {
   const need = needOf(app);
-  // A brain or wallet app another is doing the job of says so by standing back.
-  const says = need ?? (app.inUse ? app.standing : (app.standing ?? "Not in use"));
   return (
-    <button
-      type="button"
+    <Row
+      asChild
       aria-haspopup="dialog"
-      onClick={onOpen}
       data-testid="runs-on-app"
       data-app={app.id}
-      className={cn(
-        "flex h-10 max-w-full items-center gap-2.5 rounded-full bg-surface pr-4 pl-1.5 text-ui outline-none transition-colors duration-150 hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        need && "bg-waiting-surface hover:bg-waiting/[0.14]",
-      )}
-    >
-      <span className={cn("flex-none", !app.inUse && "opacity-55 grayscale")}>
-        <AppMark id={app.id} name={app.name} size={28} />
-      </span>
-      <span
-        className={cn("flex-none font-medium", app.inUse ? "text-ink" : "text-muted-foreground")}
-      >
-        {app.name}
-      </span>
-      {says ? (
-        <span className={cn("min-w-0 truncate", need ? "text-waiting" : "text-muted-foreground")}>
-          {says}
+      className="min-h-12 py-2"
+      mark={
+        <span className={cn(!app.inUse && "opacity-55 grayscale")}>
+          <AppMark id={app.id} name={app.name} size={28} />
         </span>
-      ) : null}
-    </button>
+      }
+      title={app.name}
+      meta={also.length > 0 ? `Also ${also.map((job) => JOBS[job].does).join(" and ")}` : undefined}
+      end={need ? <Badge tone="waiting">{need}</Badge> : null}
+    >
+      <button type="button" onClick={onOpen} />
+    </Row>
   );
 }

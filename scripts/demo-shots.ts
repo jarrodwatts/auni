@@ -467,20 +467,21 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
         "top",
       );
     await take(page, out, "new-chat", `${origin}/app/new`, "top");
-    // Settings, each of its panes.
-    for (const section of [
-      "general",
-      "appearance",
-      "personalization",
-      "brains",
-      "wallet",
-      "channels",
-      "remote",
-      "network",
-      "diagnostics",
-      "about",
-    ])
+    // Settings: a phone's list of its panes, then each pane.
+    await take(page, out, "settings", `${origin}/app?settings=open`, "top", undefined, {
+      only: "phone",
+    });
+    for (const section of ["you", "ai", "wallet", "devices", "health"])
       await take(page, out, `settings-${section}`, `${origin}/app?settings=${section}`, "top");
+    // A link from before the panes were folded lands on the setting it named, opened up and
+    // scrolled to: the run stops if Networks never comes into view.
+    await take(page, out, "settings-old-network-link", `${origin}/app?settings=network`, "top", {
+      does: "true",
+      shows: `(() => {
+        const at = document.getElementById("setting-networks")?.getBoundingClientRect();
+        return at && at.top >= 0 && at.top < innerHeight;
+      })()`,
+    });
     for (const thread of threads.toReversed()) {
       const name = slug(thread.title ?? thread.id);
       await take(page, out, `chat-${name}`, `${origin}/app/chat/${thread.id}`, "end");
@@ -526,7 +527,7 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const onTop = (words: string) =>
       `[...document.querySelectorAll('[role="dialog"]')].at(-1)?.textContent.includes(${JSON.stringify(words)})`;
     const wallet = `${origin}/app?settings=wallet`;
-    const KEYS = `(async () => { ${PRESS("Show wallet keys")}; await ${PAUSE(800)}; return true; })()`;
+    const KEYS = `(async () => { ${PRESS("Show your keys")}; await ${PAUSE(800)}; return true; })()`;
     const SHOWN = `(async () => { await ${KEYS}; ${PRESS("Show keys")}; await ${PAUSE(1_500)}; return true; })()`;
     const shots: readonly [string, string, Opener | undefined][] = [
       ["add-money", `${origin}/app?fund=open`, undefined],

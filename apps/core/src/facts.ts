@@ -108,7 +108,7 @@ function personalFacts(
     const asset = knownAsset(h.symbol);
     out.push({
       text: `A watched external wallet holds ${value} of ${h.name} (${h.symbol}) on ${h.chain} (watch-only; not in Auni's wallet).`,
-      source: { app: AUNI, label: `Watched ${h.symbol}`, link: "/app?settings=personalization" },
+      source: { app: AUNI, label: `Watched ${h.symbol}`, link: "/app?settings=you" },
       image: asset?.logoUrl ?? null,
       starts: startFrom(
         `A wallet I'm watching holds about ${value} of ${h.name} on ${h.chain}. What's your take on ${h.name} right now, and are there smart angles around it?`,
@@ -129,7 +129,7 @@ function personalFacts(
     const firstTopic = topics[0];
     out.push({
       text: parts.join(" "),
-      source: { app: AUNI, label: "Your profile", link: "/app?settings=personalization" },
+      source: { app: AUNI, label: "Your profile", link: "/app?settings=you" },
       image: null,
       starts: firstTopic
         ? startFrom(

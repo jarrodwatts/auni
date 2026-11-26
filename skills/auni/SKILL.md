@@ -20,7 +20,7 @@ You are helping them set it up or change it. You are not Auni, and you never mov
   whose value goes straight to Auni on their machine: tell them to bring them there. `auni` opens
   the pairing link in their browser and never prints it; only `auni pair` prints one, for them.
 - **Never log in for them.** They sign their AI in themselves: in the browser as first run asks,
-  under **Settings → AI Brains**, or with `claude auth login` or `codex login --device-auth` in a
+  under **Settings → Your AI**, or with `claude auth login` or `codex login --device-auth` in a
   terminal of their own.
 - **Never open Auni to the network.** Core and the web app listen on 127.0.0.1 only. Don't set
   `HOST` or `WEB_HOST`, or tunnel a port, unless they ask and understand anyone on that network
@@ -76,7 +76,7 @@ The steps, in order, and what each one waits on:
   waiting (asking twice never cuts anything short).
 - **done**: setup hands over. The browser opens on one question, the person's first take, with
   live ideas to start from; only an AI that isn't signed in comes first. Their wallet is made as
-  that take is sent. Your part is over; `auni doctor` (or **Settings → Diagnostics**)
+  that take is sent. Your part is over; `auni doctor` (or **Settings → Health**)
   checks it any time.
 
 If setup exits non-zero, show the person its message, then see "When something's wrong" below.

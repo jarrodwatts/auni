@@ -67,6 +67,8 @@ interface AppStart {
   readonly title: string;
   /** "Open a long on BTC with $50 on Hyperliquid." */
   readonly prompt: string;
+  /** It leads to a money move, so it waits, as moves do, until the app has all it needs. */
+  readonly moves?: true;
 }
 
 /** One setting an app reads: where its value is kept, and who may change it. */

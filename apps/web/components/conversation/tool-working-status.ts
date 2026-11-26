@@ -1,10 +1,6 @@
 import { getToolName, isToolUIPart } from "ai";
 
-import {
-  messageActivityParts,
-  type AuniToolPart,
-  type AuniUiMessage,
-} from "@/lib/conversation";
+import { messageActivityParts, type AuniToolPart, type AuniUiMessage } from "@/lib/conversation";
 import { toolActivityTitle } from "@/lib/tool-copy";
 
 /**
@@ -59,9 +55,4 @@ const sentences = (text: string) => text.trim().split(/(?<=[.!?])\s+/u);
 /** A thought is the model's own working; while it runs, its newest sentence is enough. */
 function latestSentence(text: string): string {
   return sentences(text).at(-1) ?? text;
-}
-
-/** A thought gone by reads as its first sentence, what it set out to do; its whole is a tap away. */
-export function firstSentence(text: string): string {
-  return sentences(text)[0] ?? text;
 }

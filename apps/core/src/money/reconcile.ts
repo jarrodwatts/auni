@@ -23,6 +23,7 @@ import {
   retried,
   settleLanding,
 } from "./record.ts";
+import { cardReached } from "./waiting.ts";
 import { walletAddresses } from "./wallets.ts";
 
 /** Long past any chain's settling, so a send still unconfirmed this long is held for the owner. */
@@ -252,10 +253,14 @@ async function hold(action: ActionRow, why: HeldWhy): Promise<null> {
       run: noted({ held: why }),
     });
     if (row?.threadId)
-      await wakeThread(row.threadId, heldReason(row, why, action.error), {
-        key: `action-held-${row.id}-a${row.attempts}`,
-        tx,
-      });
+      await wakeThread(
+        row.threadId,
+        heldReason(row, why, action.error, await cardReached(row, tx)),
+        {
+          key: `action-held-${row.id}-a${row.attempts}`,
+          tx,
+        },
+      );
     return row;
   });
   if (!held) return null;
@@ -266,14 +271,22 @@ async function hold(action: ActionRow, why: HeldWhy): Promise<null> {
 }
 
 /** What the agent is told of a move just held: what is known, what isn't, and what not to do. */
-function heldReason(held: ActionRow, why: HeldWhy, stoppedWith: string | null): string {
+function heldReason(
+  held: ActionRow,
+  why: HeldWhy,
+  stoppedWith: string | null,
+  shown: boolean,
+): string {
   const hashes = held.txs.flatMap((tx) => (tx.hash ? [`${tx.hash} on ${tx.chain}`] : []));
   return [
     `Action ${held.id} (${held.summary}) is held. ${HELD[why]}`,
     hashes.length > 0 ? `Its transactions: ${hashes.join(", ")}.` : "It kept no transaction hash.",
     stoppedWith ? `Its run stopped with: ${stoppedWith.slice(0, 300)}` : "",
-    "Auni will not send it again, and keeps reading by itself in case the answer comes. Its " +
-      "card now says this to the owner, with Check again and Close. Tell them once, calmly: " +
+    "Auni will not send it again, and keeps reading by itself in case the answer comes. " +
+      (shown
+        ? "Its card now says this to the owner, with Check again and Close. "
+        : "No card for it reached the owner's chat, so they haven't seen it. ") +
+      "Tell them once, calmly: " +
       "what happened, that nothing else is at risk, and where to look (the transaction on its " +
       "chain, or the service's own site). Look up what you can first (get_portfolio, " +
       "read_chain, the service's own tools). Don't propose this move again while it is held: " +

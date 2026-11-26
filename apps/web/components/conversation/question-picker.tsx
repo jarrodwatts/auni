@@ -4,6 +4,7 @@ import { Check, CornerDownLeft, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useComposerLead } from "@/components/app/composer";
+import { Button } from "@/components/ui/button";
 import { joinPicks, type AuniQuestion } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
 
@@ -94,25 +95,26 @@ export function QuestionPicker({
           ) : null}
         </div>
         {question.multiple ? (
-          <button
+          <Button
             type="button"
             disabled={checked.length === 0 || disabled || sent !== null}
             onClick={() => answer(checked)}
-            className="h-9 flex-none rounded-full bg-foreground px-4 text-ui font-medium text-background transition-[background-color,color,transform] duration-200 ease-settle hover:bg-foreground/85 active:scale-[0.97] disabled:bg-foreground/[0.06] disabled:text-foreground/35 disabled:active:scale-100"
           >
             {checked.length > 1 ? `Send ${checked.length}` : "Send"}
-          </button>
+          </Button>
         ) : null}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           aria-label="Close question"
           title="Close (Esc)"
           disabled={sent !== null}
           onClick={onClose}
-          className="-mr-1.5 flex size-9 flex-none items-center justify-center rounded-full text-muted-foreground transition-[background-color,color] duration-200 ease-settle outline-none hover:bg-foreground/[0.05] hover:text-ink focus-visible:bg-foreground/[0.05] active:bg-foreground/[0.08] disabled:opacity-40 disabled:hover:bg-transparent"
+          className="-mr-1.5"
         >
           <X aria-hidden className="size-4" strokeWidth={2} />
-        </button>
+        </Button>
       </div>
       {/* Capped, so on a phone the answer it asks about stays readable above. */}
       <ul className="flex max-h-[34dvh] flex-col overflow-y-auto overscroll-contain px-0.5">
@@ -130,7 +132,7 @@ export function QuestionPicker({
                 disabled={disabled || sent !== null}
                 onClick={() => choose(option.label)}
                 className={cn(
-                  "group/option flex min-h-12 w-full items-center gap-3 rounded-card px-3 py-2 text-left transition-[background-color,opacity] duration-200 ease-settle outline-none hover:bg-foreground/[0.035] focus-visible:bg-foreground/[0.035] active:bg-foreground/[0.06] disabled:hover:bg-transparent",
+                  "group/option flex min-h-12 w-full items-center gap-3 rounded-card px-3 py-2 text-left transition-[background-color,opacity] duration-200 ease-settle focus-ring-inset hover:bg-foreground/[0.035] active:bg-foreground/[0.06] disabled:hover:bg-transparent",
                   sent !== null && !on && "opacity-40",
                 )}
               >
@@ -202,21 +204,21 @@ function NextReplies({
       aria-label="Suggested replies"
     >
       {options.map((label, index) => (
-        <button
+        <Button
           key={label}
           type="button"
+          variant={index === 0 ? "primary" : "ghost"}
           disabled={disabled || sent !== null}
           onClick={() => onPick(label)}
           className={cn(
-            "flex h-10 max-w-full min-w-0 items-center rounded-full text-body leading-5 tracking-[-0.005em] transition-[background-color,color,opacity,transform] duration-200 ease-settle outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:scale-[0.98] disabled:active:scale-100",
-            index === 0
-              ? "bg-foreground px-4 font-semibold text-background hover:bg-foreground/85"
-              : "px-3 font-medium text-muted-foreground hover:bg-foreground/[0.05] hover:text-ink",
-            sent !== null && sent !== label && "opacity-40",
+            "max-w-full min-w-0 shrink",
+            index === 0 ? "font-semibold" : "px-3",
+            // The one picked stays as it was; the rest step back.
+            sent !== null && (sent === label ? "disabled:opacity-100" : "disabled:opacity-40"),
           )}
         >
           <span className="truncate">{label}</span>
-        </button>
+        </Button>
       ))}
     </div>
   );

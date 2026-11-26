@@ -181,7 +181,7 @@ export function ActionPlanCard({
           : null}
         {step === "ready" || step === "fund" ? <CardNote says={card.buysFirst} /> : null}
         {step === "ready" || step === "fund" ? <CardNote says={card.pricedLater} /> : null}
-        <ArrivedLine />
+        <ArrivedLine proposalId={card.proposalId} />
       </div>
       {/* Once it runs, the list and the header say it all. */}
       {step === "loading" || step === "fund" || step === "ready" ? (

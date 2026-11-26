@@ -1,15 +1,14 @@
 /*
- * A step is one quiet line inside its work panel. Rows align to their first line,
- * so a thought or long step that unfolds grows downward without its icon moving.
+ * A step is one quiet line, flush with the answer's words. Rows align to their first line,
+ * so a long step that unfolds grows downward without its icon moving.
  */
 .auni-activity-row {
   display: flex;
   width: 100%;
   min-width: 0;
   align-items: flex-start;
-  gap: 9px;
-  padding: 7px 8px;
-  border-radius: var(--radius-control);
+  gap: 8px;
+  padding: 4px 0;
   /* A step quieter than a quiet word. */
   color: color-mix(in oklab, var(--muted-foreground) 88%, var(--background));
   font-size: var(--text-ui);
@@ -23,23 +22,18 @@
 
 .auni-activity-control {
   position: relative;
+  border-radius: var(--radius-control);
 }
 
 .auni-activity-control:hover {
-  background: color-mix(in oklab, var(--foreground) 3.5%, transparent);
   color: var(--foreground);
-}
-
-.auni-activity-control:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--ring) 55%, transparent);
-  outline-offset: 2px;
 }
 
 .auni-activity-icon {
   display: flex;
-  width: 16px;
+  width: 20px;
   height: 20px;
-  flex: 0 0 16px;
+  flex: 0 0 20px;
   align-items: center;
   justify-content: center;
 }

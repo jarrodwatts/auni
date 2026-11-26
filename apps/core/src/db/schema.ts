@@ -168,6 +168,8 @@ export interface MessageMetadata {
   readonly channelRef?: string;
   /** Core left it outside any turn (money arriving, a pasted key kept out): no AI worked on it. */
   readonly posted?: true;
+  /** Money that came in while this plan waited on the owner, which its card tells (money/news.ts). */
+  readonly forPlan?: string;
 }
 
 export const messages = pgTable(

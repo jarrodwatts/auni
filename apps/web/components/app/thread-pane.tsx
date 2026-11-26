@@ -30,7 +30,6 @@ import { QuestionPicker } from "@/components/conversation/question-picker";
 import { useTrailingTextFlow } from "@/components/conversation/use-text-flow";
 import { moneyProgress } from "@/components/places/attention";
 import {
-  answerStartedAt,
   answeredQuestion,
   createOptimisticUserMessage,
   editableExchange,
@@ -42,7 +41,7 @@ import {
 import { useSustained } from "@/lib/use-sustained";
 import type { StickToBottomContext } from "use-stick-to-bottom";
 
-import { arrivalsForCards } from "@/lib/arrivals-for-cards";
+import { arrivalsForCards, type ArrivalsByPlan } from "@/lib/arrivals-for-cards";
 
 /**
  * A place's one conversation, split by day: the transcript and the reply
@@ -292,11 +291,6 @@ export function ThreadPane({
                         }
                         message={message}
                         pending={live}
-                        workStartedAt={
-                          standIn || message.id === trailingMessage?.id
-                            ? answerStartedAt(turns, index)
-                            : undefined
-                        }
                         onAskAgent={askAgent}
                         onEditMessage={
                           regenerable && !failure && message.id === regenerable.userMessageId
@@ -400,4 +394,4 @@ function useReadWhileOpen(
 }
 
 /** No money came in for a card. */
-const NONE_ARRIVED = [] as const;
+const NONE_ARRIVED: ArrivalsByPlan = new Map();

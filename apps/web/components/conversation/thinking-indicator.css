@@ -1,70 +1,28 @@
-@keyframes auni-thinking-enter {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.auni-thinking-enter {
-  animation: auni-thinking-enter 180ms var(--motion-drift) both;
-}
-
-/* Precision kinetic glyph for Auni's borderless thinking state. */
-@keyframes auni-thinking-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes auni-thinking-pulse {
+/* Auni's mascot breathes while it thinks: its one sign of life, and only while it works. */
+@keyframes auni-thinking-breathe {
   0%,
   100% {
-    opacity: 0.38;
-    transform: scale(0.82);
+    opacity: 0.72;
+    transform: scale(0.92);
   }
   50% {
     opacity: 1;
-    transform: scale(1.12);
+    transform: scale(1);
   }
 }
 
-.auni-thinking-orbit {
-  transform-origin: 8px 8px;
-  animation: auni-thinking-spin 7.2s linear infinite;
-  animation-play-state: var(--visible-animation-state, paused);
+.auni-thinking-mascot {
+  display: inline-flex;
+  flex: none;
 }
 
-.auni-thinking-node {
-  fill: currentColor;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: auni-thinking-pulse 1.6s ease-in-out infinite;
-  animation-delay: calc(var(--n) * 0.28s);
+.auni-thinking-mascot[data-active] {
+  animation: auni-thinking-breathe 1.8s ease-in-out infinite;
   animation-play-state: var(--visible-animation-state, paused);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auni-thinking-enter,
-  .auni-thinking-orbit,
-  .auni-thinking-node,
-  .auni-digit-in,
-  .auni-digit-out,
-  .auni-work-sheen::after,
-  .auni-work-panel-enter,
-  .auni-work-icon-enter,
-  .auni-work-row-enter,
-  .auni-work-failed-badge,
-  .auni-card-enter,
-  .auni-message-enter {
+  .auni-thinking-mascot[data-active] {
     animation: none;
-    filter: none;
-    transform: none;
   }
 }

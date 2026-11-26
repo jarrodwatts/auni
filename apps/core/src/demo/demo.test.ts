@@ -227,7 +227,7 @@ describe("auni demo", () => {
     await ask(`/actions/${sale!.id}/allow`, { cardFormat: CARD_FORMAT });
     const phase = async () => (await cards(unheard))[0]?.phase;
     await expect.poll(phase, { timeout: 60_000, interval: 250 }).toBe("needs_owner");
-    await says(unheard, /never got an answer.*check again now, or close it/su);
+    await says(unheard, /most likely never went in.*close that card/su);
     expect(await ask(`/actions/${sale!.id}/check`, {})).toMatchObject({
       action: { phase: "needs_owner", error: expect.stringContaining("never heard back") },
     });

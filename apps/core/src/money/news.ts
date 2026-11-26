@@ -8,7 +8,7 @@ import {
   type NetworkKey,
   type VenueEventCardWire,
 } from "@auni/shared";
-import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { fenced } from "../agent/fence.ts";
@@ -20,7 +20,7 @@ import { publishThread } from "../conversation/threads.ts";
 import { publishThreadEvent } from "../conversation/stream.ts";
 import { answered } from "../conversation/tidy.ts";
 import { db, type Tx } from "../db/client.ts";
-import { arrivals, messages, threads } from "../db/schema.ts";
+import { actions, arrivals, messages, threads } from "../db/schema.ts";
 import {
   deliverKind,
   foundKind,
@@ -31,10 +31,12 @@ import {
 import { defineJob } from "../jobs/queue.ts";
 import type { ArrivalKind } from "./arrivals.ts";
 import { chainName } from "./chains.ts";
-import { coinName } from "./coins.ts";
+import { coinName, isPlainCash } from "./coins.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
+import { spendsCashIn } from "./funding.ts";
 import { formatAmount, priceLabel, shortAddress, usdLabel } from "./format.ts";
 import { howItCame, MOVES, type Move } from "./how-it-came.ts";
+import { stagedLeg } from "./proposal-order.ts";
 import { SETTLING_MS } from "./readings.ts";
 import type { Fill } from "./recipe.ts";
 import type { Exit, Happened } from "./venue-statement.ts";
@@ -134,7 +136,48 @@ export async function tellArrivals(tx: Tx, recorded: readonly ArrivalRow[]): Pro
   if (news.length === 0) return landed;
   const cards = news.map(arrivalCard);
   const place = woken[0] ?? (await mainChat(tx));
-  return [...landed, await post(tx, place, cards)];
+  const forPlan = await fundedPlan(
+    tx,
+    place.id,
+    news.flatMap((one) => (one.direction === "in" ? one.rows : [])),
+  );
+  return [...landed, await post(tx, place, cards, forPlan ? { forPlan } : {})];
+}
+
+/**
+ * The plan in this chat this money in is for: still waiting on the owner's tap, and spending
+ * more cash on a chain where cash just came in than its own moves bring there. Its card tells
+ * the money above the step it makes possible. Any other deposit (a coin, cash on another chain,
+ * or money while a plan only sells) is no part of a plan and keeps its own place in the chat, as
+ * does money after a plan settled, however near. So does cash that came with a coin: the
+ * transaction is one card, which drawn inside the plan would show the coin as money for it too.
+ * The newest such plan, when several are.
+ */
+async function fundedPlan(
+  tx: Tx,
+  threadId: string,
+  deposits: readonly ArrivalRow[],
+): Promise<string | undefined> {
+  if (deposits.length === 0) return undefined;
+  if (!deposits.every((row) => isPlainCash(row.chain, row.instrument))) return undefined;
+  const chains = new Set(deposits.map((row) => row.chain));
+  const waiting = await tx
+    .select()
+    .from(actions)
+    .where(
+      and(
+        eq(actions.threadId, threadId),
+        eq(actions.status, "awaiting_permission"),
+        isNotNull(actions.proposalId),
+      ),
+    )
+    .orderBy(desc(actions.createdAt));
+  const plans = Map.groupBy(waiting, (leg) => leg.proposalId!);
+  for (const [plan, legs] of plans) {
+    const staged = legs.map(stagedLeg);
+    if ([...chains].some((chain) => spendsCashIn(staged, chain))) return plan;
+  }
+  return undefined;
 }
 
 /** A token they held quietly as Other that Auni came to recognise, as told. */
@@ -458,7 +501,12 @@ export function why(cause: Happened["cause"], venue: string): string {
  * One message of cards left in a thread, which the agent reads in its history as what happened, and
  * sent to their home channel with it, as Auni's answers said unasked are.
  */
-async function post(tx: Tx, place: Place, cards: readonly NewsCard[]): Promise<Posted> {
+async function post(
+  tx: Tx,
+  place: Place,
+  cards: readonly NewsCard[],
+  more: { readonly forPlan?: string } = {},
+): Promise<Posted> {
   const messageId = randomUUID();
   await tx.insert(messages).values({
     id: messageId,
@@ -467,7 +515,7 @@ async function post(tx: Tx, place: Place, cards: readonly NewsCard[]): Promise<P
     parts: [{ type: "data-cards", id: messageId, data: { cards } }],
     origin: "automation",
     // The agent reads it in the thread's history as what happened (see renderMessage).
-    metadata: { reason: cards.map(sentence).join(" "), posted: true },
+    metadata: { reason: cards.map(sentence).join(" "), posted: true, ...more },
   });
   await tx
     .update(threads)

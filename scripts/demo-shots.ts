@@ -7,8 +7,9 @@
 // prints, and visits Money (a take opened up, a receipt), the apps (the list, a sheet in each
 // state the demo's owner has one in, and one Auni itself runs on), a new chat, each pane of
 // Settings, every conversation the demo's owner has, and the states between them (the search
-// palette, a thread's details pane, Needs you, a phone's Chats and More, a turn's work opened up, a page that isn't
-// there, and a browser that isn't paired, or brings a link already used), and first run as a new
+// palette, a thread's details pane, Needs you, a phone's Chats and More, a turn's work opened up,
+// a message that may not have reached Auni, a page that isn't there, and a browser that isn't
+// paired, or brings a link already used), and first run as a new
 // owner meets it (each step of its setup), each at a desktop and a phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
 // A screen longer than the window is taken a window at a time: a conversation from its end back
 // to its start, a page from its top down. The demo makes the same owner every time (apps/core/src/demo), and here its clock
@@ -199,11 +200,11 @@ const SEARCH: Opener = {
 /** Opens the last turn's work that can open: the steps Auni took for its latest answer. */
 const OPEN_WORK: Opener = {
   does: `(() => {
-  const closed = [...document.querySelectorAll('.auni-work-header[aria-expanded="false"]')];
+  const closed = [...document.querySelectorAll('.auni-steps-line[aria-expanded="false"]')];
   closed.at(-1)?.click();
   return closed.length > 0;
 })()`,
-  shows: `document.querySelector('.auni-work-header[aria-expanded="true"]')`,
+  shows: `document.querySelector('.auni-steps-line[aria-expanded="true"]')`,
 };
 
 /** A step of first run's wizard, by the words on its button. */
@@ -211,6 +212,27 @@ const STEP = (label: string): Opener => ({
   does: PRESS(label),
   shows: `document.querySelector('[aria-current="step"]')?.textContent.includes(${JSON.stringify(label)})`,
 });
+
+/**
+ * Sends a message core never confirms: the page's own fetch answers the send with a server fault,
+ * so the thread shows what it says when a message may not have reached Auni.
+ */
+const SEND_UNCONFIRMED: Opener = {
+  does: `(() => {
+  const real = window.fetch;
+  window.fetch = (input, init) =>
+    init?.method === "POST" && /\\/messages$/u.test(typeof input === "string" ? input : input.url)
+      ? Promise.resolve(new Response("{}", { status: 503, headers: { "content-type": "application/json" } }))
+      : real(input, init);
+  const box = document.querySelector("textarea");
+  if (!box) return false;
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(box, "Is now a good time to add more?");
+  box.dispatchEvent(new Event("input", { bubbles: true }));
+  box.form?.requestSubmit();
+  return true;
+})()`,
+  shows: `document.querySelector('[role="alert"]')`,
+};
 
 /**
  * Every screen, into `out`, as an owner whose system is set to `look` sees it. Each look gets a
@@ -337,9 +359,27 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       once: true,
     });
     await take(page, out, "page-not-found", `${origin}/app/nothing-here`, "top");
+    // A message that may not have reached Auni, in a chat no later picture opens.
+    const quiet = threads.find((thread) => /nvidia/iu.test(thread.title ?? ""));
+    if (quiet)
+      await take(
+        page,
+        out,
+        "send-unconfirmed",
+        `${origin}/app/chat/${quiet.id}`,
+        "end",
+        SEND_UNCONFIRMED,
+        {
+          once: true,
+        },
+      );
+    // A turn's steps opened, in a chat whose answer looked a few things up before it spoke (its
+    // chat-... picture shows them folded to one line).
+    const looked = threads.find((thread) => /story with sol/iu.test(thread.title ?? ""));
+    if (looked)
+      await take(page, out, "work-open", `${origin}/app/chat/${looked.id}`, "end", OPEN_WORK);
     if (busiest) {
       const chat = `${origin}/app/chat/${busiest.id}`;
-      await take(page, out, "work-open", chat, "end", OPEN_WORK);
       // Last, as the pane stays open once opened (on this device) for every thread after it.
       const details: Opener = {
         does: PRESS("Show details"),

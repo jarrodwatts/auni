@@ -308,6 +308,8 @@ describe("a held move", () => {
     expect(data.reason).toContain(HELD.unrecorded);
     expect(data.reason).toContain("0xsent on monad");
     expect(data.reason).toContain("Its run stopped with: socket hang up");
+    // Its card never reached a chat here, so the agent isn't told the owner sees it.
+    expect(data.reason).toContain("No card for it reached the owner's chat");
     // The row itself is as it was held: reading it again changed nothing.
     expect(await rowOf(held.id)).toEqual(held);
   });

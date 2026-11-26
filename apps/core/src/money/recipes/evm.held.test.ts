@@ -132,7 +132,7 @@ holdsToCard("send_evm_transaction", {
     }),
     "a swap that would now leave someone a lasting approval": inWorld(SWAP, {
       ...SWAP,
-      grants: [{ kind: "spend", token: USDC, to: STRANGER }],
+      grants: [{ kind: "spend", contract: USDC, token: USDC, to: STRANGER }],
     } as Partial<SimulatedEffect>),
   },
 });

@@ -485,7 +485,13 @@ describe("prepareLegs", () => {
     vi.spyOn(recipe, "describe").mockResolvedValueOnce(preview([]));
     expect((await prepareLegs([savings])).problems).toEqual([]);
     vi.spyOn(recipe, "describe").mockResolvedValueOnce(
-      preview([{ lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" }]),
+      preview([
+        {
+          lets: "0x1a2b…9f8e spend your USDC",
+          reach: "wallet",
+          exact: { kind: "spend", token: "0x1", to: "0x2" },
+        },
+      ]),
     );
     expect(await prepareLegs([savings])).toEqual({
       prepared: [],

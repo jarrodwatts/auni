@@ -429,8 +429,7 @@ describe("a thread that acts on its own, and the coin its move would buy for fee
     world.coin = { [MONAD]: 1_000n * MON };
     const own = await insertThread({ budgetUsd, actMode: "within_limits" });
     const outcome = await proposeAction({ threadId: own.id }, recipe, INPUT);
-    const free = async () =>
-      (await db.transaction((tx) => threadPot(tx, own))).freeCashCents;
+    const free = async () => (await db.transaction((tx) => threadPot(tx, own))).freeCashCents;
     return { outcome, free };
   }
 

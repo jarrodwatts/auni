@@ -38,9 +38,7 @@ async function snapshot(
   cashUsd: string | null = null,
   holdings: readonly ReadingHolding[] | null = null,
 ) {
-  await db
-    .insert(valueSnapshots)
-    .values({ usdValue, cashUsd, holdings, takenAt: hoursAgo(hours) });
+  await db.insert(valueSnapshots).values({ usdValue, cashUsd, holdings, takenAt: hoursAgo(hours) });
 }
 
 /** A buy of `quantity` NVIDIA for `usdValue`, `hours` ago. */

@@ -131,7 +131,11 @@ export function rawEffect(seen: Simulated | null, names: ReadonlyMap<string, Tok
   return {
     gives: seen.out.map(amount),
     gets: seen.in.map(amount),
-    grants: seen.grants.map((grant) => ({ lets: grantLabel(grant, names), reach: "wallet" })),
+    grants: seen.grants.map((grant) => ({
+      lets: grantLabel(grant, names),
+      reach: "wallet",
+      exact: grant,
+    })),
     ...(lost >= 0.01 ? { costs: [{ label: "lost at market prices", usd: lost }] } : {}),
     ...(seen.sentTo ? { to: seen.sentTo } : {}),
     ...(blind ? { blind } : {}),

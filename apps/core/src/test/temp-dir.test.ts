@@ -34,6 +34,12 @@ it("removes the suite's folder once all its tests finish", () => {
   expect(existsSync(shared)).toBe(false);
 });
 
+it("makes every scratch folder inside the run's root, even with no prefix", () => {
+  const root = inject("tempRoot");
+  for (const dir of [tempDir(""), tempDir("x-"), dirname(doorSocket())])
+    expect(relative(root, dir).startsWith("..")).toBe(false);
+});
+
 it("leaves room for the Tailscale socket under a 64-byte temporary path", () => {
   const socket = relative(dirname(inject("tempRoot")), doorSocket());
   expect(64 + 1 + Buffer.byteLength(socket)).toBeLessThanOrEqual(103);

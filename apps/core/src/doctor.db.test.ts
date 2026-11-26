@@ -1,4 +1,4 @@
-import { NETWORKS, type EvmChainKey } from "@auni/shared";
+import { HELD, NETWORKS, type EvmChainKey } from "@auni/shared";
 import postgres from "postgres";
 import { InvalidParamsRpcError } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,6 @@ import { appTroubles, jobs } from "./db/schema.ts";
 import { doctor, doctorSummary, line, type Finding } from "./doctor.ts";
 import { env } from "./env.ts";
 import * as migrations from "./db/migrations.ts";
-import { heldMoves } from "./money/reconcile.ts";
 import { checkRelease } from "./release/check.ts";
 import { runningVersion, versionLine } from "./release/layout.ts";
 import { holderName } from "./running.ts";
@@ -20,10 +19,6 @@ import { insertAction, insertThread, wipe } from "./test/db.ts";
 vi.mock("./agent/brain.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   brainRows: vi.fn(),
-}));
-vi.mock("./money/reconcile.ts", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  heldMoves: vi.fn(),
 }));
 vi.mock("./money/chains.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -99,7 +94,6 @@ const of = (findings: readonly Finding[], check: Finding["check"]) =>
 beforeEach(async () => {
   await wipe(jobs, appTroubles);
   wallet.made = false;
-  vi.mocked(heldMoves).mockResolvedValue([]);
   layout.installed = false;
   service.command = null;
   service.lingers = null;
@@ -280,7 +274,8 @@ describe("auni doctor", () => {
   });
 
   it("names a held move and points to its card in the default summary", async () => {
-    vi.mocked(heldMoves).mockResolvedValue(["held-id"]);
+    const { id } = await insertThread({ title: "Fed bet" });
+    await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
     const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
     await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
     try {
@@ -288,8 +283,8 @@ describe("auni doctor", () => {
       expect(doctorSummary(findings, "auni")).toContain(
         "1 move needs checking. Open its card in Auni to check its status.",
       );
-      expect(doctorSummary(findings, "auni")).not.toContain("held-id");
-      expect(JSON.stringify(findings)).toContain("held-id");
+      expect(doctorSummary(findings, "auni")).not.toContain(id);
+      expect(JSON.stringify(findings)).toContain(id);
     } finally {
       await auni.end();
     }
@@ -445,21 +440,22 @@ describe("auni doctor", () => {
       const held = (await doctor()).filter(
         ({ check, status }) => check === "runner" && status === "fix",
       );
+      // The terminal's own words for the first ride along unseen by Health (a symbol key).
       expect(held).toEqual([
-        {
+        expect.objectContaining({
           check: "runner",
           status: "fix",
           says: "1 move needs checking. Open its card in chat for details",
           chats: [{ id, title: "Fed bet" }],
-        },
+        }),
         {
           check: "runner",
           status: "fix",
-          says: "Withdraw $20 to JAVqaE…6X8n on Solana needs checking. Auni sent it and never heard back, so it can't tell whether it went through.",
+          says: `Withdraw $20 to JAVqaE…6X8n on Solana needs checking. ${HELD.unanswered}`,
           heldMove: {
             id: withdrawal.id,
             summary: "Withdraw $20 to JAVqaE…6X8n on Solana",
-            why: "Auni sent it and never heard back, so it can't tell whether it went through.",
+            why: HELD.unanswered,
           },
         },
       ]);

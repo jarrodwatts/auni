@@ -277,9 +277,9 @@ const checkRunner: Check = async () => {
       status: "fix",
       [terminalDetail]: {
         problem:
-          held.length === 1
+          inChats.length === 1
             ? "1 move needs checking. Open its card in Auni to check its status."
-            : `${held.length} moves need checking. Open their cards in Auni to check their status.`,
+            : `${inChats.length} moves need checking. Open their cards in Auni to check their status.`,
       },
       says:
         inChats.length === 1

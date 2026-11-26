@@ -1,0 +1,11 @@
+/*
+ * The Portal in a chat card (see DepositCard): Auni and its orbit smaller, a soft dot saying
+ * it's listening, not loading, and nothing taking the addresses' place once the money lands.
+ */
+.auni-deposit-card .auni-portal-stage {
+  zoom: 0.72;
+}
+
+.auni-deposit-card[data-landed] .auni-portal-addresses {
+  height: 0;
+}

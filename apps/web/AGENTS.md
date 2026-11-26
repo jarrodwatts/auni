@@ -55,10 +55,15 @@ network on purpose, as a later `-H` wins.
   (`app-keys.tsx`, each a `SecretInput` to its private field), its switch, and for one Auni
   itself runs on, the job it does as a scene (`app-jobs.tsx`).
 - Settings: `components/settings/settings-dialog.tsx`, on core's `/me`.
-- Colours: every one a person sees is a token in `app/tokens.css`, which holds each as
-  `light-dark(light, dark)`; `app/tokens.test.ts` fails a hex value, a palette class
-  (`bg-white`) or a `dark:` class in a component. Add a token that says what it is for; never
-  write a colour in. A subject's own colour is its hue (`--hue`, the `hue-*` tokens).
+- The look is tokens (`app/tokens.css`), each colour `light-dark(light, dark)`: ink is the
+  strong action, blue is Auni (links, focus), amber only waits on the owner, green and red
+  only gain and loss; no gradients, glows or tinted tiles. Type is Inter and JetBrains Mono
+  (`app/fonts.ts`) on one role scale (`text-caption` ... `text-hero-money`); corners are
+  `rounded-control`, `-card`, `-sheet` or `-full`; one shadow, `shadow-float`, for what floats.
+  `app/tokens.test.ts` fails a colour, a font size or a radius written into a component.
+- Primitives (`components/ui/`): `Button`/`buttonVariants`, `Input`/`inputClass`, `Badge`,
+  `Card`/`CardSection`, `Row`/`Rows`, `Section`/`Eyebrow`, `AuniSheet`, `ConfirmDialog`. Build
+  from them; a logo with no mark is `NoMark`/`AppMark`'s neutral glyph, never initials.
 - The look: light, unless the owner picks another in Settings (Dark, or
   one an app brings, its theme, copied by `pnpm gen` into `app/app-themes.generated.css`).
   `lib/look.tsx` keeps the choice on the device and wears it as `data-theme`;

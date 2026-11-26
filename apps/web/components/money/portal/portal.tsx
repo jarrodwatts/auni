@@ -1,5 +1,7 @@
 "use client";
 
+import "./portal.css";
+
 import type { DepositWire } from "@auni/shared";
 import { X } from "lucide-react";
 import QRCode from "qrcode";
@@ -147,11 +149,11 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
 
       <div className="auni-portal-texts mt-[18px] w-full">
         <div className="auni-portal-waiting">
-          <DialogTitle className="text-[26px] leading-8 font-bold tracking-[-0.03em] text-ink">
+          <DialogTitle className="text-title text-ink">
             {need ? `Send me ${formatUsd(need)}` : "Send me anything"}
           </DialogTitle>
           {/* For a card, the simplest way to the amount; else, everything it takes. */}
-          <DialogDescription className="mt-1.5 text-[15px] leading-[22px] text-muted-foreground">
+          <DialogDescription className="mt-1.5 text-body leading-[22px] text-muted-foreground">
             {need ? (
               `USDC on ${EASIEST} is easiest`
             ) : (
@@ -164,13 +166,13 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
         </div>
         {/* Its lines hold their height while empty, so the dialog is as tall before as after. */}
         <div aria-hidden className="auni-portal-landing">
-          <p className="min-h-12 text-[44px] leading-[48px] font-bold tracking-[-0.035em] text-ink tabular-nums">
+          <p className="min-h-12 text-hero-money text-ink">
             {landed && counted !== null ? formatUsdcBalance(counted) : null}
           </p>
           {/* What came, once the amount has counted all the way to it. */}
           <p
             className={cn(
-              "mt-1 min-h-[22px] text-[15px] leading-[22px] text-muted-foreground transition-opacity duration-300 motion-reduce:transition-none",
+              "mt-1 min-h-[22px] text-body leading-[22px] text-muted-foreground transition-opacity duration-300 motion-reduce:transition-none",
               counted === arrived ? "opacity-100" : "opacity-0",
             )}
           >
@@ -222,7 +224,7 @@ export function Portal({ landed, need = null, networks }: PortalProps) {
         </DialogClose>
       </div>
       {clipboard.blocked ? (
-        <p role="alert" className="mt-3 text-[12.5px] text-muted-foreground">
+        <p role="alert" className="mt-3 text-meta text-muted-foreground">
           Copying was blocked. Select the address to copy it.
         </p>
       ) : null}

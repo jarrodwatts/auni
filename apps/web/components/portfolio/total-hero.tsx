@@ -49,10 +49,7 @@ export function TotalHero() {
             Your balance couldn&apos;t load just now.
           </p>
         ) : (
-          <BigMoney
-            value={formatUsdcBalance(shown)}
-            className="mt-1 min-w-0 font-semibold tracking-[-0.045em] sm:text-[52px]"
-          />
+          <BigMoney value={formatUsdcBalance(shown)} className="mt-1 min-w-0" />
         )}
         <MoneyActions className="flex flex-none max-sm:hidden" />
       </div>

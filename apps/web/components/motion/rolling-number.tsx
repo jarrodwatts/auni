@@ -1,5 +1,7 @@
 "use client";
 
+import "./rolling-number.css";
+
 import { useState } from "react";
 
 import { reducedMotion } from "@/lib/motion";
@@ -89,10 +91,7 @@ function RollingDigit({ char }: { readonly char: string }) {
           {state.prev}
         </span>
       ) : null}
-      <span
-        className={state.prev !== null ? "auni-digit-in" : undefined}
-        key={`in-${state.tick}`}
-      >
+      <span className={state.prev !== null ? "auni-digit-in" : undefined} key={`in-${state.tick}`}>
         {state.current}
       </span>
     </span>

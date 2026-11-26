@@ -1,5 +1,7 @@
 "use client";
 
+import "../conversation/thinking-indicator.css";
+
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
@@ -27,10 +29,34 @@ export function ThinkingGlyph({
       viewBox="0 0 16 16"
     >
       <g className="auni-thinking-orbit">
-        <circle className="auni-thinking-node" cx="8" cy="3.2" r="1.55" style={{ "--n": 0 } as CSSProperties} />
-        <circle className="auni-thinking-node" cx="12.8" cy="8" r="1.55" style={{ "--n": 1 } as CSSProperties} />
-        <circle className="auni-thinking-node" cx="8" cy="12.8" r="1.55" style={{ "--n": 2 } as CSSProperties} />
-        <circle className="auni-thinking-node" cx="3.2" cy="8" r="1.55" style={{ "--n": 3 } as CSSProperties} />
+        <circle
+          className="auni-thinking-node"
+          cx="8"
+          cy="3.2"
+          r="1.55"
+          style={{ "--n": 0 } as CSSProperties}
+        />
+        <circle
+          className="auni-thinking-node"
+          cx="12.8"
+          cy="8"
+          r="1.55"
+          style={{ "--n": 1 } as CSSProperties}
+        />
+        <circle
+          className="auni-thinking-node"
+          cx="8"
+          cy="12.8"
+          r="1.55"
+          style={{ "--n": 2 } as CSSProperties}
+        />
+        <circle
+          className="auni-thinking-node"
+          cx="3.2"
+          cy="8"
+          r="1.55"
+          style={{ "--n": 3 } as CSSProperties}
+        />
       </g>
     </svg>
   );

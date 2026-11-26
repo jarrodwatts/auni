@@ -51,7 +51,7 @@ export function ChatPlace({ threadId }: { readonly threadId: ThreadId }) {
       {thread ? <title>{`${thread.title} | auni`}</title> : null}
       <PlaceHeader
         icon={null}
-        title={thread ? thread.title : <Skeleton className="h-4 w-40 rounded-md" />}
+        title={thread ? thread.title : <Skeleton className="h-4 w-40 rounded-control" />}
         money={headerBadge}
         pane={thread !== undefined}
         actions={thread ? <ChatMenu thread={thread} place="header" /> : null}
@@ -69,13 +69,15 @@ export function ChatPlace({ threadId }: { readonly threadId: ThreadId }) {
 function ArchivedNote({ thread }: { readonly thread: Thread }) {
   const { restore } = useTidyChat(thread);
   return (
-    <div className="flex flex-none items-center justify-center gap-3 border-b border-foreground/[0.06] bg-sidebar px-4 py-2.5 text-[13.5px] text-muted-foreground">
+    <div className="flex flex-none items-center justify-center gap-3 border-b border-foreground/[0.06] bg-sidebar px-4 py-2.5 text-ui text-muted-foreground">
       <Archive aria-hidden className="size-4 flex-none text-faint" strokeWidth={1.75} />
-      <span className="min-w-0">Archived. It comes back to Threads when you or Auni write here.</span>
+      <span className="min-w-0">
+        Archived. It comes back to Threads when you or Auni write here.
+      </span>
       <button
         type="button"
         onClick={restore}
-        className="h-7 flex-none rounded-full bg-background px-3 text-[13px] font-medium text-ink ring-1 ring-foreground/[0.1] transition-colors hover:bg-foreground/[0.04]"
+        className="h-7 flex-none rounded-full bg-background px-3 text-meta font-medium text-ink ring-1 ring-foreground/[0.1] transition-colors hover:bg-foreground/[0.04]"
       >
         Bring back
       </button>
@@ -88,8 +90,8 @@ function MissingPlace() {
   return (
     <section className="flex h-full flex-col items-center justify-center px-6 text-center">
       <Mascot alt="" size={64} state="sad" />
-      <p className="mt-4 text-[15px] font-semibold text-ink">This thread isn&apos;t here</p>
-      <Link href="/app" className="auni-text-link mt-2 text-[13.5px]">
+      <p className="mt-4 text-body font-semibold text-ink">This thread isn&apos;t here</p>
+      <Link href="/app" className="auni-text-link mt-2 text-ui">
         Back to Portfolio
       </Link>
     </section>

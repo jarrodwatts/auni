@@ -1,5 +1,7 @@
 "use client";
 
+import "./settings-dialog.css";
+
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -98,11 +100,9 @@ export function SettingsDialog({
                   className="size-4.5 text-muted-foreground"
                   strokeWidth={1.9}
                 />
-                <h3 className="text-[18px] leading-6 font-semibold tracking-[-0.02em] text-ink">
-                  {current.label}
-                </h3>
+                <h3 className="text-section text-ink">{current.label}</h3>
               </div>
-              <DialogDescription className="mt-1 text-[13px] leading-[1.45] text-muted-foreground">
+              <DialogDescription className="mt-1 text-meta leading-[1.45] text-muted-foreground">
                 {current.description}
               </DialogDescription>
             </div>
@@ -110,7 +110,7 @@ export function SettingsDialog({
               type="button"
               aria-label="Close settings"
               onClick={close}
-              className="grid size-8 flex-none place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/35 focus-visible:outline-none"
+              className="grid size-8 flex-none place-items-center rounded-control text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/35 focus-visible:outline-none"
             >
               <X className="size-4" />
             </button>

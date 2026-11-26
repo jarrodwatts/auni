@@ -45,7 +45,7 @@ export function AboutPane({ highlightedTarget }: { readonly highlightedTarget: s
               <Mascot alt="" size={36} state="listening" />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[15px] font-semibold text-ink">
+                  <span className="text-body font-semibold text-ink">
                     Auni {data ? displayVersion(data.version) : ""}
                   </span>
                   {data ? (
@@ -54,7 +54,7 @@ export function AboutPane({ highlightedTarget }: { readonly highlightedTarget: s
                     </SettingsBadge>
                   ) : null}
                 </div>
-                <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                <span className="mt-0.5 block text-meta text-muted-foreground">
                   MIT licensed, zero fees, self-custodied
                 </span>
               </div>
@@ -92,17 +92,17 @@ export function AboutPane({ highlightedTarget }: { readonly highlightedTarget: s
           description="Where Auni keeps its database, settings, and logs on this machine."
         >
           <SettingsRow label="Runtime">
-            <code className="font-mono text-[12px] text-ink-soft">
+            <code className="font-mono text-caption text-ink-soft">
               Node {data.nodeVersion} ({data.platform}/{data.arch})
             </code>
           </SettingsRow>
           <SettingsRow label="Data folder">
-            <code className="max-w-[340px] truncate font-mono text-[12px] text-ink-soft">
+            <code className="max-w-[340px] truncate font-mono text-caption text-ink-soft">
               {data.dataDir}
             </code>
           </SettingsRow>
           <SettingsRow label="Settings file">
-            <code className="max-w-[340px] truncate font-mono text-[12px] text-ink-soft">
+            <code className="max-w-[340px] truncate font-mono text-caption text-ink-soft">
               {data.settingsFile}
             </code>
           </SettingsRow>

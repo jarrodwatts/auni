@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 
 import { AppJobs } from "./app-jobs";
 import { AppKeysNeeded, AppSettings } from "./app-keys";
-import { AppMark, appTint } from "./app-mark";
+import { AppMark } from "./app-mark";
 import { AppPairing } from "./app-pairing";
 import { keysNeeded } from "./app-standing";
 import { AppSwitch } from "./app-switch";
@@ -26,7 +26,7 @@ import { Section } from "./sheet-section";
 
 /** A way to try an app, as a pill; one that can't be tapped yet is the same pill, pale. */
 const CHIP =
-  "flex h-10 max-w-full items-center rounded-full border px-4 text-[13.5px] font-medium tracking-[-0.01em]";
+  "flex h-10 max-w-full items-center rounded-full border px-4 text-ui font-medium tracking-[-0.01em]";
 
 /**
  * One app, opened from the Apps list: the keys it still needs, what the owner has there, ways
@@ -78,7 +78,6 @@ export function AppSheet({
       side={wide ? "right" : "bottom"}
       title={name}
       initialFocus={wide && asksKey ? firstKey : undefined}
-      wash={appTint(app.id)}
       className="sm:w-[420px]"
     >
       <div
@@ -89,9 +88,7 @@ export function AppSheet({
         <header className="relative flex items-center gap-4 pr-8">
           <AppMark id={app.id} name={app.name} size={56} />
           <div className="min-w-0">
-            <h2 className="truncate text-[22px] leading-7 font-semibold tracking-[-0.03em] text-ink">
-              {name}
-            </h2>
+            <h2 className="truncate text-title text-ink">{name}</h2>
             {app.does ? (
               <p className="mt-0.5 text-ui font-normal text-muted-foreground">{app.does}</p>
             ) : null}
@@ -105,7 +102,7 @@ export function AppSheet({
             <Section title="What isn't working">
               <ul className="grid gap-2" data-testid="app-troubles">
                 {app.troubles.map((trouble) => (
-                  <li key={trouble.says} className="rounded-xl bg-surface px-4 py-3">
+                  <li key={trouble.says} className="rounded-card bg-surface px-4 py-3">
                     <span className="block text-ui font-medium text-ink">{trouble.short}</span>
                     <span className="mt-0.5 block text-meta text-muted-foreground">
                       {trouble.says}
@@ -159,7 +156,7 @@ export function AppSheet({
                       onClick={() => ask(way.prompt)}
                       className={cn(
                         CHIP,
-                        "border-foreground/[0.08] bg-card text-ink shadow-[0_1px_2px_--alpha(var(--color-shade)/4%)] transition-[transform,box-shadow,border-color] duration-200 ease-settle hover:-translate-y-px hover:border-foreground/[0.12] hover:shadow-[0_6px_16px_-8px_--alpha(var(--color-shade)/22%)] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
+                        "border-foreground/[0.08] bg-card text-ink transition-[transform,box-shadow,border-color] duration-200 ease-settle hover:-translate-y-px hover:border-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
                       )}
                     >
                       <span className="truncate">{way.title}</span>
@@ -253,9 +250,7 @@ function Holdings({ app }: { readonly app: AppWire }) {
   const own = appListing(app.id)?.logo;
   return (
     <section aria-label="You have" className="mt-8">
-      <p className="text-[40px] leading-none font-semibold tracking-[-0.045em] text-ink tabular-nums">
-        {formatUsd(account.usd)}
-      </p>
+      <p className="text-hero-money text-ink">{formatUsd(account.usd)}</p>
       <p className="mt-1.5 text-meta text-muted-foreground">there now</p>
       <ul className="mt-4 flex flex-col">
         {account.holdings.map((holding) => (
@@ -320,7 +315,7 @@ function Way({
       disabled={busy || off}
       onClick={onAsk}
       className={cn(
-        "flex h-11 min-w-0 items-center justify-center gap-2 rounded-full bg-foreground/[0.05] px-4 text-[14.5px] font-semibold text-ink transition-[background-color,scale] duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.985] disabled:pointer-events-none disabled:opacity-55",
+        "flex h-11 min-w-0 items-center justify-center gap-2 rounded-full bg-foreground/[0.05] px-4 text-body font-semibold text-ink transition-[background-color,scale] duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.985] disabled:pointer-events-none disabled:opacity-55",
       )}
     >
       {icon}

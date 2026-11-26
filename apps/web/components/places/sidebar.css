@@ -1,0 +1,16 @@
+/* A scrolling list dissolves into whatever sits beneath it instead of butting
+   against a rule. The stops ease, so the fade has no visible start line. The
+   list keeps a floor as tall as the fade (pb-12), so once scrolled to its end
+   the last row sits clear of it: only rows still to come are ever faded. */
+.auni-list-fade {
+  --auni-list-fade: linear-gradient(
+    to bottom,
+    #000 calc(100% - 48px),
+    rgb(0 0 0 / 0.82) calc(100% - 38px),
+    rgb(0 0 0 / 0.5) calc(100% - 26px),
+    rgb(0 0 0 / 0.2) calc(100% - 13px),
+    transparent 100%
+  );
+  -webkit-mask-image: var(--auni-list-fade);
+  mask-image: var(--auni-list-fade);
+}

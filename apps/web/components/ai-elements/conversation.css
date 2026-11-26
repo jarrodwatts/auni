@@ -1,0 +1,14 @@
+.auni-transcript {
+  --auni-transcript-mask: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--auni-transcript-fade)),
+    transparent calc(100% - var(--auni-transcript-fade) * 0.6)
+  );
+  -webkit-mask-image: var(--auni-transcript-mask);
+  mask-image: var(--auni-transcript-mask);
+  transition: --auni-transcript-fade 200ms ease-out;
+}
+[role="log"]:has(> [data-slot="conversation-scroll-button"][data-at-bottom="false"])
+  > .auni-transcript {
+  --auni-transcript-fade: 92px;
+}

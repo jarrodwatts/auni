@@ -53,7 +53,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
 
   if (rpcs.isPending && !rpcs.data) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded-[16px] border border-foreground/[0.08] bg-card py-12 text-[13px] text-muted-foreground">
+      <div className="flex items-center justify-center gap-2 rounded-card border border-foreground/[0.08] bg-card py-12 text-meta text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
         Reading RPC configuration…
       </div>
@@ -62,7 +62,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
 
   if (rpcs.isError || !rpcs.data) {
     return (
-      <div className="rounded-[16px] border border-foreground/[0.08] bg-card p-5 text-[13px] text-destructive">
+      <div className="rounded-card border border-foreground/[0.08] bg-card p-5 text-meta text-destructive">
         Could not load network settings.
       </div>
     );
@@ -185,7 +185,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                   </button>
                 ) : null}
                 {alchemySaved ? (
-                  <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+                  <span className="inline-flex items-center gap-1 text-caption text-positive">
                     <Check className="size-3.5" />
                     Saved
                   </span>
@@ -193,7 +193,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
               </div>
             </div>
           ) : null}
-          {alchemyError ? <p className="text-[12.5px] text-destructive">{alchemyError}</p> : null}
+          {alchemyError ? <p className="text-meta text-destructive">{alchemyError}</p> : null}
           {pairAgainFor === "alchemy" ? (
             <PairAgain then="Then save your Alchemy API key again." />
           ) : null}
@@ -218,16 +218,16 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                 <span className="flex items-center gap-2">
                   <span>{chain.name}</span>
                   <SettingsBadge tone={badge.tone}>{badge.label}</SettingsBadge>
-                  {chain.envLocked ? <SettingsBadge tone="warn">Env locked</SettingsBadge> : null}
+                  {chain.envLocked ? <SettingsBadge>Env locked</SettingsBadge> : null}
                 </span>
               }
               description={
                 chain.customHost ? (
-                  <code className="font-mono text-[12px] break-all text-ink-soft">
+                  <code className="font-mono text-caption break-all text-ink-soft">
                     {chain.customHost} (write-only override)
                   </code>
                 ) : (
-                  <span className="font-mono text-[11.5px] text-faint">{chain.envVar}</span>
+                  <span className="font-mono text-caption text-faint">{chain.envVar}</span>
                 )
               }
             >
@@ -291,7 +291,7 @@ export function NetworkPane({ highlightedTarget }: { readonly highlightedTarget:
                       Cancel
                     </button>
                   </div>
-                  {rpcError ? <p className="text-[12.5px] text-destructive">{rpcError}</p> : null}
+                  {rpcError ? <p className="text-meta text-destructive">{rpcError}</p> : null}
                   {pairAgainFor === "rpc" ? (
                     <PairAgain then="Then save the custom RPC URL again." />
                   ) : null}

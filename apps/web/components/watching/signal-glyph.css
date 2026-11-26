@@ -1,0 +1,19 @@
+/* The automation card's "on watch" mark: a broadcast glyph whose arc pairs
+   ripple outward one after the other. */
+@keyframes auni-watch-wave {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+.auni-watch-signal [data-wave] {
+  animation: auni-watch-wave 2.6s var(--motion-settle) infinite;
+}
+
+.auni-watch-signal [data-wave="2"] {
+  animation-delay: 320ms;
+}

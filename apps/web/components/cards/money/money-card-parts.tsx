@@ -3,11 +3,12 @@ import { useState, type ReactNode } from "react";
 
 import { EDGE_SIZE, EdgeMascot } from "@/components/brand/edge-mascot";
 import { headroom, wantsAuni, type EdgeScene } from "@/components/brand/edge-pose";
-import { LogoImage, Monogram } from "@/components/brand/marks";
+import { LogoImage, NoMark } from "@/components/brand/marks";
 import { IntegrationMark } from "@/components/integrations/integration-mark";
 import { AutoHeight } from "@/components/motion/auto-height";
 import { TextSwap } from "@/components/motion/text-swap";
 import { TurnTag } from "@/components/places/place-marks";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import type { MoneyCardMark } from "./action-card-content";
@@ -16,14 +17,13 @@ import styles from "./money-card.module.css";
 import { useNewestCard } from "./use-newest-card";
 
 /**
- * A money card is an object: a white card with a crisp hairline, barely
- * lifted, its color left to the mark it is about. Once settled it eases
+ * A money card is an object: a flat card with a hairline edge, its color left to the mark it is
+ * about. Once settled it eases
  * down to a one-line receipt tile.
  */
 export function MoneyCardFrame({
   auni = null,
   children,
-  flat = false,
   label,
   phase,
 }: {
@@ -35,8 +35,6 @@ export function MoneyCardFrame({
    */
   readonly auni?: EdgeScene | null;
   readonly children: ReactNode;
-  /** A receipt of something finished: it rests on the page instead of lifting off it. */
-  readonly flat?: boolean;
   readonly label: string;
   readonly phase: "open" | "confirmed" | "expired";
 }) {
@@ -62,10 +60,7 @@ export function MoneyCardFrame({
         <section
           ref={setCard}
           aria-label={label}
-          className={cn(
-            "relative z-[1] w-full min-w-0 overflow-hidden border border-foreground/[0.08] bg-card text-ink transition-shadow duration-500",
-            settled ? "rounded-[18px]" : cn("rounded-[22px]", !flat && "shadow-card"),
-          )}
+          className="relative z-[1] w-full min-w-0 overflow-hidden rounded-card border border-border bg-card text-ink"
           data-phase={phase}
           data-testid="money-card"
         >
@@ -116,8 +111,8 @@ export function MoneyMark({
           aria-hidden
           className={cn(
             styles.ring,
-            // A logo or initials is a circle and a venue's mark a rounded square; the ring keeps 5px off either.
-            mark.kind === "integration" ? "rounded-[18px]" : "rounded-full",
+            // A logo is a circle and a venue's mark a rounded square; the ring keeps 5px off either.
+            mark.kind === "integration" ? "rounded-card" : "rounded-full",
           )}
           data-landed={ring === "landed" || undefined}
         />
@@ -148,7 +143,7 @@ export function MarkFace({ mark, size }: { readonly mark: MoneyCardMark; readonl
     case "integration":
       return <IntegrationMark integration={mark.integration} size={size} />;
     case "initials":
-      return <Monogram name={mark.name} size={size} />;
+      return <NoMark size={size} />;
     case "image":
       return (
         <LogoImage
@@ -189,14 +184,15 @@ export function MoneyButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative flex h-12 items-center justify-center rounded-full px-5 text-[15px] font-semibold transition-[background-color,transform,opacity] duration-200 ease-settle active:scale-[0.985] disabled:pointer-events-none disabled:opacity-60",
-        tone === "primary" && "bg-foreground text-background hover:bg-foreground/85",
+        buttonVariants({
+          variant: tone === "quiet" ? "secondary" : tone,
+          size: "lg",
+        }),
+        "font-semibold",
         // A main button that can't be pressed yet waits pale, and darkens the moment it can.
         tone === "primary" &&
           !busy &&
-          "disabled:bg-foreground/[0.05] disabled:text-muted-foreground disabled:opacity-100",
-        tone === "quiet" && "bg-foreground/[0.05] text-ink hover:bg-foreground/[0.08]",
-        tone === "outline" && "border border-foreground/[0.12] text-ink hover:bg-foreground/[0.03]",
+          "disabled:bg-foreground/[0.06] disabled:text-muted-foreground disabled:opacity-100",
         busy && "disabled:opacity-100",
         className,
       )}
@@ -229,7 +225,7 @@ export function NeedsYou({ count }: { readonly count: number }) {
 /** Said beside what's happening only once the wait is long enough to wonder about. */
 export function Late() {
   return (
-    <span aria-hidden className={cn("flex-none text-[13px] text-muted-foreground", styles.late)}>
+    <span aria-hidden className={cn("flex-none text-meta text-muted-foreground", styles.late)}>
       Can take a minute
     </span>
   );

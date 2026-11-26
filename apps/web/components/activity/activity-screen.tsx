@@ -30,9 +30,7 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: ThreadId
   const { chats, archived } = usePlaces();
   const allThreads = [...chats, ...archived].map(({ thread }) => thread);
   const threadsById = new Map(allThreads.map((thread) => [thread.id, thread]));
-  const filterThreads = allThreads.filter(
-    (thread) => thread.moveCount > 0 || thread.id === only,
-  );
+  const filterThreads = allThreads.filter((thread) => thread.moveCount > 0 || thread.id === only);
   const wide = useMediaQuery("(min-width: 1280px)");
   const roomy = useMediaQuery("(min-width: 1024px)");
   const [picked, setPicked] = useState<string | null>(null);
@@ -57,7 +55,7 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: ThreadId
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[760px] px-4 pt-6 pb-16 sm:px-8">
-            <h2 className="text-amount tracking-[-0.02em] text-ink max-sm:hidden">Activity</h2>
+            <h2 className="text-title text-ink max-sm:hidden">Activity</h2>
             <Chips
               threads={filterThreads}
               only={only}
@@ -76,11 +74,11 @@ export function ActivityScreen({ initialOnly }: { readonly initialOnly: ThreadId
             ) : !activity.data ? (
               <ul className="auni-appear-late mt-6 flex flex-col gap-2">
                 {[0, 1, 2, 3, 4].map((key) => (
-                  <li key={key} className="h-16 rounded-[16px] bg-surface" />
+                  <li key={key} className="h-16 rounded-card bg-surface" />
                 ))}
               </ul>
             ) : items.length === 0 ? (
-              <p className="py-16 text-center text-[14px] text-muted-foreground">
+              <p className="py-16 text-center text-ui text-muted-foreground">
                 {only
                   ? `Nothing has happened in ${threadsById.get(only)?.title ?? "this thread"} yet.`
                   : "Nothing has happened to your money yet."}
@@ -132,7 +130,7 @@ function Chips({
   if (threads.length === 0) return null;
   const chip = (on: boolean) =>
     cn(
-      "flex h-9 max-w-[220px] flex-none items-center gap-2 rounded-full border px-4 text-[14px] font-medium transition-colors",
+      "flex h-9 max-w-[220px] flex-none items-center gap-2 rounded-full border px-4 text-ui font-medium transition-colors",
       on
         ? "border-foreground bg-foreground text-background"
         : "border-foreground/[0.08] text-ink hover:bg-surface",
@@ -211,7 +209,7 @@ function Row({
       aria-current={selected || undefined}
       onClick={onPick}
       className={cn(
-        "-mx-2.5 flex w-[calc(100%+20px)] items-center gap-3.5 rounded-[14px] px-2.5 py-3 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50",
+        "-mx-2.5 flex w-[calc(100%+20px)] items-center gap-3.5 rounded-card px-2.5 py-3 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50",
         decision
           ? selected
             ? "bg-negative/[0.09]"
@@ -225,7 +223,9 @@ function Row({
         <ItemMark item={item} size={40} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className={cn("block truncate text-ui text-ink", fresh && "font-semibold")}>
+        <span
+          className={cn("block truncate text-ui font-medium text-ink", fresh && "font-semibold")}
+        >
           {fresh ? <span className="sr-only">New: </span> : null}
           {item.title}
         </span>

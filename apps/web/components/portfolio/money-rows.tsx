@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { OtherTokensDialog, OtherTokensMark } from "./other-tokens";
 import { otherTokensLabel } from "./other-tokens-text";
 
-const LIST = "overflow-hidden rounded-[20px] bg-surface";
+const LIST = "overflow-hidden rounded-card bg-surface";
 const ROW =
   "flex items-center pl-4 outline-none transition-colors duration-150 active:bg-foreground/[0.04] focus-visible:bg-foreground/[0.04]";
 const RULE = "group-[:not(:first-child)]/row:border-t border-foreground/[0.06]";

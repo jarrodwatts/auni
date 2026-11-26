@@ -15,11 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ManageDialogContent,
-  ManageFooter,
-  manageFieldClass,
-} from "@/components/ui/manage-dialog";
+import { ManageDialogContent, ManageFooter, manageFieldClass } from "@/components/ui/manage-dialog";
 import { CoreApiError } from "@/lib/core";
 import type { Thread } from "@/lib/data/views";
 import { cn } from "@/lib/utils";
@@ -31,7 +27,7 @@ import { usePlaceRoute } from "./use-places";
 export const MAX_TITLE_CHARS = 160;
 
 const ITEM =
-  "min-h-9 gap-2.5 rounded-[9px] px-2.5 py-1.5 text-[14px] text-ink focus:bg-foreground/[0.045] focus:text-ink [&_svg]:text-faint";
+  "min-h-9 gap-2.5 rounded-control px-2.5 py-1.5 text-ui text-ink focus:bg-foreground/[0.045] focus:text-ink [&_svg]:text-faint";
 
 function heldBy(thread: Thread): { archive: boolean; delete: boolean; why: string } | null {
   if (thread.state === "needs_user")
@@ -84,8 +80,8 @@ export function ChatMenu({
             aria-label={`${thread.title} options`}
             className={
               place === "header"
-                ? "flex size-8 flex-none items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-ink"
-                : "auni-touch-target flex size-6 items-center justify-center rounded-[6px] text-muted-foreground outline-none transition-colors duration-150 hover:bg-foreground/[0.06] hover:text-ink focus-visible:text-ink focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-ink"
+                ? "flex size-8 flex-none items-center justify-center rounded-card text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-ink data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-ink"
+                : "auni-touch-target flex size-6 items-center justify-center rounded-control text-muted-foreground outline-none transition-colors duration-150 hover:bg-foreground/[0.06] hover:text-ink focus-visible:text-ink focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-ink"
             }
           >
             <Ellipsis aria-hidden className={place === "header" ? "size-[18px]" : "size-4"} />
@@ -96,7 +92,7 @@ export function ChatMenu({
           sideOffset={6}
           collisionPadding={12}
           onCloseAutoFocus={(event) => event.preventDefault()}
-          className="w-[232px] rounded-[14px] border-foreground/[0.08] p-1.5 shadow-menu"
+          className="w-[232px] rounded-card border-foreground/[0.08] p-1.5 shadow-float"
         >
           {!thread.archived ? (
             <DropdownMenuItem className={ITEM} onSelect={() => tidy.pin(!thread.pinned)}>
@@ -142,7 +138,7 @@ export function ChatMenu({
             Delete
           </DropdownMenuItem>
           {held ? (
-            <p className="px-2.5 pt-1.5 pb-1 text-[12.5px] leading-[1.45] text-muted-foreground">
+            <p className="px-2.5 pt-1.5 pb-1 text-meta leading-[1.45] text-muted-foreground">
               {held.why}
             </p>
           ) : null}
@@ -249,7 +245,7 @@ function RenameForm({ thread, onDone }: { readonly thread: Thread; readonly onDo
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
       <div className="px-6 pt-6 pb-5">
         <DialogTitle className={auniDialogTitleClass}>Rename thread</DialogTitle>
-        <DialogDescription className="mt-1.5 text-[14px] text-muted-foreground">
+        <DialogDescription className="mt-1.5 text-ui text-muted-foreground">
           The name it goes by in your sidebar and search.
         </DialogDescription>
       </div>

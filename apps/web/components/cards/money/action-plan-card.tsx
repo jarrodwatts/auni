@@ -135,18 +135,17 @@ export function ActionPlanCard({
   return (
     <MoneyCardFrame
       auni={step === "loading" ? null : edgeScene({ phase, retry: needsYou > 0, rows })}
-      flat={finished}
       label={card.title}
       phase="open"
     >
       <div className="flex items-center gap-3">
         <MoneyMark mark={mark} />
         <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
+          <h3 className="line-clamp-2 text-reading leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
             {card.title}
           </h3>
           {line.text ? (
-            <p className="mt-0.5 flex items-center gap-2 text-[13px] leading-[18px] text-muted-foreground">
+            <p className="mt-0.5 flex items-center gap-2 text-meta leading-[18px] text-muted-foreground">
               <span className="flex min-w-0">
                 <TextSwap className={line.working ? styles.shimmer : undefined} text={line.text} />
               </span>
@@ -156,10 +155,10 @@ export function ActionPlanCard({
         </div>
         {units > 0n ? (
           <div className="flex-none pl-1 text-right">
-            <p className="text-[26px] leading-[1.1] font-semibold tracking-[-0.035em] text-ink tabular-nums">
+            <p className="text-card-money text-ink">
               <RollingNumber value={total} />
             </p>
-            <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">
+            <p className="mt-0.5 text-meta leading-4 text-muted-foreground">
               <TextSwap text={amountNote(phase, flow, done === 0)} />
             </p>
           </div>
@@ -174,7 +173,7 @@ export function ActionPlanCard({
           ? permissions.map((says, index) => (
               <p
                 key={index}
-                className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive"
+                className="mt-3 text-meta leading-[1.45] font-medium break-words text-destructive"
               >
                 {says}
               </p>

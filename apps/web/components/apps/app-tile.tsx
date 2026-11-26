@@ -2,23 +2,22 @@
 
 import { appListing, type AppWire } from "@auni/shared";
 import { ArrowRight } from "lucide-react";
-import type { CSSProperties } from "react";
 
 import { AssetLogo } from "@/components/brand/marks";
 import { cn } from "@/lib/utils";
 
-import { AppMark, appTint } from "./app-mark";
+import { AppMark } from "./app-mark";
 import { appStanding, needOf } from "./app-standing";
 
 /** The most holdings a tile shows the logos of. */
 const LOGOS_SHOWN = 3;
 
 /**
- * Resting, a quiet fill with a whisper of the app's own colour behind its mark; under the
- * pointer the colour comes up a little. Nothing moves until it's pressed.
+ * A card with a hairline edge: its logo brings the colour. Under the pointer the fill comes up a
+ * little; nothing moves until it's pressed.
  */
 const TILE = [
-  "group relative isolate flex min-h-[172px] w-full min-w-0 flex-col overflow-hidden rounded-[22px] bg-surface p-4 text-left outline-none",
+  "group relative isolate flex min-h-[172px] w-full min-w-0 flex-col overflow-hidden rounded-card border border-border bg-card p-4 text-left outline-none hover:bg-accent/60",
   "transition-[scale] duration-300 ease-settle active:scale-[0.985] active:duration-100 motion-reduce:transition-none motion-reduce:active:scale-100",
   "focus-visible:ring-[3px] focus-visible:ring-ring/50",
 ].join(" ");
@@ -47,14 +46,7 @@ export function AppTile({ app, onOpen }: { readonly app: AppWire; readonly onOpe
       data-testid="app-tile"
       data-app={app.id}
       data-tone={standing.tone}
-      style={{ "--app-tint": appTint(app.id) } as CSSProperties}
     >
-      {off ? null : (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute -top-[70px] -left-[70px] -z-10 size-[230px] opacity-70 transition-opacity duration-300 ease-settle group-hover:opacity-100 [background:radial-gradient(closest-side,var(--app-tint),transparent)]"
-        />
-      )}
       <span className={cn("flex items-start", off && "opacity-55 grayscale")}>
         <AppMark id={app.id} name={app.name} size={44} />
         <ArrowRight
@@ -71,7 +63,7 @@ export function AppTile({ app, onOpen }: { readonly app: AppWire; readonly onOpe
             className={cn(
               "block truncate text-ink tabular-nums",
               standing.tone === "money"
-                ? "text-amount leading-none tracking-[-0.03em]"
+                ? "text-title"
                 : "text-ui leading-6 font-semibold tracking-[-0.01em]",
               off && "text-muted-foreground",
             )}
@@ -96,7 +88,7 @@ export function AppTile({ app, onOpen }: { readonly app: AppWire; readonly onOpe
             {held.slice(0, LOGOS_SHOWN).map((holding, index) => (
               <span
                 key={holding.id}
-                className="rounded-full ring-2 ring-surface"
+                className="rounded-full ring-2 ring-card"
                 style={{ marginLeft: index === 0 ? 0 : -8, zIndex: LOGOS_SHOWN - index }}
               >
                 <AssetLogo holding={holding} size={26} />

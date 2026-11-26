@@ -17,7 +17,7 @@ export function ChartChange({
   const amount = formatUsdcChange(move.change);
   const percent = Math.abs(move.percent).toFixed(1);
   return (
-    <p className={cn("flex min-w-0 items-baseline gap-2 text-[14px] leading-5", className)}>
+    <p className={cn("flex min-w-0 items-baseline gap-2 text-ui leading-5", className)}>
       <span
         className={cn(
           "flex-none font-medium transition-colors duration-300",

@@ -69,17 +69,17 @@ export function ConnectCard({ card }: { readonly card: AskCardWire & { readonly 
             <AppMark id={card.app} name={name} size={38} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink">
+            <p className="text-body leading-5 font-semibold tracking-[-0.01em] text-ink">
               {done ? `${name} is on` : card.summary}
             </p>
-            <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.4] text-muted-foreground">
+            <p className="mt-0.5 line-clamp-2 text-meta leading-[1.4] text-muted-foreground">
               {done ? "Auni can use it from now on" : standing.label}
             </p>
           </div>
           {done ? (
             <Link
               href={appHref(card.app)}
-              className="flex h-9 flex-none items-center gap-1 rounded-full bg-foreground/[0.05] px-4 text-[13.5px] font-semibold text-ink transition-colors duration-200 ease-settle hover:bg-foreground/[0.08]"
+              className="flex h-9 flex-none items-center gap-1 rounded-full bg-foreground/[0.05] px-4 text-ui font-semibold text-ink transition-colors duration-200 ease-settle hover:bg-foreground/[0.08]"
             >
               Open
               <ArrowRight aria-hidden className="size-3.5" strokeWidth={2.4} />
@@ -97,27 +97,27 @@ export function ConnectCard({ card }: { readonly card: AskCardWire & { readonly 
         <div className="flex items-center gap-3">
           {mark}
           <div className="min-w-0 flex-1">
-            <p className="text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
+            <p className="text-reading leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
               {card.summary}
             </p>
             {does ? (
-              <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{does}</p>
+              <p className="mt-0.5 text-meta leading-[18px] text-muted-foreground">{does}</p>
             ) : null}
           </div>
         </div>
         {why ? (
           <figure className="mt-5 border-t border-foreground/[0.06] pt-5">
-            <figcaption className="text-[12px] text-muted-foreground">Auni says</figcaption>
-            <blockquote className="mt-1 text-[15px] leading-[1.5] text-pretty text-ink">
+            <figcaption className="text-caption text-muted-foreground">Auni says</figcaption>
+            <blockquote className="mt-1 text-body leading-[1.5] text-pretty text-ink">
               {why}
             </blockquote>
           </figure>
         ) : null}
         {changes ? (
-          <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">{changes}</p>
+          <p className="mt-4 text-meta leading-[1.45] text-muted-foreground">{changes}</p>
         ) : null}
         {failed ? (
-          <p role="alert" className="mt-4 text-[13px] text-destructive">
+          <p role="alert" className="mt-4 text-meta text-destructive">
             That didn&apos;t reach Auni, so nothing changed. Try again.
           </p>
         ) : null}

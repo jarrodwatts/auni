@@ -85,18 +85,18 @@ function TokenList() {
   if (tokens.isPending)
     return (
       <div className="mt-5 grid gap-2">
-        <Skeleton className="h-14 rounded-[14px]" />
-        <Skeleton className="h-14 rounded-[14px]" />
+        <Skeleton className="h-14 rounded-card" />
+        <Skeleton className="h-14 rounded-card" />
       </div>
     );
   if (!tokens.data)
     return (
-      <p role="alert" className="mt-5 text-[14px] text-destructive">
+      <p role="alert" className="mt-5 text-ui text-destructive">
         They couldn&apos;t be read just now. Try again in a moment.
       </p>
     );
   if (tokens.data.length === 0)
-    return <p className="mt-5 text-[14px] text-muted-foreground">None right now.</p>;
+    return <p className="mt-5 text-ui text-muted-foreground">None right now.</p>;
   return (
     <ul className="mt-5 grid gap-2">
       {tokens.data.map((token) => (
@@ -118,19 +118,19 @@ function TokenRow({ token }: { readonly token: OtherToken }) {
   });
   const network = NETWORKS[token.network];
   return (
-    <li className="flex items-center gap-3 rounded-[14px] bg-surface px-3.5 py-2.5">
+    <li className="flex items-center gap-3 rounded-card bg-surface px-3.5 py-2.5">
       <NetworkMark network={network} size={28} />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-mono text-[13.5px] text-ink" title={token.address}>
+        <p className="truncate font-mono text-ui text-ink" title={token.address}>
           {shortAddress(token.address)}
         </p>
-        <p className="truncate text-[12.5px] text-muted-foreground">
+        <p className="truncate text-meta text-muted-foreground">
           {otherTokenLine(token, network.name)}
         </p>
       </div>
       <MoneyButton
         tone="outline"
-        className="h-9 px-4 text-[13.5px]"
+        className="h-9 px-4 text-ui"
         busy={add.isPending}
         busyLabel="Adding"
         disabled={add.isPending}

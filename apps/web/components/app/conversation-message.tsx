@@ -1,5 +1,7 @@
 "use client";
 
+import "./conversation-message.css";
+
 import type { ThreadId } from "@auni/shared";
 import { getToolName } from "ai";
 import { Brain, OctagonPause, Pencil, RefreshCw } from "lucide-react";
@@ -85,7 +87,7 @@ export function ConversationMessage({
           {answering?.question ? (
             // What the words answer, quiet over them; picked or typed, an answer is a message.
             <p
-              className="-mb-1 line-clamp-2 max-w-[80%] self-end px-1 text-right text-[12.5px] leading-[17px] text-muted-foreground"
+              className="-mb-1 line-clamp-2 max-w-[80%] self-end px-1 text-right text-meta leading-[17px] text-muted-foreground"
               dir="auto"
             >
               {answering.question}
@@ -93,7 +95,7 @@ export function ConversationMessage({
           ) : null}
           <Bubble align="end" variant="muted">
             {text.length > 0 && (
-              <BubbleContent className="rounded-[20px_20px_6px_20px] px-[18px] py-3 text-[15px] leading-normal">
+              <BubbleContent className="rounded-sheet rounded-br-control px-[18px] py-3 text-body leading-normal">
                 <p className="whitespace-pre-wrap" dir="auto">
                   {text}
                 </p>
@@ -198,7 +200,9 @@ export function ConversationMessage({
                       cards={cards}
                       retried={transcript.retried}
                       // A card something later followed up on offers no follow-up of its own.
-                      onAskAgent={cards.some(({ id }) => id === lastCardId) ? onAskAgent : undefined}
+                      onAskAgent={
+                        cards.some(({ id }) => id === lastCardId) ? onAskAgent : undefined
+                      }
                     />
                   ) : undefined,
               };
@@ -254,7 +258,7 @@ export function ConversationMessage({
 /** Says this answer is short because the person stopped it. */
 function StoppedAnswerNotice() {
   return (
-    <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-muted-foreground/80">
+    <p className="mt-2 flex items-center gap-1.5 text-meta text-muted-foreground/80">
       <OctagonPause className="size-3.5" aria-hidden />
       You stopped this answer.
     </p>

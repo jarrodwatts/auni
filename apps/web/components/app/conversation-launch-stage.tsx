@@ -1,5 +1,7 @@
 "use client";
 
+import "./conversation-launch-stage.css";
+
 import { useLayoutEffect, useRef } from "react";
 
 import { Composer } from "@/components/app/composer";
@@ -40,10 +42,7 @@ export function ConversationLaunchStage() {
     const dy = composerFromTop - toTop;
     if (Math.abs(dy) < 2 || typeof dock.animate !== "function") return undefined;
     const animation = dock.animate(
-      [
-        { transform: `translate3d(0, ${dy}px, 0)` },
-        { transform: "translate3d(0, 0, 0)" },
-      ],
+      [{ transform: `translate3d(0, ${dy}px, 0)` }, { transform: "translate3d(0, 0, 0)" }],
       { duration: 360, easing: easings.settle },
     );
     return () => animation.cancel();

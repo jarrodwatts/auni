@@ -113,13 +113,13 @@ export function PrivateInput({
       <SecretNote says={field.goes} />
 
       {checked ? (
-        <div className="text-left text-[13px] leading-5">
+        <div className="text-left text-meta leading-5">
           <p className="text-ink-soft">
             {words.preview}{" "}
-            <span className="font-mono text-[12.5px] break-all text-ink">{checked.preview}</span>
+            <span className="font-mono text-meta break-all text-ink">{checked.preview}</span>
           </p>
           {checked.notes.map((note) => (
-            <p key={note} className="mt-1 text-[12.5px] leading-[18px] text-muted-foreground">
+            <p key={note} className="mt-1 text-meta leading-[18px] text-muted-foreground">
               {note}
             </p>
           ))}
@@ -127,7 +127,7 @@ export function PrivateInput({
       ) : null}
 
       {"error" in stage && stage.error ? (
-        <p role="alert" className="text-left text-[13px] text-destructive">
+        <p role="alert" className="text-left text-meta text-destructive">
           {stage.error}
         </p>
       ) : null}

@@ -36,7 +36,7 @@ export function QrCodeCanvas({
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center rounded-[14px] border border-foreground/[0.08] bg-plate p-2.5 shadow-xs",
+        "inline-flex items-center justify-center rounded-card border border-foreground/[0.08] bg-plate p-2.5",
         className,
       )}
     >
@@ -45,7 +45,7 @@ export function QrCodeCanvas({
         role="img"
         aria-label={label}
         style={{ width: size, height: size }}
-        className="block rounded-[6px]"
+        className="block rounded-control"
       />
     </div>
   );

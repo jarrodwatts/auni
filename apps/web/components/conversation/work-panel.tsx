@@ -1,5 +1,7 @@
 "use client";
 
+import "./work-panel.css";
+
 import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -228,7 +230,7 @@ export function WorkPanel({
   useLayoutEffect(() => {
     const pill = pillRef.current;
     if (!pill) return undefined;
-    const activeRow = open && activeStepKey ? rowRefs.current.get(activeStepKey) ?? null : null;
+    const activeRow = open && activeStepKey ? (rowRefs.current.get(activeStepKey) ?? null) : null;
     if (!activeRow) {
       pillVisibleRef.current = false;
       pill.dataset.shown = "false";
@@ -278,11 +280,7 @@ export function WorkPanel({
     >
       {/* Whisper-subtle top-edge living sheen while steps are actively executing. */}
       {active ? (
-        <span
-          aria-hidden
-          className="auni-work-sheen"
-          ref={observeVisibleAnimation}
-        />
+        <span aria-hidden className="auni-work-sheen" ref={observeVisibleAnimation} />
       ) : null}
 
       <button
@@ -309,16 +307,9 @@ export function WorkPanel({
         ) : null}
 
         {/* Only what it is doing is announced; the clock ticks for the eye alone. */}
-        <span
-          aria-live={active ? "polite" : undefined}
-          className="min-w-0 flex-auto"
-        >
+        <span aria-live={active ? "polite" : undefined} className="min-w-0 flex-auto">
           <SpotlightShimmer active={active} className="text-muted-foreground">
-            <WorkHeaderLabel
-              counting={countingTools}
-              label={label}
-              toolCount={toolCount}
-            />
+            <WorkHeaderLabel counting={countingTools} label={label} toolCount={toolCount} />
           </SpotlightShimmer>
         </span>
 
@@ -330,14 +321,11 @@ export function WorkPanel({
 
         {active ? (
           <LiveElapsed
-            className="flex-none text-[12.5px] text-muted-foreground/75"
+            className="flex-none text-meta text-muted-foreground/75"
             startedAt={clockStartedAt}
           />
         ) : finalDuration !== null ? (
-          <span
-            aria-hidden
-            className="flex-none text-[12.5px] text-muted-foreground/75 tabular-nums"
-          >
+          <span aria-hidden className="flex-none text-meta text-muted-foreground/75 tabular-nums">
             <TextSwap align="end" text={finalDuration} />
           </span>
         ) : null}
@@ -421,13 +409,7 @@ function WorkHeaderLabel({
     swap.current.label !== label
   ) {
     const modeChanged = swap.current.modeKey !== modeKey;
-    setSwap(
-      swapTo(
-        swap,
-        { modeKey, counting, label, toolCount },
-        modeChanged && !reducedMotion(),
-      ),
-    );
+    setSwap(swapTo(swap, { modeKey, counting, label, toolCount }, modeChanged && !reducedMotion()));
   }
   const copy = useHandover(swap, setSwap, LABEL_LEAVE, LABEL_ARRIVE);
   const copies = [...swap.leaving, { id: swap.id, value: swap.current }];
@@ -450,9 +432,7 @@ function WorkHeaderLabel({
               <>
                 <span className="whitespace-pre">Working on </span>
                 <RollingNumber value={value.toolCount} />
-                <span className="whitespace-pre">
-                  {value.toolCount === 1 ? " step" : " steps"}
-                </span>
+                <span className="whitespace-pre">{value.toolCount === 1 ? " step" : " steps"}</span>
               </>
             ) : (
               value.label

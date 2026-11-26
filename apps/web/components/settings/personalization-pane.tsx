@@ -217,7 +217,7 @@ export function PersonalizationPane({
             </div>
           ) : me.profileSummary ? (
             <div className="flex flex-col gap-2.5">
-              <p className="text-[13.5px] leading-[1.55] text-ink-soft">{me.profileSummary}</p>
+              <p className="text-ui leading-[1.55] text-ink-soft">{me.profileSummary}</p>
               {topics.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {topics.map((topic) => (
@@ -228,13 +228,13 @@ export function PersonalizationPane({
                 </div>
               ) : null}
               {signals?.refreshedAt ? (
-                <p className="text-[11.5px] text-faint">
+                <p className="text-caption text-faint">
                   Last updated {new Date(signals.refreshedAt).toLocaleString()}
                 </p>
               ) : null}
             </div>
           ) : (
-            <p className="text-[13px] leading-[1.5] text-muted-foreground">
+            <p className="text-meta leading-[1.5] text-muted-foreground">
               Nothing inferred yet. Add your public X handle or a watch-only wallet below and Auni
               will read them in the background to tailor your starting ideas automatically.
             </p>
@@ -291,7 +291,7 @@ export function PersonalizationPane({
               </button>
             ) : null}
             {xSaved ? (
-              <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+              <span className="inline-flex items-center gap-1 text-caption text-positive">
                 <Check className="size-3.5" />
                 Saved
               </span>
@@ -299,7 +299,7 @@ export function PersonalizationPane({
           </form>
         </SettingsRow>
         {xError ? (
-          <div className="px-4 py-2.5 text-[12.5px] text-destructive sm:px-5">{xError}</div>
+          <div className="px-4 py-2.5 text-meta text-destructive sm:px-5">{xError}</div>
         ) : null}
       </SettingsSection>
 
@@ -343,7 +343,7 @@ export function PersonalizationPane({
                 setWalletInput(event.target.value);
                 setWalletError(null);
               }}
-              className={cn(SETTINGS_INPUT, "min-w-[220px] flex-1 font-mono text-[12.5px]")}
+              className={cn(SETTINGS_INPUT, "min-w-[220px] flex-1 font-mono text-meta")}
             />
             <button
               type="submit"
@@ -358,7 +358,7 @@ export function PersonalizationPane({
               Add
             </button>
           </form>
-          {walletError ? <p className="text-[12.5px] text-destructive">{walletError}</p> : null}
+          {walletError ? <p className="text-meta text-destructive">{walletError}</p> : null}
         </SettingsRow>
 
         {me.watchedWallets.length > 0 ? (
@@ -367,7 +367,7 @@ export function PersonalizationPane({
               key={w.address}
               label={
                 <span className="flex items-center gap-2">
-                  <span className="font-mono text-[13px] text-ink">
+                  <span className="font-mono text-meta text-ink">
                     {w.label ?? shortAddress(w.address)}
                   </span>
                   <SettingsBadge tone="neutral">
@@ -393,7 +393,7 @@ export function PersonalizationPane({
             </SettingsRow>
           ))
         ) : (
-          <div className="px-4 py-3 text-[12.5px] text-muted-foreground sm:px-5">
+          <div className="px-4 py-3 text-meta text-muted-foreground sm:px-5">
             No watch-only addresses added yet (up to 5).
           </div>
         )}
@@ -426,7 +426,7 @@ export function PersonalizationPane({
         >
           <div className="flex items-center gap-2">
             {promptsQueued ? (
-              <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+              <span className="inline-flex items-center gap-1 text-caption text-positive">
                 <Check className="size-3.5" />
                 Refreshing
               </span>

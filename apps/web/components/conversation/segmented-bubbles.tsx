@@ -1,5 +1,7 @@
 "use client";
 
+import "./segmented-bubbles.css";
+
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { MessageResponse } from "@/components/ai-elements/message";
@@ -142,8 +144,7 @@ export function SegmentedBubbles({
           !settled &&
           (bubble.leading.some((step) => step.status === "now") ||
             (!hasFollowingContent && index === lastWorkIndex));
-        const panelSettledDuration =
-          settled && singleWorkPanel ? settledDuration : null;
+        const panelSettledDuration = settled && singleWorkPanel ? settledDuration : null;
         const cards = bubble.leading.flatMap((activity) =>
           activity.cards ? [{ key: activity.key, node: activity.cards }] : [],
         );
@@ -156,7 +157,9 @@ export function SegmentedBubbles({
           node: activity.node,
         }));
         const hasBodyBelowTop =
-          cards.length > 0 || bubble.segment !== undefined || (index === lastIndex && Boolean(trailing));
+          cards.length > 0 ||
+          bubble.segment !== undefined ||
+          (index === lastIndex && Boolean(trailing));
 
         return (
           <Bubble
@@ -213,7 +216,7 @@ export function SegmentedBubbles({
 
             {bubble.segment !== undefined ? (
               // Its lines break so none ends on a word left alone.
-              <BubbleContent className="relative w-full border-0 text-[15px] leading-relaxed text-pretty">
+              <BubbleContent className="relative w-full border-0 text-body leading-relaxed text-pretty">
                 <MessageResponse
                   isAnimating={index === lastSegmentIndex && (flow?.animating ?? false)}
                 >

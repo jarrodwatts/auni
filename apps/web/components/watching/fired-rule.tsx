@@ -19,7 +19,7 @@ export function FiredRule({
     <div
       role="separator"
       aria-label={`${fires.length > 1 ? "Watches" : "A watch"} spoke up: ${watches}`}
-      className="mb-7 flex items-center gap-2.5 text-[12.5px] font-medium text-muted-foreground"
+      className="mb-7 flex items-center gap-2.5 text-meta font-medium text-muted-foreground"
     >
       <span aria-hidden className="h-px min-w-6 flex-1 bg-foreground/[0.07]" />
       <SignalGlyph live={false} className="text-primary" />

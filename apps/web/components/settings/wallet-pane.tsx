@@ -58,7 +58,7 @@ export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: 
             description="Same address on Monad, Base, Arbitrum, Polygon, and Ethereum."
           >
             <div className="flex items-center gap-2">
-              <code className="rounded-[8px] bg-surface px-2.5 py-1 font-mono text-[12px] text-ink">
+              <code className="rounded-control bg-surface px-2.5 py-1 font-mono text-caption text-ink">
                 {wallets.evm.slice(0, 8)}…{wallets.evm.slice(-6)}
               </code>
               <button
@@ -85,7 +85,7 @@ export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: 
         {wallets?.solana ? (
           <SettingsRow label="Solana address" description="Used for Solana tokens and stocks.">
             <div className="flex items-center gap-2">
-              <code className="rounded-[8px] bg-surface px-2.5 py-1 font-mono text-[12px] text-ink">
+              <code className="rounded-control bg-surface px-2.5 py-1 font-mono text-caption text-ink">
                 {wallets.solana.slice(0, 8)}…{wallets.solana.slice(-6)}
               </code>
               <button
@@ -110,7 +110,7 @@ export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: 
         ) : null}
 
         {!wallets?.evm && !wallets?.solana ? (
-          <div className="px-4 py-4 text-[13px] text-muted-foreground sm:px-5">
+          <div className="px-4 py-4 text-meta text-muted-foreground sm:px-5">
             No wallet created yet. Auni creates one when you finish the setup wizard or start your
             first move.
           </div>
@@ -158,7 +158,7 @@ export function WalletPane({ highlightedTarget }: { readonly highlightedTarget: 
       </SettingsSection>
 
       {addKey.isSuccess || addKey.isError || brought ? (
-        <p role="status" className="px-1 text-[12.5px] leading-[1.5] text-muted-foreground">
+        <p role="status" className="px-1 text-meta leading-[1.5] text-muted-foreground">
           {addKey.isSuccess || brought
             ? "Your new address is ready. Open Show wallet keys and save its key with your backup."
             : "The address wasn't made. Try again."}
@@ -213,10 +213,8 @@ function ActionRow({
     >
       <span className="text-muted-foreground">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13.5px] font-medium text-ink">{label}</span>
-        {hint ? (
-          <span className="mt-0.5 block text-[12.5px] text-muted-foreground">{hint}</span>
-        ) : null}
+        <span className="block text-ui font-medium text-ink">{label}</span>
+        {hint ? <span className="mt-0.5 block text-meta text-muted-foreground">{hint}</span> : null}
       </span>
       <ChevronRight aria-hidden className="-mr-1 size-4 text-faint" />
     </button>

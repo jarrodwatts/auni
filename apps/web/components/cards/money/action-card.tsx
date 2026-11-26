@@ -203,7 +203,7 @@ export function ActionCard({
                   <button
                     type="button"
                     onClick={() => openReport({ action: card.actionReference })}
-                    className="h-8 flex-none rounded-full bg-foreground/[0.06] px-3.5 text-[13px] font-semibold text-ink transition-[background-color,transform] hover:bg-foreground/[0.09] active:scale-[.98]"
+                    className="h-8 flex-none rounded-full bg-foreground/[0.06] px-3.5 text-meta font-semibold text-ink transition-[background-color,transform] hover:bg-foreground/[0.09] active:scale-[.98]"
                     data-testid="report-it"
                   >
                     Report it
@@ -251,11 +251,11 @@ export function ActionCard({
           ring={landing ? "landed" : step === "running" ? "working" : null}
         />
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
+          <p className="line-clamp-2 text-reading leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
             {moves && !content.note ? subject(content.title) : content.title}
           </p>
           {line.text ? (
-            <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">
+            <p className="mt-0.5 text-meta leading-[18px] text-muted-foreground">
               {/* Its own line can be all that names what's bought (a prediction's question), so it wraps. */}
               <TextSwap
                 className={line.working ? styles.shimmer : undefined}
@@ -267,10 +267,8 @@ export function ActionCard({
         </div>
         {moves ? (
           <div className="flex-none pl-1 text-right">
-            <p className="text-[26px] leading-[1.1] font-semibold tracking-[-0.035em] text-ink tabular-nums">
-              {amount}
-            </p>
-            <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">
+            <p className="text-card-money text-ink">{amount}</p>
+            <p className="mt-0.5 text-meta leading-4 text-muted-foreground">
               {landing
                 ? "done"
                 : step === "held"
@@ -310,20 +308,20 @@ export function ActionCard({
                   width === "row" && "col-span-full",
                 )}
               >
-                <dt className="text-[12px] text-muted-foreground">{figure.label}</dt>
+                <dt className="text-caption text-muted-foreground">{figure.label}</dt>
                 {/* Every value is read whole: it wraps, and a whole address is drawn to be checked. */}
-                <dd className="mt-0.5 text-[15px] leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
+                <dd className="mt-0.5 text-body leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
                   {address ? (
                     <FullAddress
                       address={figure.value}
-                      className="text-[14px] font-normal tracking-normal"
+                      className="text-ui font-normal tracking-normal"
                       split="narrow"
                     />
                   ) : (
                     figure.value
                   )}
                   {figure.note ? (
-                    <span className="ml-1.5 text-[12.5px] font-normal tracking-normal text-muted-foreground">
+                    <span className="ml-1.5 text-meta font-normal tracking-normal text-muted-foreground">
                       {figure.note}
                     </span>
                   ) : null}
@@ -335,19 +333,15 @@ export function ActionCard({
       ) : null}
       {content.scene?.kind === "route" ? <Route {...content.scene} /> : null}
       {content.finePrint ? (
-        <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">
-          {content.finePrint}
-        </p>
+        <p className="mt-4 text-meta leading-[1.45] text-muted-foreground">{content.finePrint}</p>
       ) : null}
       {/* What Allow signs before the move itself, in core's words, until it has been allowed. */}
       {content.buysFirst && step === "ready" ? (
-        <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">
-          {content.buysFirst}
-        </p>
+        <p className="mt-4 text-meta leading-[1.45] text-muted-foreground">{content.buysFirst}</p>
       ) : null}
       {content.warning ? (
         // A token's name is its maker's, unbroken at any length: it wraps, never runs off the card.
-        <p className="mt-3 text-[12.5px] leading-[1.45] font-medium break-words text-destructive">
+        <p className="mt-3 text-meta leading-[1.45] font-medium break-words text-destructive">
           {content.warning}
         </p>
       ) : null}
@@ -357,15 +351,13 @@ export function ActionCard({
           <figcaption>
             <CheckHeading>{content.checks.unchecked.heading}</CheckHeading>
           </figcaption>
-          <blockquote className="mt-2 text-[15px] leading-[1.5] text-pretty text-ink">
+          <blockquote className="mt-2 text-body leading-[1.5] text-pretty text-ink">
             {content.checks.unchecked.says}
           </blockquote>
         </figure>
       ) : null}
       {content.checks ? (
-        <p className="mt-4 text-[12.5px] leading-[1.45] text-muted-foreground">
-          {content.checks.why}
-        </p>
+        <p className="mt-4 text-meta leading-[1.45] text-muted-foreground">{content.checks.why}</p>
       ) : null}
       <FooterMorph stepKey={step}>
         {step === "ready" ? (
@@ -400,13 +392,13 @@ export function ActionCard({
             </MoneyButtons>
           </>
         ) : step === "held" && failed ? (
-          <div className="rounded-[14px] border border-foreground/[0.08] px-4 py-3.5">
-            <p className="text-[14px] leading-5 font-semibold tracking-[-0.01em] text-ink">
+          <div className="rounded-card border border-foreground/[0.08] px-4 py-3.5">
+            <p className="text-ui leading-5 font-semibold tracking-[-0.01em] text-ink">
               Not confirmed
             </p>
             <p
               aria-live="polite"
-              className="mt-1 text-[13px] leading-[1.5] text-pretty text-muted-foreground"
+              className="mt-1 text-meta leading-[1.5] text-pretty text-muted-foreground"
             >
               {problem ?? failed.reason}
             </p>
@@ -478,7 +470,7 @@ function CheckHeading({
   return (
     <p
       className={cn(
-        "flex items-center gap-1.5 text-[13px] leading-[18px] font-medium",
+        "flex items-center gap-1.5 text-meta leading-[18px] font-medium",
         checked ? "text-ink" : "text-muted-foreground",
         className,
       )}
@@ -518,8 +510,8 @@ function Route({
     >
       <LogoImage fallback={null} size={26} src={CHAIN_LOGOS[chain] ?? null} />
       <div className="min-w-0">
-        <p className="truncate text-[12px] text-muted-foreground">{label}</p>
-        <p className="mt-0.5 truncate text-[15px] font-semibold tracking-[-0.01em] text-ink tabular-nums">
+        <p className="truncate text-caption text-muted-foreground">{label}</p>
+        <p className="mt-0.5 truncate text-body font-semibold tracking-[-0.01em] text-ink tabular-nums">
           {value}
         </p>
       </div>
@@ -556,13 +548,13 @@ function Receipt({
     <div className="flex flex-wrap items-center gap-x-3.5 gap-y-3 sm:flex-nowrap">
       {mark}
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-pretty text-ink">
+        <p className="text-body leading-5 font-semibold tracking-[-0.01em] text-pretty text-ink">
           {title}
         </p>
         {detail ? (
           <p
             className={cn(
-              "mt-0.5 text-[13px] leading-[1.4] text-pretty text-muted-foreground tabular-nums",
+              "mt-0.5 text-meta leading-[1.4] text-pretty text-muted-foreground tabular-nums",
               !whole && "line-clamp-2",
             )}
           >
@@ -571,7 +563,7 @@ function Receipt({
         ) : null}
       </div>
       {amount ? (
-        <span className="flex-none self-center text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink tabular-nums">
+        <span className="flex-none self-center text-body leading-5 font-semibold tracking-[-0.01em] text-ink tabular-nums">
           {amount}
         </span>
       ) : null}

@@ -28,7 +28,7 @@ export function ItemMark({
   readonly size: number;
 }) {
   if (!item.logo) return <AuniMark size={size} />;
-  const logo = <AssetLogo holding={{ logoUrl: item.logo.src, name: item.logo.name }} size={size} />;
+  const logo = <AssetLogo holding={{ logoUrl: item.logo.src }} size={size} />;
   return item.kind === "outside" && item.decision ? (
     <span className={OUTSIDE_RING}>{logo}</span>
   ) : (
@@ -60,9 +60,7 @@ export function ActivityReceipt({
       <div className="flex justify-center">
         <ItemMark item={item} size={60} />
       </div>
-      <h2 className="mt-3.5 text-center text-[18px] leading-6 font-semibold tracking-[-0.015em] text-ink">
-        {item.title}
-      </h2>
+      <h2 className="mt-3.5 text-center text-section text-ink">{item.title}</h2>
       <p className="mt-1 text-center text-meta text-muted-foreground">
         {item.kind === "outside" ? (
           <>
@@ -73,12 +71,7 @@ export function ActivityReceipt({
         {item.subtitle}
       </p>
       {item.amount ? (
-        <p
-          className={cn(
-            "mt-3 text-center text-[40px] leading-[1.15] font-semibold tracking-[-0.03em] tabular-nums",
-            TONE_CLASS_NAME[item.amount.tone],
-          )}
-        >
+        <p className={cn("mt-3 text-center text-hero-money", TONE_CLASS_NAME[item.amount.tone])}>
           {amountText(item.amount)}
         </p>
       ) : null}
@@ -139,8 +132,8 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
         <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3">
           {story.facts.map(({ label, value }) => (
             <div key={label} className={cn("min-w-0", value.length > 18 && "col-span-2")}>
-              <dt className="text-caption text-muted-foreground">{label}</dt>
-              <dd className="mt-0.5 text-[15px] leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
+              <dt className="text-caption font-medium text-muted-foreground">{label}</dt>
+              <dd className="mt-0.5 text-body leading-[1.4] font-semibold tracking-[-0.01em] break-words text-ink tabular-nums">
                 {value}
               </dd>
             </div>
@@ -173,7 +166,7 @@ function Story({ story }: { readonly story: ActivityStoryWire }) {
 
 function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
   return (
-    <ol className="mt-5 rounded-[16px] bg-surface px-4 py-1.5">
+    <ol className="mt-5 rounded-card bg-surface px-4 py-1.5">
       {levels.map(({ label, price, kind }) => (
         <li
           key={label}
@@ -186,8 +179,8 @@ function Levels({ levels }: { readonly levels: ActivityStoryWire["levels"] }) {
               kind === "price" ? "bg-ink" : "border-[1.5px] border-muted-foreground bg-surface",
             )}
           />
-          <span className="min-w-0 flex-1 text-[14px] text-muted-foreground">{label}</span>
-          <span className="flex-none text-[15px] font-semibold tracking-[-0.01em] text-ink tabular-nums">
+          <span className="min-w-0 flex-1 text-ui text-muted-foreground">{label}</span>
+          <span className="flex-none text-body font-semibold tracking-[-0.01em] text-ink tabular-nums">
             {price}
           </span>
         </li>
@@ -219,9 +212,9 @@ function Steps({
                 </span>
               }
             />
-            <span className="min-w-0 flex-1 text-[14px] leading-5 text-ink">{step.text}</span>
+            <span className="min-w-0 flex-1 text-ui leading-5 text-ink">{step.text}</span>
             {step.amountUsd ? (
-              <span className="flex-none text-[14px] text-muted-foreground tabular-nums">
+              <span className="flex-none text-ui text-muted-foreground tabular-nums">
                 {formatUsd(step.amountUsd)}
               </span>
             ) : null}
@@ -249,9 +242,7 @@ function WhatHappened({
         <ArrowRight aria-hidden className="size-4 flex-none text-faint" strokeWidth={2} />
         <Side label="After" value={receipt.after} />
       </div>
-      <p className="mt-4 text-center text-[14px] leading-[1.55] text-muted-foreground">
-        {receipt.why}
-      </p>
+      <p className="mt-4 text-center text-ui leading-[1.55] text-muted-foreground">{receipt.why}</p>
       {!decision ? null : thread ? (
         <PrimaryLink href={chatHref(thread.id)} thread={thread}>
           Ask Auni what now
@@ -277,17 +268,19 @@ function Side({
   readonly tone?: keyof typeof TONE_CLASS_NAME;
 }) {
   return (
-    <div className="min-w-0 flex-1 rounded-[16px] bg-surface px-3 py-3 text-center">
-      <p className="text-caption text-faint">{label}</p>
+    <div className="min-w-0 flex-1 rounded-card bg-surface px-3 py-3 text-center">
+      <p className="text-caption font-medium text-faint">{label}</p>
       <p
         className={cn(
-          "mt-0.5 text-[15px] leading-5 font-semibold break-words tabular-nums",
+          "mt-0.5 text-body leading-5 font-semibold break-words tabular-nums",
           TONE_CLASS_NAME[tone],
         )}
       >
         {value}
       </p>
-      {place ? <p className="mt-0.5 text-caption text-muted-foreground">on {place}</p> : null}
+      {place ? (
+        <p className="mt-0.5 text-caption font-medium text-muted-foreground">on {place}</p>
+      ) : null}
     </div>
   );
 }
@@ -308,11 +301,11 @@ function WhatArrived({
   ];
   if (receipt.counterparty) facts.push([out ? "To" : "From", receipt.counterparty]);
   return (
-    <dl className="rounded-[16px] bg-surface px-4 py-1">
+    <dl className="rounded-card bg-surface px-4 py-1">
       {facts.map(([label, value]) => (
         <div
           key={label}
-          className="flex items-baseline gap-4 py-2.5 text-[14px] [&:not(:first-child)]:border-t [&:not(:first-child)]:border-foreground/[0.06]"
+          className="flex items-baseline gap-4 py-2.5 text-ui [&:not(:first-child)]:border-t [&:not(:first-child)]:border-foreground/[0.06]"
         >
           <dt className="flex-none text-muted-foreground">{label}</dt>
           <dd className="min-w-0 flex-1 text-right break-words text-ink tabular-nums">{value}</dd>

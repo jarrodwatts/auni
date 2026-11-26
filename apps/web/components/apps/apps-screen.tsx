@@ -107,14 +107,12 @@ export function AppsScreen() {
           ) : (
             <>
               <section aria-label="Your apps">
-                <h2 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.035em] text-ink">
-                  Venues &amp; data apps
-                </h2>
+                <h2 className="text-title text-ink">Venues &amp; data apps</h2>
                 <p className="mt-1.5 max-w-[540px] text-ui leading-[1.5] font-normal text-muted-foreground">
                   The financial venues and research services Auni acts through. Open one to see what
                   you hold there, configure keys, or turn it on or off.
                 </p>
-                <div className="mt-4 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-meta text-muted-foreground">
                   <span>Looking for system setup?</span>
                   <button
                     type="button"
@@ -175,11 +173,11 @@ export function AppsScreen() {
 function Loading() {
   return (
     <div className="auni-appear-late">
-      <Skeleton className="h-8 w-40 rounded-lg" />
-      <Skeleton className="mt-3 h-4 w-72 max-w-full rounded-md" />
+      <Skeleton className="h-8 w-40 rounded-card" />
+      <Skeleton className="mt-3 h-4 w-72 max-w-full rounded-control" />
       <div className={cn(GRID, "mt-5")}>
         {[0, 1, 2, 3, 4].map((key) => (
-          <Skeleton key={key} className="h-[172px] rounded-[22px]" />
+          <Skeleton key={key} className="h-[172px] rounded-card" />
         ))}
       </div>
     </div>

@@ -41,14 +41,14 @@ export function PairAgain({
       ref={note}
       role="alert"
       className={cn(
-        "rounded-[14px] border border-foreground/[0.08] px-4 py-3.5 text-left",
+        "rounded-card border border-foreground/[0.08] px-4 py-3.5 text-left",
         className,
       )}
     >
-      <p className="text-[14px] leading-5 font-semibold tracking-[-0.01em] text-ink">
+      <p className="text-ui leading-5 font-semibold tracking-[-0.01em] text-ink">
         Show Auni it&apos;s you
       </p>
-      <p className="mt-1 text-[13px] leading-[1.5] text-pretty text-muted-foreground">
+      <p className="mt-1 text-meta leading-[1.5] text-pretty text-muted-foreground">
         This browser signed in a while ago. Run this in the terminal where Auni runs and open the
         link it prints. {then}
       </p>

@@ -176,7 +176,7 @@ export function Composer({
         className={cn(
           COMPOSER_SURFACE_CLASS_NAME,
           // Glows for typing only: tapping a docked answer is not writing.
-          "transition-shadow duration-300 ease-settle has-[textarea:focus]:shadow-[0_10px_30px_--alpha(var(--color-primary)/12%),0_0_0_1px_--alpha(var(--color-primary)/24%)] motion-reduce:transition-none",
+          "transition-shadow duration-300 ease-settle has-[textarea:focus]:border-ring/50 motion-reduce:transition-none",
         )}
         onClick={(event) => {
           if (!disabled) focusDraftFromTap(event.target, inputRef.current);

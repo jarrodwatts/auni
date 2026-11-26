@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
-import { ConversationLaunchProvider } from "@/components/app/conversation-launch-context";
 import { ConversationLaunchStage } from "@/components/app/conversation-launch-stage";
 import { useFirstRun } from "@/components/first-run/use-first-run";
 import { WelcomeWizard } from "@/components/onboarding/welcome-wizard";
@@ -27,18 +26,16 @@ import { usePlaceRoute } from "./use-places";
 export function PlaceWorkspace({ children }: { readonly children: ReactNode }) {
   useLiveThreadRows();
   return (
-    <ConversationLaunchProvider>
-      <SearchProvider>
-        <PlaceShell>
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-            {children}
-            <ConversationLaunchStage />
-          </div>
-        </PlaceShell>
-        {/* First run's local-first onboarding wizard, over the app until completed or skipped. */}
-        <WelcomeWizard />
-      </SearchProvider>
-    </ConversationLaunchProvider>
+    <SearchProvider>
+      <PlaceShell>
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          {children}
+          <ConversationLaunchStage />
+        </div>
+      </PlaceShell>
+      {/* First run's local-first onboarding wizard, over the app until completed or skipped. */}
+      <WelcomeWizard />
+    </SearchProvider>
   );
 }
 

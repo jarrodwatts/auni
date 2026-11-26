@@ -76,8 +76,8 @@ function Chip({ app, onOpen }: { readonly app: AppWire; readonly onOpen: () => v
       data-testid="runs-on-app"
       data-app={app.id}
       className={cn(
-        "flex h-10 max-w-full items-center gap-2.5 rounded-full bg-surface pr-4 pl-1.5 text-[14px] outline-none transition-colors duration-150 hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        need && "bg-warning-surface hover:bg-warning/[0.14]",
+        "flex h-10 max-w-full items-center gap-2.5 rounded-full bg-surface pr-4 pl-1.5 text-ui outline-none transition-colors duration-150 hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        need && "bg-waiting-surface hover:bg-waiting/[0.14]",
       )}
     >
       <span className={cn("flex-none", !app.inUse && "opacity-55 grayscale")}>
@@ -89,7 +89,7 @@ function Chip({ app, onOpen }: { readonly app: AppWire; readonly onOpen: () => v
         {app.name}
       </span>
       {says ? (
-        <span className={cn("min-w-0 truncate", need ? "text-warning" : "text-muted-foreground")}>
+        <span className={cn("min-w-0 truncate", need ? "text-waiting" : "text-muted-foreground")}>
           {says}
         </span>
       ) : null}

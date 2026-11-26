@@ -53,17 +53,18 @@ export function AppearancePane({
                   aria-pressed={selected}
                   onClick={() => pick(entry.id)}
                   className={cn(
-                    "group flex flex-col gap-2.5 rounded-[14px] border p-3 text-left transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35",
+                    "group flex flex-col gap-2.5 rounded-card border p-3 text-left transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/35",
                     selected
                       ? "border-primary bg-primary/[0.06]"
                       : "border-foreground/[0.08] bg-background hover:border-foreground/[0.16]",
                   )}
                 >
-                  {/* Miniature live-token preview using native CSS color-scheme */}
+                  {/* A miniature of the look, in its own colours whatever the page wears. */}
                   <div
-                    data-theme={entry.id}
-                    style={{ colorScheme: isDark ? "dark" : "light" }}
-                    className="flex h-[74px] w-full overflow-hidden rounded-[10px] border border-foreground/[0.1] bg-background"
+                    className={cn(
+                      "flex h-[74px] w-full overflow-hidden rounded-control border border-border bg-background",
+                      isDark ? "look-dark" : "look-light",
+                    )}
                   >
                     <div className="flex w-12 flex-col gap-1.5 border-r border-foreground/[0.08] bg-sidebar p-2">
                       <span className="h-2 w-6 rounded-full bg-foreground/20" />
@@ -75,7 +76,7 @@ export function AppearancePane({
                         <span className="size-2.5 rounded-full bg-primary" />
                         <span className="h-2 w-16 rounded-full bg-foreground/20" />
                       </div>
-                      <div className="rounded-[6px] border border-foreground/[0.08] bg-card px-2 py-1.5">
+                      <div className="rounded-control border border-foreground/[0.08] bg-card px-2 py-1.5">
                         <span className="block h-1.5 w-20 rounded-full bg-foreground/25" />
                       </div>
                     </div>
@@ -83,8 +84,8 @@ export function AppearancePane({
 
                   <div className="flex items-center justify-between gap-2 px-0.5">
                     <div>
-                      <span className="block text-[13.5px] font-medium text-ink">{entry.name}</span>
-                      <span className="block text-[11.5px] text-muted-foreground">
+                      <span className="block text-ui font-medium text-ink">{entry.name}</span>
+                      <span className="block text-caption text-muted-foreground">
                         {entry.id === "light"
                           ? "Crisp daylight surface"
                           : entry.id === "dark"

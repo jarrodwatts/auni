@@ -1,7 +1,8 @@
 "use client";
 
+import "./dawn-chart.css";
+
 import {
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -17,9 +18,8 @@ import { Moments, type ChartMoment, type Spot } from "./dawn-moments";
 import { COMPACT_WIDTH, noteAir } from "./dawn-notes";
 
 /**
- * Auni's line: thin, in the place's own color, over a soft field of dots in
- * a morning sky, warming from the place's hue toward peach where today is. No axes, no grid. Today is a small lit orb, lit the way the
- * mascot is lit. Dragging across it reports the
+ * Auni's line: thin, in the place's own color, on nothing: no field, no axes, no grid. Today is
+ * a dot at its end. Dragging across it reports the
  * reading under the finger. Levels, when given, mark prices across it (see
  * dawn-levels). Moments, when given, sit on the line as beads
  * (see dawn-moments).
@@ -52,22 +52,8 @@ const START_ROOM = 5;
 const MIN_SPAN = 0.01;
 /** One reading per this many pixels: the line keeps its shape, not noise a screen can't show. */
 const READING_PITCH = 14;
-/** The dot field's pitch in pixels. */
-const DOT_PITCH = 5;
-
-/**
- * What the chart is drawn in. The chart says only its hue (`--hue`), and the stylesheet works
- * these out from it for each look (`.auni-dawn` in app/globals.css).
- */
-const COLOR = {
-  line: "var(--dawn-line)",
-  lineSoft: "var(--dawn-line-soft)",
-  deep: "var(--dawn-deep)",
-  mist: "var(--dawn-mist)",
-  haze: "var(--dawn-haze)",
-  blush: "var(--dawn-blush)",
-  ember: "var(--dawn-ember)",
-} as const;
+/** What the line is drawn in: the chart says only its hue (`--hue`), dawn-chart.css the rest. */
+const LINE = "var(--dawn-line)";
 
 /**
  * The slope at each reading of a monotone cubic through them all (Steffen's
@@ -156,7 +142,6 @@ export function DawnChart({
   readonly levels?: readonly ChartLevel[];
   readonly className?: string;
 }) {
-  const id = useId().replace(/:/gu, "");
   const box = useRef<HTMLDivElement>(null);
   // Drawn in real pixels, so the dots stay round at any width.
   const [width, setWidth] = useState(0);
@@ -223,7 +208,6 @@ export function DawnChart({
       line,
       spots,
       placed,
-      area: `${line}L${end},${height}L0,${height}Z`,
     };
   }, [points, height, width, moments, levels, notes, compact]);
 
@@ -263,8 +247,6 @@ export function DawnChart({
       aria-label={label}
       data-draw-in={drawIn || undefined}
       // Only a chart you can scrub keeps the finger; any other lets the page scroll.
-      // Blue days warm into the sky's own peach; other hues into their orb's blush.
-      data-sky={(hue.h > 200 && hue.h < 240) || undefined}
       className={cn("auni-dawn relative select-none", onScrub && "touch-none", className)}
       style={{ height, "--hue": hue.h } as CSSProperties}
       onPointerMove={move}
@@ -275,13 +257,11 @@ export function DawnChart({
       ) : null}
       {geometry ? (
         <Drawing
-          id={id}
           geometry={geometry}
           width={width}
           height={height}
           at={scrub ?? geometry.xs.length - 1}
           scrubbing={scrub !== null}
-          breathing={onScrub !== undefined}
         />
       ) : null}
       {geometry?.placed.length ? (
@@ -300,91 +280,34 @@ export function DawnChart({
 }
 
 function Drawing({
-  id,
-  geometry: { xs, ys, line, area },
+  geometry: { xs, ys, line },
   width,
   height,
   at,
   scrubbing,
-  breathing,
 }: {
-  readonly id: string;
   readonly geometry: {
     readonly xs: readonly number[];
     readonly ys: readonly number[];
     readonly line: string;
-    readonly area: string;
   };
   readonly width: number;
   readonly height: number;
   readonly at: number;
   readonly scrubbing: boolean;
-  readonly breathing: boolean;
 }) {
   const place: CSSProperties = { left: xs[at], top: ys[at] };
-  const orb: CSSProperties = {
-    ...place,
-    background: [
-      "radial-gradient(circle at 32% 28%, color-mix(in oklab, var(--color-plate) 95%, transparent) 0, transparent 42%)",
-      `radial-gradient(circle at 72% 80%, ${COLOR.blush} 0, transparent 60%)`,
-      `radial-gradient(circle at 40% 35%, ${COLOR.lineSoft} 0, ${COLOR.line} 55%, ${COLOR.deep} 100%)`,
-    ].join(", "),
-    boxShadow: `0 0 0 4px color-mix(in oklab, var(--background) 90%, transparent), 0 2px 10px ${COLOR.mist}`,
-  };
-  const glide = "transition-[left,top] duration-150 ease-settle motion-reduce:transition-none";
   return (
     <>
       <svg aria-hidden width={width} height={height} className="absolute inset-0 overflow-visible">
-        <defs>
-          <linearGradient id={`${id}-sky`} x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor={COLOR.line} stopOpacity="0.5" />
-            <stop offset="0.6" stopColor={COLOR.line} stopOpacity="0.6" />
-            <stop offset="1" stopColor={COLOR.ember} stopOpacity="0.85" />
-          </linearGradient>
-          <linearGradient id={`${id}-wash`} x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor={COLOR.mist} stopOpacity="0.4" />
-            <stop offset="1" stopColor={COLOR.haze} stopOpacity="0.7" />
-          </linearGradient>
-          <linearGradient id={`${id}-down`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="white" stopOpacity="1" />
-            <stop offset="1" stopColor="white" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id={`${id}-sides`} x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="white" stopOpacity="0.55" />
-            <stop offset="0.35" stopColor="white" stopOpacity="1" />
-          </linearGradient>
-          <pattern
-            id={`${id}-dots`}
-            width={DOT_PITCH}
-            height={DOT_PITCH}
-            patternUnits="userSpaceOnUse"
-          >
-            <circle cx={DOT_PITCH / 2} cy={DOT_PITCH / 2} r="0.9" fill="white" />
-          </pattern>
-          <mask id={`${id}-fade`}>
-            <rect width={width} height={height} fill={`url(#${id}-sides)`} />
-          </mask>
-          <mask id={`${id}-depth`}>
-            <rect width={width} height={height} fill={`url(#${id}-down)`} />
-          </mask>
-          <mask id={`${id}-field`}>
-            <rect width={width} height={height} fill={`url(#${id}-dots)`} />
-          </mask>
-        </defs>
-        <g mask={`url(#${id}-fade)`}>
-          <g mask={`url(#${id}-depth)`}>
-            <path d={area} fill={`url(#${id}-wash)`} />
-            <path d={area} fill={`url(#${id}-sky)`} mask={`url(#${id}-field)`} />
-          </g>
-          <path
-            d={line}
-            fill="none"
-            stroke={COLOR.line}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </g>
+        <path
+          d={line}
+          fill="none"
+          stroke={LINE}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
       {scrubbing ? (
         <span
@@ -395,21 +318,9 @@ function Drawing({
       ) : null}
       {/* Today: drawn last when the line sweeps in. */}
       <span aria-hidden className="auni-dawn-today pointer-events-none absolute inset-0">
-        {breathing ? (
-          <span
-            className={cn(
-              "absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full animate-[auni-orb-breathe_3.6s_ease-in-out_infinite] motion-reduce:animate-none motion-reduce:opacity-0",
-              glide,
-            )}
-            style={{ ...place, background: COLOR.line }}
-          />
-        ) : null}
         <span
-          className={cn(
-            "auni-dawn-orb absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
-            glide,
-          )}
-          style={orb}
+          className="auni-dawn-orb absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-4 ring-background transition-[left,top] duration-150 ease-settle motion-reduce:transition-none"
+          style={{ ...place, background: LINE }}
         />
       </span>
     </>

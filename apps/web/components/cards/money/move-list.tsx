@@ -26,7 +26,7 @@ import { restLabel } from "./pick-money";
 
 const MARK = 36;
 /** Each row's hover wash reaches 14px past its content; the list gives that back at its edges. */
-const ROW = "-mx-3.5 rounded-[16px] px-3.5 py-2";
+const ROW = "-mx-3.5 rounded-card px-3.5 py-2";
 const MORE = "more";
 
 /** What a card's steps that didn't go through say and offer, and what a tap on one does. */
@@ -154,10 +154,10 @@ export function MoveList({
               >
                 <MoreHorizontal aria-hidden className="size-4" />
               </span>
-              <span className="min-w-0 flex-1 text-[15px] font-medium text-muted-foreground transition-colors group-hover:text-ink">
+              <span className="min-w-0 flex-1 text-body font-medium text-muted-foreground transition-colors group-hover:text-ink">
                 {rest.length} more
               </span>
-              <span className="flex-none text-[15px] font-semibold text-muted-foreground tabular-nums">
+              <span className="flex-none text-body font-semibold text-muted-foreground tabular-nums">
                 {restLabel(rest.flatMap((row) => (row.pick ? [row.pick] : [])))}
               </span>
               {begun ? <StatusMark status={overall(rest)} /> : null}
@@ -200,7 +200,7 @@ function Row({
   const { pick } = row;
   const words = (
     <>
-      <span className="flex min-w-0 items-center gap-1.5 text-[15px] leading-5 font-medium tracking-[-0.01em] text-ink">
+      <span className="flex min-w-0 items-center gap-1.5 text-body leading-5 font-medium tracking-[-0.01em] text-ink">
         <span className="flex min-w-0">
           <TextSwap
             className={row.status === "now" ? styles.shimmer : undefined}
@@ -211,7 +211,7 @@ function Row({
           <span
             key={tag.text}
             className={cn(
-              "flex-none rounded-full px-1.5 py-px text-[11.5px] leading-4 font-semibold",
+              "flex-none rounded-full px-1.5 py-px text-caption leading-4 font-semibold",
               TAG[tag.tone],
             )}
           >
@@ -222,7 +222,7 @@ function Row({
       {row.line ? (
         <span
           className={cn(
-            "mt-0.5 block text-[13px] leading-[18px] text-muted-foreground",
+            "mt-0.5 block text-meta leading-[18px] text-muted-foreground",
             open && hoverable ? "text-pretty" : "truncate",
           )}
         >
@@ -283,7 +283,7 @@ function Row({
               onPeek(rowRef.current, true);
           }}
           onBlur={onUnpeek}
-          className="min-w-0 flex-1 text-left outline-none after:absolute after:inset-0 after:rounded-[14px] focus-visible:after:ring-2 focus-visible:after:ring-ring/50"
+          className="min-w-0 flex-1 text-left outline-none after:absolute after:inset-0 after:rounded-card focus-visible:after:ring-2 focus-visible:after:ring-ring/50"
         >
           {words}
         </button>
@@ -292,7 +292,7 @@ function Row({
       )}
       {/* Centered on the whole row, so the amount reads as the row's value, not the name's. */}
       {row.meta ? (
-        <span className="flex-none self-center text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink tabular-nums">
+        <span className="flex-none self-center text-body leading-5 font-semibold tracking-[-0.01em] text-ink tabular-nums">
           <TextSwap text={row.meta} />
         </span>
       ) : row.status === "now" ? (
@@ -309,7 +309,7 @@ function Row({
           {/* A held step hasn't failed, so it says where it stands calmly. */}
           <p
             className={cn(
-              "min-w-0 flex-1 basis-48 text-[13px] leading-[18px] text-pretty",
+              "min-w-0 flex-1 basis-48 text-meta leading-[18px] text-pretty",
               failure.calm ? "text-muted-foreground" : "text-destructive",
             )}
           >
@@ -376,7 +376,7 @@ export function FailedActions({
           data-check-status={action === "check" ? "" : undefined}
           className={cn(
             onlyWhileNewest(action) && styles.whileNewest,
-            "h-8 flex-none rounded-full bg-foreground/[0.06] px-3.5 text-[13px] font-semibold text-ink transition-[background-color,transform,opacity] hover:bg-foreground/[0.09] active:scale-[.98] disabled:opacity-60",
+            "h-8 flex-none rounded-full bg-foreground/[0.06] px-3.5 text-meta font-semibold text-ink transition-[background-color,transform,opacity] hover:bg-foreground/[0.09] active:scale-[.98] disabled:opacity-60",
           )}
         >
           <TextSwap
@@ -456,7 +456,7 @@ function Spotlight({
     <span
       ref={spot}
       aria-hidden
-      className="pointer-events-none absolute top-0 left-0 -z-10 rounded-[16px] bg-surface opacity-0"
+      className="pointer-events-none absolute top-0 left-0 -z-10 rounded-card bg-surface opacity-0"
     />
   );
 }

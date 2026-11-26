@@ -57,14 +57,12 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
   return (
     <div className="flex min-h-full flex-col pt-6 pb-8">
       <div className="px-6">
-        <p className="text-[12.5px] font-medium text-faint">Thread details</p>
-        <h2 className="mt-1 line-clamp-2 text-[17px] leading-[1.35] font-semibold tracking-[-0.015em] text-ink lg:pr-8">
-          {thread.title}
-        </h2>
+        <p className="text-meta font-medium text-faint">Thread details</p>
+        <h2 className="mt-1 line-clamp-2 text-section text-ink lg:pr-8">{thread.title}</h2>
 
-        <div className="mt-4 rounded-[16px] border border-foreground/[0.08] bg-card p-3.5">
+        <div className="mt-4 rounded-card border border-foreground/[0.08] bg-card p-3.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[12.5px] font-medium text-muted-foreground">Permissions</span>
+            <span className="text-meta font-medium text-muted-foreground">Permissions</span>
             <AutonomyPicker
               actMode={thread.actMode}
               budgetUsd={thread.budgetUsd}
@@ -80,7 +78,7 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
 
           {auto ? (
             <div className="mt-3">
-              <div className="flex items-baseline justify-between gap-2 text-[12.5px] tabular-nums">
+              <div className="flex items-baseline justify-between gap-2 text-meta tabular-nums">
                 <span className="flex items-center gap-1.5 font-medium text-ink">
                   <Zap aria-hidden className="size-3.5 text-primary" />
                   {formatUsdCompact(state.data?.freeBudgetUsd ?? thread.budgetUsd)} remaining
@@ -100,13 +98,13 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
               </div>
             </div>
           ) : (
-            <p className="mt-2 text-[12.5px] leading-[1.45] text-muted-foreground">
+            <p className="mt-2 text-meta leading-[1.45] text-muted-foreground">
               Every move in this thread waits for your tap on a card.
             </p>
           )}
 
           {!alwaysOn && needsAlwaysOn ? (
-            <div className="mt-3 flex items-start gap-2 rounded-[10px] bg-warning-surface px-2.5 py-2 text-[12px] leading-[1.45] text-warning">
+            <div className="mt-3 flex items-start gap-2 rounded-control bg-surface px-2.5 py-2 text-caption leading-[1.45] text-ink-soft">
               <Laptop aria-hidden className="mt-0.5 size-3.5 flex-none" />
               <span>
                 Running locally on {me.reach.machine}. Watches and Auto moves pause while this
@@ -127,8 +125,8 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
       {holdings.length > 0 ? (
         <section aria-label="Positions opened here" className="mt-7 px-6">
           <div className="mb-3 flex items-baseline justify-between gap-2">
-            <h3 className="text-[12.5px] font-medium text-faint">Positions opened here</h3>
-            <span className="text-[13.5px] font-semibold text-ink tabular-nums">
+            <h3 className="text-meta font-medium text-faint">Positions opened here</h3>
+            <span className="text-ui font-semibold text-ink tabular-nums">
               {formatUsdcBalance(totalBaseUnits)}
             </span>
           </div>
@@ -141,7 +139,7 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
       <PaneRecord thread={thread} />
 
       {!hasContent ? (
-        <p className="mt-7 px-6 text-[13.5px] leading-[1.5] text-muted-foreground">
+        <p className="mt-7 px-6 text-ui leading-[1.5] text-muted-foreground">
           Positions opened in this thread, watches, working notes, and recent activity show up here
           as you go.
         </p>
@@ -153,9 +151,9 @@ function ThreadDetails({ thread }: { readonly thread: Thread }) {
 function PaneLoading() {
   return (
     <div className="auni-appear-late flex flex-col px-6 pt-6">
-      <Skeleton className="h-3.5 w-24 rounded-md" />
-      <Skeleton className="mt-2 h-5 w-52 rounded-md" />
-      <Skeleton className="mt-4 h-24 w-full rounded-[16px]" />
+      <Skeleton className="h-3.5 w-24 rounded-control" />
+      <Skeleton className="mt-2 h-5 w-52 rounded-control" />
+      <Skeleton className="mt-4 h-24 w-full rounded-card" />
       <Skeleton className="mt-6 h-12 w-full rounded-card" />
     </div>
   );

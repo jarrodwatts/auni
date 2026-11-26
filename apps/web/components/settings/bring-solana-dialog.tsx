@@ -70,7 +70,7 @@ function Bring({
       {loaded.kind === "pair_again" ? (
         <PairAgain then="Then paste your key here." />
       ) : (
-        <p className="text-[13px] leading-[18px] text-muted-foreground">
+        <p className="text-meta leading-[18px] text-muted-foreground">
           {loaded.kind === "gone"
             ? "This wallet can't take a Solana key now."
             : "That didn't reach Auni. Try again."}

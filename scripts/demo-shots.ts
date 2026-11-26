@@ -6,9 +6,10 @@
 // It starts `auni demo` on a port of its own, signs a headless Chrome in with the link the demo
 // prints, and visits the portfolio, the activity list, the apps (the list, a sheet in each
 // state the demo's owner has one in, and one Auni itself runs on), a new chat, each pane of
-// Settings, every conversation and every specialist the demo's owner has, and first run as a new
-// owner meets it (its question, then the first card its take puts up), each at a desktop and a
-// phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
+// Settings, every conversation the demo's owner has, and the states between them (the search
+// palette, a thread's details pane, a phone's menu, a turn's work opened up, a page that isn't
+// there, and a browser that isn't paired, or brings a link already used), and first run as a new
+// owner meets it (each step of its setup), each at a desktop and a phone width, in Auni's light look and then, in a folder `dark` beside them, its dark one.
 // A screen longer than the window is taken a window at a time: a conversation from its end back
 // to its start, a page from its top down. The demo makes the same owner every time (apps/core/src/demo), and here its clock
 // and the browser's both stand at one moment in one time zone, so two runs of one build give the
@@ -87,13 +88,13 @@ const slug = (text: string) =>
     .slice(0, 40);
 
 /**
- * Moves the page's main scroller (an open sheet, a conversation's list of messages, or the page
- * itself): to its top or its end when `to` says which, else one window back from that end. Says
- * whether it moved.
+ * Moves the page's main scroller (what's open over the page, such as a sheet or Settings, else a
+ * conversation's list of messages, or the page itself): to its top or its end when `to` says
+ * which, else one window back from that end. Says whether it moved.
  */
 const SCROLL = (from: "top" | "end", to?: "top" | "end") => `(() => {
-  const sheet = document.querySelector('[data-testid="app-sheet"]');
-  const scrollers = (sheet ? [sheet] : [document.scrollingElement, ...document.querySelectorAll("main, main *")]).filter(
+  const open = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+  const scrollers = (open ? [open, ...open.querySelectorAll("*")] : [document.scrollingElement, ...document.querySelectorAll("main, main *")]).filter(
     (el) => el && el.scrollHeight > el.clientHeight + 40 && getComputedStyle(el).overflowY !== "visible",
   );
   const scroller = scrollers.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
@@ -105,9 +106,21 @@ const SCROLL = (from: "top" | "end", to?: "top" | "end") => `(() => {
 })()`;
 
 /**
+ * What the owner does on a screen before its picture, as script run in the page (false when
+ * there was nothing to press), and what is true in the page once the state it opens shows.
+ */
+interface Opener {
+  readonly does: string;
+  readonly shows: string;
+}
+
+/**
  * Takes `url` into `out` at each width, a window at a time across all of it: from its top down
  * for a page, from its end back up for a conversation, which opens at its latest message.
- * `first` is what the owner does there before the picture, as script run in the page.
+ * `first` opens the state the picture is of; if it can't, the run stops, so no picture of the
+ * screen it was opened over is ever saved under that state's name. `only`
+ * takes one width, for a state the other doesn't have (a phone's menu), and `once` one window,
+ * for something open over the page (the page scrolling under it shows nothing new).
  */
 async function take(
   page: Page,
@@ -115,9 +128,10 @@ async function take(
   name: string,
   url: string,
   from: "top" | "end",
-  first?: string,
+  first?: Opener,
+  { only, once = false }: { only?: (typeof WIDTHS)[number]["name"]; once?: boolean } = {},
 ): Promise<void> {
-  for (const { name: size, width, height } of WIDTHS) {
+  for (const { name: size, width, height } of WIDTHS.filter((w) => !only || w.name === only)) {
     await page.picture(width, height);
     await page.open(url);
     // A blinking caret would make two pictures of one screen differ.
@@ -127,7 +141,14 @@ async function take(
     // What a page shows of money comes a moment after it loads.
     await sleep(1_200);
     if (first) {
-      await page.evaluate(first);
+      const at = `${name} at ${size} width`;
+      if ((await page.evaluate<unknown>(first.does)) === false)
+        throw new Error(`${at}: nothing on screen opens it (${first.does.trim().slice(0, 80)})`);
+      try {
+        await page.until(first.shows, 5_000);
+      } catch {
+        throw new Error(`${at}: it never showed (${first.shows})`);
+      }
       await sleep(600);
     }
     await page.evaluate(SCROLL(from, from));
@@ -136,11 +157,50 @@ async function take(
       const file = `${name}.${size}${part === 1 ? "" : `.${part}`}.png`;
       writeFileSync(join(out, file), await page.picture(width, height));
       console.log(file);
-      if (!(await page.evaluate<boolean>(SCROLL(from)))) break;
+      if (once || !(await page.evaluate<boolean>(SCROLL(from)))) break;
       await sleep(300);
     }
   }
 }
+
+/**
+ * Presses the first button on screen whose label or words (after any number) start with `label`,
+ * and says whether there was one.
+ */
+const PRESS = (label: string) => `(() => {
+  const wanted = ${JSON.stringify(label)};
+  const button = [...document.querySelectorAll("button")].find(
+    (el) =>
+      el.getClientRects().length > 0 &&
+      ((el.getAttribute("aria-label") ?? "").startsWith(wanted) ||
+        // A step's words follow its number: "2Wallet".
+        (el.textContent ?? "").trim().replace(/^\\d+/u, "").trim().startsWith(wanted)),
+  );
+  button?.click();
+  return Boolean(button);
+})()`;
+
+/** Opens the search palette, as its shortcut does. */
+const SEARCH: Opener = {
+  does: `void window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))`,
+  shows: `document.querySelector('[role="dialog"] [role="combobox"]')`,
+};
+
+/** Opens the last turn's work that can open: the steps Auni took for its latest answer. */
+const OPEN_WORK: Opener = {
+  does: `(() => {
+  const closed = [...document.querySelectorAll('.auni-work-header[aria-expanded="false"]')];
+  closed.at(-1)?.click();
+  return closed.length > 0;
+})()`,
+  shows: `document.querySelector('.auni-work-header[aria-expanded="true"]')`,
+};
+
+/** A step of first run's wizard, by the words on its button. */
+const STEP = (label: string): Opener => ({
+  does: PRESS(label),
+  shows: `document.querySelector('[aria-current="step"]')?.textContent.includes(${JSON.stringify(label)})`,
+});
 
 /**
  * Every screen, into `out`, as an owner whose system is set to `look` sees it. Each look gets a
@@ -160,6 +220,16 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     await page.open(link);
     // The demo's link lands on a new chat, signed in once the code is off the address.
     await page.until("location.pathname.startsWith('/app') && !location.hash");
+    // A browser that isn't this one: unpaired, and then with the link this one already spent.
+    const stranger = await launch();
+    try {
+      await stranger.page.look(look);
+      await stranger.page.standAt(Date.parse(AT), TIME_ZONE);
+      await take(stranger.page, out, "pairing-unpaired", `${origin}/app`, "top");
+      await take(stranger.page, out, "pairing-link-used", link, "top");
+    } finally {
+      await stranger.close();
+    }
     const core = <T>(path: string) =>
       page.evaluate<T>(`fetch("/core/${path}").then((response) => response.json())`);
     const { threads } = await core<{
@@ -185,7 +255,10 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
     const yours = apps.filter((app) => app.canSwitch);
     const holds = (app: (typeof yours)[number]) => Number(app.account?.usd ?? 0) > 0;
     const sheet = (id: string) => `${origin}/app/apps?app=${id}`;
-    const SWITCH = `document.querySelector('[data-testid="app-switch"]').click()`;
+    const SWITCH: Opener = {
+      does: `document.querySelector('[data-testid="app-switch"]').click()`,
+      shows: `document.querySelector('[data-testid="app-switch-question"], [data-testid="app-switch-refused"]')`,
+    };
     const stays = yours.find((app) => holds(app) && app.stays);
     const leaves = yours.find((app) => holds(app) && !app.stays && app.needs.length === 0);
     const needs = yours.find((app) => !app.account && app.needs.length > 0);
@@ -231,6 +304,31 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
       const name = slug(thread.title ?? thread.id);
       await take(page, out, `chat-${name}`, `${origin}/app/chat/${thread.id}`, "end");
     }
+    // The states between screens. The take that holds the most is the one to open up.
+    const busiest =
+      threads.find((thread) => /long bitcoin/iu.test(thread.title ?? "")) ?? threads[0];
+    await take(page, out, "search", `${origin}/app`, "top", SEARCH, { once: true });
+    const places: Opener = {
+      does: PRESS("Open places"),
+      shows: `document.querySelector('[role="dialog"]')`,
+    };
+    await take(page, out, "phone-menu", `${origin}/app`, "top", places, {
+      only: "phone",
+      once: true,
+    });
+    await take(page, out, "page-not-found", `${origin}/app/nothing-here`, "top");
+    if (busiest) {
+      const chat = `${origin}/app/chat/${busiest.id}`;
+      await take(page, out, "work-open", chat, "end", OPEN_WORK);
+      // Last, as the pane stays open once opened (on this device) for every thread after it.
+      const details: Opener = {
+        does: PRESS("Show details"),
+        shows: `document.querySelector('[aria-label="Hide details"], [role="dialog"]')`,
+      };
+      await take(page, out, "thread-details", chat, "top", details, {
+        once: true,
+      });
+    }
   } finally {
     await browser.close();
     await demo.stop();
@@ -238,7 +336,8 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
 }
 
 /**
- * First run, as a new owner meets it (`auni demo --first-run`): the local setup wizard.
+ * First run, as a new owner meets it (`auni demo --first-run`): the local setup wizard, each of
+ * its steps.
  */
 async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
   const browser = await launch();
@@ -252,6 +351,8 @@ async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise
     await page.open(link);
     await page.until("location.pathname.startsWith('/app') && !location.hash");
     await take(page, out, "first-run", `${origin}/app/new`, "top");
+    await take(page, out, "first-run-wallet", `${origin}/app/new`, "top", STEP("Wallet"));
+    await take(page, out, "first-run-yours", `${origin}/app/new`, "top", STEP("Make it yours"));
   } finally {
     await browser.close();
     await demo.stop();

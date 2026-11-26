@@ -1,5 +1,7 @@
 "use client";
 
+import "./sonner.css";
+
 import { InfoIcon, TriangleAlertIcon } from "lucide-react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
@@ -23,7 +25,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       icons={{
         success: <Mascot className="auni-onb-mascot" size={MASCOT_SIZE} state="celebrating" />,
         info: <InfoIcon className="size-4 text-ring" />,
-        warning: <TriangleAlertIcon className="size-4 text-warning" />,
+        warning: <TriangleAlertIcon className="size-4 text-ink-soft" />,
         error: <Mascot className="auni-onb-mascot" size={MASCOT_SIZE} state="sad" />,
         loading: <Mascot className="auni-loading-mascot" size={MASCOT_SIZE} state="thinking" />,
       }}

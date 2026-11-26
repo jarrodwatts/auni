@@ -82,10 +82,7 @@ export function ReportDialog({
             <FeedbackBody feedback={report.data} />
           ) : report.isError ? (
             <div className="flex flex-col gap-3">
-              <p
-                role="alert"
-                className="text-center text-[14px] leading-[1.5] text-muted-foreground"
-              >
+              <p role="alert" className="text-center text-ui leading-[1.5] text-muted-foreground">
                 Auni couldn&apos;t put the report together just now. Nothing was sent.
               </p>
               <MoneyButton
@@ -100,7 +97,7 @@ export function ReportDialog({
                 href={feedbackBlankUrl("bug")}
                 target="_blank"
                 rel="noreferrer"
-                className="text-center text-[13px] leading-5 font-medium text-muted-foreground underline decoration-foreground/20 underline-offset-2 transition-colors hover:text-ink hover:decoration-foreground/50"
+                className="text-center text-meta leading-5 font-medium text-muted-foreground underline decoration-foreground/20 underline-offset-2 transition-colors hover:text-ink hover:decoration-foreground/50"
               >
                 Or write it yourself on GitHub
               </a>

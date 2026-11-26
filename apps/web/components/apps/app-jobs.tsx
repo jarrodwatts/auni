@@ -161,7 +161,7 @@ export function AppJobs({
           {JOBS[job].scene(app.name).map((beat) => (
             <li key={beat.says} className="relative flex items-center gap-3.5">
               {beat.icon === "app" ? (
-                <span className="flex size-8 flex-none items-center justify-center rounded-[10px] bg-popover">
+                <span className="flex size-8 flex-none items-center justify-center rounded-control bg-popover">
                   <AppMark id={app.id} name={app.name} size={32} />
                 </span>
               ) : (
@@ -197,7 +197,7 @@ export function AppJobs({
                 key={other.id}
                 type="button"
                 onClick={() => onOpen(other.id)}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-surface pr-2.5 pl-1 text-[12.5px] font-medium text-ink transition-colors duration-150 outline-none hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="flex h-7 items-center gap-1.5 rounded-full bg-surface pr-2.5 pl-1 text-meta font-medium text-ink transition-colors duration-150 outline-none hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <AppMark id={other.id} name={other.name} size={20} />
                 {other.name}

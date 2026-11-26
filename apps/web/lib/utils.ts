@@ -1,10 +1,34 @@
 import { clsx, type ClassValue } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
-/** Knows the type scale in tokens.css, so `text-meta` is a size a color can't override. */
+/**
+ * The scale's own steps in tokens.css, so `cn` knows `text-meta` is a size (which a colour like
+ * `text-ink` never overrides), `rounded-card` a corner and `shadow-float` a shadow. tokens.test.ts
+ * holds these to the tokens.
+ */
+export const SCALE = {
+  text: [
+    "caption",
+    "meta",
+    "ui",
+    "body",
+    "reading",
+    "section",
+    "title",
+    "card-money",
+    "hero-money",
+  ],
+  radius: ["control", "card", "sheet"],
+  shadow: ["float"],
+} as const;
+
 const twMerge = extendTailwindMerge({
   extend: {
-    theme: { text: ["caption", "meta", "ui", "reading", "section", "amount", "display", "hero"] },
+    theme: {
+      text: [...SCALE.text],
+      radius: [...SCALE.radius],
+      shadow: [...SCALE.shadow],
+    },
   },
 });
 

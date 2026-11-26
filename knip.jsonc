@@ -13,8 +13,11 @@
       "paths": { "@/*": ["../web/*"] },
     },
     "apps/web": {
-      // Vendored shadcn/ui, owned upstream and kept whole (as in eslint.config.mjs).
+      // Auni's primitives (button, row, card...), each with every variant a screen may need, and
+      // the vendored shadcn/ui parts they're built on, kept whole (as in eslint.config.mjs).
       "ignore": ["components/ui/**"],
+      // The two typefaces, read by path from app/fonts.ts (next/font/local), not imported.
+      "ignoreDependencies": ["@fontsource-variable/inter", "@fontsource-variable/jetbrains-mono"],
     },
   },
 }

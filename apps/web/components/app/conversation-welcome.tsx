@@ -1,5 +1,7 @@
 "use client";
 
+import "./conversation-welcome.css";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ComposerStandin } from "@/components/app/composer-shell";
@@ -73,11 +75,11 @@ function NewChat({ preview }: { readonly preview: boolean }) {
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 pt-8 pb-4 sm:justify-center sm:px-8 sm:pb-20">
         <div className="flex flex-1 flex-col items-center justify-center pb-6 sm:flex-none sm:pb-0">
           <InteractiveMascot ref={mascotRef} size={104} className="size-22 sm:size-[104px]" />
-          <h1 className="mt-4 text-center text-[25px] font-bold tracking-[-0.025em] text-ink sm:text-[29px]">
+          <h1 className="mt-4 text-center text-title text-ink">
             {name ? `Where should we start, ${name}?` : "What do you want to explore?"}
           </h1>
           {/* On a phone the heading says it alone, and the points get the room. */}
-          <p className="mt-2 hidden max-w-[520px] text-center text-[15px] leading-[1.5] text-muted-foreground sm:block">
+          <p className="mt-2 hidden max-w-[520px] text-center text-body leading-[1.5] text-muted-foreground sm:block">
             Ask a question, test a take, or start from one of the live ideas below.
           </p>
         </div>

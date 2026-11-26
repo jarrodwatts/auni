@@ -116,7 +116,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
 
   if (remote.isPending && !remote.data) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded-[16px] border border-foreground/[0.08] bg-card py-12 text-[13px] text-muted-foreground">
+      <div className="flex items-center justify-center gap-2 rounded-card border border-foreground/[0.08] bg-card py-12 text-meta text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
         Inspecting Tailscale, service, and sessions…
       </div>
@@ -125,7 +125,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
 
   if (remote.isError || !remote.data) {
     return (
-      <div className="rounded-[16px] border border-foreground/[0.08] bg-card p-5 text-[13px] text-destructive">
+      <div className="rounded-card border border-foreground/[0.08] bg-card p-5 text-meta text-destructive">
         Could not load remote access status. Try reopening Settings.
       </div>
     );
@@ -261,7 +261,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
           }
         >
           <div className="flex items-center gap-2">
-            <code className="max-w-[240px] truncate rounded-[8px] bg-surface px-2.5 py-1 font-mono text-[12px] text-ink">
+            <code className="max-w-[240px] truncate rounded-control bg-surface px-2.5 py-1 font-mono text-caption text-ink">
               {data.address}
             </code>
             <button
@@ -400,7 +400,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
                     label={`QR code to open Auni at ${liveRemoteUrl}`}
                     size={136}
                   />
-                  <span className="text-[11px] text-muted-foreground">Scan on your phone</span>
+                  <span className="text-caption text-muted-foreground">Scan on your phone</span>
                 </div>
               ) : null}
             </div>
@@ -412,16 +412,16 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
             stacked
           >
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5 rounded-[10px] bg-surface p-1">
+              <div className="flex items-center gap-1.5 rounded-control bg-surface p-1">
                 {PORT_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     onClick={() => setPort(preset)}
                     className={cn(
-                      "rounded-[7px] px-2.5 py-1 font-mono text-[12px] transition-colors",
+                      "rounded-control px-2.5 py-1 font-mono text-caption transition-colors",
                       port === preset
-                        ? "bg-card font-medium text-ink shadow-xs"
+                        ? "bg-card font-medium text-ink ring-1 ring-border"
                         : "text-muted-foreground hover:text-ink",
                     )}
                   >
@@ -444,7 +444,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
               </button>
             </div>
             {previewUrl ? (
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Will publish at <code className="font-mono text-ink">{previewUrl}</code>
               </p>
             ) : null}
@@ -476,13 +476,13 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
           </SettingsRow>
         ) : null}
         {tsRestartNote ? (
-          <div className="flex flex-col gap-2 bg-positive/[0.08] px-4 py-3 text-[12.5px] leading-[1.45] text-positive sm:px-5">
+          <div className="flex flex-col gap-2 bg-positive/[0.08] px-4 py-3 text-meta leading-[1.45] text-positive sm:px-5">
             <span>{tsRestartNote}</span>
             {tsRestartCommand ? <CopyLine value={tsRestartCommand} command /> : null}
           </div>
         ) : null}
         {tsError ? (
-          <div className="px-4 py-3 text-[12.5px] text-destructive sm:px-5">{tsError}</div>
+          <div className="px-4 py-3 text-meta text-destructive sm:px-5">{tsError}</div>
         ) : null}
         {pairAgainFor === "tailscale" ? (
           <div className="px-4 py-3 sm:px-5">
@@ -559,7 +559,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
           </SettingsRow>
         ) : null}
         {serviceError ? (
-          <div className="px-4 py-3 text-[12.5px] text-destructive sm:px-5">{serviceError}</div>
+          <div className="px-4 py-3 text-meta text-destructive sm:px-5">{serviceError}</div>
         ) : null}
         {pairAgainFor === "service" ? (
           <div className="px-4 py-3 sm:px-5">
@@ -601,7 +601,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
                 <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                   <CopyLine value={mintPair.data.url} />
                   {mintPair.data.loopback ? (
-                    <div className="flex items-start gap-2 rounded-[10px] bg-warning-surface px-3 py-2 text-[12px] leading-[1.45] text-warning">
+                    <div className="flex items-start gap-2 rounded-control bg-surface px-3 py-2 text-caption leading-[1.45] text-ink-soft">
                       <AlertTriangle className="mt-0.5 size-3.5 flex-none" />
                       <span>
                         This link uses <code>localhost</code> and only works on this computer.
@@ -677,7 +677,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
               ) : null}
             </>
           ) : (
-            <div className="px-4 py-3.5 text-[12.5px] text-muted-foreground sm:px-5">
+            <div className="px-4 py-3.5 text-meta text-muted-foreground sm:px-5">
               No active paired browser sessions found.
             </div>
           )}
@@ -695,7 +695,7 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
         <details
           id="setting-handover"
           className={cn(
-            "group scroll-mt-4 rounded-[16px] border bg-card",
+            "group scroll-mt-4 rounded-card border bg-card",
             highlightedTarget === "setting-handover"
               ? "border-primary/50 ring-[3px] ring-ring/25"
               : "border-foreground/[0.08]",
@@ -703,10 +703,10 @@ export function RemotePane({ highlightedTarget }: { readonly highlightedTarget: 
         >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 select-none sm:px-5">
             <div>
-              <span className="block text-[14.5px] font-semibold tracking-[-0.015em] text-ink">
+              <span className="block text-body font-semibold tracking-[-0.015em] text-ink">
                 Move Auni to another machine
               </span>
-              <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+              <span className="mt-0.5 block text-meta text-muted-foreground">
                 Hand over your wallet keys, database, and settings once to an always-on Linux or Mac
                 machine on Tailscale.
               </span>

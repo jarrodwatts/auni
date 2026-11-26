@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { GROUP, ROW, ROW_HINT, ROW_LABEL, ROW_TEXT } from "./rows";
 
 /** One box of words and controls, the rows' frame without their dividers. */
-const BOX = "rounded-[14px] border border-foreground/[0.08] bg-card p-4";
+const BOX = "rounded-card border border-foreground/[0.08] bg-card p-4";
 
 /** Where to get Tailscale, for a laptop without it. */
 const TAILSCALE = "https://tailscale.com/download";
@@ -50,10 +50,10 @@ const ENDED: Record<
 export function KeepRunning() {
   return (
     <section aria-labelledby="keep-running" className="mt-5">
-      <p id="keep-running" className="px-1 text-[13.5px] font-medium text-ink">
+      <p id="keep-running" className="px-1 text-ui font-medium text-ink">
         Keep Auni running when your laptop sleeps
       </p>
-      <p className="mt-0.5 mb-2.5 px-1 text-[12.5px] leading-[1.5] text-muted-foreground">
+      <p className="mt-0.5 mb-2.5 px-1 text-meta leading-[1.5] text-muted-foreground">
         Hand it over to one of your machines on Tailscale that stays on, and open it there from any
         of your devices.
       </p>
@@ -157,7 +157,7 @@ function HandOver() {
   return (
     <>
       {said ? (
-        <p role="status" className="mb-3 px-1 text-[12.5px] leading-[1.5] text-muted-foreground">
+        <p role="status" className="mb-3 px-1 text-meta leading-[1.5] text-muted-foreground">
           {said.replace("{machine}", handover!.machine)}
         </p>
       ) : null}
@@ -178,7 +178,7 @@ function HandOver() {
       </div>
       {pairAgain ? <PairAgain className="mt-3" then="Then pick the machine again." /> : null}
       {refused ? (
-        <p role="alert" className="mt-3 px-1 text-[12.5px] leading-[1.5] text-destructive">
+        <p role="alert" className="mt-3 px-1 text-meta leading-[1.5] text-destructive">
           {refused}
         </p>
       ) : null}
@@ -245,11 +245,11 @@ function Handing({
   if (handover.stage !== "waiting")
     return (
       <div className={BOX}>
-        <p className="flex items-center gap-2 text-[14px] text-ink">
+        <p className="flex items-center gap-2 text-ui text-ink">
           <LoaderCircle aria-hidden className="size-4 animate-spin text-muted-foreground" />
           Handing Auni over to {handover.machine}
         </p>
-        <p className="mt-1.5 text-[12.5px] leading-[1.5] text-muted-foreground">
+        <p className="mt-1.5 text-meta leading-[1.5] text-muted-foreground">
           Auni here has paused. Once {handover.machine} has everything, Auni runs there and this
           computer runs nothing.
         </p>
@@ -258,7 +258,7 @@ function Handing({
   return (
     <div className={BOX}>
       <div className="flex items-center justify-between gap-3">
-        <p role="status" className="text-[14px] font-medium text-ink">
+        <p role="status" className="text-ui font-medium text-ink">
           Run this on {handover.machine}
         </p>
         <MoneyButton
@@ -272,7 +272,7 @@ function Handing({
           Cancel
         </MoneyButton>
       </div>
-      <p className="mt-1 text-[12.5px] leading-[1.5] text-muted-foreground">
+      <p className="mt-1 text-meta leading-[1.5] text-muted-foreground">
         {offer
           ? `In its terminal, or give it to your coding agent there. It installs Auni and takes over everything from this computer. Its code works once, until ${until}.`
           : "Its command showed when you picked it. For a new one, cancel this and pick it again."}
@@ -286,8 +286,8 @@ function Handing({
 function HandedOver({ went }: { readonly went: HandedOverWire }) {
   return (
     <div className={BOX}>
-      <p className="text-[14px] font-medium text-ink">Auni runs on {went.machine} now</p>
-      <p className="mt-1 text-[12.5px] leading-[1.5] text-muted-foreground">
+      <p className="text-ui font-medium text-ink">Auni runs on {went.machine} now</p>
+      <p className="mt-1 text-meta leading-[1.5] text-muted-foreground">
         It may take a minute to start there. Nothing was removed from this computer, and nothing
         here runs.
       </p>

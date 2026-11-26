@@ -30,14 +30,14 @@ export function FeedbackCard({
       phase="open"
     >
       <div className="flex items-center gap-3">
-        <span className="flex size-11 flex-none items-center justify-center rounded-full bg-primary/[0.08] text-primary">
+        <span className="flex size-11 flex-none items-center justify-center rounded-full bg-glyph-plate text-glyph-ink">
           <Icon aria-hidden className="size-5" strokeWidth={2} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
+          <p className="text-reading leading-[1.3] font-semibold tracking-[-0.015em] text-ink">
             {feedback.heading}
           </p>
-          <p className="mt-0.5 text-[13px] leading-[18px] text-pretty text-muted-foreground">
+          <p className="mt-0.5 text-meta leading-[18px] text-pretty text-muted-foreground">
             {feedback.why}
           </p>
         </div>

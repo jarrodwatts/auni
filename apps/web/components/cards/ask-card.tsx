@@ -76,10 +76,10 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
         <div className="flex items-center gap-3.5" data-testid="ask-card" data-standing="ended">
           <AskMark ask={card.ask} muted={!done} size={38} />
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] leading-5 font-semibold tracking-[-0.01em] text-ink">
+            <p className="text-body leading-5 font-semibold tracking-[-0.01em] text-ink">
               {face.title}
             </p>
-            <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.4] text-muted-foreground">
+            <p className="mt-0.5 line-clamp-2 text-meta leading-[1.4] text-muted-foreground">
               {standing.label}
             </p>
           </div>
@@ -96,21 +96,19 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
         <div className="flex items-center gap-3">
           <AskMark ask={card.ask} size={44} />
           <div className="min-w-0 flex-1">
-            <p className="text-[16.5px] leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
+            <p className="text-reading leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
               {face.title}
             </p>
             {face.line ? (
-              <p className="mt-0.5 text-[13px] leading-[18px] text-pretty text-muted-foreground">
+              <p className="mt-0.5 text-meta leading-[18px] text-pretty text-muted-foreground">
                 {face.line}
               </p>
             ) : null}
           </div>
           {face.figure ? (
             <div className="flex-none pl-1 text-right">
-              <p className="text-[26px] leading-[1.1] font-semibold tracking-[-0.035em] text-ink tabular-nums">
-                {face.figure.value}
-              </p>
-              <p className="mt-0.5 text-[13px] leading-4 text-muted-foreground">
+              <p className="text-card-money text-ink">{face.figure.value}</p>
+              <p className="mt-0.5 text-meta leading-4 text-muted-foreground">
                 {face.figure.label}
               </p>
             </div>
@@ -120,10 +118,10 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
           <dl className="mt-5 flex flex-col gap-3.5 border-t border-foreground/[0.06] pt-5">
             {face.details.map((line) => (
               <div key={line.label} className="min-w-0">
-                <dt className="text-[12.5px] leading-4 text-muted-foreground">{line.label}</dt>
+                <dt className="text-meta leading-4 text-muted-foreground">{line.label}</dt>
                 <dd
                   className={cn(
-                    "mt-1 text-[15px] leading-[1.45] break-words whitespace-pre-wrap text-ink",
+                    "mt-1 text-body leading-[1.45] break-words whitespace-pre-wrap text-ink",
                     // A few words read as a value; a routine's whole text reads as prose.
                     line.value.length <= SHORT && "font-semibold tracking-[-0.01em]",
                   )}
@@ -135,7 +133,7 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
           </dl>
         ) : null}
         {failed ? (
-          <p role="alert" className="mt-4 text-[13px] text-destructive">
+          <p role="alert" className="mt-4 text-meta text-destructive">
             That didn&apos;t reach Auni, so nothing changed. Try again.
           </p>
         ) : null}
@@ -184,7 +182,7 @@ function AskMark({
     <span
       aria-hidden
       className={cn(
-        "flex flex-none items-center justify-center rounded-full bg-primary/[0.08] text-primary",
+        "flex flex-none items-center justify-center rounded-full bg-glyph-plate text-glyph-ink",
         muted && "opacity-55 grayscale",
       )}
       style={{ width: size, height: size }}

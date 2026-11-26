@@ -1,5 +1,7 @@
 "use client";
 
+import "./orbit.css";
+
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 
 import type { DepositNetwork } from "@/lib/data/portfolio";

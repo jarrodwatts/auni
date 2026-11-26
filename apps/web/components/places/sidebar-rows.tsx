@@ -22,7 +22,7 @@ export const ROW_CLASS_NAME =
   "group/row relative isolate flex items-center rounded-control outline-none before:absolute before:inset-y-0 before:right-0 before:left-0 before:-z-10 before:rounded-control before:[transition:right_340ms_var(--motion-settle),background-color_150ms] hover:before:bg-foreground/[0.04] focus-visible:before:ring-2 focus-visible:before:ring-ring/50 group-data-folded/sidebar:before:right-[calc(100%-44px)] motion-reduce:before:transition-none";
 
 export const ROW_LINE_CLASS_NAME =
-  "h-9 gap-2.5 px-3 text-[14px] group-data-mobile/sidebar:h-11 group-data-mobile/sidebar:text-[16px]";
+  "h-9 gap-2.5 px-3 text-ui group-data-mobile/sidebar:h-11 group-data-mobile/sidebar:text-reading";
 
 export const ROW_ACTIVE_CLASS_NAME =
   "before:bg-foreground/[0.06] hover:before:bg-foreground/[0.06]";
@@ -41,7 +41,7 @@ function RowKeys({ keys }: { readonly keys: string }) {
   return (
     <kbd
       className={cn(
-        "flex-none font-sans text-[12px] text-faint opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-data-mobile/sidebar:hidden",
+        "flex-none font-sans text-caption text-faint opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-data-mobile/sidebar:hidden",
         FOLD_FADE,
       )}
     >
@@ -106,7 +106,7 @@ export function PlaceRow({
       ) : (
         <span className={cn("flex min-w-0 flex-1 flex-col", FOLD_FADE)}>
           <span className="truncate leading-5 font-medium text-ink">{title}</span>
-          <span className="truncate text-[12.5px] leading-[18px] text-muted-foreground group-data-mobile/sidebar:text-[14px]">
+          <span className="truncate text-meta leading-[18px] text-muted-foreground group-data-mobile/sidebar:text-ui">
             {detail}
           </span>
         </span>
@@ -163,7 +163,7 @@ export function RailSearchRow({
 export function SectionLabel({ children }: { readonly children: string }) {
   return (
     <div className="relative mt-5 mb-1 flex h-5 items-center px-3">
-      <p className={cn("text-[12px] font-medium text-faint", FOLD_FADE)}>{children}</p>
+      <p className={cn("text-caption font-medium text-faint", FOLD_FADE)}>{children}</p>
       <span aria-hidden className={cn("absolute left-3 h-px w-5 bg-foreground/[0.1]", RAIL_FADE)} />
     </div>
   );

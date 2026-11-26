@@ -32,16 +32,16 @@ import { defineTool, failure, result, type AuniTool } from "./tool.ts";
 
 /** Exact Settings deep links the agent can hand the owner in markdown (`[label](/app?settings=...)`). */
 const SETTINGS_LINKS = {
-  general: "/app?settings=general",
-  appearance: "/app?settings=appearance",
-  personalization: "/app?settings=personalization",
-  brains: "/app?settings=brains",
+  /** Their name, time zone, daily brief and where Auni messages them, what Auni knows about them, light or dark. */
+  you: "/app?settings=you",
+  /** Their AI: Claude Code or Codex, signing in, which goes first. */
+  ai: "/app?settings=ai",
+  /** Their addresses, add money, withdraw, showing their keys. */
   wallet: "/app?settings=wallet",
-  channels: "/app?settings=channels",
-  remote: "/app?settings=remote",
-  network: "/app?settings=network",
-  diagnostics: "/app?settings=diagnostics",
-  about: "/app?settings=about",
+  /** Their phone (Tailscale), Telegram, keeping Auni running, signed-in browsers, moving Auni. */
+  devices: "/app?settings=devices",
+  /** Health checks, updates, and under For developers: networks (RPCs, Alchemy), logs, backups. */
+  health: "/app?settings=health",
   apps: "/app/apps",
 } as const;
 
@@ -162,14 +162,14 @@ const inspectAuniTool = defineTool({
                   status: f.status,
                   hasAutoRepair: Boolean(f.repair),
                 })),
-                detailsLink: SETTINGS_LINKS.diagnostics,
+                detailsLink: SETTINGS_LINKS.health,
               },
             }
           : {}),
       };
 
       return result(
-        `Live Auni configuration (use settingsLinks like [Open Remote access](/app?settings=remote) when pointing the owner to Settings):\n${JSON.stringify(payload, null, 2)}`,
+        `Live Auni configuration (use settingsLinks like [Your devices](/app?settings=devices) when pointing the owner to Settings):\n${JSON.stringify(payload, null, 2)}`,
         { found: include_health ? "Status & health" : "Auni status", ...payload },
       );
     } catch (error) {

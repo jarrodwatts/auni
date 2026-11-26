@@ -24,15 +24,15 @@ export function supplyFace(chain: string, rate: string | null): CardFace {
 /** What a withdrawal's card says: savings on `chain` coming back to the wallet there as cash. */
 export function withdrawFace(chain: string): CardFace {
   return {
-    title: `Take out of savings on ${about.name}`,
-    note: "to take out",
-    action: `Take out ${AMOUNT}`,
-    working: "Taking it out of savings",
+    title: `Bring cash back from ${about.name}`,
+    note: "to bring back",
+    action: `Bring back ${AMOUNT}`,
+    working: `Bringing it back from ${about.name}`,
     context: `To your wallet on ${chain}`,
     figures: figures({ label: "Arrives", value: "At once, as cash" }),
     finePrint: "Asking for all of it takes the interest earned up to now too.",
     receipt: {
-      title: `Took out of savings on ${about.name}`,
+      title: `Brought cash back from ${about.name}`,
       detail: `On ${chain}`,
       amount: "back",
     },

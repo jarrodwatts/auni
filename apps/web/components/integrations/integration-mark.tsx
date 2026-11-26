@@ -30,14 +30,8 @@ const TRADE_GLYPH = {
   ink: "var(--color-glyph-ink)",
 } as const satisfies Omit<Mark, "src">;
 
-/** The tile and the ink of a glyph for a part of Auni itself, as its app's logo. */
-const TOOL_GLYPH = {
-  background: "var(--color-tool-plate)",
-  ring: "color-mix(in oklab, var(--foreground) 8%, transparent)",
-  fit: "contain",
-  size: 1,
-  ink: "var(--color-tool-ink)",
-} as const satisfies Omit<Mark, "src">;
+/** The tile and the ink of a glyph for a part of Auni itself, as its app's logo: neutral too. */
+const TOOL_GLYPH = { ...TRADE_GLYPH, size: 1 } as const satisfies Omit<Mark, "src">;
 
 /** Auni's own marks, for cards no app's mark fits. */
 const AUNI_MARKS = {

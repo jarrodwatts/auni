@@ -25,10 +25,9 @@ export function WatchIcon({ watch }: { readonly watch: AutomationWire }) {
     <span
       aria-hidden
       className={cn(
-        "flex size-[34px] flex-none items-center justify-center rounded-[10px]",
-        watch.status === "active"
-          ? "bg-primary/[0.08] text-primary"
-          : "bg-foreground/[0.05] text-muted-foreground",
+        "flex size-[34px] flex-none items-center justify-center rounded-control",
+        "bg-glyph-plate",
+        watch.status === "active" ? "text-primary" : "text-muted-foreground",
       )}
     >
       <Icon className="size-[17px]" strokeWidth={1.9} />

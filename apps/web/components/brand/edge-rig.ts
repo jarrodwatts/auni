@@ -403,8 +403,9 @@ export class EdgeRig {
         }
       }
     }
-    // A card ready for the person's tap keeps Auni up with them; one waiting on money, or done, may not.
-    const resting = this.scene?.kind === "funding" || this.scene?.kind === "landed";
+    // A card ready for the person's tap keeps Auni up with them; one waiting on money may not.
+    // (Anywhere else it rests out of sight, so there is nothing to doze.)
+    const resting = this.scene?.kind === "funding";
     if (
       !this.asleep &&
       resting &&

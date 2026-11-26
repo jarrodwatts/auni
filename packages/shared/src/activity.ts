@@ -30,6 +30,12 @@ const activityLogoSchema = z.object({
 
 const activityBaseSchema = z.object({
   id: z.string(),
+  /**
+   * What it is, which Recent filters by: money into or out of the owner's wallet (a deposit, a
+   * withdrawal), or a trade (what Auni bought, sold, opened or closed, and what a venue did),
+   * whatever it made or lost.
+   */
+  category: z.enum(["trade", "transfer"]),
   /** In plain words: "Bought Pearl", "Closed Meta, bought Micron", "Money arrived". */
   title: z.string(),
   /** Where and when: "Peptides, Oct 14 at 8:21pm"; "Auni" for a move outside a named thread. */

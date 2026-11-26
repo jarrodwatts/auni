@@ -19,11 +19,11 @@ export function ProofNote({
   return (
     <p
       className={cn(
-        "flex gap-2.5 rounded-[12px] border border-foreground/[0.08] px-3.5 py-3 text-[13px] leading-[1.5] text-muted-foreground",
+        "flex gap-2.5 rounded-control border border-foreground/[0.08] px-3.5 py-3 text-meta leading-[1.5] text-muted-foreground",
         className,
       )}
     >
-      <KeyRound aria-hidden className="mt-0.5 size-4 flex-none text-primary" />
+      <KeyRound aria-hidden className="mt-0.5 size-4 flex-none text-ink-soft" />
       <span>{children}</span>
     </p>
   );

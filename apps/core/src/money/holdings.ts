@@ -13,7 +13,7 @@ import type { MarketFace } from "../apps/contract.ts";
 import { accountOf, accountOwning, isSavings } from "../apps/registry.ts";
 import { coinOf, isWrappedCoin } from "./coins.ts";
 import { chainLabel } from "./chains.ts";
-import { dayMoves } from "./day-moves.ts";
+import { dayMoves, type DayFill } from "./day-moves.ts";
 import { cleanName } from "./buckets.ts";
 import { evmTokenKey, fillIdentity, solanaMintKey, type FillKey } from "./fill-key.ts";
 import { heldLabel } from "./format.ts";
@@ -171,10 +171,16 @@ export async function paysFees(
   return paysOwnGas(viem ? viem.id : "solana");
 }
 
+/** A holding's id on the wire: by where it is and what it is. */
+export function holdingId(holding: Pick<Holding, "chain" | "instrument">): string {
+  return `${holding.chain}:${holding.instrument}`;
+}
+
 async function view(holding: Holding, stocks: StockIndex): Promise<HoldingFace> {
   const base = {
-    id: `${holding.chain}:${holding.instrument}`,
+    id: holdingId(holding),
     usdValue: holding.usdValue ?? "0.00",
+    priced: holding.usdValue !== null,
   };
   // Cash orders hold reads the same at any account, wearing its app's logo.
   if (holding.heldForOrders) {
@@ -231,8 +237,15 @@ export async function holdingFaces(holdings: readonly Holding[]): Promise<Holdin
   );
 }
 
-/** Largest first, so the first few are the logos a card shows; each with its move since `today` began (see dayMoves). */
-export async function holdingViews(all: readonly Holding[], today: number): Promise<HoldingView[]> {
+/**
+ * Largest first, so the first few are the logos a card shows; each with its move since `today`
+ * began for it, by the `fills` that bought these holdings (see dayMoves).
+ */
+export async function holdingViews(
+  all: readonly Holding[],
+  today: number,
+  fills: readonly DayFill[],
+): Promise<HoldingView[]> {
   // A crumb worth under a cent, like the dust a sale leaves, isn't something a person holds. One
   // with no price now still is: only what's theirs or recognised gets here (see buckets.ts), as a
   // buy whose token lost its price, or any holding while prices can't be read.
@@ -241,7 +254,10 @@ export async function holdingViews(all: readonly Holding[], today: number): Prom
   );
   // Nothing held needs no stock catalog, whose cold read takes seconds.
   if (holdings.length === 0) return [];
-  const [faces, moves] = await Promise.all([holdingFaces(holdings), dayMoves(holdings, today)]);
+  const [faces, moves] = await Promise.all([
+    holdingFaces(holdings),
+    dayMoves(holdings, today, fills),
+  ]);
   const views = holdings.map((_, index): HoldingView => ({
     ...faces[index]!,
     todayChangeUsd: moves[index] ?? null,

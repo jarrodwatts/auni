@@ -11,13 +11,12 @@ import { actions, threads, type ActionRow } from "../db/schema.ts";
 import { actionKind, wakeThread } from "../jobs/kinds.ts";
 import type { Executor } from "../jobs/queue.ts";
 import { APPROVED_SALE, APPROVED_SALE_OF } from "./approved.ts";
-import { fitted, leftOutPermission, tooMuchToWarn, withPermissions } from "./card-face.ts";
+import { fitted, leftOutPermission, tooMuchToShow, withLeaves } from "./card-face.ts";
 import { approval, effectLines, pinnedApproval } from "./effect.ts";
 import { failureKind, retryRefusal } from "./failure.ts";
 import { fillIdentity, tokenKey, type FillKey } from "./fill-key.ts";
 import { begins, SETTLED, step } from "./life.ts";
 import { feeCoinFor, payingFees, topUpFor } from "./fee-coin.ts";
-import { lostSaid } from "./gone-for-good.ts";
 import { feeCoinTrades, feeCoinUsd, pinned, withFeeCoin, withoutFeeCoin } from "./fee-coin-said.ts";
 import { unpaid } from "./funding.ts";
 import { countBeforeTrading } from "./other-tokens.ts";
@@ -42,7 +41,7 @@ import {
 } from "./recipe.ts";
 import { recipeForTool, toolRecipe } from "./recipes/index.ts";
 import { Refused } from "./refused.ts";
-import { replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
+import { cardReached, replaceCards, retractStale, type WaitingCard } from "./waiting.ts";
 import { errorWords } from "../safe-words.ts";
 import { settleFromReceipts } from "./reconcile.ts";
 import {
@@ -60,7 +59,7 @@ import {
 } from "./record.ts";
 import { dollars } from "./summaries.ts";
 import { normalizeUsd, parseUnits } from "./usd.ts";
-import { signerFor } from "./wallets.ts";
+import { makeWalletIfNone, signerFor } from "./wallets.ts";
 import { chainKey, placeName } from "./chains.ts";
 
 export interface ActionContext {
@@ -110,6 +109,14 @@ export async function prepareLeg(
   { heldTo }: { readonly heldTo?: Pick<ActionRow, "details"> } = {},
 ): Promise<PreparedLeg> {
   const input = toolInput(recipe.input).parse(rawInput);
+  // Every move needs the wallet: one not made yet, because it couldn't be as the owner's first
+  // take started, is made by the first move.
+  await makeWalletIfNone().catch((error: unknown) => {
+    console.error("The owner's wallet couldn't be made:", error);
+    throw new Error(
+      "The owner's wallet couldn't be made just now, so there's no card and nothing moved.",
+    );
+  });
   const closed = await buyClosedHere(recipe, input);
   if (closed) throw new Error(closed);
   const described = await recipe.describe(input, { heldTo });
@@ -119,8 +126,7 @@ export async function prepareLeg(
   // there is no card (see buyingSolOnce).
   const bought = described.sends ? await feeCoinFor(described.sends) : null;
   const preview = bought ? withFeeCoin(withoutFeeCoin(described), bought) : described;
-  const lost = lostSaid({ details: approvedDetails(preview) });
-  const unshowable = tooMuchToWarn(preview.effect, lost);
+  const unshowable = tooMuchToShow(preview.effect);
   if (unshowable) throw new Error(unshowable);
   // The most it may spend, which a tap allows and execute holds it to (see assertApprovedSpend).
   return {
@@ -288,10 +294,8 @@ export async function recordActions(
           lines: effectLines(leg.preview.effect),
           details: approvedDetails(leg.preview),
           // Cut to the lengths a card takes, so words from outside can't make one that fails to draw.
-          // Saying every permission the move leaves, whoever wrote its face.
-          card: leg.preview.card
-            ? fitted(withPermissions(leg.preview.card, leg.preview.effect))
-            : null,
+          // Saying everything the move leaves behind, whoever wrote its face.
+          card: leg.preview.card ? fitted(withLeaves(leg.preview.card, leg.preview.effect)) : null,
           cardFormat: CARD_FORMAT,
         })),
       )
@@ -757,7 +761,11 @@ export async function settledOutcome(
   if (!SETTLED.includes(action.status)) return null;
   if (!action.proposalId)
     return {
-      reason: actionOutcome(action).slice(0, SETTLED_SAID),
+      reason: settledSaid(
+        actionOutcome(action).replace(/[^.!?]$/u, "$&."),
+        " ",
+        await cardSays(action, executor),
+      ),
       id: `action-settled-${action.id}-a${action.attempts}`,
     };
   const legs = await proposalActions(action.proposalId, executor);
@@ -774,20 +782,37 @@ export async function settledOutcome(
   });
   const heading = `Every leg of proposal ${action.proposalId} has settled`;
   return {
-    reason: [
-      notDone.length === 0
-        ? `${heading}:`
-        : `${heading}; ${String(notDone.length)} of ${String(legs.length)} didn't go through:`,
-      ...list,
-      // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
-      ...[...notDone, ...legs.filter((leg) => leg.status === "done")].map(
-        (leg) => `- ${actionOutcome({ ...leg, error: said.has(leg.id) ? null : cut(leg) })}`,
-      ),
-    ]
-      .join("\n")
-      .slice(0, SETTLED_SAID),
+    reason: settledSaid(
+      [
+        notDone.length === 0
+          ? `${heading}:`
+          : `${heading}; ${String(notDone.length)} of ${String(legs.length)} didn't go through:`,
+        ...list,
+        // What didn't go through first, which the agent acts on, so a wake cut short cuts only what did.
+        ...[...notDone, ...legs.filter((leg) => leg.status === "done")].map(
+          (leg) => `- ${actionOutcome({ ...leg, error: said.has(leg.id) ? null : cut(leg) })}`,
+        ),
+      ].join("\n"),
+      "\n",
+      await cardSays(action, executor),
+    ),
     id: `proposal-settled-${action.proposalId}-a${cardRuns(legs)}`,
   };
+}
+
+/**
+ * What the owner already sees of a settled move: its card, changed in place to how it ended, when
+ * one reached their chat. Said only as it's true: a move begun as its turn was cut off has none.
+ */
+async function cardSays(action: ActionRow, executor: Pick<typeof db, "select">): Promise<string> {
+  return (await cardReached(action, executor))
+    ? "Its card already shows the owner how it ended."
+    : "No card for it reached the owner's chat, so they haven't seen it or how it ended.";
+}
+
+/** A settled wake's words cut to fit SETTLED_SAID, with what the owner saw of it whole after them. */
+function settledSaid(said: string, between: string, seen: string): string {
+  return `${said.slice(0, SETTLED_SAID - between.length - seen.length)}${between}${seen}`;
 }
 
 /**

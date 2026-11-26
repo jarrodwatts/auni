@@ -1,61 +1,123 @@
 /*
- * auni design tokens.
+ * Auni's design tokens: every colour, size, shape, shadow and curve a screen is drawn with.
  *
- * Semantic colors are recorded from the Claude Design handoff (Auni.dc.html)
- * and exposed as shadcn-compatible CSS variables plus brand utilities. Kept
- * separate from globals.css so the token layer stays readable on its own;
- * globals.css remains the Tailwind entry point and owns content scanning.
+ * Auni has two looks, light and dark. Each colour here says both, as light-dark(light, dark), and
+ * the browser picks one by `color-scheme`: light, unless the owner picked another look in
+ * Settings, which lib/look.tsx wears as `data-theme` on the document. Every colour a person sees
+ * comes from here (tokens.test.ts fails one written into a component, and any font size or radius
+ * that isn't one of these), so nothing else knows there are two looks.
  *
- * Auni has two looks, light and dark. Each colour here says both, as
- * light-dark(light, dark), and the browser picks one by `color-scheme`:
- * light, unless the owner picked another look in Settings, which lib/look.tsx
- * wears as `data-theme` on the document. Auni doesn't follow the system's. Every colour a person sees comes
- * from here (tokens.test.ts fails one written into a component), so nothing
- * else knows there are two looks.
+ * What colour means, and only that:
+ *
+ *   ink     the strong action: a money button is ink with paper words on it
+ *   blue    Auni itself: a link, focus, Auni at work. Never a status
+ *   amber   waiting on the owner, and nothing else
+ *   green   a gain on a number, or money done; never a thing that merely works
+ *   red     a loss on a number, or something that failed; a destructive button
+ *
+ * Everything else is paper and ink: a cool slate ramp. No gradients, washes, glows or tinted
+ * tiles. The colour on a screen comes from the logos of real things.
  */
 
 :root {
   color-scheme: light;
+}
 
-  --radius: 0.625rem;
-
-  --background: light-dark(#ffffff, #0f1115);
-  --foreground: light-dark(#141414, #eef0f3);
-
-  /* Depth. The page; the sidebar beside it; a card to sign, which is bordered; and what floats
-     over the page (a menu, a dialog, a sheet), which casts a shadow. In the dark each is a step
-     lighter than what it sits on, since a shadow shows little there. */
-  --sidebar: light-dark(#fafbfd, #0b0d10);
+/* Every colour, declared again on a part of the page drawn in one look whatever the page wears
+   (a preview of that look, `look-light` or `look-dark`): a light-dark() value is settled where
+   it is declared, so a preview declares its own. */
+:root,
+.look-light,
+.look-dark {
+  /* Paper and ink. The page; the sidebar beside it; a card, which is bordered and flat; and what
+     floats over the page (a menu, a dialog, a sheet), which casts the one shadow. In the dark
+     each is a step lighter than what it sits on, since a shadow shows little there. */
+  --background: light-dark(#ffffff, #0e1014);
+  --foreground: light-dark(#101623, #eef1f5);
+  --sidebar: light-dark(#f8f9fb, #0b0c0f);
   --card: light-dark(#ffffff, #15181d);
-  --popover: light-dark(#ffffff, #181b21);
-  --popover-foreground: light-dark(#141414, #eef0f3);
+  --popover: light-dark(#ffffff, #1a1d23);
+  --popover-foreground: light-dark(#101623, #eef1f5);
 
+  /* Auni blue: Auni's presence, links and focus. */
   --primary: light-dark(#3d63e0, #7d9cff);
 
-  --muted: light-dark(#eef1f7, #1f2329);
-  --muted-foreground: light-dark(#5c6472, #9aa2af);
+  /* A quiet fill, and the secondary ink read on any surface (AA on each). */
+  --muted: light-dark(#f1f3f6, #1d2026);
+  --muted-foreground: light-dark(#535c6b, #a1a9b6);
 
-  /* Neutral, not blue: --accent is the universal hover/focus fill. Blue lives
-     in --primary and --ring for genuine accent, never in a hover state. */
-  --accent: light-dark(#f0f0f0, #22262d);
-  --accent-foreground: light-dark(#141414, #eef0f3);
+  /* The hover and pressed fill: neutral, never blue. */
+  --accent: light-dark(#f1f3f6, #22252c);
+  --accent-foreground: light-dark(#101623, #eef1f5);
 
-  --destructive: light-dark(#a34450, #ec8d98);
+  --destructive: light-dark(#b8372b, #f47c66);
 
-  --border: light-dark(#e3e8f2, #262a31);
-  --input: light-dark(#e3e8f2, #262a31);
-  --ring: light-dark(#5b7fe8, #7d9cff);
+  /* Hairlines, for what only groups (a card, a list). A field's edge is no hairline: it is the
+     only thing showing where to type, so it is 3:1 on every surface a field sits on. */
+  --border: light-dark(#e4e7ec, #262a31);
+  --input: light-dark(#848d9d, #666f7f);
+  --ring: light-dark(#3d63e0, #7d9cff);
 
-  --sidebar-border: light-dark(rgb(50 80 150 / 9%), rgb(255 255 255 / 6%));
+  --sidebar-border: light-dark(#e9ecf0, #1c1f25);
 
-  /* Motion curves, named by role, not repeated as literals. The first two decelerate
-     hard, so a movement arrives early and eases to rest instead of coasting;
-     that late settle is what reads as calm rather than fast. `settle` is the
-     default for anything the eye tracks; `drift` is its longer, softer form
-     for whole surfaces. `exit` speeds up as it goes, for things leaving;
-     `glide` is even in and out, for things moving from place to place.
-     These and the durations and blurs below must match lib/motion.ts, which
-     hands the same values to the Web Animations API. */
+  /* Gain and loss: green on a number, or money done (arrived, landed), and never a thing that
+     merely works; red on a number, or something that failed. */
+  --positive: light-dark(#16794a, #4cc38a);
+  --negative: light-dark(#c0392b, #f47c66);
+
+  /* The ink ramp. Primary is --ink; --ink-soft a step softer, for a note read at length;
+     secondary is --muted-foreground, a quiet word; --faint, the quietest, for an
+     icon at rest or a field's hint. Each one is AA as text on every surface in its look
+     (tokens.test.ts). */
+  --ink: light-dark(#101623, #f1f3f6);
+  --ink-soft: light-dark(#3f4856, #c8cdd5);
+  --faint: light-dark(#656e7e, #858e9e);
+  /* What is set on ink: a money button's words. */
+  --paper: light-dark(#ffffff, #0e1014);
+
+  /* A fill content sits on with no line around it. */
+  --surface: light-dark(#f5f6f8, #1a1d22);
+  /* What the page falls away to behind first run and every notice before the app. */
+  --floor: light-dark(#f3f4f7, #08090b);
+
+  /* Waiting on the owner: its words, the fill they sit on, and its mark (a pending card's edge,
+     a count in the sidebar). Amber means this and nothing else. */
+  --waiting: light-dark(#94560a, #ebbd70);
+  --waiting-surface: light-dark(#fdf3e4, #2a2216);
+  --waiting-mark: light-dark(#d98b1f, #e5a646);
+
+  /* What a shadow is cast in. */
+  --shade: light-dark(#101623, #000000);
+  /* What stands between the page and something opened over it: a sheet dims it, and a dialog
+     frosts it. */
+  --scrim: light-dark(rgb(16 22 35 / 0.24), rgb(0 0 0 / 0.56));
+  --veil: light-dark(rgb(243 244 247 / 0.8), rgb(8 9 11 / 0.74));
+
+  /* What a logo or a QR code is printed on, and what is printed: the same in every look, as a
+     logo is. */
+  --plate: #ffffff;
+  --plate-ink: #101623;
+  /* A line around a mark in the dark, where a dark logo would have no edge on a dark page; in
+     the light, a hairline so a white logo doesn't melt into a white page. */
+  --mark-line: light-dark(rgb(16 22 35 / 0.08), rgb(255 255 255 / 0.14));
+
+  /* A glyph Auni drew, which is no service's logo, so it never sits on a logo's white plate: a
+     neutral glyph in the look's ink on the look's quiet fill, beside the thing's own name. */
+  --glyph-plate: light-dark(#f1f3f6, #23272e);
+  --glyph-ink: light-dark(#3f4856, #c8cdd5);
+
+  /* A switch's knob: always the lighter part, so an off switch never reads as a hole. */
+  --knob: light-dark(#ffffff, #aeb5c1);
+}
+
+:root {
+  /* Motion curves, named by role, not repeated as literals. The first two decelerate hard, so a
+     movement arrives early and eases to rest instead of coasting; that late settle is what reads
+     as calm rather than fast. `settle` is the default for anything the eye tracks; `drift` is its
+     longer, softer form for whole surfaces. `exit` speeds up as it goes, for things leaving;
+     `glide` is even in and out, for things moving from place to place. Motion only ever shows a
+     change of state; under reduced motion, a fade. These and the durations and blurs below must
+     match lib/motion.ts, which hands the same values to the Web Animations API. */
   --motion-settle: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-drift: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-exit: cubic-bezier(0.7, 0, 0.84, 0);
@@ -76,7 +138,18 @@
   color-scheme: dark;
 }
 
-@theme inline {
+/* A part of the page drawn in one look whatever the page wears: a preview of that look. */
+.look-light {
+  color-scheme: light;
+}
+
+.look-dark {
+  color-scheme: dark;
+}
+
+/* `static`, so every token is a variable on the page for a stylesheet beside a component as well
+   as for a class: those compile on their own, out of sight of Tailwind's own. */
+@theme inline static {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-sidebar: var(--sidebar);
@@ -94,139 +167,118 @@
   --color-ring: var(--ring);
   --color-sidebar-border: var(--sidebar-border);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Shape: three radii and a pill (rounded-full). A control (a button, a field, a chip, a row
+     you press); a card; a sheet or a dialog. Tailwind's own names land on these too, for the
+     markdown renderer's code blocks; Auni's code says the role (tokens.test.ts). */
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-sheet: 20px;
+  --radius-xs: var(--radius-control);
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-card);
+  --radius-2xl: var(--radius-sheet);
+  --radius-3xl: var(--radius-sheet);
 
-  /* Radius roles, separate what a shape IS from a hard-coded pixel value. */
-  --radius-control: 10px; /* buttons, nav items, inputs */
-  --radius-card: 16px; /* surfaces */
+  /* Type: one scale, each step named for what it sets. Size and line height always; weight and
+     tracking for the display steps, which are always set the same way. The two money steps set
+     their figures tabular (see the base layer below), so a changing total doesn't jiggle.
 
-  /* Type scale, each step with its weight: 600 for money the person owns,
-     500 for labels, 400 for prose. */
+       caption     12/16   a field's label, a table's head, a badge
+       meta        13/18   a quiet second line: a time, a note under a row
+       ui          14/20   controls, nav, row titles
+       body        15/22   prose in a sheet, a card or a setting
+       reading     16/26   the conversation
+       section     18/24   a group's or a sheet's heading
+       title       24/30   a page's heading
+       card-money  30/36   the amount on a card or a sheet
+       hero-money  48/52   the total */
   --text-caption: 12px;
-  --text-caption--font-weight: 500;
+  --text-caption--line-height: 16px;
   --text-meta: 13px;
   --text-meta--line-height: 18px;
-  --text-meta--font-weight: 400;
-  --text-ui: 15px;
+  --text-ui: 14px;
   --text-ui--line-height: 20px;
-  --text-ui--font-weight: 500;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
   --text-reading: 16px;
-  --text-reading--line-height: 1.55;
-  --text-reading--font-weight: 400;
-  --text-section: 20px;
-  --text-section--line-height: 26px;
+  --text-reading--line-height: 26px;
+  --text-section: 18px;
+  --text-section--line-height: 24px;
   --text-section--font-weight: 600;
-  --text-section--letter-spacing: -0.02em;
-  --text-amount: 24px;
-  --text-amount--font-weight: 600;
+  --text-section--letter-spacing: -0.015em;
+  --text-title: 24px;
+  --text-title--line-height: 30px;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.025em;
+  --text-card-money: 30px;
+  --text-card-money--line-height: 36px;
+  --text-card-money--font-weight: 600;
+  --text-card-money--letter-spacing: -0.03em;
+  --text-hero-money: 48px;
+  --text-hero-money--line-height: 52px;
+  --text-hero-money--font-weight: 600;
+  --text-hero-money--letter-spacing: -0.035em;
+  /* Tailwind's own names, for the markdown renderer, on the same steps. */
+  --text-xs: var(--text-caption);
+  --text-xs--line-height: var(--text-caption--line-height);
+  --text-sm: var(--text-ui);
+  --text-sm--line-height: var(--text-ui--line-height);
+  --text-base: var(--text-reading);
+  --text-base--line-height: var(--text-reading--line-height);
+  --text-lg: var(--text-section);
+  --text-lg--line-height: var(--text-section--line-height);
+  --text-xl: var(--text-section);
+  --text-xl--line-height: var(--text-section--line-height);
+  --text-2xl: var(--text-title);
+  --text-2xl--line-height: var(--text-title--line-height);
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace;
+  /* Inter, its optical size following the size it's set at, so a total is drawn in its display
+     cut and a caption in its text cut; JetBrains Mono for addresses, hashes and commands only.
+     Both are this app's own files (app/fonts.ts), so every machine draws the same letters. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, Menlo, monospace;
 
-  /* Motion curves, as Tailwind utilities. The literals live in `:root` above so
-     hand-written keyframes can reach them too, a value referenced only inside
-     `@theme` is inlined into utilities and never lands on the element. */
+  /* Motion curves, as Tailwind utilities. The literals live in `:root` above so hand-written
+     keyframes can reach them too, a value referenced only inside `@theme` is inlined into
+     utilities and never lands on the element. */
   --ease-settle: var(--motion-settle);
   --ease-drift: var(--motion-drift);
   --ease-exit: var(--motion-exit);
   --ease-glide: var(--motion-glide);
 }
 
-/* Brand utilities for the financial surface, literal values from the handoff. `static`, so each
-   is there for a style written in code (a chart's stroke, a gradient) as well as for a class. */
-@theme static {
-  --color-positive: light-dark(#1d8a5b, #4cc38a);
-  --color-negative: light-dark(#c0452e, #f47c66);
-
-  /* Text ramp, four tiers. Primary is --color-ink, and --color-ink-soft a step softer, for a
-     note read at length or a chip's label; secondary is --muted-foreground, a quiet word;
-     tertiary is --color-faint, for an icon at rest or a field's hint. */
-  --color-ink: light-dark(#101623, #f1f3f6);
-  --color-ink-soft: light-dark(#4a5362, #c5cad3);
-  --color-faint: light-dark(#9aa2ae, #68707d);
-
-  /* Content sits on this fill with no line around it. */
-  --color-surface: light-dark(#f5f7fb, #1c1f25);
-  /* What the page falls away to behind first run and every notice before the app. */
-  --color-floor: light-dark(#f1f4f8, #07080b);
-
-  /* Something to know before going on: the text, and the fill it sits on. */
-  --color-warning: light-dark(#8a5a12, #e9b96a);
-  --color-warning-surface: light-dark(#fff4e5, #2c2416);
-
-  /* The dot on something that waits for the owner. */
-  --color-waiting: #e8a33d;
-
-  /* What a shadow is cast in, and the bluer one under what floats over money. */
-  --color-shade: light-dark(#101623, #000000);
-  --color-shade-blue: light-dark(#28468c, #000000);
-  /* What stands between the page and something opened over it: a sheet dims it, and a dialog
-     frosts it. */
-  --color-scrim: light-dark(rgb(16 22 35 / 0.24), rgb(0 0 0 / 0.56));
-  --color-veil: light-dark(rgb(237 240 245 / 0.82), rgb(7 8 11 / 0.74));
-
-  /* The light Auni is drawn in: the soft blue around the mascot, and the warm end of a chart,
-     which is the same in every look where it lights a drawing, and let down in the dark where
-     it washes over a surface. */
-  --color-halo: #8ba3e8;
-  --color-blush: #ffe3d6;
-  --color-blush-wash: light-dark(#ffe3d6, #4d3228);
-  --color-ember: #f6b08f;
-
-  /* The sky first run opens under (the landing): cool at the top, lighter through the middle,
-     warm at the foot, with soft cloud and light drifting through it; its dawn is the blush wash.
-     And the frosted glass a take floats on over it. */
-  --color-sky-top: light-dark(#edf2ff, #0e1424);
-  --color-sky-middle: light-dark(#f6f8ff, #0f1218);
-  --color-sky-foot: light-dark(#fbf8f7, #14110f);
-  --color-sky-cloud: light-dark(#d7e3ff, #1a2645);
-  --color-sky-light: light-dark(#ffffff, #171c28);
-  --color-glass: light-dark(rgb(255 255 255 / 0.76), rgb(24 27 33 / 0.76));
-
-  /* What a logo or a QR code is printed on, and what is printed: the same in every look, as a
-     logo is. Letters set on a coloured mark are the plate's colour too. */
-  --color-plate: #ffffff;
-  --color-plate-ink: #101623;
-  /* A line around a mark in the dark, where one drawn on a dark tile would have no edge on a
-     dark page. Nothing in the light, where every mark already stands clear. */
-  --color-mark-line: light-dark(transparent, rgb(255 255 255 / 0.14));
-  /* What lifts a deep mark colour (initials on navy, on near-black) a step in the dark, where it
-     would sink into the page. Laid over the colour; nothing in the light. */
-  --color-mark-lift: light-dark(transparent, rgb(255 255 255 / 0.2));
-
-  /* A glyph Auni drew, which is no service's logo, so it never sits on a logo's white plate: it
-     is drawn in the look's ink on a tile of the look's. One that stands where a logo would (a
-     stock's candlesticks, a swap's arrows), and one for a part of Auni itself (the wallet's key,
-     the price watcher's pulse), tinted as Auni is. */
-  --color-glyph-plate: light-dark(rgb(255 255 255 / 0.8), #272c35);
-  --color-glyph-ink: light-dark(#111318, #dfe4ec);
-  --color-tool-plate: light-dark(#e6ecfb, #222a3f);
-  --color-tool-ink: light-dark(#22304f, #c2cff5);
-
-  /* A switch's knob: always the lighter part, so an off switch never reads as a hole. */
-  --color-knob: light-dark(#ffffff, #aeb5c1);
-
-  /* Shadows that more than one thing casts: a card to sign, and a menu. */
-  --shadow-card:
-    0 1px 2px --alpha(var(--color-shade) / 3%), 0 10px 28px -16px --alpha(var(--color-shade) / 12%);
-  --shadow-menu:
-    0 18px 48px --alpha(var(--color-shade) / 13%), 0 2px 6px --alpha(var(--color-shade) / 5%);
-}
-
-/* What has a colour of its own (an app with no logo, a specialist) says only its hue, as --hue
-   where it is drawn; these are what that hue is drawn in, in each look: a soft tile, the words
-   on it, the line around it, a wash behind, and its mark (a specialist's orb), solid.
-   `inline`, so each is worked out there. */
-@theme inline {
-  --color-hue-mark: light-dark(hsl(var(--hue) 64% 62%), hsl(var(--hue) 52% 56%));
-  --color-hue-plate: light-dark(hsl(var(--hue) 78% 95%), hsl(var(--hue) 34% 19%));
-  --color-hue-ink: light-dark(hsl(var(--hue) 42% 34%), hsl(var(--hue) 68% 80%));
-  --color-hue-line: light-dark(hsl(var(--hue) 45% 40% / 0.12), hsl(var(--hue) 60% 78% / 0.14));
-  --color-hue-wash: light-dark(hsl(var(--hue) 95% 97%), hsl(var(--hue) 42% 17%));
-  --color-hue-shade: light-dark(hsl(var(--hue) 45% 35% / 0.35), rgb(0 0 0 / 0.5));
+/* `static`, so each is there for a style written in code (a chart's stroke) as well as for a
+   class. */
+/* The colours above as Tailwind's (`text-ink`, `bg-waiting-surface`), read where they're used,
+   and `static`, so each is there as `var(--color-…)` for a style written in code too. */
+@theme inline static {
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-faint: var(--faint);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-floor: var(--floor);
+  --color-waiting: var(--waiting);
+  --color-waiting-surface: var(--waiting-surface);
+  --color-waiting-mark: var(--waiting-mark);
+  --color-shade: var(--shade);
+  --color-scrim: var(--scrim);
+  --color-veil: var(--veil);
+  --color-plate: var(--plate);
+  --color-plate-ink: var(--plate-ink);
+  --color-mark-line: var(--mark-line);
+  --color-glyph-plate: var(--glyph-plate);
+  --color-glyph-ink: var(--glyph-ink);
+  --color-knob: var(--knob);
+  /* The one shadow, for what floats over the page: a menu, a popover, a sheet, a dialog, a
+     toast, the composer. Nothing that sits in the page casts one. */
+  --shadow-float:
+    0 1px 2px color-mix(in oklab, var(--color-shade) 4%, transparent),
+    0 12px 32px -8px color-mix(in oklab, var(--color-shade) 16%, transparent);
 }
 
 @layer base {
@@ -238,7 +290,65 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    letter-spacing: -0.011em; /* the blueprint's ~-0.15px default, tokenized */
+    /* Inter's own spacing at text sizes, a touch tighter as it's read on screens. */
+    letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Figures, tabular, so a column of them lines up and a changing one doesn't jiggle: the money
+     steps here, and anywhere else a figure sits (an amount, a count, a timer) by `tabular-nums`
+     (a Row's end, a Badge and the rolling numbers wear it already). Never on the body: Inter's
+     tabular set widens the hyphen, the brackets and the stops too, so "stop-loss" reads
+     "stop - loss" in prose (tokens.test.ts). */
+  [class*="text-card-money"],
+  [class*="text-hero-money"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* With forced colours on, the system's own colours replace these and drop every box-shadow, so
+     a focus ring drawn as a shadow vanished there (2026-11-25 council). Whatever has the keyboard
+     shows the system's highlight, even where a screen turned the outline off. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 2px solid Highlight !important;
+    }
+
+    /* The system palette paints a switch's track and knob alike, so on and off would look the
+       same: draw the knob in the text colour, and fill the track when it's on. */
+    [data-slot="switch"] {
+      border-color: ButtonText !important;
+      forced-color-adjust: none;
+      background: Canvas !important;
+    }
+    [data-slot="switch"][data-state="checked"] {
+      background: Highlight !important;
+    }
+    [data-slot="switch-thumb"] {
+      background: ButtonText !important;
+    }
+    [data-slot="switch"][data-state="checked"] [data-slot="switch-thumb"] {
+      background: HighlightText !important;
+    }
+  }
+}
+
+/* Where the keyboard is: a solid ring in `--ring`, 3:1 or more on every surface in both looks
+   (tokens.test.ts), outside the control. `focus-ring-inset` draws it just inside, for a field
+   (over its edge) or a row that runs to its list's edge, where an outside ring would be cut off.
+   Only its style switches on focus, and a style can't be eased, so a control that eases its
+   colours shows the ring at once, never a dark one turning blue. */
+@utility focus-ring {
+  outline: 2px none var(--ring);
+  outline-offset: 2px;
+  &:focus-visible {
+    outline-style: solid;
+  }
+}
+
+@utility focus-ring-inset {
+  outline: 2px none var(--ring);
+  outline-offset: -2px;
+  &:focus-visible {
+    outline-style: solid;
   }
 }

@@ -2,7 +2,6 @@
 
 import type { ToolUIPart } from "ai";
 import { Wrench } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 
 import { ActivityRow } from "@/components/conversation/activity-row";
 import { SiteMarks } from "@/components/conversation/site-marks";
@@ -12,9 +11,7 @@ import {
   toolAppId,
   toolStepStatus,
 } from "@/components/conversation/generic-activity-copy";
-import { formatStepDuration } from "@/components/conversation/work-clock";
 import { hasMark, IntegrationMark } from "@/components/integrations/integration-mark";
-import type { Status } from "@/components/motion/status-mark";
 import { toolActivityTitle } from "@/lib/tool-copy";
 import { stepSites } from "@/lib/sources";
 import { toolResult } from "@/lib/tool-results";
@@ -36,17 +33,13 @@ export function GenericActivityTool({
 }) {
   const status = toolStepStatus(state, live);
   const done = state === "output-available";
-  const durationMs = useStepDuration(status);
-
   const found = done ? toolResult(toolName, output) : null;
-  const timing = done && durationMs !== null ? formatStepDuration(durationMs) : null;
 
   return (
     <>
       <ActivityRow
         detail={status === "failed" ? null : toolInputDetail(toolName, input)}
-        duration={timing}
-        icon={<ToolStepIcon size={16} toolName={toolName} />}
+        icon={<ToolStepIcon size={18} toolName={toolName} />}
         result={found}
         status={status}
         swap
@@ -72,31 +65,6 @@ export function ToolStepIcon({
   }
   const Icon = TOOL_ICONS[toolName] ?? Wrench;
   return <Icon className="size-3.5" aria-hidden />;
-}
-
-/**
- * Measures how long a live step took from the moment it started running until it
- * finished; steps loaded from history already finished report null.
- */
-function useStepDuration(status: Status | null): number | null {
-  const startedAt = useRef<number | null>(null);
-  const [durationMs, setDurationMs] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (status === "now") {
-      if (startedAt.current === null) startedAt.current = performance.now();
-      return undefined;
-    }
-    if ((status === "done" || status === "failed") && startedAt.current !== null) {
-      const elapsed = Math.max(0, performance.now() - startedAt.current);
-      startedAt.current = null;
-      const frame = window.requestAnimationFrame(() => setDurationMs(elapsed));
-      return () => window.cancelAnimationFrame(frame);
-    }
-    return undefined;
-  }, [status]);
-
-  return durationMs;
 }
 
 function toolInputDetail(toolName: string, input: unknown): string | null {

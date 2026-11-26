@@ -1,331 +1,233 @@
 import {
-  Cpu,
-  GlobeLock,
-  Info,
-  MessageSquare,
-  Network,
-  Palette,
-  SlidersHorizontal,
+  HeartPulse,
+  Smartphone,
   Sparkles,
-  Stethoscope,
+  UserRound,
   WalletMinimal,
   type LucideIcon,
 } from "lucide-react";
 
 import type { SettingsSection } from "@/lib/app-links";
 
-export interface SettingsSectionMeta {
+/** One of Settings' panes, as its list shows it. */
+export interface SettingsPane {
   readonly id: SettingsSection;
   readonly label: string;
-  readonly group: string | null;
   readonly icon: LucideIcon;
-  readonly description: string;
+  /** What's in it, under its name in the phone's list. */
+  readonly holds: string;
 }
 
-export const SETTINGS_SECTIONS_META: readonly SettingsSectionMeta[] = [
+export const SETTINGS_PANES: readonly SettingsPane[] = [
   {
-    id: "general",
-    label: "General",
-    group: null,
-    icon: SlidersHorizontal,
-    description: "Your name, time zone, daily brief schedule, and chat display preferences.",
+    id: "you",
+    label: "You",
+    icon: UserRound,
+    holds: "Name, daily brief, look, and what Auni knows",
   },
-  {
-    id: "appearance",
-    label: "Appearance",
-    group: null,
-    icon: Palette,
-    description: "Choose how Auni looks across your browser and paired devices.",
-  },
-  {
-    id: "personalization",
-    label: "Personalization",
-    group: null,
-    icon: Sparkles,
-    description:
-      "Connect read-only signals so Auni tailors starting ideas and research without questionnaires.",
-  },
-  {
-    id: "brains",
-    label: "AI Brains",
-    group: "Agent & Money",
-    icon: Cpu,
-    description: "Manage the local AI CLIs Auni thinks with and pick which one runs first.",
-  },
+  { id: "ai", label: "Your AI", icon: Sparkles, holds: "The AI Auni thinks with" },
   {
     id: "wallet",
-    label: "Wallet & Keys",
-    group: "Agent & Money",
+    label: "Your wallet",
     icon: WalletMinimal,
-    description: "Your local self-custody wallet addresses, withdrawals, and key backups.",
+    holds: "Addresses, deposits, withdrawals, and keys",
   },
   {
-    id: "channels",
-    label: "Channels",
-    group: "Agent & Money",
-    icon: MessageSquare,
-    description: "Connect chat apps and choose where Auni sends alerts and daily briefs.",
+    id: "devices",
+    label: "Your devices",
+    icon: Smartphone,
+    holds: "Your phone, Telegram, and this computer",
   },
-  {
-    id: "remote",
-    label: "Remote access",
-    group: "Local & Remote",
-    icon: GlobeLock,
-    description:
-      "Reach Auni from your phone via Tailscale HTTPS, keep it running in the background, and manage paired browsers.",
-  },
-  {
-    id: "network",
-    label: "Network & RPCs",
-    group: "Local & Remote",
-    icon: Network,
-    description: "Configure an Alchemy API key or custom RPC endpoints for any chain.",
-  },
-  {
-    id: "diagnostics",
-    label: "Diagnostics",
-    group: "System",
-    icon: Stethoscope,
-    description: "Run live health checks, apply safe repairs, inspect logs, and triage issues.",
-  },
-  {
-    id: "about",
-    label: "About",
-    group: "System",
-    icon: Info,
-    description: "Running version, updates, local data paths, and open-source project links.",
-  },
+  { id: "health", label: "Health", icon: HeartPulse, holds: "Whether everything's working" },
 ];
 
+/** One thing a search in Settings finds: where it is, and the words it's found by. */
 export interface SettingsSearchItem {
-  readonly id: string;
   readonly section: SettingsSection;
-  readonly targetId: string;
+  /** The id of the setting, group or disclosure it lands on. */
+  readonly target: string;
   readonly title: string;
-  readonly description: string;
-  readonly keywords: readonly string[];
+  readonly words: readonly string[];
 }
 
 export const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
   {
-    id: "general-name",
-    section: "general",
-    targetId: "setting-name",
-    title: "Display name",
-    description: "What Auni calls you in chat",
-    keywords: ["name", "profile", "owner", "identity"],
+    section: "you",
+    target: "setting-name",
+    title: "Your name",
+    words: ["name", "profile", "call"],
   },
   {
-    id: "general-timezone",
-    section: "general",
-    targetId: "setting-timezone",
+    section: "you",
+    target: "setting-time-zone",
     title: "Time zone",
-    description: "Used for schedules, watches, and daily briefs",
-    keywords: ["timezone", "clock", "time", "schedule"],
+    words: ["timezone", "clock", "time", "schedule"],
   },
   {
-    id: "general-brief",
-    section: "general",
-    targetId: "setting-brief",
+    section: "you",
+    target: "setting-brief",
     title: "Daily brief",
-    description: "Schedule when Auni sends a morning summary",
-    keywords: ["brief", "digest", "summary", "morning", "daily", "weekdays", "schedule"],
+    words: ["brief", "digest", "summary", "morning", "daily", "weekdays", "schedule"],
   },
   {
-    id: "general-thinking",
-    section: "general",
-    targetId: "setting-thinking",
-    title: "Show Auni's thinking",
-    description: "Display intermediate reasoning steps in chat",
-    keywords: ["thinking", "reasoning", "steps", "chat", "verbose"],
+    section: "you",
+    target: "setting-home",
+    title: "Where Auni messages you",
+    words: ["notifications", "alerts", "notices", "home channel", "telegram", "messages"],
   },
   {
-    id: "general-wizard",
-    section: "general",
-    targetId: "setting-wizard",
-    title: "Re-run setup wizard",
-    description: "Open the local onboarding wizard again",
-    keywords: ["onboarding", "wizard", "welcome", "first run", "setup"],
-  },
-  {
-    id: "appearance-theme",
-    section: "appearance",
-    targetId: "setting-theme",
-    title: "Theme & look",
-    description: "Switch between Light, Dark, or app themes",
-    keywords: ["theme", "dark", "light", "look", "color", "mode", "appearance"],
-  },
-  {
-    id: "personalization-profile",
-    section: "personalization",
-    targetId: "setting-profile-summary",
+    section: "you",
+    target: "setting-known",
     title: "What Auni knows about you",
-    description: "Inspect, edit, or clear Auni's inferred context",
-    keywords: ["memory", "context", "profile", "beliefs", "interests", "bio", "summary"],
+    words: ["memory", "context", "profile", "interests", "personalization", "summary"],
   },
   {
-    id: "personalization-x",
-    section: "personalization",
-    targetId: "setting-x-handle",
-    title: "X / Twitter handle",
-    description: "Public handle used to infer themes and tailor prompts",
-    keywords: ["twitter", "x", "social", "handle", "prompts", "recommended"],
+    section: "you",
+    target: "setting-x",
+    title: "Your X handle",
+    words: ["twitter", "x", "social", "handle", "personalization", "ideas"],
   },
   {
-    id: "personalization-watched",
-    section: "personalization",
-    targetId: "setting-watched-wallets",
-    title: "Watch-only wallets",
-    description: "Connect MetaMask/Rabby or paste EVM, ENS, or Solana addresses",
-    keywords: ["watch", "wallet", "metamask", "rabby", "ens", "holdings", "portfolio", "external"],
+    section: "you",
+    target: "setting-watched",
+    title: "Wallets Auni watches",
+    words: ["watch", "watch-only", "wallet", "metamask", "rabby", "ens", "holdings", "elsewhere"],
   },
   {
-    id: "brains-preferred",
-    section: "brains",
-    targetId: "setting-preferred-brain",
-    title: "Preferred AI brain",
-    description: "Choose which AI CLI runs first with automatic fallback",
-    keywords: ["brain", "ai", "model", "cli", "claude", "codex", "provider", "login", "sign in"],
+    section: "you",
+    target: "setting-look",
+    title: "Light or dark",
+    words: ["theme", "dark", "light", "look", "appearance", "mode", "colour", "color"],
   },
   {
-    id: "wallet-addresses",
+    section: "you",
+    target: "setting-thinking",
+    title: "Show Auni's thinking",
+    words: ["thinking", "reasoning", "steps", "chat"],
+  },
+  {
+    section: "ai",
+    target: "setting-brains",
+    title: "Your AI",
+    words: ["brain", "ai", "claude", "codex", "chatgpt", "model", "sign in", "login", "install"],
+  },
+  {
+    section: "ai",
+    target: "setting-first-brain",
+    title: "Which AI goes first",
+    words: ["preferred", "brain", "claude", "codex", "order", "usage limit", "fallback"],
+  },
+  {
     section: "wallet",
-    targetId: "setting-wallet-addresses",
-    title: "Wallet addresses",
-    description: "Your local EVM and Solana addresses",
-    keywords: ["address", "evm", "solana", "deposit", "fund", "balance"],
+    target: "setting-addresses",
+    title: "Your addresses",
+    words: ["address", "evm", "solana", "deposit", "receive", "copy", "monad", "base"],
   },
   {
-    id: "wallet-withdraw",
     section: "wallet",
-    targetId: "setting-wallet-actions",
-    title: "Withdraw & wallet keys",
-    description: "Move money out, add a missing chain key, or reveal private keys",
-    keywords: ["withdraw", "keys", "private key", "backup", "export", "seed", "solana"],
+    target: "setting-wallet-moves",
+    title: "Add money or withdraw",
+    words: ["add money", "deposit", "fund", "withdraw", "send", "cash out"],
   },
   {
-    id: "channels-home",
-    section: "channels",
-    targetId: "setting-home-channel",
-    title: "When Auni speaks up",
-    description: "Choose where unasked alerts and daily briefs are delivered",
-    keywords: ["notifications", "alerts", "home channel", "notices", "brief"],
+    section: "wallet",
+    target: "setting-keys",
+    title: "Show your keys",
+    words: ["keys", "private key", "backup", "export", "seed", "reveal", "solana key", "import"],
   },
   {
-    id: "channels-apps",
-    section: "channels",
-    targetId: "setting-channel-apps",
-    title: "Chat apps",
-    description: "Configure bot tokens and pair direct chats",
-    keywords: ["telegram", "chat", "bot", "channel", "messaging", "pair"],
+    section: "devices",
+    target: "setting-phone",
+    title: "Use Auni on your phone",
+    words: ["phone", "mobile", "tailscale", "remote", "https", "qr", "away", "laptop"],
   },
   {
-    id: "remote-tailscale",
-    section: "remote",
-    targetId: "setting-tailscale",
-    title: "Tailscale HTTPS",
-    description: "Reach Auni securely from your phone or laptop over your tailnet",
-    keywords: ["tailscale", "remote", "phone", "mobile", "https", "serve", "qr", "tailnet"],
+    section: "devices",
+    target: "setting-running",
+    title: "Keep Auni running",
+    words: ["always on", "background", "service", "reboot", "systemd", "launchd", "sleep"],
   },
   {
-    id: "remote-service",
-    section: "remote",
-    targetId: "setting-service",
-    title: "Background service (Always on)",
-    description: "Run Auni as a systemd or launchd service so it stays awake",
-    keywords: ["service", "always on", "systemd", "launchd", "linger", "background", "daemon"],
+    section: "devices",
+    target: "setting-telegram",
+    title: "Telegram",
+    words: ["telegram", "chat", "bot", "channel", "messaging", "pair"],
   },
   {
-    id: "remote-sessions",
-    section: "remote",
-    targetId: "setting-sessions",
-    title: "Paired devices & browsers",
-    description: "Mint a pairing link or QR code and revoke connected browsers",
-    keywords: ["pair", "pairing", "qr", "sessions", "browsers", "devices", "revoke", "sign out"],
+    section: "devices",
+    target: "setting-browsers",
+    title: "Signed-in browsers",
+    words: ["pair", "pairing link", "sign in", "browsers", "sessions", "sign out", "revoke"],
   },
   {
-    id: "remote-handover",
-    section: "remote",
-    targetId: "setting-handover",
-    title: "Move to another machine",
-    description: "Hand Auni over to an always-on Linux or Mac machine on Tailscale",
-    keywords: ["handover", "migrate", "move", "server", "vps", "mac mini", "laptop"],
+    section: "devices",
+    target: "setting-handover",
+    title: "Move Auni to another computer",
+    words: ["handover", "move", "migrate", "server", "mac mini", "always on", "computer"],
   },
   {
-    id: "network-alchemy",
-    section: "network",
-    targetId: "setting-alchemy",
-    title: "Alchemy API key",
-    description: "Reliable RPCs across all supported chains with one key",
-    keywords: ["alchemy", "rpc", "api key", "node", "rate limit"],
+    section: "health",
+    target: "setting-checks",
+    title: "Health checks",
+    words: ["doctor", "health", "fix", "repair", "check", "broken", "diagnostics", "problem"],
   },
   {
-    id: "network-chains",
-    section: "network",
-    targetId: "setting-chain-rpcs",
-    title: "Per-chain RPC URLs",
-    description:
-      "Override the RPC endpoint for Monad, Base, Arbitrum, Polygon, Ethereum, or Solana",
-    keywords: ["rpc", "custom rpc", "monad", "base", "arbitrum", "polygon", "ethereum", "solana"],
+    section: "health",
+    target: "setting-version",
+    title: "Version and updates",
+    words: ["version", "update", "upgrade", "release", "about"],
   },
   {
-    id: "diagnostics-doctor",
-    section: "diagnostics",
-    targetId: "setting-doctor",
-    title: "Health checks (auni doctor)",
-    description: "Run diagnostics and apply one-click safe repairs",
-    keywords: ["doctor", "health", "fix", "repair", "check", "broken", "troubleshoot"],
+    section: "health",
+    target: "setting-help",
+    title: "Get help",
+    words: ["help", "bug", "report", "issue", "github", "source", "security"],
   },
   {
-    id: "diagnostics-logs",
-    section: "diagnostics",
-    targetId: "setting-logs",
-    title: "Recent logs",
-    description: "Inspect redacted lines from ~/.auni/auni.log",
-    keywords: ["logs", "debug", "errors", "auni.log", "triage"],
+    section: "health",
+    target: "setting-networks",
+    title: "Networks",
+    words: ["rpc", "alchemy", "api key", "node", "network", "custom rpc", "chain", "developers"],
   },
   {
-    id: "diagnostics-backup",
-    section: "diagnostics",
-    targetId: "setting-backup",
-    title: "Export, import & triage",
-    description: "CLI commands for backups and AI-assisted troubleshooting",
-    keywords: ["export", "import", "backup", "triage", "help", "bug", "github", "issue"],
+    section: "health",
+    target: "setting-logs",
+    title: "Logs",
+    words: ["logs", "debug", "errors", "triage", "developers"],
   },
   {
-    id: "about-version",
-    section: "about",
-    targetId: "setting-version",
-    title: "Version & updates",
-    description: "Check for newer Auni releases and view local paths",
-    keywords: ["version", "update", "upgrade", "github", "open source", "license", "paths"],
+    section: "health",
+    target: "setting-backup",
+    title: "Back up and restore",
+    words: ["export", "import", "backup", "restore", "developers"],
   },
 ];
 
-export function sectionMeta(section: SettingsSection): SettingsSectionMeta {
-  return SETTINGS_SECTIONS_META.find((item) => item.id === section) ?? SETTINGS_SECTIONS_META[0]!;
+export function paneOf(section: SettingsSection): SettingsPane {
+  return SETTINGS_PANES.find(({ id }) => id === section)!;
 }
 
+/**
+ * What a search finds: every item that has each word typed, in its title, its words or its
+ * pane's name; one whose title starts with what was typed first.
+ */
 export function searchSettings(query: string): readonly SettingsSearchItem[] {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return [];
-  const tokens = normalized.split(/\s+/u).filter(Boolean);
-  const scored: { readonly item: SettingsSearchItem; readonly score: number }[] = [];
-
-  for (const item of SETTINGS_SEARCH_ITEMS) {
+  const typed = query.trim().toLowerCase();
+  if (!typed) return [];
+  const tokens = typed.split(/\s+/u);
+  const scored = SETTINGS_SEARCH_ITEMS.flatMap((item) => {
     const title = item.title.toLowerCase();
-    const desc = item.description.toLowerCase();
-    const kw = item.keywords.join(" ").toLowerCase();
-    const hay = `${title} ${desc} ${kw} ${item.section}`;
-    if (!tokens.every((token) => hay.includes(token))) continue;
-
-    let score = 1;
-    if (title === normalized) score += 100;
-    else if (title.startsWith(normalized)) score += 60;
-    else if (title.includes(normalized)) score += 40;
-    else if (kw.includes(normalized)) score += 25;
-    scored.push({ item, score });
-  }
-
+    const words = item.words.join(" ");
+    const hay = `${title} ${words} ${paneOf(item.section).label.toLowerCase()}`;
+    if (!tokens.every((token) => hay.includes(token))) return [];
+    const score = title.startsWith(typed)
+      ? 3
+      : title.includes(typed)
+        ? 2
+        : item.words.some((word) => word.startsWith(typed))
+          ? 1
+          : 0;
+    return [{ item, score }];
+  });
   return scored.toSorted((a, b) => b.score - a.score).map(({ item }) => item);
 }

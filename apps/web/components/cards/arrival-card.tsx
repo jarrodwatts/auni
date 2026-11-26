@@ -1,57 +1,49 @@
 "use client";
 
 import type { ArrivalCardWire } from "@auni/shared";
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
 import { useAppDialogs } from "@/components/app/app-dialogs";
-import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+
+import { CardFrame, CardReceipt } from "./card-parts";
+import { EventMark } from "./event-mark";
 
 /**
- * Money that moved without Auni, as core leaves it in their chat: what came
- * in, or what left that Auni didn't send, calmly, with where to act if it
- * wasn't them.
+ * Money that moved without Auni, as core leaves it in their chat: what came in, or what left
+ * that Auni didn't send, calmly, with where to act if it wasn't them. An event, so it is drawn
+ * settled: the coin, what happened, and on which network.
  */
 export function ArrivalCard({ card }: { readonly card: ArrivalCardWire }) {
   const { settingsHref } = useAppDialogs();
   const out = card.direction === "out";
-  const Arrow = out ? ArrowUpRight : ArrowDownLeft;
   return (
-    <div
-      className="my-2 flex w-full min-w-0 items-start gap-3 rounded-[18px] border border-foreground/[0.08] bg-card px-3.5 py-3"
-      data-direction={card.direction}
-      data-testid="arrival"
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "flex size-9 flex-none items-center justify-center rounded-full",
-          out ? "bg-warning-surface text-warning" : "bg-positive/10 text-positive",
-        )}
-      >
-        <Arrow className="size-4" strokeWidth={2.4} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[14.5px] leading-5 font-medium text-ink">{card.title}</p>
-        <p className="mt-0.5 text-[13.5px] leading-5 break-words text-muted-foreground">
-          {movedLine(card)}
-        </p>
-        {out ? (
-          <p className="mt-1.5 text-[13px] leading-[1.45] text-muted-foreground">
-            If this was you, there&apos;s nothing to do. If it wasn&apos;t, withdraw what&apos;s
-            left to an address you trust.
-          </p>
-        ) : null}
-      </div>
-      {out ? (
-        <Link
-          href={settingsHref("wallet")}
-          scroll={false}
-          className="flex h-9 flex-none items-center rounded-full bg-foreground px-4 text-[13.5px] font-semibold text-background"
-        >
-          Wallet
-        </Link>
-      ) : null}
+    <div data-direction={card.direction} data-testid="arrival">
+      <CardFrame label={card.title} phase="confirmed">
+        <CardReceipt
+          mark={<EventMark coin={card.moved[0]?.symbol ?? null} network={card.network} />}
+          title={card.title}
+          detail={movedLine(card)}
+          whole
+          trailing={
+            out ? (
+              <div className="flex flex-col items-start gap-2.5">
+                <p className="text-meta leading-[1.45] text-pretty text-muted-foreground">
+                  If this was you, there&apos;s nothing to do. If it wasn&apos;t, withdraw
+                  what&apos;s left to an address you trust.
+                </p>
+                <Link
+                  href={settingsHref("wallet")}
+                  scroll={false}
+                  className={buttonVariants({ size: "sm", variant: "secondary" })}
+                >
+                  Open your wallet
+                </Link>
+              </div>
+            ) : null
+          }
+        />
+      </CardFrame>
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { enqueueSignalsRefresh, forceRefreshStartingPoints } from "../jobs/kinds
 import { postgresKnowsZone } from "../money/value-history.ts";
 import {
   addMissingKey,
+  makeWalletIfNone,
   missingAddress,
   noSolanaBring,
   revealWalletKeys,
@@ -30,7 +31,6 @@ import {
 import {
   appendWatchedWallet,
   normalizeXHandle,
-  refreshOwnerSignals,
   resolveWatchedWallet,
   sameWatchedWalletAddress,
 } from "../signals.ts";
@@ -195,12 +195,6 @@ meRouter.delete("/watched-wallets/:address", async (req, res) => {
   res.json(await meWire(ownerHere(req)));
 });
 
-/** Refreshes X + watch-only wallet signals while preserving any manually edited profile summary. */
-meRouter.post("/signals/refresh", async (req, res) => {
-  await refreshOwnerSignals().catch(() => null);
-  res.json(await meWire(ownerHere(req)));
-});
-
 /**
  * The wallet's keys, for a request that proves the owner is there (auth/proof.ts), as first run's
  * is. So whoever is at a browser paired long ago can't read the keys off Auni's button alone.
@@ -215,6 +209,16 @@ meRouter.post("/keys", async (req, res) => {
   });
   if (!keys) return void res.status(409).json({ error: "no_wallet" });
   res.json({ keys });
+});
+
+/**
+ * Makes the owner's wallet when there's none yet, as Add money opens on none (a first take that
+ * couldn't make it, say), so there's always an address to send to; one there already, or made
+ * by a second tab asking at once, is the one it answers with (see makeWalletIfNone).
+ */
+meRouter.post("/wallet", async (req, res) => {
+  await makeWalletIfNone();
+  res.json(await meWire(ownerHere(req)));
 });
 
 /**

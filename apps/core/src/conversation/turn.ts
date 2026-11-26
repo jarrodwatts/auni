@@ -196,9 +196,16 @@ async function turnNotice(
   return result.limit ? limitNotice(picked, result.limit.resetsAt, timeZone) : null;
 }
 
-/** Why a background turn ended with nothing to tell, when it called settle_quietly. */
+/**
+ * Why a background turn ended with nothing to tell: it called settle_quietly and shows the owner
+ * nothing but its thinking and steps. Words or a card beside that call (a warning written before
+ * it, a card it put up, a cut-off or usage notice core added) are something to tell, so that
+ * answer isn't quiet: it's shown, marked unread and sent on like any other.
+ */
 function settledQuietly(parts: readonly unknown[]): string | undefined {
-  const call = (parts as { type: string; state?: string; input?: { reason?: unknown } }[]).find(
+  const all = parts as { type: string; state?: string; input?: { reason?: unknown } }[];
+  if (messageText(parts) || all.some((part) => part.type === "data-cards")) return undefined;
+  const call = all.find(
     (part) => part.type === "tool-settle_quietly" && part.state === "output-available",
   );
   if (!call) return undefined;

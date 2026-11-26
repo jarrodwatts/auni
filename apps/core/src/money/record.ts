@@ -11,7 +11,15 @@ import { settling } from "./holding-trades.ts";
 import { noted, step } from "./life.ts";
 import { type OnItsWay } from "./portfolio.ts";
 import { askForReading } from "./readings.ts";
-import { allFills, holdersOf, ownedMoveFills, saleOwners, sharedFill, threadBooks } from "./books.ts";
+import {
+  allFills,
+  buyersOf,
+  holdersOf,
+  ownedMoveFills,
+  saleOwners,
+  sharedFill,
+  threadBooks,
+} from "./books.ts";
 import { potLeaving, threadFills } from "./pot.ts";
 import type { ExecuteResult, Fill, KeptTx, Landed, Recipe } from "./recipe.ts";
 import { recipeForTool } from "./recipes/index.ts";
@@ -68,7 +76,11 @@ export async function recordResult(
     if (leaving.length > 0) {
       const byThread = Map.groupBy(leaving, (fill) => fill.threadId!);
       for (const otherId of [...byThread.keys()].sort()) {
-        const [other] = await tx.select().from(threads).where(eq(threads.id, otherId)).for("update");
+        const [other] = await tx
+          .select()
+          .from(threads)
+          .where(eq(threads.id, otherId))
+          .for("update");
         if (!other || usdToCents(other.budgetUsd) <= 0n) continue;
         const history = [...(await threadFills(tx, otherId))];
         let budgetUsd = other.budgetUsd;
@@ -165,7 +177,8 @@ export function soldHolding(action: Pick<ActionRow, "tool" | "input" | "details"
   const sold = action.details[APPROVED_SALE_OF];
   if (
     !sold ||
-    (action.tool !== "convert_to_cash" && recipeForTool(action.tool)?.readies?.(action.input as never))
+    (action.tool !== "convert_to_cash" &&
+      recipeForTool(action.tool)?.readies?.(action.input as never))
   )
     return null;
   // The chain may itself hold a colon (eip155:1), so the instrument is what follows the last.
@@ -179,7 +192,8 @@ export function soldHolding(action: Pick<ActionRow, "tool" | "input" | "details"
  * to whichever thread held what it sold when what was there just before it
  * could be read and nothing else of it has run since, and what it brought in
  * is theirs in the same shares: one thread may sell another's holding, and the
- * books follow it.
+ * books follow it. What it bought with the owner's own loose holding is its
+ * own thread's, as what it buys with their cash is.
  */
 async function attributed(
   tx: Tx,
@@ -209,9 +223,15 @@ async function attributed(
   const books = threadBooks(await allFills(tx));
   const held = holdersOf(heldBefore.units, books, key, place);
   const owners = saleOwners(size, place, held);
-  // What it brought in is theirs in the same shares; a fee or other leg stays where it was made.
+  const buyers = buyersOf(owners, place);
+  // What it brought in is theirs in the same shares (see buyersOf); a fee or other leg stays
+  // where it was made.
   return moved.flatMap((fill) =>
-    sale(fill) || fill.side === "buy" ? sharedFill(fill, owners) : [{ ...fill, threadId: place }],
+    sale(fill)
+      ? sharedFill(fill, owners)
+      : fill.side === "buy"
+        ? sharedFill(fill, buyers)
+        : [{ ...fill, threadId: place }],
   );
 }
 
@@ -267,7 +287,7 @@ async function landedOwners(
     (fill) => [fill.threadId, parseUnits(fill.quantity, QUANTITY_DECIMALS)] as const,
   );
   return weights.length > 0
-    ? bought.flatMap((fill) => sharedFill(fill, weights))
+    ? bought.flatMap((fill) => sharedFill(fill, buyersOf(weights, action.threadId)))
     : bought.map((fill) => ({ ...fill, threadId: action.threadId }));
 }
 

@@ -1,8 +1,9 @@
-import type { MoneyToolName } from "@auni/shared";
+import { fillFace, type ActionCardWire, type FilledFace, type MoneyToolName } from "@auni/shared";
 
 import type { ActionRow } from "../../db/schema.ts";
 import { appRecipes, offered } from "../../apps/registry.ts";
 import { moneyOf, type Money, type Recipe } from "../recipe.ts";
+import { parseUnits } from "../usd.ts";
 import { convertToCash } from "./convert.ts";
 import { sendEvmTransaction } from "./evm.ts";
 import { sendSolanaTransaction } from "./solana.ts";
@@ -54,18 +55,25 @@ export function recipeForTool(tool: string): Recipe | undefined {
   return everyRecipe().find((recipe) => recipe.tool === tool);
 }
 
-type MoneyRow = Pick<ActionRow, "tool" | "input" | "details" | "run" | "amountUsd">;
+type MoneyRow = Pick<ActionRow, "tool" | "input" | "details" | "run" | "amountUsd" | "card">;
+
+/** How a card's note starts when what comes back is a floor, not a quote. */
+const FLOOR = "at least";
 
 /**
  * The money a recorded move moves, and which way: cash it readies without
  * selling anything (a bridge, savings back to the wallet) moves rather than
- * goes in.
+ * goes in. What a sale's card promises at least ("at least, if all 310 sell")
+ * stays a floor, on the card's own condition ("if all 310 sell"), until it has come back.
  */
 export function rowMoney(row: MoneyRow): Money | null {
   const money = moneyOf(row);
-  return money?.flow === "in" && recipeForTool(row.tool)?.readies?.(row.input as never)
-    ? { ...money, flow: "move" }
-    : money;
+  if (money?.flow === "in" && recipeForTool(row.tool)?.readies?.(row.input as never))
+    return { ...money, flow: "move" };
+  const note = row.card?.note;
+  if (money?.flow === "back" && !row.run.returnedUsd && note?.startsWith(FLOOR))
+    return { ...money, least: note.slice(FLOOR.length).replace(/^[,\s]+/u, "") };
+  return money;
 }
 
 /**
@@ -83,4 +91,20 @@ export function cardMoneys(rows: readonly MoneyRow[]): (Money | null)[] {
   });
   const buys = legs.some(({ lands, draws }) => lands === null && draws !== null);
   return rows.map((row, index) => (buys && legs[index]!.lands !== null ? null : rowMoney(row)));
+}
+
+/** A move's card face with its own amount in, or null for a move recorded with no face. */
+export function filledFace(row: ActionRow): FilledFace | null {
+  return row.card ? fillFace(row.card, cardMoney(rowMoney(row)).amount) : null;
+}
+
+/** A move's money as its card carries it, which way it goes included; zero for none. */
+export function cardMoney(money: Money | null): Pick<ActionCardWire, "amount" | "flow"> {
+  return {
+    amount: {
+      baseUnits: parseUnits(money?.usd ?? "0", 6).toString(),
+      currency: { code: "USDC", decimals: 6 },
+    },
+    flow: money?.flow ?? "in",
+  };
 }

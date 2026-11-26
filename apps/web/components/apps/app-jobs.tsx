@@ -18,6 +18,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+
 import { AppMark } from "./app-mark";
 import { Section } from "./sheet-section";
 
@@ -35,6 +37,8 @@ export const JOBS: Record<
   AppJob,
   {
     readonly label: string;
+    /** The job said after "Also", for an app shown under another of its jobs: "prices tokens". */
+    readonly does: string;
     readonly icon: LucideIcon;
     /** When the scene plays, as its heading: "When you trade". */
     readonly when: string;
@@ -45,6 +49,7 @@ export const JOBS: Record<
 > = {
   thinks: {
     label: "Thinks with",
+    does: "thinks",
     icon: Sparkles,
     when: "When you talk to Auni",
     scene: (name) => [
@@ -56,6 +61,7 @@ export const JOBS: Record<
   },
   keys: {
     label: "Keeps your keys with",
+    does: "keeps your keys",
     icon: KeyRound,
     when: "When you allow a move",
     scene: (name) => [
@@ -67,6 +73,7 @@ export const JOBS: Record<
   },
   trades: {
     label: "Trades through",
+    does: "routes trades",
     icon: ArrowLeftRight,
     when: "When you trade",
     scene: (name) => [
@@ -78,10 +85,11 @@ export const JOBS: Record<
   },
   moves: {
     label: "Moves cash with",
+    does: "moves cash",
     icon: Waypoints,
-    when: "When cash changes chains",
+    when: "When cash moves between networks",
     scene: (name) => [
-      { icon: Coins, says: "Your cash is on one chain and is needed on another" },
+      { icon: Coins, says: "Your cash is on one network and needed on another" },
       { icon: "app", says: `${name} carries it across` },
       { icon: Hourglass, says: "Auni waits for it to land, then carries on" },
     ],
@@ -89,23 +97,25 @@ export const JOBS: Record<
   },
   prices: {
     label: "Prices tokens with",
+    does: "prices tokens",
     icon: Tag,
     when: "When Auni reads what you hold",
     scene: (name) => [
       { icon: Wallet, says: "Auni finds a token in your wallet" },
-      { icon: "app", says: `It asks ${name} what the token is and what it is worth` },
-      { icon: PieChart, says: "Your portfolio shows it by name, with its value" },
+      { icon: "app", says: `Auni asks ${name} what it is and what it's worth` },
+      { icon: PieChart, says: "You see it by name, with its current value" },
     ],
     also: "Auni also asks",
   },
   watches: {
     label: "Watches with",
+    does: "watches the market",
     icon: Eye,
-    when: "While you are away",
+    when: "While you're away",
     scene: (name) => [
       { icon: MessageCircle, says: "You ask Auni to keep an eye on something" },
       { icon: "app", says: `${name} keeps watching for it` },
-      { icon: BellRing, says: "When it happens, Auni wakes and tells you" },
+      { icon: BellRing, says: "When it hits, Auni wakes up and tells you" },
     ],
     also: "Also watching",
   },
@@ -141,10 +151,12 @@ export function AppJobs({
     return (
       <Section title="Not in use">
         <p className="text-ui leading-[1.5] font-normal text-muted-foreground">
-          {names.length > 0
-            ? `${listed(names)} does this job now.`
-            : "Another app does this job now."}{" "}
-          {rule ?? "Which one does it is set in Auni's settings file."}
+          {names.length > 1
+            ? `${listed(names)} handle this right now.`
+            : names.length === 1
+              ? `${names[0]} handles this right now.`
+              : "Another service handles this right now."}{" "}
+          {rule ?? "Change which service Auni uses in your settings file."}
         </p>
       </Section>
     );
@@ -161,7 +173,7 @@ export function AppJobs({
           {JOBS[job].scene(app.name).map((beat) => (
             <li key={beat.says} className="relative flex items-center gap-3.5">
               {beat.icon === "app" ? (
-                <span className="flex size-8 flex-none items-center justify-center rounded-[10px] bg-popover">
+                <span className="flex size-8 flex-none items-center justify-center rounded-control bg-popover">
                   <AppMark id={app.id} name={app.name} size={32} />
                 </span>
               ) : (
@@ -193,15 +205,16 @@ export function AppJobs({
           <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 pl-[46px]">
             <span className="text-meta text-faint">{JOBS[job].also}</span>
             {others.map((other) => (
-              <button
+              <Button
                 key={other.id}
-                type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => onOpen(other.id)}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-surface pr-2.5 pl-1 text-[12.5px] font-medium text-ink transition-colors duration-150 outline-none hover:bg-foreground/[0.06] focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="pl-1.5"
               >
                 <AppMark id={other.id} name={other.name} size={20} />
                 {other.name}
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}

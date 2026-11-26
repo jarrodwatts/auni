@@ -86,7 +86,7 @@ describe("auni demo --at a moment", () => {
     );
     expect(log).not.toMatch(/which refused|has no scene for|waited a minute|no stand-in for/u);
     expect(log).toMatch(
-      /owner is ready \([\d.]+ s\): \d+ cards done, 5 waiting, 2 failed, 1 held/u,
+      /owner is ready \([\d.]+ s\): \d+ cards done, 7 waiting, 2 failed, 1 held/u,
     );
   });
 

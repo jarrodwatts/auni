@@ -7,9 +7,12 @@ compatibility: For coding agents with a terminal (Claude Code, Codex and the lik
 
 # Auni
 
-Auni is an AI agent for the person's own money. It runs on their machine, thinks with their own
-Claude Code or Codex login, and every money move is a card they tap to allow in their browser.
-Nobody operates it for them: no accounts, no fees, no token.
+Auni is an AI agent for the person's own money. It runs on their machine and thinks with their
+own Claude Code or Codex login. Tell it a take and it researches it, builds a position and
+manages it. Every money move is a card they tap to allow, in their browser or a paired Telegram
+chat, unless they turn on Auto for a take with a dollar budget they set. Nobody operates it for
+them: no accounts, no fees, no token. `auni demo` shows the whole app with fake money and no
+login, for someone who wants to look first.
 
 You are helping them set it up or change it. You are not Auni, and you never move their money.
 
@@ -19,8 +22,8 @@ You are helping them set it up or change it. You are not Auni, and you never mov
   wallet export, login token or pairing link. Keys go in only in the browser, through a field
   whose value goes straight to Auni on their machine: tell them to bring them there. `auni` opens
   the pairing link in their browser and never prints it; only `auni pair` prints one, for them.
-- **Never log in for them.** They sign their AI in themselves: in the browser setup wizard,
-  under **Settings → AI Brains**, or with `claude auth login` or `codex login --device-auth` in a
+- **Never log in for them.** They sign their AI in themselves: in the browser as first run asks,
+  under **Settings → Your AI**, or with `claude auth login` or `codex login --device-auth` in a
   terminal of their own.
 - **Never open Auni to the network.** Core and the web app listen on 127.0.0.1 only. Don't set
   `HOST` or `WEB_HOST`, or tunnel a port, unless they ask and understand anyone on that network
@@ -74,16 +77,17 @@ The steps, in order, and what each one waits on:
   it, whatever started it (you, a terminal, the service), letting moves in flight finish first:
   it can take up to two and a half minutes, so give it that long, and run it again to keep
   waiting (asking twice never cuts anything short).
-- **done**: setup hands over. The browser opens on the skippable setup wizard (AI Brain → Wallet →
-  optional X handle, watch-only wallets, Telegram & Tailscale) and lands in a clean chat with
-  tailored starting prompts. Your part is over; `auni doctor` (or **Settings → Diagnostics**)
+- **done**: setup hands over. The browser opens on one question, the person's first take, with
+  live ideas to start from; only an AI that isn't signed in comes first. Their wallet is made as
+  that take is sent. Your part is over; `auni doctor` (or **Settings → Health**)
   checks it any time.
 
 If setup exits non-zero, show the person its message, then see "When something's wrong" below.
 
 Optional extras, only if they want them, such as Telegram or a key for Elfa's news watches:
-`README.md` says how to add each. A key is theirs to paste into its app under Apps, in the web
-app, where it works at once: never ask them for it. Every other setting goes in `~/.auni/.env`
+`README.md` says how to add each. A key for an app (Elfa, Jupiter) is theirs to paste into that
+app under Apps, in the web app, where it works at once; Telegram's bot token and pairing are under
+**Settings → Your devices**. Never ask them for either. Every other setting goes in `~/.auni/.env`
 (`apps/core/.env.example` lists them all) and takes effect on the next start (`auni stop`, then
 start it as before). `auni update` checks a newer release, says what changed and that it stops
 the running Auni, and asks; show the person what it says, and run `auni update --yes` only once
@@ -102,9 +106,9 @@ words, the checks, and which folder's own `AGENTS.md` to read before editing the
 - **A new app.** Each outside service is one folder, `apps/core/src/apps/<id>/`, and core finds
   it without being edited. Read `apps/core/src/apps/AGENTS.md` first, then pick the smallest of
   three sizes that does the job; each is finished at its size:
-  - **Know-how** (Claude should stop rediscovering how a service works): `pnpm scaffold <id>`,
+  - **Know-how** (the agent should stop rediscovering how a service works): `pnpm scaffold <id>`,
     then write its `SKILL.md`: when to load it, and the steps that work there.
-  - **A reader** (a transaction Claude builds for it should read as a real card, under its
+  - **A reader** (a transaction the agent builds for it should read as a real card, under its
     name): `pnpm scaffold <id> --with reads`, then say which contracts are its own (`addresses`)
     and write `reads`. It changes no figure on the card. Copy `apps/core/src/apps/kyberswap/`.
   - **A venue** (something a bare transaction can't do, such as an exchange order):
@@ -125,9 +129,11 @@ words, the checks, and which folder's own `AGENTS.md` to read before editing the
 
 ## When something's wrong
 
-- **Anything at all**: start with `auni doctor`, which checks the version, the database, the
-  jobs, the service, each chain's RPC, the brain, the wallet and the web app. Act on every `fix`
-  line it prints. Where a safe repair exists (starting or restarting the service, starting it at
+- **Anything at all**: start with `auni doctor`, which checks the version, the database,
+  background work, the service, the networks, the brain, the wallet and the web app. It says
+  first whether Auni is running and the command to run next, then each problem on a line of its
+  own. `auni doctor --json` gives every check with its status: act on each one marked `fix`
+  (`--verbose` prints them all as text). Where a safe repair exists (starting or restarting the service, starting it at
   boot) it lists it: `auni doctor --dry-run` shows them, and `auni doctor --fix` runs the
   recommended ones once the person says yes. None touches keys or money.
 - **Still stuck**: follow `triage.md` beside this file, the playbook `auni triage` starts the
@@ -137,7 +143,7 @@ words, the checks, and which folder's own `AGENTS.md` to read before editing the
 - **"Auni is already running"**: another `auni` has this database, and it opened that one; it
   says how that one runs (in a terminal, in the background, as a service). `auni stop` stops it,
   whatever started it; `auni service uninstall` removes the service for good.
-- **Turns never start, or watches never fire**: `auni doctor`'s jobs line says whether the job
-  runner is running and what is late or failed.
+- **Turns never start, or watches never fire**: `auni doctor`'s Background work line (the
+  `runner` check in `--json`) says whether the job runner is running and what is late or failed.
 - **A card failed**: its message says why; nothing moved unless the card says it may have. Read the
   thread before suggesting the person try again.

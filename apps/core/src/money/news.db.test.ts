@@ -219,6 +219,55 @@ describe("telling them money arrived", () => {
     expect(await db.select().from(arrivals)).toHaveLength(3);
   });
 
+  // A deposit days after a plan had run was drawn inside that plan's old card, its day lost; and
+  // one while a sell waited only on a tap was drawn inside the sell (2026-11-25 reviews). Only a
+  // plan still waiting, that spends cash where cash came in, is named, and only when cash is all
+  // that came.
+  it("names only the waiting plan this cash funds, never one that settled, sells or spends elsewhere", async () => {
+    const thread = await chat();
+    const buy = { chain: "base", sellToken: BASE_USDC, buyToken: "ETH" };
+    const plan = (
+      proposalId: string,
+      status: "awaiting_permission" | "done",
+      input: Record<string, unknown>,
+    ) => insertAction({ threadId: thread.id, proposalId, status, tool: "evm_swap", input });
+    const told = async () =>
+      (
+        await db
+          .select({ metadata: messages.metadata })
+          .from(messages)
+          .where(eq(messages.role, "assistant"))
+          .orderBy(asc(messages.createdAt))
+      ).map(({ metadata }) => metadata.forPlan);
+
+    await plan("00000000-0000-4000-8000-00000000000a", "done", buy);
+    await hint("0xafter", [usdc({ position: "log:1" })]);
+    // A sell waiting on a tap spends no cash, so money in is no part of it.
+    await insertAction({
+      threadId: thread.id,
+      proposalId: "00000000-0000-4000-8000-00000000000c",
+      status: "awaiting_permission",
+      summary: "Sell a prediction market position",
+    });
+    await hint("0xunrelated", [usdc({ position: "log:2" })]);
+    // A buy spending cash on Arbitrum isn't funded by cash on Base, nor by a coin on Base.
+    await plan("00000000-0000-4000-8000-00000000000d", "awaiting_permission", {
+      ...buy,
+      chain: "arbitrum",
+      sellToken: NETWORKS.arbitrum.usdc,
+    });
+    await hint("0xelsewhere", [usdc({ position: "log:3" })]);
+    await plan("00000000-0000-4000-8000-00000000000b", "awaiting_permission", buy);
+    await hint("0xcoin", [ETH]);
+    // Cash and a coin in one transaction are one card: drawn inside the plan, the coin would
+    // read as money for it, so the whole deposit keeps its own place.
+    await hint("0xmixed", [usdc({ position: "log:5" }), { ...ETH, position: "call:1" }]);
+    expect(await told()).toEqual([undefined, undefined, undefined, undefined, undefined]);
+
+    await hint("0xwhile", [usdc({ position: "log:4" })]);
+    expect((await told()).at(-1)).toBe("00000000-0000-4000-8000-00000000000b");
+  });
+
   it("starts the main conversation for someone with none", async () => {
     await hint("0xfirst", [usdc()]);
     const [started] = await db.select().from(threads);
@@ -343,7 +392,7 @@ describe("waiting on a deposit", () => {
     });
     expect(card).toMatchObject({
       kind: "deposit",
-      title: "Send me your STANDARD and ORBIO",
+      title: "Send your STANDARD and ORBIO",
       network: "robinhood",
       tokens: [
         { name: "STANDARD", address: STANDARD },
@@ -369,7 +418,7 @@ describe("waiting on a deposit", () => {
     }
 
     expect((await waitWithCard()).card).toMatchObject({
-      title: "Send me anything",
+      title: "Add money",
       network: null,
       tokens: [],
     });

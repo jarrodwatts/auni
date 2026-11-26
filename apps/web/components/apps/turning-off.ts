@@ -32,7 +32,7 @@ export function turningOff(app: AppWire, name: string): TurningOff {
     title: `Turn ${name} off?`,
     says: [
       "Auni will stop acting there.",
-      `Your ${formatUsd(usd)} stays yours and stays in your portfolio, and anything you already allowed still finishes.`,
+      `Your ${formatUsd(usd)} stays yours, and anything you already allowed still finishes.`,
     ],
   };
 }

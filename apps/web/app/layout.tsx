@@ -9,6 +9,8 @@ import { WEAR_LOOK_FIRST } from "@/lib/look-first";
 import { nonceOf } from "@/lib/security-policy";
 import { TITLE_TEMPLATE } from "@/lib/site";
 
+import { FONT_VARIABLES } from "./fonts";
+
 // A person's own Auni: nothing in it is for search engines.
 export const metadata: Metadata = {
   applicationName: "auni",
@@ -37,7 +39,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     // The script below may name a look on this element before React reads it.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={FONT_VARIABLES} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: WEAR_LOOK_FIRST }} />
       </head>

@@ -3,8 +3,8 @@
  * left with an optional hint under it, and the control flush to the right edge.
  */
 export const GROUP =
-  "divide-y divide-foreground/[0.06] overflow-hidden rounded-[14px] border border-foreground/[0.08] bg-card";
+  "divide-y divide-foreground/[0.06] overflow-hidden rounded-card border border-foreground/[0.08] bg-card";
 export const ROW = "flex min-h-[56px] items-center gap-4 px-4 py-2.5";
 export const ROW_TEXT = "min-w-0 flex-1";
-export const ROW_LABEL = "block text-[14px] leading-5 text-ink";
-export const ROW_HINT = "mt-0.5 block truncate text-[12.5px] leading-4 text-muted-foreground";
+export const ROW_LABEL = "block text-ui leading-5 text-ink";
+export const ROW_HINT = "mt-0.5 block truncate text-meta leading-4 text-muted-foreground";

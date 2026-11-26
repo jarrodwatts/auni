@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   askAbout,
   failedStep,
+  heldHeading,
+  stillHeld,
   needingYou,
   needsYouLabel,
   onlyWhileNewest,
@@ -68,20 +70,30 @@ describe("failedStep", () => {
     });
   });
 
-  it("runs a moved price again only once a fresh quote is back inside what was approved", () => {
+  it("runs a moved price again only once a fresh quote is back inside what was allowed", () => {
     const price = failure({ kind: "price" });
     expect(failedStep(price, { inside: true, price: "$184.20" }, true)).toEqual({
       reason:
-        "The price moved, and it's back inside what you approved. Your money is still in your Monad wallet.",
+        "The price moved, and it's back inside what you allowed. Try again checks it first and sends nothing if it would still fail. Your money is still in your Monad wallet.",
       actions: ["retry", "ask"],
     });
     expect(failedStep(price, { inside: false, price: "$190.10" }, true)).toEqual({
       reason:
-        "The price moved past what you approved, to $190.10. Your money is still in your Monad wallet.",
+        "The price moved past what you allowed, to $190.10. Your money is still in your Monad wallet.",
       actions: ["ask"],
     });
     // Until the quote is read, nothing claims it would go through.
     expect(failedStep(price, null, true).actions).toEqual(["ask"]);
+  });
+
+  // A route can quote inside what was allowed and fail its own simulation each time it's built.
+  it("offers no Try again on a price core won't run again, and never says it's back inside", () => {
+    const again = failure({ kind: "price", retryable: false });
+    expect(failedStep(again, { inside: true, price: "$184.20" }, true)).toEqual({
+      reason:
+        "The price moved, and this one needs a fresh card from Auni to go. Your money is still in your Monad wallet.",
+      actions: ["ask"],
+    });
   });
 
   it("never offers to send again what went out, or may have", () => {
@@ -121,12 +133,12 @@ describe("failedStep", () => {
 });
 
 describe("a held step", () => {
-  const why = "Auni sent it and never heard back, so it can't tell whether it went through.";
+  const why = "Auni sent this and didn't get a receipt back.";
   const held = failure({ kind: "sent", said: why, retryable: false, held: true });
 
   it("says why and what stays true, and offers to check again or close, never to send again", () => {
     expect(failedStep(held, null, true)).toEqual({
-      reason: `${why} Auni won't send it again, and your portfolio shows what you hold either way.`,
+      reason: `${why} It won't retry on its own, and your balance shows what's actually there.`,
       actions: ["check", "close", "ask"],
     });
     expect(failedStep(held, null, false).actions).toEqual(["check", "close"]);
@@ -135,7 +147,7 @@ describe("a held step", () => {
   it("asks once what closing means before it closes, with a way back", () => {
     expect(failedStep(held, null, true, true)).toEqual({
       reason:
-        "Close it without a record? Auni stops checking, and adds nothing to any thread's record. Your portfolio still shows what you hold.",
+        "Dismiss this card? Auni stops checking on it and records nothing more. Whatever happened still shows in your balance.",
       actions: ["keep", "close"],
     });
   });
@@ -183,8 +195,8 @@ describe("needingYou", () => {
       failedStep(failure({ kind: "funds" }), null, false),
     ];
     expect(needingYou(steps)).toBe(2);
-    expect(needsYouLabel(1)).toBe("1 needs your OK");
-    expect(needsYouLabel(2)).toBe("2 need your OK");
+    expect(needsYouLabel(1)).toBe("1 needs you");
+    expect(needsYouLabel(2)).toBe("2 need you");
   });
 });
 
@@ -194,7 +206,9 @@ describe("retryProblem", () => {
     expect(retryProblem("short_of_money")).toBe(
       "There isn't enough money there for it now. Nothing moved.",
     );
-    expect(retryProblem(null)).toBe("Auni couldn't be reached. Nothing moved, so try again.");
+    expect(retryProblem(null)).toBe(
+      "Couldn't confirm that reached Auni. Trying again won't send it twice.",
+    );
   });
 });
 
@@ -227,5 +241,31 @@ describe("onlyWhileNewest", () => {
     expect(onlyWhileNewest("retry")).toBe(false);
     expect(onlyWhileNewest("ask")).toBe(true);
     expect(onlyWhileNewest("add_money")).toBe(true);
+  });
+});
+
+// Core confirmed the send; only the fill couldn't be read back. "Not confirmed yet" above "Its
+// money moved" contradicted itself.
+describe("heldHeading", () => {
+  it("says the money moved when only what came back is unread", () => {
+    expect(heldHeading("unrecorded", "Polymarket")).toEqual({
+      title: "Money moved",
+      badge: "Fill not read",
+      note: "moved",
+    });
+    expect(stillHeld("unrecorded")).toBe(
+      "Still can't read what came back. Auni keeps checking by itself.",
+    );
+  });
+
+  it("waits on the venue that never answered, and is unconfirmed otherwise", () => {
+    expect(heldHeading("unanswered", "Polymarket").title).toBe("Waiting on Polymarket");
+    expect(heldHeading("unanswered", null).title).toBe("Not confirmed yet");
+    expect(heldHeading("overdue", "Polymarket")).toEqual({
+      title: "Not confirmed yet",
+      badge: "Status unknown",
+      note: "status unknown",
+    });
+    expect(stillHeld("unanswered")).toBe("Still no answer. Auni keeps checking by itself.");
   });
 });

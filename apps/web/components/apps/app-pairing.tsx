@@ -7,6 +7,7 @@ import { useEffect } from "react";
 
 import { MoneyButton } from "@/components/cards/money/money-card-parts";
 import { useRefreshMe } from "@/components/personalization/use-me";
+import { buttonVariants } from "@/components/ui/button";
 import { CopyLine } from "@/components/ui/copy-line";
 import { useRefreshApps } from "@/lib/data/apps";
 import { pairChannel } from "@/lib/data/channels";
@@ -46,18 +47,18 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
       {waiting && pairing.data ? (
         <div className="flex flex-col gap-3">
           <p className="text-meta leading-[1.55] text-muted-foreground">
-            Within 15 minutes, send Auni this code in a direct chat on {name}. Whoever sends it
-            becomes you there.
+            Send this code to Auni in a direct message on {name} within 15 minutes. Whoever sends
+            it is paired as you.
           </p>
           <CopyLine value={pairing.data.code} label="Your code" />
           {link ? (
             <a
-              className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-foreground px-5 text-[14.5px] font-semibold text-background transition-colors duration-200 ease-settle hover:bg-foreground/85"
+              className={buttonVariants({ variant: "primary", size: "lg" })}
               href={link}
               rel="noreferrer"
               target="_blank"
             >
-              Open {name} with it
+              Open in {name}
               <ArrowUpRight aria-hidden className="size-4" strokeWidth={2.2} />
             </a>
           ) : null}
@@ -67,20 +68,20 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
           <p className="flex min-w-0 flex-1 items-center gap-2 text-ui font-normal text-ink">
             {paired ? (
               <>
-                <Check aria-hidden className="size-4 flex-none text-positive" strokeWidth={2.6} />
+                <Check aria-hidden className="size-4 flex-none text-ink" strokeWidth={2.6} />
                 Paired with your chat
               </>
             ) : (
               <span className="text-muted-foreground">
-                Pair it with your own chat, and Auni answers you there too.
+                Pair your {name} chat so Auni can message you there.
               </span>
             )}
           </p>
           <MoneyButton
             tone={paired ? "quiet" : "primary"}
             busy={pairing.isPending}
-            busyLabel="Making a code"
-            className="h-10 flex-none px-4 text-[14px]"
+            busyLabel="Creating code"
+            className="h-10 flex-none px-4 text-ui"
             onClick={() => pairing.mutate()}
           >
             {paired ? "Pair again" : "Pair"}
@@ -88,7 +89,7 @@ export function AppPairing({ app, name }: { readonly app: AppWire; readonly name
         </div>
       )}
       {pairing.isError ? (
-        <p role="alert" className="mt-2 text-[12.5px] text-destructive">
+        <p role="alert" className="mt-2 text-meta text-destructive">
           Couldn&apos;t make a pairing code. Try again.
         </p>
       ) : null}

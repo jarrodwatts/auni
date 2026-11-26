@@ -407,6 +407,10 @@ describe("proof that the owner is there", () => {
     for (const [path, body] of [
       [`/actions/${card.id}/allow`, {}],
       [`/actions/${card.id}/allow`, { cardFormat: CARD_FORMAT - 1 }],
+      // Found in review: the web app before draws format 2, which reads a card's permissions from
+      // where today's cards no longer put them, so it would show none and still allow.
+      [`/actions/${card.id}/allow`, { cardFormat: 2 }],
+      [`/proposals/${plan}/allow`, { cardFormat: 2 }],
       [`/proposals/${plan}/allow`, {}],
     ] as const)
       expect(await post(path, cookie, body)).toMatchObject({

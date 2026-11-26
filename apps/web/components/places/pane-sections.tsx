@@ -14,13 +14,13 @@ import { cn } from "@/lib/utils";
 
 import { PlaceLink } from "./open-place";
 
-/** Recent items the record shows before pointing to Activity. */
+/** Recent moves the record shows before pointing to all of them. */
 const RECORD_ITEMS = 5;
 
 function Section({ title, children }: { readonly title: string; readonly children: ReactNode }) {
   return (
     <section aria-label={title} className="mt-7 px-6">
-      <h3 className="mb-2 text-[12.5px] font-medium text-faint">{title}</h3>
+      <h3 className="mb-2 text-meta font-medium text-faint">{title}</h3>
       {children}
     </section>
   );
@@ -44,13 +44,13 @@ export function PaneWatches({ threadId }: { readonly threadId: ThreadId }) {
               type="button"
               aria-haspopup="dialog"
               onClick={() => setOpen(true)}
-              className="flex w-full items-center gap-3 rounded-[12px] px-2 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="flex w-full items-center gap-3 rounded-control px-2 py-2.5 text-left transition-colors duration-150 hover:bg-foreground/[0.03] focus-ring-inset"
             >
               <WatchIcon watch={watch} />
               <span className="min-w-0 flex-1">
                 <span
                   className={cn(
-                    "block truncate text-[14px] leading-5",
+                    "block truncate text-ui leading-5",
                     watch.status === "active" ? "text-ink" : "text-muted-foreground",
                   )}
                 >
@@ -79,7 +79,7 @@ export function PaneNotes({ notes }: { readonly notes: string | null }) {
     <Section title="Notes">
       <p
         className={cn(
-          "text-[13.5px] leading-[1.55] whitespace-pre-line text-ink-soft",
+          "text-ui leading-[1.55] whitespace-pre-line text-ink-soft",
           long && !all && "line-clamp-6",
         )}
       >
@@ -89,7 +89,7 @@ export function PaneNotes({ notes }: { readonly notes: string | null }) {
         <button
           type="button"
           onClick={() => setAll(!all)}
-          className="auni-text-link mt-1.5 text-[13px]"
+          className="auni-text-link mt-1.5 text-meta"
         >
           {all ? "Show less" : "Show all"}
         </button>
@@ -98,24 +98,32 @@ export function PaneNotes({ notes }: { readonly notes: string | null }) {
   );
 }
 
-/** Recent money activity opened in this thread, with a link to all of it in Activity. */
+/** A move's line under its title, less the take's name: here, the take is what's open. */
+function withoutTake(subtitle: string, title: string): string {
+  const prefix = `${title}, `;
+  return subtitle.startsWith(prefix) ? subtitle.slice(prefix.length) : subtitle;
+}
+
+/** The take's recent moves, with a link to all of them in Money. */
 export function PaneRecord({ thread }: { readonly thread: Thread }) {
   const activity = useActivity(thread.id).data;
   const items = activity?.items ?? [];
   if (items.length === 0) return null;
   return (
-    <Section title="Activity">
-      <ul className="divide-y divide-foreground/[0.05]">
+    <Section title="Moves">
+      <ul className="divide-y divide-border">
         {items.slice(0, RECORD_ITEMS).map((item) => (
           <li key={item.id} className="flex items-center gap-3 py-2.5">
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] text-ink">{item.title}</span>
-              <span className="mt-0.5 block truncate text-[12px] text-faint">{item.subtitle}</span>
+              <span className="block truncate text-ui text-ink">{item.title}</span>
+              <span className="mt-0.5 block truncate text-caption text-faint">
+                {withoutTake(item.subtitle, thread.title)}
+              </span>
             </span>
             {item.amount ? (
               <span
                 className={cn(
-                  "flex-none text-[14px] font-semibold tabular-nums",
+                  "flex-none text-ui font-semibold tabular-nums",
                   TONE_CLASS_NAME[item.amount.tone],
                 )}
               >
@@ -127,9 +135,9 @@ export function PaneRecord({ thread }: { readonly thread: Thread }) {
       </ul>
       <PlaceLink
         href={`/app/activity?${new URLSearchParams({ thread: thread.id })}`}
-        className="auni-text-link mt-2 inline-block text-[13px]"
+        className="auni-text-link mt-2 inline-block text-meta"
       >
-        All thread activity
+        All moves in this take
       </PlaceLink>
     </Section>
   );

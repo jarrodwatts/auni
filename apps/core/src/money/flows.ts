@@ -17,6 +17,11 @@ export interface Flow {
   readonly usd: number;
   /** The holding it moved into or out of, by fillIdentity (see madeUsd). */
   readonly key?: string;
+  /**
+   * When the money was really there, where `at` counts it from earlier: what every reading of
+   * the wallet holds counts from the start, at 0 (see arrivalFlows), though it was found later.
+   */
+  readonly since?: number;
 }
 
 /** One fill as returns count it. A perp carries its leverage when the order said it. */

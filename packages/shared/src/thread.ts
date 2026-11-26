@@ -7,6 +7,7 @@ import {
   automationFireIdSchema,
   automationRuleIdSchema,
   messageIdSchema,
+  proposalIdSchema,
   threadIdSchema,
   timestampSchema,
 } from "./shared.ts";
@@ -84,11 +85,18 @@ export const updateThreadRequestSchema = z
   .partial();
 export type UpdateThreadRequest = z.infer<typeof updateThreadRequestSchema>;
 
-/** `GET /threads/:threadId/state`: live budget headroom and holdings opened in this thread. */
+/**
+ * `GET /threads/:threadId/state`: live budget headroom, the holdings opened in this thread, and
+ * what they made since it bought them, the same as Money's take says (see GET /takes).
+ */
 export const threadStateWireSchema = z.object({
   budgetUsd: dollarsSchema,
   freeBudgetUsd: dollarsSchema,
   holdings: z.array(holdingWireSchema),
+  /** Signed, since entry; null when nothing records any cost. */
+  changeUsd: dollarsSchema.nullable(),
+  /** What `changeUsd` counts cost; null with it. */
+  costUsd: dollarsSchema.nullable(),
 });
 export type ThreadStateWire = z.infer<typeof threadStateWireSchema>;
 
@@ -127,8 +135,13 @@ export const messageMetadataWireSchema = z.looseObject({
       }),
     )
     .optional(),
-  /** A background answer that ended with nothing worth telling, and why. */
+  /**
+   * A background answer that ended with nothing worth telling, and why: core marks one only when
+   * it shows the owner no words and no card, so the chat leaves it out.
+   */
   quiet: z.string().optional(),
+  /** Money that came in while this plan waited on the owner, which its card tells. */
+  forPlan: proposalIdSchema.optional(),
 });
 
 /** `GET /threads/:id/messages`: each message in the UI parts it streamed as. */

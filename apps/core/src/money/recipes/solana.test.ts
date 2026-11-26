@@ -292,8 +292,9 @@ describe("send_solana_transaction", () => {
     expect(card.card).toMatchObject({
       title: "Buy Bonk",
       context: "Jupiter on Solana",
-      finePrint: "It goes through JUP6Lk…TaV4.",
+      finePrint: null,
     });
+    expect(figureOf(card, "Program")).toMatch(/^JUP6Lk\w+TaV4$/u);
     expect(figureOf(card, "Network fee")).toBe("$0.15");
   });
 
@@ -308,9 +309,9 @@ describe("send_solana_transaction", () => {
     const tapped = await describeIt(transaction(), app);
     expect(approval(tapped.effect, [])).toEqual({ kind: "tap" });
     expect(tapped.card?.checks).toEqual({
-      checked: "Checked by running it first",
-      unchecked: { heading: "Not checked: what Auni says about it", says: "It earns 6% a year." },
-      why: "No app for Kamino yet, so Auni read this by running it first.",
+      checked: "Observed in simulation",
+      unchecked: { heading: "Auni's note (unverified)", says: "It earns 6% a year." },
+      why: "No app for Kamino yet, so Auni simulated it to show what it does.",
     });
     scene = () => ({ ...swap(), ...delegated });
     const proved = await describeIt(transaction(), app);

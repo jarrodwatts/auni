@@ -12,10 +12,10 @@ import { livePrices, movedUsd, perpSize, priceKey, pricesNow } from "./history.t
 import { outdated, priceKeys, readStands, saveReading } from "./readings.ts";
 import { onForget } from "./swaps/shared.ts";
 import { onTheirWay } from "./record.ts";
-import { centsToUsd, formatUnits, sumUsd, unitsUsd } from "./usd.ts";
+import { centsToUsd, formatUnits, signedUsdToCents, sumUsd, unitsUsd, usdToCents } from "./usd.ts";
 import { walletAddresses } from "./wallets.ts";
 import type { Account, AccountHolding, RawHolding } from "../apps/contract.ts";
-import { accountOwning, accounts, savingsTokens } from "../apps/registry.ts";
+import { accountOwning, accounts, isSavingsToken, savingsTokens } from "../apps/registry.ts";
 import { countFirstLook, placeOf, stillLooking } from "./first-look.ts";
 
 /** An EVM chain a fill or arrival names: one of Auni's, or another recorded as eip155:N. */
@@ -30,10 +30,7 @@ function isEvmPlace(chain: string): boolean {
  * on their own and filed under the app that keeps them.
  */
 function isWalletToken(chain: string, instrument: string): boolean {
-  return (
-    /^0x[0-9a-fA-F]{40}$/u.test(instrument) &&
-    !savingsTokens(chain).some(({ token }) => token.toLowerCase() === instrument.toLowerCase())
-  );
+  return /^0x[0-9a-fA-F]{40}$/u.test(instrument) && !isSavingsToken({ chain, instrument });
 }
 
 /**
@@ -94,6 +91,11 @@ export interface Holding extends FillKey {
    * else from Auni's fills. Absent when nothing records what was paid.
    */
   readonly averageCostUsd?: string;
+  /**
+   * Signed, in dollars: what a perp position has made so far, as its venue says, funding and
+   * fees as the venue counts them. Absent where the venue doesn't say.
+   */
+  readonly unrealizedPnlUsd?: string;
 }
 
 interface PortfolioBucket {
@@ -245,7 +247,19 @@ function repriced(
       then.get(key) ?? null,
       now.get(key) ?? null,
     );
-    return { ...holding, usdValue: centsToUsd(BigInt(Math.round(usd * 100))) };
+    const usdValue = centsToUsd(BigInt(Math.round(usd * 100)));
+    // What a perp has made moves with its value: it is worth its margin plus what it made.
+    const made =
+      holding.unrealizedPnlUsd === undefined
+        ? {}
+        : {
+            unrealizedPnlUsd: centsToUsd(
+              signedUsdToCents(holding.unrealizedPnlUsd) +
+                usdToCents(usdValue) -
+                usdToCents(holding.usdValue),
+            ),
+          };
+    return { ...holding, usdValue, ...made };
   };
   const holdings = read.holdings.map(move);
   const assets = holdings.filter((holding) => !holding.cash || holding.heldForOrders);
@@ -500,9 +514,7 @@ export async function readPortfolio(): Promise<Portfolio> {
     everyFill,
   );
   if (looked)
-    void saveReading(portfolio).catch((error: unknown) =>
-      console.error("reading not kept", error),
-    );
+    void saveReading(portfolio).catch((error: unknown) => console.error("reading not kept", error));
   return portfolio;
 }
 
@@ -555,6 +567,9 @@ export async function priceHoldings(
       ...(holding.short ? { short: true } : {}),
       ...(holding.leverage ? { leverage: holding.leverage } : {}),
       ...(holding.averageCostUsd ? { averageCostUsd: holding.averageCostUsd } : {}),
+      ...(holding.unrealizedPnlUsd === undefined
+        ? {}
+        : { unrealizedPnlUsd: holding.unrealizedPnlUsd }),
     };
   });
   return { holdings, pricesRead };

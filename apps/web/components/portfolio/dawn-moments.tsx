@@ -21,7 +21,7 @@ import { noteRows, placeNotes, type PlacedNote } from "./dawn-notes";
  * quiet card over any bead that is pointed at, tapped or focused.
  */
 
-export type MomentTone = "positive" | "negative" | "neutral";
+export type MomentTone = "positive" | "negative" | "neutral" | "ink";
 
 /** Two lines written above a bead: what it was, and what came of it. */
 export interface MomentNote {
@@ -48,6 +48,7 @@ export const MOMENT_COLOR: Record<MomentTone, string> = {
   positive: "var(--color-positive)",
   negative: "var(--color-negative)",
   neutral: "var(--color-faint)",
+  ink: "var(--color-ink)",
 };
 
 /** A note's second line, colored by what came of it. */
@@ -190,7 +191,7 @@ export function MomentTrigger({
           onPointerLeave={(event) => {
             if (event.pointerType === "mouse") cards.hideSoon();
           }}
-          className="z-50 w-[288px] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) rounded-[16px] bg-popover px-3.5 pt-3 pb-3.5 text-left text-ink shadow-[inset_0_0_0_1px_--alpha(var(--color-shade-blue)/7%),0_2px_6px_--alpha(var(--color-shade-blue)/5%),0_18px_40px_-16px_--alpha(var(--color-shade-blue)/30%)] outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
+          className="z-50 w-[288px] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) rounded-card bg-popover px-3.5 pt-3 pb-3.5 text-left text-ink border border-border shadow-float outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
         >
           {moment.detail}
         </Popover.Content>
@@ -280,7 +281,8 @@ function useNotePlaces(noted: readonly Spot[], width: number, compact: boolean) 
   useLayoutEffect(() => {
     const spots = noted.map(({ moment, x }) => ({
       x,
-      width: Math.ceil(ghosts.current.get(moment.key)?.offsetWidth ?? 0),
+      // Its exact width, rounded up: offsetWidth rounds to the nearest pixel, which can cut the last letter.
+      width: Math.ceil(ghosts.current.get(moment.key)?.getBoundingClientRect().width ?? 0),
     }));
     setPlaced(placeNotes(spots, width, compact));
   }, [noted, width, compact]);
@@ -313,7 +315,7 @@ function Note({
       <span
         className={cn(
           "block truncate font-semibold tracking-[-0.01em] text-ink",
-          compact ? "text-[11.5px] leading-[15px]" : "text-[12.5px] leading-4",
+          compact ? "text-caption leading-[15px]" : "text-meta leading-4",
         )}
       >
         {note.title}
@@ -321,7 +323,7 @@ function Note({
       <span
         className={cn(
           "block truncate tabular-nums",
-          compact ? "text-[11px] leading-[14px]" : "text-[11.5px] leading-[15px]",
+          compact ? "text-caption leading-[14px]" : "text-caption leading-[15px]",
           NOTE_LINE_TONE[note.lineTone],
         )}
       >

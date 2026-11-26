@@ -27,6 +27,7 @@ import { simulateSolana } from "./solana-effect.ts";
 import { solUsd } from "./token-feeds.ts";
 import { formatUnits } from "./usd.ts";
 import { ownGas } from "./gas.ts";
+import { Refused } from "./refused.ts";
 import { noAddressOn, paysOwnGas, walletAddresses } from "./wallets.ts";
 
 // Apps top up SOL through this file, and the registry loads every app, so the Solana route
@@ -188,7 +189,7 @@ const buysSol = (from: FeeCoin["from"], token: string, usdc: bigint, by: string)
 });
 
 /** A pay-in is asked for at least a dollar: what's left over pays the wallet's next fees. */
-const LEAST_PAY_IN_USDC = 1_000_000n;
+export const LEAST_PAY_IN_USDC = 1_000_000n;
 
 /** The USDC `lamports` of SOL cost at `usdPrice`, in base units. */
 const usdcFor = (lamports: bigint, usdPrice: number, over = 1) =>
@@ -230,7 +231,8 @@ async function topUpUsdc(lamports: bigint, least: bigint, approved?: Approved): 
 
 /**
  * How the wallet gets the `lamports` of SOL it's short of, as the wallet decides who pays (see
- * the top), or a plain error saying what would let it.
+ * the top), or a plain error saying what would let it: money short, when the wallet holds too
+ * little to buy it, so its card offers adding money.
  */
 export async function solForFees(
   lamports: bigint,
@@ -246,7 +248,8 @@ export async function solForFees(
       solanaTokenBalance(address(solana), SOLANA_USDC.mint, SOLANA_USDC.tokenProgram),
     ]);
     if (held < usdc + spends)
-      throw new Error(
+      throw new Refused(
+        "funds",
         `${needs}, and too little USDC on Solana to buy it (about ${dollars(usdc)}). Move a ` +
           `little USDC to Solana with ${await bridgeTool()}, then propose it again.`,
       );
@@ -266,7 +269,8 @@ export async function solForFees(
       })
     : 0n;
   if (!evm || held < usdc)
-    throw new Error(
+    throw new Refused(
+      "funds",
       `${needs}, and under ${dollars(usdc)} of USDC on Monad to buy it with. Ask them to send a ` +
         "little SOL to their Solana address, or USDC on Monad, which Auni turns into SOL as a " +
         "move needs it; then propose it again.",

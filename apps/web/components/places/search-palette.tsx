@@ -35,8 +35,8 @@ export function useSearch(): SearchContextValue {
   return useContext(SearchContext);
 }
 
-/** The places search offers again once they've been opened: Portfolio, Activity, Apps, or a thread. */
-const PLACE_PATH = /^\/app(?:\/activity|\/apps|\/chat\/[^/]+)?$/u;
+/** The places search offers again once they've been opened: Money, Apps, Needs you, or a chat. */
+const PLACE_PATH = /^\/app(?:\/apps|\/needs-you|\/chat\/[^/]+)?$/u;
 
 /**
  * Search lives in one palette over everything, opened by ⌘K (Ctrl+K)
@@ -91,7 +91,7 @@ export function SearchProvider({ children }: { readonly children: ReactNode }) {
           <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-scrim/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-200 motion-reduce:animate-none" />
           <DialogPrimitive.Content
             aria-describedby={undefined}
-            className="fixed top-[max(16px,14vh)] left-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[min(620px,calc(100vw-32px))] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-foreground/[0.08] bg-popover shadow-[0_24px_64px_-12px_--alpha(var(--color-shade)/22%),0_2px_6px_--alpha(var(--color-shade)/4%)] outline-none ease-settle data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] data-[state=closed]:duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=open]:slide-in-from-top-1 data-[state=open]:duration-[260ms] motion-reduce:animate-none"
+            className="fixed top-[max(16px,14vh)] left-1/2 z-50 flex max-h-[calc(100dvh-32px)] w-[min(620px,calc(100vw-32px))] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-foreground/[0.08] bg-popover shadow-float outline-none ease-settle data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.98] data-[state=closed]:duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] data-[state=open]:slide-in-from-top-1 data-[state=open]:duration-[260ms] motion-reduce:animate-none"
           >
             <DialogPrimitive.Title className="sr-only">Search</DialogPrimitive.Title>
             <SearchPanel key={palette.session} variant="palette" onDone={close} />

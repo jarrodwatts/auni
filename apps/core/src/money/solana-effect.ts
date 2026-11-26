@@ -211,8 +211,8 @@ export interface SolanaSimulation {
   readonly short: bigint;
   /** A program keeping an account for the wallet that it changes (see positionAt). */
   readonly position: string | null;
-  /** The program it calls last, besides Solana's own: the app it is for. */
-  readonly via: string;
+  /** The program it calls last, besides Solana's own, in full: the app it is for. Null with none. */
+  readonly via: string | null;
   /** Each mint's decimals, as the chain counts them. */
   readonly decimals: ReadonlyMap<string, number>;
   /** The transaction as the wallet signs it, on a fresh blockhash. */
@@ -335,7 +335,7 @@ export async function simulateSolana(
     short,
     // One it opens shows only after; one it empties and closes, only before.
     position: before ?? keeperOf(result.accounts, owner) ?? sharedCustody(instructions, result),
-    via: app ? shortAddress(app.programAddress) : "no program",
+    via: app ? app.programAddress : null,
     decimals: new Map([
       [WRAPPED_SOL, 9],
       ...balances.map(({ mint, uiTokenAmount }) => [mint, uiTokenAmount.decimals] as const),

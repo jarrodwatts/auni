@@ -383,7 +383,7 @@ describe("legsToRetry", () => {
   });
 
   it("runs nothing when a leg it would run was drawn before cards said all they say now, leaving a permission its plan didn't show", () => {
-    const old = { ...as(bridge, "failed", "glitch"), cardFormat: CARD_FORMAT - 1 };
+    const old = { ...as(bridge, "failed", "glitch"), cardFormat: 1 };
     const lets = [{ label: "Lets", value: "Polymarket's exchanges trade your shares" }];
     expect(retried([{ ...old, lines: lets }, as(ether, "failed", "stopped")])).toBeNull();
     // One that leaves nothing finishes its plan as before.

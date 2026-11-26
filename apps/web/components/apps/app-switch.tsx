@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { CoreApiError } from "@/lib/core";
 import { useSwitchApp } from "@/lib/data/apps";
 
-import { waitingFor } from "./app-standing";
+import { keysFirst, waitingFor } from "./app-standing";
 import { turningOff } from "./turning-off";
 
 /**
@@ -38,7 +38,8 @@ export function AppSwitch({
   const [refusal, setRefusal] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const off = turningOff(app, name);
-  // On with something still missing is said as that, never as ready.
+  // On with something still missing, its keys too, is said as that, never as ready; and it can
+  // still be turned off, money there or not, without giving the keys first.
   const waits = app.on ? waitingFor(app) : null;
 
   const turn = async (on: boolean) => {
@@ -67,13 +68,15 @@ export function AppSwitch({
         ? off
         : null;
 
+  // Waiting on keys with nothing there, the key form above is the one thing to do.
+  if (keysFirst(app)) return null;
   return (
     <AutoHeight className="mt-9">
       {refused ? (
-        <div className="rounded-[20px] bg-surface p-5" data-testid="app-switch-refused">
+        <div className="rounded-card bg-surface p-5" data-testid="app-switch-refused">
           <h3 className="text-ui font-semibold text-ink">{refused.title}</h3>
           <p className="mt-1.5 text-meta leading-[1.55] text-muted-foreground">{refused.why}</p>
-          <div className="mt-4 grid grid-cols-[1fr_1.6fr] gap-2">
+          <div className="mt-4 flex flex-col-reverse gap-2">
             <MoneyButton
               tone="quiet"
               onClick={() => {
@@ -85,7 +88,7 @@ export function AppSwitch({
             </MoneyButton>
             {refused.fix ? (
               <MoneyButton tone="primary" disabled={busy} onClick={() => onAsk(refused.fix)}>
-                Close what&apos;s open
+                Review a plan to close positions
               </MoneyButton>
             ) : (
               <MoneyButton tone="primary" busy={pending} onClick={() => void turn(false)}>
@@ -95,7 +98,7 @@ export function AppSwitch({
           </div>
         </div>
       ) : asking && off.kind === "question" ? (
-        <div className="rounded-[20px] bg-surface p-5" data-testid="app-switch-question">
+        <div className="rounded-card bg-surface p-5" data-testid="app-switch-question">
           <h3 className="text-ui font-semibold text-ink">{off.title}</h3>
           {off.says.map((line) => (
             <p key={line} className="mt-1.5 text-meta leading-[1.55] text-muted-foreground">
@@ -109,7 +112,7 @@ export function AppSwitch({
             <MoneyButton
               tone="primary"
               busy={pending}
-              busyLabel="Turning it off"
+              busyLabel="Turning off"
               onClick={() => void turn(false)}
             >
               Turn it off
@@ -117,17 +120,19 @@ export function AppSwitch({
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-4 rounded-[20px] bg-surface py-3.5 pr-4 pl-5">
+        <div className="flex items-center gap-4 rounded-card bg-surface py-3.5 pr-4 pl-5">
           <span className="min-w-0 flex-1">
-            <span className="block text-ui text-ink">{waits?.says ?? (app.on ? "On" : "Off")}</span>
+            <span className="block text-ui font-medium text-ink">
+              {waits?.says ?? (app.on ? "On" : "Off")}
+            </span>
             <span
               id={`app-switch-${app.id}`}
               className="mt-0.5 block text-meta text-muted-foreground"
             >
               {waits?.under ??
                 (app.on
-                  ? "Auni can use it when it would help"
-                  : "Auni doesn't use it. What you have there stays yours.")}
+                  ? `Auni can use ${name} when it helps`
+                  : `Auni won't use ${name}. Anything you hold there stays yours.`)}
             </span>
           </span>
           {/* Named for what it turns on and off, not by its state ("On"), which it says itself. */}
@@ -142,7 +147,7 @@ export function AppSwitch({
         </div>
       )}
       {failed ? (
-        <p role="alert" className="mt-2 px-1 text-[12.5px] text-destructive">
+        <p role="alert" className="mt-2 px-1 text-meta text-destructive">
           That didn&apos;t reach Auni, so nothing changed. Try again.
         </p>
       ) : null}

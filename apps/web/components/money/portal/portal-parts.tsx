@@ -1,5 +1,9 @@
 "use client";
 
+import "./orbit.css";
+
+import "./portal.css";
+
 import { QrCode } from "lucide-react";
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 
@@ -17,7 +21,7 @@ import {
 import { NetworkMark } from "./network-mark";
 import { NetworkOrbit, type OrbitProps } from "./network-orbit";
 
-// What the Portal and the chat's deposit card share: Auni waiting over its glow in its orbit of
+// What the Portal and the chat's deposit card share: Auni waiting in its orbit of
 // networks, and the addresses under it. Each sits inside an `.auni-portal`, whose data attributes set its states.
 
 /** Auni nods when an address is copied, squashing from its feet. */
@@ -96,12 +100,12 @@ const COIN_DELAY_MS = 140;
 const COIN_FLIGHT_MS = 840;
 
 /**
- * Auni floating over its glow and its shadow, with happy eyes ready for a landing, inside the
+ * Auni floating over its shadow, with happy eyes ready for a landing, inside the
  * orbit of every network it takes money on. Money landing, Auni opens wide and gulps it down: a
  * coin of what arrived (`coin`, its symbol: USDC's own, or its network's mark for a coin Auni has
  * no art for) flies out of its network's place on the orbit, along an arc that its trail draws,
  * and into Auni's mouth as it shuts, then a burst. `body` is what NOD and HOP move; whatever else
- * is given sits over the glow, under Auni.
+ * is given sits under Auni.
  */
 export function PortalHero({
   body,
@@ -110,19 +114,22 @@ export function PortalHero({
   coin: arrived = null,
   hero,
   orbit,
+  ringed = orbit.networks.length > 1,
 }: {
   readonly body: RefObject<HTMLSpanElement | null>;
   readonly children?: ReactNode;
   readonly className?: string;
   /** The symbol of what arrived, while it does. */
   readonly coin?: string | null;
-  /** What useGaze sets Auni's eyes on. */
+  /** Where Auni stands in the scene. */
   readonly hero: RefObject<HTMLDivElement | null>;
   readonly orbit: OrbitProps;
+  /**
+   * Whether the networks ring Auni. A ring says "any of these", so by default only where there's
+   * more than one; with the networks chosen elsewhere (Add money's chips), none.
+   */
+  readonly ringed?: boolean;
 }) {
-  // A ring says "any of these": with a single network there is nothing to choose from, so Auni
-  // stands alone and the line under it names the one (see DepositCard).
-  const ringed = orbit.networks.length > 1;
   const arriving = orbit.networks.find(({ key }) => key === orbit.arriving) ?? null;
   const coin = useRef<HTMLSpanElement>(null);
   useCoinFlight(coin, arriving?.key ?? null);
@@ -130,7 +137,6 @@ export function PortalHero({
     <div className={cn("auni-portal-stage", className)} data-ringed={ringed ? "" : undefined}>
       {ringed ? <NetworkOrbit {...orbit} /> : null}
       <div ref={hero} className="auni-portal-hero">
-        <span aria-hidden className="auni-portal-glow" />
         <span aria-hidden className="auni-portal-ring" />
         <span aria-hidden className="auni-portal-shadow" />
         {children}
@@ -241,7 +247,7 @@ function NetworkStack({ networks }: { readonly networks: DepositAddress["network
 /** The card the address rows sit on, a hairline between each. */
 // The rows share their columns, so every address starts at one edge, after the widest stack.
 export const addressRowsClass =
-  "grid grid-cols-[auto_minmax(0,1fr)_auto] divide-y divide-border overflow-hidden rounded-[18px] bg-card text-left shadow-[0_0_0_1px_var(--border),0_4px_14px_--alpha(var(--color-shade-blue)/6%)]";
+  "grid grid-cols-[auto_minmax(0,1fr)_auto] divide-y divide-border overflow-hidden rounded-card bg-card text-left border border-border";
 
 /** The height and shape of a row's buttons: its code's and Copy. */
 const chipClass =
@@ -255,6 +261,7 @@ const chipClass =
  */
 export function AddressRow({
   blocked,
+  brief,
   copied,
   entry,
   on = false,
@@ -264,6 +271,8 @@ export function AddressRow({
 }: {
   /** The browser refused to copy, so the whole address shows, to be selected by hand. */
   readonly blocked: boolean;
+  /** The line under the address, its networks by default; null for none, where they're named above. */
+  readonly brief?: string | null;
   readonly copied: boolean;
   readonly entry: DepositAddress;
   readonly on?: boolean;
@@ -292,15 +301,17 @@ export function AddressRow({
       <span className="min-w-0">
         <span
           className={cn(
-            "block text-[15px] leading-5 font-semibold whitespace-nowrap text-ink tabular-nums",
-            blocked && "font-mono text-[13px] break-all whitespace-normal select-all",
+            "block text-body leading-5 font-semibold whitespace-nowrap text-ink tabular-nums",
+            blocked && "font-mono text-meta break-all whitespace-normal select-all",
           )}
         >
           {blocked ? entry.address : shortAddress(entry.address)}
         </span>
-        <span className="block truncate text-[12.5px] leading-[18px] text-muted-foreground">
-          {networksInBrief(entry.networks)}
-        </span>
+        {brief === null ? null : (
+          <span className="block truncate text-meta leading-[18px] text-muted-foreground">
+            {brief ?? networksInBrief(entry.networks)}
+          </span>
+        )}
       </span>
       <span className="flex items-center gap-2">
         {onToggleQr ? (
@@ -323,10 +334,10 @@ export function AddressRow({
           onClick={onCopy}
           className={cn(
             chipClass,
-            "px-3.5 text-[14px] font-semibold",
+            "px-3.5 text-ui font-semibold",
             copied
-              ? "bg-positive/[0.12] text-positive"
-              : "bg-primary/[0.08] text-primary hover:bg-primary/[0.13]",
+              ? "bg-foreground/[0.05] text-ink"
+              : "bg-foreground/[0.05] text-ink hover:bg-foreground/[0.08]",
           )}
         >
           {/* Both words share one cell, so the button never changes width. */}

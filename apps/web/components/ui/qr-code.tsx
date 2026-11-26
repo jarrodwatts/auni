@@ -25,18 +25,23 @@ export function QrCodeCanvas({
 
   useEffect(() => {
     if (!canvas || !value) return;
+    // Drawn at twice its size for a sharp code; the library then sets the canvas's own style to
+    // that width, so it is put back to the size it shows at.
     void QRCode.toCanvas(canvas, value, {
       width: size * 2,
       margin: 1,
       errorCorrectionLevel: "M",
       color: QR_COLORS,
+    }).then(() => {
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
     });
   }, [canvas, size, value]);
 
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center rounded-[14px] border border-foreground/[0.08] bg-plate p-2.5 shadow-xs",
+        "inline-flex items-center justify-center rounded-card border border-foreground/[0.08] bg-plate p-2.5",
         className,
       )}
     >
@@ -45,7 +50,7 @@ export function QrCodeCanvas({
         role="img"
         aria-label={label}
         style={{ width: size, height: size }}
-        className="block rounded-[6px]"
+        className="block rounded-control"
       />
     </div>
   );

@@ -1,7 +1,10 @@
 import { LINE_WIDTH_PX, lineFits, lineWidth } from "@auni/shared";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { WORDS_START } from "./starting-points";
+import { requestComposerFocus } from "./composer";
+import { pickStartingPoint, seenOn, WORDS_START } from "./starting-points";
+
+vi.mock("./composer", () => ({ requestComposerFocus: vi.fn() }));
 
 // Core shows a starting point only when `lineFits` measures its line within LINE_WIDTH_PX on a
 // phone 360 wide (@auni/shared). Here the rows' layout is held to leave that room, and the
@@ -46,5 +49,46 @@ describe("a starting point's line on a 360 wide phone", () => {
   it("refuses a line with a blank in it, cut short or left to be filled in", () => {
     for (const statement of ["AI bubble burst by...?", "Anthropic IPO by __?", "Fed decision in…"])
       expect(lineFits({ statement, action: "Weigh it up" })).toBe(false);
+  });
+});
+
+// A click sent a point's words at once while a tap put them in the box, so a desktop owner sent
+// words they never read (2026-11-25 council). Every device now puts them in the box.
+describe("picking a starting point", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(requestComposerFocus).mockClear();
+  });
+
+  it("puts its words in the new chat's box, to read and send, by mouse, key or touch alike", () => {
+    const prompt = "Test a December cut at 66%: what would you do?";
+    for (const coarse of [false, true]) {
+      const fetch = vi.fn();
+      vi.stubGlobal("fetch", fetch);
+      vi.stubGlobal("matchMedia", () => ({ matches: coarse }));
+      pickStartingPoint({ prompt });
+      expect(requestComposerFocus).toHaveBeenLastCalledWith("new", prompt, true);
+      expect(fetch).not.toHaveBeenCalled();
+    }
+    expect(requestComposerFocus).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("where a starting point's claim came from", () => {
+  const at = "2026-11-26T02:05:00.000Z";
+  const clock = new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  it("names the outside source and when it was read, before the owner sends it", () => {
+    const market = { app: "polymarket", label: "Will the Fed cut in December?", link: null };
+    expect(seenOn([market], at)).toBe(`Polymarket at ${clock}`);
+    const prices = { app: "prices", label: "BTC on Hyperliquid", link: null };
+    const money = { app: "auni", label: "Your money", link: "/app" };
+    expect(seenOn([prices, money, market], at)).toBe(
+      `BTC on Hyperliquid and Polymarket at ${clock}`,
+    );
+  });
+
+  it("says nothing for a point about the owner's own money", () => {
+    expect(seenOn([{ app: "auni", label: "Your cash", link: "/app" }], at)).toBeNull();
   });
 });

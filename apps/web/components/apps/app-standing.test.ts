@@ -1,7 +1,15 @@
 import type { AppWire } from "@auni/shared";
 import { describe, expect, it } from "vitest";
 
-import { appStanding, keysNeeded, needOf } from "./app-standing";
+import {
+  appStanding,
+  keysFirst,
+  keysNeeded,
+  keysWord,
+  moneyInOut,
+  needOf,
+  waysToTry,
+} from "./app-standing";
 import { turningOff } from "./turning-off";
 
 const KEY = {
@@ -44,110 +52,145 @@ const account = (usd: string | null) => ({
 });
 
 describe("appStanding", () => {
-  it("says what keeps going wrong for an app that is ready otherwise, as its key running out of credits", () => {
-    const outOfCredits = {
-      short: "Out of credits",
-      says: "Venue said its account is out of credits.",
-    };
-    expect(appStanding(app({ troubles: [outOfCredits] }))).toEqual({
-      tone: "needs",
-      says: "Out of credits",
-      under: "Open it to see why",
-      setUp: false,
-    });
-    expect(needOf(app({ troubles: [outOfCredits], account: account("5") }))).toBe("Out of credits");
-  });
-
-  it("offers Set up only for what the owner has left to give, never for a trouble of the service's own", () => {
-    // A tile whose app kept failing said "Not working" with a "Set up" button beside it
-    // (2026-11-14), though there was nothing to set up.
-    const failing = { short: "Not working", says: "Reading its statement failed at 12:55 AM." };
-    expect(appStanding(app({ troubles: [failing] })).setUp).toBe(false);
-    expect(appStanding(app({ troubles: [failing], account: account("5") })).setUp).toBe(false);
-    expect(appStanding(app({ needs: ["Needs an API key"], settings: [KEY] })).setUp).toBe(true);
-    expect(appStanding(app({ needs: ["Not paired yet"], pairing: "ready" })).setUp).toBe(true);
-    // Something to give and a trouble too: there is still something to set up.
-    expect(
-      appStanding(app({ needs: ["Needs an API key"], settings: [KEY], troubles: [failing] })),
-    ).toMatchObject({ says: "Needs a key", setUp: true });
-    // Money there, and a key still missing.
-    expect(
-      appStanding(app({ account: account("5"), needs: ["Needs an API key"], settings: [KEY] }))
-        .setUp,
-    ).toBe(true);
-    expect(appStanding(app()).setUp).toBe(false);
-    expect(
-      appStanding(app({ on: false, needs: ["Needs an API key"], settings: [KEY] })).setUp,
-    ).toBe(false);
-  });
-
-  it("says the money there before anything else, with what it still needs under it", () => {
+  it("says the money there, with nothing beside it when nothing's in the way", () => {
     expect(appStanding(app({ account: account("412.18") }))).toEqual({
-      tone: "money",
-      says: "$412.18",
-      under: "there now",
-      setUp: false,
+      money: "$412.18",
+      badge: null,
     });
+    // Nothing there, or less than a cent, is no figure at all.
+    expect(appStanding(app({ account: account("0.004") }))).toEqual({ money: null, badge: null });
+    expect(appStanding(app())).toEqual({ money: null, badge: null });
+  });
+
+  it("says what the owner still has to give in amber, with the money there beside it", () => {
     expect(
       appStanding(
         app({ account: account("408.58"), needs: ["Needs an API key"], settings: [KEY] }),
       ),
-    ).toEqual({ tone: "money", says: "$408.58", under: "Needs a key", setUp: true });
-  });
-
-  it("says the one thing it needs when nothing is there", () => {
-    expect(appStanding(app({ needs: ["Needs an API key"], settings: [KEY] }))).toMatchObject({
-      tone: "needs",
-      says: "Needs a key",
-    });
+    ).toEqual({ money: "$408.58", badge: { tone: "waiting", says: "Needs a key" } });
     expect(
-      needOf(
+      appStanding(
         app({
           needs: ["Needs an API key", "Needs a secret"],
           settings: [KEY, { ...KEY, key: "secret" }],
         }),
-      ),
-    ).toBe("Needs 2 keys");
+      ).badge,
+    ).toEqual({ tone: "waiting", says: "Needs 2 keys" });
     // What isn't a key is said as core said it.
-    expect(needOf(app({ needs: ["Not paired yet"], pairing: "ready" }))).toBe("Not paired yet");
-    // A wallet app that isn't the one in use lists settings and needs none of them.
+    expect(appStanding(app({ needs: ["Not paired yet"], pairing: "ready" })).badge).toEqual({
+      tone: "waiting",
+      says: "Not paired yet",
+    });
+  });
+
+  it("says the service's own trouble as a failure, never as something for the owner to set up", () => {
+    // A tile whose app kept failing said "Not working" with a "Set up" button beside it
+    // (2026-11-14), though there was nothing to set up.
+    const failing = { short: "Not working", says: "Reading its statement failed at 12:55 AM." };
+    expect(appStanding(app({ troubles: [failing], account: account("5") }))).toEqual({
+      money: "$5",
+      badge: { tone: "loss", says: "Not working" },
+    });
+    // Something to give and a trouble too: what's the owner's to give comes first.
+    expect(
+      appStanding(app({ needs: ["Needs an API key"], settings: [KEY], troubles: [failing] })).badge,
+    ).toEqual({ tone: "waiting", says: "Needs a key" });
+  });
+
+  it("says off, and keeps the money there in view", () => {
+    expect(appStanding(app({ on: false, account: account("212") }))).toEqual({
+      money: "$212",
+      badge: { tone: "neutral", says: "Off" },
+    });
+    // Off, a key it lacks is nothing to chase.
+    expect(
+      appStanding(app({ on: false, needs: ["Needs an API key"], settings: [KEY] })).badge,
+    ).toEqual({
+      tone: "neutral",
+      says: "Off",
+    });
+  });
+
+  it("never shows an account it couldn't read as empty", () => {
+    expect(appStanding(app({ account: account(null) }))).toEqual({
+      money: null,
+      badge: { tone: "neutral", says: "Couldn't read balance" },
+    });
+  });
+
+  it("needs only the keys typed into the app, and none for a wallet app not in use", () => {
     expect(needOf(app({ settings: [KEY], inUse: false }))).toBeNull();
-    // Only a secret is typed into the app: a setting the owner's file alone sets is never asked for here.
     const file = { ...KEY, key: "appId", kind: "file", field: null } as const;
     expect(
       keysNeeded(app({ needs: ["Needs an app ID", "Needs an API key"], settings: [file, KEY] })),
     ).toEqual([KEY]);
   });
+});
 
-  it("never shows nothing there as a figure, nor an account it couldn't read as empty", () => {
-    expect(appStanding(app({ account: account("0.00") }))).toEqual({
-      tone: "ready",
-      says: "Ready",
-      under: "Nothing there yet",
-      setUp: false,
-    });
-    expect(appStanding(app({ account: account(null) }))).toEqual({
-      tone: "ready",
-      says: "On",
-      under: "Couldn't read it just now",
-      setUp: false,
-    });
-    expect(appStanding(app({ standing: "Paired with your chat" }))).toMatchObject({
-      under: "Paired with your chat",
-    });
-    expect(appStanding(app())).toMatchObject({ says: "Ready", under: "Auni can use it" });
+describe("waysToTry", () => {
+  const read = { title: "What are people betting on?" };
+  const bet = { title: "Bet $20 on something I believe", moves: true } as const;
+  const titles = ({ now, waiting }: ReturnType<typeof waysToTry<{ readonly title: string }>>) => ({
+    now: now.map(({ title }) => title),
+    waiting: waiting.map(({ title }) => title),
   });
 
-  it("says off, and that the money is still there", () => {
-    expect(appStanding(app({ on: false }))).toEqual({
-      tone: "off",
-      says: "Off",
-      under: "Auni doesn't use it",
-      setUp: false,
+  it("offers every way once nothing is missing", () => {
+    expect(titles(waysToTry(app(), [read, bet]))).toEqual({
+      now: [read.title, bet.title],
+      waiting: [],
     });
-    expect(appStanding(app({ on: false, account: account("212") }))).toMatchObject({
-      under: "$212 still there",
+  });
+
+  // Polymarket with $408.58 and no keys offered "Bet $20" and "Take money out", neither of
+  // which can work until its keys are in (2026-11-25).
+  it("keeps a way that moves money waiting for the keys, even with money there", () => {
+    const needsKeys = { needs: ["Needs an API key"], settings: [KEY] };
+    expect(
+      titles(waysToTry(app({ ...needsKeys, account: account("408.58") }), [read, bet])),
+    ).toEqual({ now: [read.title], waiting: [bet.title] });
+    // With no money there, there's nothing to read yet either.
+    expect(titles(waysToTry(app(needsKeys), [read, bet]))).toEqual({
+      now: [],
+      waiting: [read.title, bet.title],
     });
+  });
+});
+
+describe("moneyInOut", () => {
+  const polymarket = (fields: Partial<AppWire> = {}) =>
+    app({
+      name: "Polymarket",
+      account: {
+        ...account("408.58"),
+        moneyIn: "A buy spends the cash already in your Polymarket wallet first.",
+      },
+      ...fields,
+    });
+
+  it("says how money moves there, and offers what Auni is asked for, once it can", () => {
+    expect(moneyInOut(polymarket())).toEqual({
+      in: { words: "A buy spends the cash already in your Polymarket wallet first." },
+      out: { waits: false },
+      blocked: null,
+    });
+    expect(moneyInOut(app())).toBeNull();
+  });
+
+  // Polymarket with money and no keys still explained how a buy spends its cash, while buying
+  // waited for those keys (2026-11-25).
+  it("says only what's in the way until money can move there", () => {
+    expect(moneyInOut(polymarket({ needs: ["Needs an API key"], settings: [KEY] }))).toEqual({
+      in: null,
+      out: { waits: true },
+      blocked: "Add your key above to move money here.",
+    });
+    expect(moneyInOut(polymarket({ on: false }))?.blocked).toBe(
+      "Turn Polymarket on to move money here.",
+    );
+    expect(moneyInOut(polymarket({ needs: ["Not paired yet"] }))?.blocked).toBe(
+      "Auni can move money here once Polymarket is set up.",
+    );
   });
 });
 
@@ -165,7 +208,7 @@ describe("turningOff", () => {
       title: "Turn Venue off?",
       says: [
         "Auni will stop acting there.",
-        "Your $212 stays yours and stays in your portfolio, and anything you already allowed still finishes.",
+        "Your $212 stays yours, and anything you already allowed still finishes.",
       ],
     });
   });
@@ -179,5 +222,29 @@ describe("turningOff", () => {
       why: stays,
       fix: "Close every position I have open on Venue.",
     });
+  });
+});
+
+describe("keysFirst", () => {
+  const waiting = { needs: ["Add your key"], settings: [KEY] };
+
+  it("shows only the key form while an app with nothing there waits for its key", () => {
+    expect(keysFirst(app(waiting))).toBe(true);
+    expect(keysFirst(app({ ...waiting, account: account("0.00") }))).toBe(true);
+  });
+
+  it("keeps the switch, and its way off, for an app holding money or one that can't be read", () => {
+    expect(keysFirst(app({ ...waiting, account: account("408.58") }))).toBe(false);
+    expect(keysFirst(app({ ...waiting, account: account(null) }))).toBe(false);
+    expect(keysFirst(app({ settings: [{ ...KEY, set: "file" }] }))).toBe(false);
+  });
+});
+
+describe("keysWord", () => {
+  it("names one field as the owner pastes it, else says keys", () => {
+    const token = { ...KEY, label: "Telegram bot token" };
+    expect(keysWord({ name: "Telegram" }, [token])).toBe("bot token");
+    expect(keysWord({ name: "Elfa" }, [{ ...KEY, label: "Elfa API key" }])).toBe("key");
+    expect(keysWord({ name: "Polymarket" }, [KEY, token])).toBe("keys");
   });
 });

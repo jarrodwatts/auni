@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { RETRACTED } from "@auni/shared";
-import { and, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { mainChat } from "../conversation/places.ts";
@@ -14,7 +14,6 @@ import {
   channelDeliveries,
   channelLinks,
   messages,
-  threads,
   type ChannelDeliveryRow,
   type ChannelLinkRow,
 } from "../db/schema.ts";
@@ -34,10 +33,9 @@ import {
 import { proposalFunding } from "../money/funding.ts";
 import { needsStepUp } from "../money/step-up.ts";
 import { dollars } from "../money/summaries.ts";
-import { centsToUsd, parseUnits, signedUsdToCents, usdToCents } from "../money/usd.ts";
-import { allFills, holdersOf, threadBooks } from "../money/books.ts";
-import { fillIdentity, QUANTITY_DECIMALS } from "../money/fill-key.ts";
+import { centsToUsd, signedUsdToCents, sumUsd } from "../money/usd.ts";
 import { portfolioNow } from "../money/portfolio.ts";
+import { readTakes } from "../money/takes.ts";
 import { valueHistory } from "../money/value-history.ts";
 import {
   appDestination,
@@ -225,13 +223,14 @@ async function pending(found: Found, chat: string): Promise<void> {
     if (ready <= 4) await send();
   }
   if (ready > 4) {
-    const { link, machine } = appDestination("/app");
+    // Where everything waiting on the owner collects in the app, named as the app names it.
+    const { link, machine } = appDestination("/app/needs-you");
     const more = ready - 4;
     await found.channel.send(chat, {
       text: link
         ? `${more} more waiting in Auni`
-        : `${more} more waiting. Open Auni on ${literal(machine)} to see them.`,
-      ...(link && { buttons: [[{ label: "Open Money", url: link }]] }),
+        : `${more} more waiting. Open Needs you in Auni on ${literal(machine)} to see them.`,
+      ...(link && { buttons: [[{ label: "Needs you", url: link }]] }),
     });
   }
   if (ready === 0)
@@ -261,67 +260,31 @@ function moneyChange(points: Awaited<ReturnType<typeof valueHistory>>["points"])
   return ` (${sign}${amount} today)`;
 }
 
+/**
+ * /money: the total, then the takes, Cash and what no take holds, as Money shows them (see
+ * readTakes), so a savings take is a take here too and Cash is the same figure.
+ */
 async function readMoney(): Promise<string> {
-  const [portfolio, fills] = await Promise.all([portfolioNow(), allFills(db)]);
-  const books = threadBooks(fills);
-  const ids = [...books.keys()];
-  const [takes, history] = await Promise.all([
-    ids.length
-      ? db
-          .select({ id: threads.id, title: threads.title })
-          .from(threads)
-          .where(inArray(threads.id, ids))
-          .orderBy(threads.title, threads.id)
-      : [],
+  const portfolio = portfolioNow();
+  const [read, money, history] = await Promise.all([
+    portfolio,
+    readTakes(portfolio),
     valueHistory("Today").catch(() => null),
   ]);
-  const values = new Map<string, { cents: bigint; priced: boolean }>();
-  let looseHoldings = false;
-  let loosePriced = false;
-  // Allocate each holding once, even if several takes bought more than the wallet now holds.
-  for (const holding of portfolio.assets.holdings) {
-    const units = parseUnits(holding.quantity, QUANTITY_DECIMALS);
-    if (units === 0n) continue;
-    const { threads: owners, other: loose } = holdersOf(
-      holding.short ? -units : units,
-      books,
-      fillIdentity(holding),
-    );
-    if (loose > 0n) {
-      looseHoldings = true;
-      if (holding.usdValue !== null) loosePriced = true;
-    }
-    for (const [id, share] of owners) {
-      const value = values.get(id) ?? { cents: 0n, priced: false };
-      if (holding.usdValue !== null) {
-        value.cents += (usdToCents(holding.usdValue) * share) / units;
-        value.priced = true;
-      }
-      values.set(id, value);
-    }
-  }
-  // Unassigned holdings and cents left from splitting a holding belong on their own line.
-  let other = usdToCents(portfolio.assets.usdValue);
-  const lines = takes.flatMap(({ id, title }) => {
-    const value = values.get(id);
-    if (!value) return [];
-    other -= value.cents;
-    const amount = value.priced ? dollars(centsToUsd(value.cents)) : "Value unavailable";
-    return [`> ${literal(title || "Untitled take")}: ${amount}`];
-  });
-  const missing = [...new Set([...portfolio.unavailable, ...portfolio.looking])];
+  const sum = (values: readonly { usdValue: string }[]) =>
+    sumUsd(values.map(({ usdValue }) => usdValue));
+  // A group none of whose holdings has a price now is worth what can't be told, not $0.
+  const worth = (holdings: readonly { priced: boolean }[], usd: string) =>
+    holdings.some(({ priced }) => priced) ? dollars(usd) : "Value unavailable";
+  const missing = [...new Set([...read.unavailable, ...read.looking])];
   return [
-    `> Total: ${dollars(portfolio.totalUsd)}${moneyChange(history?.points ?? [])}`,
-    `> Cash: ${dollars(portfolio.cash.usdValue)}`,
-    ...lines,
-    ...(other || looseHoldings
-      ? [
-          `> Other holdings: ${other || loosePriced ? dollars(centsToUsd(other)) : "Value unavailable"}`,
-        ]
-      : []),
-    ...(portfolio.onTheWay.moves.length
-      ? [`> On the way: ${dollars(portfolio.onTheWay.usdValue)}`]
-      : []),
+    `> Total: ${dollars(read.totalUsd)}${moneyChange(history?.points ?? [])}`,
+    `> Cash: ${dollars(sum(money.cash))}`,
+    ...money.takes.map(
+      (take) => `> ${literal(take.title)}: ${worth(take.holdings, take.valueUsd)}`,
+    ),
+    ...(money.loose.length ? [`> Other holdings: ${worth(money.loose, sum(money.loose))}`] : []),
+    ...(read.onTheWay.moves.length ? [`> On the way: ${dollars(read.onTheWay.usdValue)}`] : []),
     ...(missing.length ? [`\nStill missing balances from ${literal(missing.join(", "))}.`] : []),
   ].join("\n");
 }

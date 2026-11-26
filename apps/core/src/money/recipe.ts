@@ -308,6 +308,12 @@ export function subjectOf(
 export interface Money {
   readonly flow: MoneyFlow;
   readonly usd: string;
+  /**
+   * What comes back is at least this, as its card promises, rather than a quote, on the
+   * condition its card says: "if all 310 sell" for a sale that may fill in part, or "" for a
+   * floor that holds as it is.
+   */
+  readonly least?: string;
 }
 
 /**

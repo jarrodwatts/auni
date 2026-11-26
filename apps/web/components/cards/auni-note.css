@@ -1,0 +1,19 @@
+/* Auni's note: the mascot lands on its corner with a little bounce, then settles at a tilt. */
+.auni-note-mascot {
+  rotate: 10deg;
+  animation: auni-note-perch 640ms cubic-bezier(0.34, 1.56, 0.64, 1) 260ms both;
+}
+
+@keyframes auni-note-perch {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+    scale: 0.5;
+    rotate: -12deg;
+  }
+}
+
+.auni-note {
+  transform-origin: 0 0;
+  animation: auni-note 420ms var(--motion-settle) 180ms both;
+}

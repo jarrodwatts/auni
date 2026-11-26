@@ -136,11 +136,9 @@ describe("Auni naming a chat", () => {
     (await db.select().from(threads).where(eq(threads.id, threadId)))[0]?.title;
 
   it("names it once, while it still goes by its first message, and never over the owner's name", async () => {
-    const started = await startChat("hey");
-    await db.insert(messages).values({
-      threadId: started.id,
-      role: "user",
-      parts: [{ type: "text", text: "hey" }],
+    const { thread: started } = await startChat({
+      id: randomUUID(),
+      firstMessage: { id: randomUUID(), text: "hey" },
     });
     expect((await nameChat(started.id, "Nvidia buy")).isError).toBeFalsy();
     expect(await titleOf(started.id)).toBe("Nvidia buy");

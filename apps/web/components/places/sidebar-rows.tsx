@@ -19,10 +19,17 @@ export const RAIL_FADE =
   "opacity-0 transition-opacity duration-100 ease-settle group-data-folded/sidebar:opacity-100 group-data-folded/sidebar:delay-100 group-data-folded/sidebar:duration-200 motion-reduce:transition-none";
 
 export const ROW_CLASS_NAME =
-  "group/row relative isolate flex items-center rounded-control outline-none before:absolute before:inset-y-0 before:right-0 before:left-0 before:-z-10 before:rounded-control before:[transition:right_340ms_var(--motion-settle),background-color_150ms] hover:before:bg-foreground/[0.04] focus-visible:before:ring-2 focus-visible:before:ring-ring/50 group-data-folded/sidebar:before:right-[calc(100%-44px)] motion-reduce:before:transition-none";
+  "group/row relative isolate flex items-center rounded-control outline-none before:absolute before:inset-y-0 before:right-0 before:left-0 before:-z-10 before:rounded-control before:[transition:right_340ms_var(--motion-settle),background-color_150ms] hover:before:bg-foreground/[0.04] focus-visible:before:ring-2 focus-visible:before:ring-ring focus-visible:before:ring-inset group-data-folded/sidebar:before:right-[calc(100%-44px)] motion-reduce:before:transition-none";
 
 export const ROW_LINE_CLASS_NAME =
-  "h-9 gap-2.5 px-3 text-[14px] group-data-mobile/sidebar:h-11 group-data-mobile/sidebar:text-[16px]";
+  "h-9 gap-2.5 px-3 text-ui group-data-mobile/sidebar:h-11 group-data-mobile/sidebar:text-reading";
+
+/** A row with a second line under its title. */
+export const ROW_DETAIL_CLASS_NAME = "h-12 group-data-mobile/sidebar:h-14";
+
+/** A row whose second line may wrap: as tall as it needs, never shorter than one line's row. */
+export const ROW_WRAP_CLASS_NAME =
+  "h-auto min-h-12 py-1.5 group-data-mobile/sidebar:h-auto group-data-mobile/sidebar:min-h-14";
 
 export const ROW_ACTIVE_CLASS_NAME =
   "before:bg-foreground/[0.06] hover:before:bg-foreground/[0.06]";
@@ -41,7 +48,7 @@ function RowKeys({ keys }: { readonly keys: string }) {
   return (
     <kbd
       className={cn(
-        "flex-none font-sans text-[12px] text-faint opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-data-mobile/sidebar:hidden",
+        "flex-none font-sans text-caption text-faint opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-within/row:opacity-100 group-data-mobile/sidebar:hidden",
         FOLD_FADE,
       )}
     >
@@ -58,6 +65,7 @@ export function PlaceRow({
   onClick,
   mark,
   title,
+  titleClassName,
   detail,
   keys,
   status,
@@ -72,6 +80,7 @@ export function PlaceRow({
   readonly onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   readonly mark: ReactNode;
   readonly title: string;
+  readonly titleClassName?: string;
   readonly detail?: ReactNode;
   readonly keys?: readonly [shown: string, aria: string];
   readonly status?: string;
@@ -90,7 +99,7 @@ export function PlaceRow({
       className={cn(
         ROW_CLASS_NAME,
         ROW_LINE_CLASS_NAME,
-        detail !== undefined && "h-12 group-data-mobile/sidebar:h-14",
+        detail !== undefined && ROW_DETAIL_CLASS_NAME,
         active && ROW_ACTIVE_CLASS_NAME,
         className,
       )}
@@ -102,11 +111,13 @@ export function PlaceRow({
       ) : null}
       <MarkBox>{mark}</MarkBox>
       {detail === undefined ? (
-        <span className={cn("min-w-0 flex-1 truncate text-ink", FOLD_FADE)}>{title}</span>
+        <span className={cn("min-w-0 flex-1 truncate text-ink", titleClassName, FOLD_FADE)}>
+          {title}
+        </span>
       ) : (
         <span className={cn("flex min-w-0 flex-1 flex-col", FOLD_FADE)}>
           <span className="truncate leading-5 font-medium text-ink">{title}</span>
-          <span className="truncate text-[12.5px] leading-[18px] text-muted-foreground group-data-mobile/sidebar:text-[14px]">
+          <span className="truncate text-meta leading-[18px] text-muted-foreground group-data-mobile/sidebar:text-ui">
             {detail}
           </span>
         </span>
@@ -163,7 +174,7 @@ export function RailSearchRow({
 export function SectionLabel({ children }: { readonly children: string }) {
   return (
     <div className="relative mt-5 mb-1 flex h-5 items-center px-3">
-      <p className={cn("text-[12px] font-medium text-faint", FOLD_FADE)}>{children}</p>
+      <p className={cn("text-caption font-medium text-faint", FOLD_FADE)}>{children}</p>
       <span aria-hidden className={cn("absolute left-3 h-px w-5 bg-foreground/[0.1]", RAIL_FADE)} />
     </div>
   );
@@ -205,7 +216,7 @@ function Hint({
 }
 
 const HEADER_BUTTON_CLASS_NAME =
-  "group/row auni-touch-target flex size-8 flex-none items-center justify-center rounded-control outline-none transition-[background-color,transform] duration-200 ease-settle hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95";
+  "group/row auni-touch-target flex size-8 flex-none items-center justify-center rounded-control transition-[background-color,transform] duration-200 ease-settle hover:bg-foreground/[0.04] focus-ring active:scale-95";
 
 export function SearchButton({ onClick }: { readonly onClick: () => void }) {
   return (

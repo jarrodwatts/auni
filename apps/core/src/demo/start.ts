@@ -27,6 +27,8 @@ export async function startDemo({
   open,
   at,
   firstRun = false,
+  signedOut = false,
+  noWallet = false,
 }: {
   readonly port: number;
   readonly web: boolean;
@@ -35,6 +37,10 @@ export async function startDemo({
   readonly at?: number | undefined;
   /** A new owner's first run: no past, no money, their first take ahead (first-run.ts). */
   readonly firstRun?: boolean;
+  /** Its AI waits to be signed in, so first run asks for one (brain.ts). */
+  readonly signedOut?: boolean;
+  /** First run starts with no wallet, made with the first take's chat (wallet.ts). */
+  readonly noWallet?: boolean;
 }): Promise<void> {
   console.log(
     "Demo mode. Fake money only; your real data is untouched.\n" +
@@ -85,6 +91,8 @@ export async function startDemo({
     const { standIn } = await import("../apps/registry.ts");
     const { demoApps } = await import("./app.ts");
     standIn(demoApps);
+    if (signedOut) (await import("./brain.ts")).startSignedOut();
+    if (firstRun && noWallet) (await import("./wallet.ts")).startWithoutWallet();
 
     const { start } = await import("../start.ts");
     const { takeOutput } = await import("../hello/telling.ts");

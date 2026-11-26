@@ -1,5 +1,5 @@
-import { type DepositWire, type NetworkKey } from "@auni/shared";
-import { and, asc, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { type CashKey, type DepositWire, type NetworkKey } from "@auni/shared";
+import { and, asc, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 
 import { lockOwner } from "../auth/owner.ts";
 import { db } from "../db/client.ts";
@@ -391,27 +391,46 @@ function valueOf(
   return unitsUsd(transfer.pricedUnits ?? transfer.baseUnits, transfer.decimals, price);
 }
 
-/** Long enough that a deposit recorded while a screen waits on one is still there to see. */
+/** How far back the portfolio lists deposits. */
 const RECENT_MS = 60 * 60_000;
 
-/**
- * The latest few deposits told (see toldDeposit), recorded in the last hour,
- * newest first: what a screen waiting on a deposit sees land. Recorded, not
- * made, as a first sweep may find money sent in days ago, which is news all the same.
- */
-export async function recentDeposits(): Promise<ArrivalRow[]> {
+/** Deposits told (see toldDeposit) recorded as `when` says, newest first. */
+function toldDeposits(when: SQL): Promise<ArrivalRow[]> {
   return db
     .select()
     .from(arrivals)
-    .where(
-      and(
-        eq(arrivals.kind, "deposit"),
-        gte(arrivals.createdAt, new Date(Date.now() - RECENT_MS)),
-        TOLD_SQL,
-      ),
-    )
-    .orderBy(desc(arrivals.createdAt), asc(arrivals.position))
-    .limit(5);
+    .where(and(eq(arrivals.kind, "deposit"), when, TOLD_SQL))
+    .orderBy(desc(arrivals.createdAt), asc(arrivals.position));
+}
+
+/**
+ * This instant on the database's own clock, the one each deposit is recorded by, rounded to the
+ * millisecond as each one's record is: where a screen about to wait for a deposit marks its start
+ * (see depositsAfter). Rounding never reorders, so one recorded before it is never after it.
+ */
+export async function depositMark(): Promise<string> {
+  const [row] = await db.execute<{ now: string }>(
+    sql`select to_json(now()::timestamptz(3)) #>> '{}' as now`,
+  );
+  return row!.now;
+}
+
+/**
+ * Every deposit told recorded after `mark` (see depositMark), newest first: what a screen
+ * waiting on one sees land, however many landed between two of its reads, and never one recorded
+ * before it began. Recorded, not made, as a first sweep may find money sent in days ago, which is
+ * news all the same.
+ */
+export function depositsAfter(mark: string): Promise<ArrivalRow[]> {
+  return toldDeposits(sql`${arrivals.createdAt} > ${mark}::timestamptz`);
+}
+
+/** The latest few deposits recorded in the last hour, as the portfolio lists them. */
+export async function recentDeposits(): Promise<ArrivalRow[]> {
+  return (await toldDeposits(gte(arrivals.createdAt, new Date(Date.now() - RECENT_MS)))).slice(
+    0,
+    5,
+  );
 }
 
 /** A deposit as a person reads it: "0.081 ETH on Base", its token named as news names it (see nameOf). */
@@ -422,5 +441,6 @@ export function depositWire(row: ArrivalRow): DepositWire {
     amount: formatUnits(BigInt(row.baseUnits), row.decimals),
     network: chainName(row.chain as NetworkKey),
     usdValue: row.usdValue ?? "0.00",
+    cash: isPlainCash(row.chain, row.instrument) ? (row.chain as CashKey) : null,
   };
 }

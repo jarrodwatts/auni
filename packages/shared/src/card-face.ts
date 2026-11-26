@@ -40,6 +40,14 @@ export const cardFaceSchema = z.object({
       value: z.string().max(500),
       /** What the value is worth, said small beside it: "$26.04". */
       note: z.string().max(40).nullable().optional(),
+      /**
+       * The two sides of the exchange, when the move is one: what the owner gives ("You pay
+       * $250") and what they get for it ("You get, about 1.43 shares"). A card that has both
+       * draws them as the move's story, one leading to the other, with the rest as its facts.
+       */
+      role: z.enum(["pays", "gets"]).optional(),
+      /** A gain or a loss, drawn in its colour: "+$73.47" made so far on what a close sells. */
+      tone: z.enum(["gain", "loss"]).optional(),
     }),
   ),
   /** A small picture of the move. One today: cash leaving one chain and landing on another. */
@@ -74,8 +82,17 @@ export const cardFaceSchema = z.object({
    * money/fee-coin-said.ts), so no drawing of a card leaves out a send its Allow signs.
    */
   buysFirst: z.string().max(300).optional(),
-  /** A permission the move leaves behind, said on its own line in red. */
+  /** Money the move would lose for good, said on its own line in red (core's withLoss). */
   warning: z.string().max(500).nullable().optional(),
+  /**
+   * What the move leaves behind once allowed, one entry each, in core's words whoever wrote the
+   * face (core's withLeaves): each lasting permission over the owner's money, and each order it
+   * leaves resting on a venue, which the venue fills later on its own (`order`: a stop-loss, a
+   * limit). Never cut: core bounds what goes in one (a token's name), so no card drops one.
+   */
+  leaves: z
+    .array(z.object({ says: z.string().max(500), order: z.literal(true).optional() }))
+    .optional(),
   /**
    * Set on the card of a transaction the agent built for a service no app covers, which nothing
    * vouches for but its simulation. The card then says apart what Auni checked by running the

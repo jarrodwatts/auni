@@ -25,7 +25,7 @@ import { requestCore } from "@/lib/core";
 
 const REMOTE_KEY = ["system", "remote"] as const;
 export const RPCS_KEY = ["system", "rpcs"] as const;
-const DIAGNOSTICS_KEY = ["system", "diagnostics"] as const;
+export const DIAGNOSTICS_KEY = ["system", "diagnostics"] as const;
 const LOGS_KEY = ["system", "logs"] as const;
 const ABOUT_KEY = ["system", "about"] as const;
 

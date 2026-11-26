@@ -30,8 +30,8 @@ short, complete one. The parts that matter:
 - `tool`, `description`, `input`: the tool the agent sees. Its `venue` is the app's id.
 - `describe(input)`: what the card shows, before anything runs. `effect` lists what the move gives,
   gets and grants (`../money/effect.ts`); `amountUsd` is the dollars it spends. Core says every
-  grant in the card's warning, except one marked `order: true` (a resting limit, a stop-loss),
-  which your own card must then show among its figures.
+  grant on the card, each its own entry (`leaves`); a lone card leaves one marked `order: true`
+  (a resting limit, a stop-loss) to your own card, which must show it among its figures.
 - `card`, in what `describe` returns: how the move's own card reads, as a `CardFace`
   (`packages/shared/src/card-face.ts`): its title, button, figures and receipt, as plain data the
   web app and every channel draw alike. Write `AMOUNT` wherever the card's dollars go, never a

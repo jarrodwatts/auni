@@ -2,6 +2,7 @@ import { NETWORKS, EVM_CHAIN_KEYS, type EvmChainKey } from "@auni/shared";
 import {
   decodeFunctionData,
   encodeAbiParameters,
+  encodeErrorResult,
   encodeFunctionResult,
   erc20Abi,
   getAddress,
@@ -51,6 +52,14 @@ export type Contract = (call: Call, chain: Chain) => Ran;
 
 /** A call the chain refused, with the reason a node would give. */
 export class Reverted extends Error {}
+
+/** A revert's reason as a node returns it: Solidity's `Error(string)`. */
+const revertData = (reason: string): Hex =>
+  encodeErrorResult({
+    abi: [{ type: "error", name: "Error", inputs: [{ name: "reason", type: "string" }] }],
+    errorName: "Error",
+    args: [reason],
+  });
 
 const TRANSFER = toEventSelector("Transfer(address,address,uint256)");
 const APPROVAL = toEventSelector("Approval(address,address,uint256)");
@@ -329,7 +338,8 @@ export class Chain {
               ran instanceof Reverted
                 ? {
                     status: "0x0",
-                    returnData: "0x",
+                    // As a node says it: the reason, encoded as Solidity's Error(string).
+                    returnData: revertData(ran.message),
                     gasUsed: "0x0",
                     logs: [],
                     error: { code: 3, message: `execution reverted: ${ran.message}` },

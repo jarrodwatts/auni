@@ -8,7 +8,7 @@ description: Load when someone asks how Auni itself works, how to configure or r
 Answer product and setup questions as someone who built it: plainly, confidently, in everyday words.
 Always call `inspect_auni` first when answering about THIS Auni's live status (active brain, Tailscale,
 background service, channels, apps, RPCs, or health via `include_health: true`) rather than guessing.
-Give clickable in-app Settings links like `[Remote access](/app?settings=remote)` whenever directing the owner to a Settings pane.
+Give clickable in-app Settings links like `[Your devices](/app?settings=devices)` whenever directing the owner to a Settings pane.
 
 ## Running locally, open-source & Settings
 
@@ -16,23 +16,19 @@ Auni is a single-owner, open-source program that runs locally on the owner's own
 embedded Postgres unless `DATABASE_URL` is set) and thinks with the owner's own AI CLI login (Claude
 Code or Codex). No hosted account, no cloud relay, no fees.
 
-Every local configuration area lives in **Settings** (press `/` or `Cmd+F` inside Settings to search any option):
+Every local configuration area lives in **Settings**, five panes (search any option with `/` or `Cmd+F` inside it):
 
-- **General** (`/app?settings=general`): display name, time zone, daily brief schedule, show-thinking toggle, and re-running the setup wizard.
-- **Appearance** (`/app?settings=appearance`): Light, Dark, or app-provided themes (synced across devices; Auni can switch this directly with `update_auni_preferences`).
-- **Personalization** (`/app?settings=personalization`): inspectable, editable "What Auni knows about you" summary, public X/Twitter handle (`@handle`), watch-only external wallets (public EVM, ENS, or Solana addresses — zero keys needed), and refreshing tailored starting prompts.
-- **AI Brains** (`/app?settings=brains`): live status of Claude Code and Codex, one-click CLI install or inline sign-in from any device, and picking a preferred brain (takes effect immediately; if one hits a usage limit, Auni automatically falls back to another ready brain).
-- **Wallet & Keys** (`/app?settings=wallet`): local EVM and Solana addresses, Withdraw, adding a missing chain key, importing an existing key, and revealing keys (gated by owner step-up proof). Keys live on this machine in the OS keychain or a `0600` file.
-- **Channels** (`/app?settings=channels`): Telegram setup (bot token via private field + 15-minute one-time pairing code) and choosing where unasked notices/briefs go.
-- **Remote access** (`/app?settings=remote`):
-  - **Tailscale HTTPS**: detect Tailscale on this machine, pick an HTTPS port (443 or 8443+), enable Tailscale Serve to Auni's private `0700` unix door socket, and get a MagicDNS HTTPS URL + scannable QR code to open Auni on your phone. If root is needed once for `tailscale serve`, Settings shows the exact `sudo` command to run and verifies live.
-  - **Background service (Always on)**: install or uninstall the machine's user service (`systemd` on Linux, `launchd` on macOS) and enable Linux `loginctl enable-linger` so Auni keeps running after logout.
-  - **Paired devices & browsers** (in local mode): mint a one-time 15-minute pairing link + QR code, view connected browser sessions, and revoke individual or other sessions.
-  - **Move to another machine (Handover)**: hand everything (wallet keys, database, settings) once over Tailscale to an always-on Linux/Mac machine.
-- **Network & RPCs** (`/app?settings=network`): set an Alchemy API key or per-chain custom RPC URLs (`Monad`, `Base`, `Arbitrum`, `Polygon`, `Ethereum`, `Solana`). Takes effect immediately; gated by owner step-up proof.
-- **Diagnostics** (`/app?settings=diagnostics`): live `auni doctor` checks (version, database, runner, service, RPCs, brain, wallet, apps, web, Tailscale) with one-click safe repairs, live log viewer (`~/.auni/auni.log`), `auni export`/`import` commands, `auni triage`, and GitHub issue reporting.
-- **About** (`/app?settings=about`): running version, check for updates (`auni update`), data folder and `~/.auni/.env` paths, and open-source links.
-- **Apps** (`/app/apps`): financial venues and data apps (enabled trading venues, yield protocols, prediction markets, and research feeds) — balances, enable/disable switches, and API keys.
+- **You** (`/app?settings=you`): their name and time zone; the daily brief's schedule and where Auni messages them unasked (home channel); what Auni knows about them (an editable summary, their public X handle, and watch-only wallets elsewhere: public EVM, ENS or Solana addresses, no keys); light or dark (synced across devices; you can switch it with `update_auni_preferences`); and whether Auni's thinking shows.
+- **Your AI** (`/app?settings=ai`): Claude Code and Codex, each installed or signed in from any device, and which goes first (if one reaches its usage limit, Auni carries on with the other).
+- **Your wallet** (`/app?settings=wallet`): their addresses (one for every EVM network, one for Solana), Add money, Withdraw, adding an address for a missing network, bringing in a Solana key they hold, and showing their keys (after they confirm it's them). Keys stay with the wallet app: by default on this machine, in the OS keychain or a file only they can read.
+- **Your devices** (`/app?settings=devices`):
+  - **Use Auni on your phone**: Tailscale on this machine, one step at a time, then a MagicDNS HTTPS URL and a QR code. If `tailscale serve` needs root once, it shows the exact command to run.
+  - **Telegram**: its bot token (typed into a private field), pairing their own chat with a one-time code, and its switch.
+  - **Keep Auni running**: install or remove the service that restarts Auni (`systemd` on Linux, `launchd` on macOS), and the `loginctl enable-linger` command where it's needed.
+  - **Signed-in browsers** (on this computer only): a one-time 15-minute sign-in link and QR code, and signing other browsers out.
+  - **Move Auni to another computer**: hand everything (wallet keys, database, settings) once over Tailscale to one that stays on.
+- **Health** (`/app?settings=health`): whether everything's working, only what needs them with a safe fix where there is one, every `auni doctor` check behind "Show every check", the version and `auni update`, and help links. Under **For developers**: networks (an Alchemy key or a URL of their own for any network, typed into a private field), `auni triage`, `auni export`/`import`, the log, and where Auni keeps its data.
+- **Apps** (`/app/apps`): where Auni trades and what it reads (venues, yield, prediction markets, research), each with what they hold there, the keys it needs, and its switch; and the services Auni uses on its own behind the scenes.
 
 What Auni can update directly from chat (`update_auni_preferences`): display name, theme/look, preferred brain, daily brief schedule, home channel, public X handle, watch-only wallets, and profile notes. Security-sensitive changes (wallet keys, Tailscale, RPCs, pairing/revoking sessions, moving machines) are always done by the owner directly in Settings with step-up proof.
 
@@ -62,7 +58,7 @@ or they added it. Recognised: the network's own coin, USDC, Tether's own USDT, o
 a waiting card with it, and knows about it in every conversation; the same goes for money
 leaving without Auni. Anything else is an
 other token: anyone can send one, priced from a pool its sender seeded, so it isn't
-counted, named or announced, and costs nothing. Portfolio lists them under Other tokens by
+counted, named or announced, and costs nothing. Money lists them under Other tokens by
 address, with what they hold, and Add makes one theirs; list_other_tokens and add_token do
 the same in chat. When Auni comes to recognise one they held, you're woken in their latest
 chat with what it is and how it came and went, to tell them where it came from and offer to
@@ -132,8 +128,8 @@ Every view, task, or ongoing job lives in a thread, with its own working notes, 
 inspector panel beside the chat showing positions opened in that thread, its budget headroom,
 its watches, and its record. By default every thread asks before every move.
 
-Only the owner can set a thread to act on its own (from the composer control or by tapping an
-ask card), with a dollar budget it can never spend past. Even then it acts unasked only in that
+Only the owner can set a thread to act on its own (Auto, under Spending in the take's details,
+or by tapping an ask card), with a dollar budget it can never spend past. Even then it acts unasked only in that
 thread, for buys and sells inside its budget that it can price: stocks, tokens for cash,
 savings, and prediction-market orders at the market price. Perps, limit orders, moving cash
 between networks and anything leaving the account still ask. It spends only its budget's free

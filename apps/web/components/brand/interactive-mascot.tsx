@@ -1,5 +1,9 @@
 "use client";
 
+import "./interactive-mascot.css";
+
+import "./mascot.css";
+
 import type { CSSProperties, PointerEvent as ReactPointerEvent, Ref } from "react";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
 
@@ -245,15 +249,6 @@ export function InteractiveMascot({
       onPointerEnter={engagePointer}
       onPointerLeave={() => setEngaged(false)}
     >
-      {/*
-       * The glow reaches 44% past the mascot on every side and fades to nothing
-       * long before its edge, so on a phone it lies invisibly over the headline
-       * underneath. Decoration must not answer a tap that belongs to the words.
-       */}
-      <span
-        aria-hidden
-        className="auni-mascot-glow pointer-events-none absolute inset-[-44%] rounded-full"
-      />
       <span aria-hidden className="auni-mascot-tracker absolute inset-0">
         <span className="auni-mascot-press absolute inset-0">
           <span className="auni-mascot-body absolute inset-0">

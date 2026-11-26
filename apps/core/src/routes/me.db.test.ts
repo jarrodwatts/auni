@@ -10,12 +10,17 @@ import { meRouter } from "./me.ts";
 
 const WALLETS = { evm: "0x00000000000000000000000000000000000000e1", solana: "So1ana" };
 // A wallet brought with its EVM key alone lacks a Solana key until Settings makes one.
-const brought = vi.hoisted(() => ({ lacks: null as "solana" | null }));
+const brought = vi.hoisted(() => ({ lacks: null as "solana" | null, none: false }));
+const made = vi.hoisted(() => ({ count: 0 }));
 vi.mock("../money/wallets.ts", async (importOriginal) => {
   const { WalletExists } = await import("../apps/contract.ts");
   return {
     ...(await importOriginal<object>()),
-    walletAddresses: async () => WALLETS,
+    walletAddresses: async () => (brought.none ? { evm: null, solana: null } : WALLETS),
+    makeWalletIfNone: async () => {
+      made.count += 1;
+      brought.none = false;
+    },
     revealWalletKeys: async () => ({ evm: "0xkey", solana: "base58key" }),
     missingAddress: async () => brought.lacks,
     addMissingKey: async () => {
@@ -76,6 +81,21 @@ describe("GET /me", () => {
     expect(me).toMatchObject({ name: null, timeZone: "UTC", wallets: WALLETS });
     // One owner: nothing in it names them.
     expect(me).not.toHaveProperty("id");
+  });
+});
+
+describe("POST /me/wallet", () => {
+  // A first take whose wallet couldn't be made left none, so Add money had no address to show.
+  it("makes the wallet there's none of, and answers the owner with its addresses", async () => {
+    brought.none = true;
+    made.count = 0;
+    expect(await (await fetch(url("/me"))).json()).toMatchObject({
+      wallets: { evm: null, solana: null },
+    });
+    const response = await fetch(url("/me/wallet"), { method: "POST" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ wallets: WALLETS });
+    expect(made.count).toBe(1);
   });
 });
 

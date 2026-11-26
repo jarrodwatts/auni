@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
-import { AutonomyPicker } from "@/components/app/autonomy-picker";
 import { Composer, requestComposerFocus } from "@/components/app/composer";
 import { COMPOSER_DOCK_CLASS_NAME } from "@/components/app/composer-shell";
 import { useConversationLaunch } from "@/components/app/conversation-launch-context";
@@ -14,12 +13,10 @@ import { TRANSCRIPT_COLUMN_CLASS_NAME } from "@/components/app/conversation-hist
 import { ConversationMessage } from "@/components/app/conversation-message";
 import { DayRule, dayLabel } from "@/components/app/day-rule";
 import { EmptyThread } from "@/components/app/empty-thread";
-import { EnvironmentPicker } from "@/components/app/environment-picker";
 import { ModelPicker } from "@/components/app/model-picker";
 import { useChangeThread, useThreads } from "@/components/app/use-threads";
 import { ThreadFailureNotice } from "@/components/app/thread-failure-notice";
 import { useThreadTranscript } from "@/components/app/use-thread-transcript";
-import { useThreadState } from "@/components/portfolio/use-portfolio";
 import { BrainNeeded, useNoBrainYet } from "@/components/first-run/brain-needed";
 import { SpareKey } from "@/components/first-run/spare-key";
 import { ArrivedForCard } from "@/components/cards/money/arrived-line";
@@ -33,7 +30,6 @@ import { QuestionPicker } from "@/components/conversation/question-picker";
 import { useTrailingTextFlow } from "@/components/conversation/use-text-flow";
 import { moneyProgress } from "@/components/places/attention";
 import {
-  answerStartedAt,
   answeredQuestion,
   createOptimisticUserMessage,
   editableExchange,
@@ -45,7 +41,7 @@ import {
 import { useSustained } from "@/lib/use-sustained";
 import type { StickToBottomContext } from "use-stick-to-bottom";
 
-import { arrivalsForCards } from "@/lib/arrivals-for-cards";
+import { arrivalsForCards, type ArrivalsByPlan } from "@/lib/arrivals-for-cards";
 
 /**
  * A place's one conversation, split by day: the transcript and the reply
@@ -64,7 +60,6 @@ export function ThreadPane({
   const { readThread, refreshThreads, threads } = useThreads();
   const changeThread = useChangeThread();
   const thread = threads.find(({ id }) => id === threadId);
-  const threadState = useThreadState(threadId);
   const money = moneyProgress(thread?.moving ?? null);
   const {
     failure,
@@ -296,11 +291,6 @@ export function ThreadPane({
                         }
                         message={message}
                         pending={live}
-                        workStartedAt={
-                          standIn || message.id === trailingMessage?.id
-                            ? answerStartedAt(turns, index)
-                            : undefined
-                        }
                         onAskAgent={askAgent}
                         onEditMessage={
                           regenerable && !failure && message.id === regenerable.userMessageId
@@ -366,28 +356,11 @@ export function ThreadPane({
                 value={thread?.modelSelection}
                 onChange={(modelSelection) =>
                   void changeThread(threadId, { modelSelection }).catch(() =>
-                    toast.error("That model choice couldn't be saved. Try again."),
+                    toast.error("Couldn't save that model choice. Try again."),
                   )
                 }
                 disabled={!historyReady || historyFailed}
               />
-            }
-            footerStrip={
-              <>
-                <EnvironmentPicker />
-                <AutonomyPicker
-                  actMode={thread?.actMode ?? "ask_first"}
-                  budgetUsd={thread?.budgetUsd ?? "0"}
-                  freeBudgetUsd={threadState.data?.freeBudgetUsd ?? null}
-                  threadTitle={thread?.title}
-                  onChange={(next) =>
-                    void changeThread(threadId, next).catch(() =>
-                      toast.error("That permission change couldn't be saved. Try again."),
-                    )
-                  }
-                  disabled={!historyReady || historyFailed}
-                />
-              </>
             }
             onStop={() => void stop()}
             onSubmit={async (content) => {
@@ -421,4 +394,4 @@ function useReadWhileOpen(
 }
 
 /** No money came in for a card. */
-const NONE_ARRIVED = [] as const;
+const NONE_ARRIVED: ArrivalsByPlan = new Map();

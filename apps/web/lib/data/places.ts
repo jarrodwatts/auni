@@ -2,11 +2,11 @@ import {
   startedChatWireSchema,
   type ModelSelectionWire,
   type StartChatRequest,
-  type ThreadActMode,
+  type ThreadId,
 } from "@auni/shared";
 
 import { chatHref } from "@/lib/app-links";
-import { requestCore } from "@/lib/core";
+import { CoreApiError, requestCore } from "@/lib/core";
 import { toThread } from "@/lib/data/threads";
 import type { Thread } from "@/lib/data/views";
 
@@ -18,20 +18,43 @@ export function threadHref(thread: Pick<Thread, "id">): string {
 
 export interface StartChatOptions {
   readonly modelSelection?: ModelSelectionWire | null;
-  readonly actMode?: ThreadActMode;
-  readonly budgetUsd?: string;
 }
 
-/** A new thread with Auni, titled by the first message and optional starting settings. */
-export async function startChat(text: string, options?: StartChatOptions): Promise<Thread> {
+/**
+ * Neither ask to start a chat was answered with it: core may have made it all the same, and the
+ * same words sent again (the same ids, see start-ids.ts) open it, or start it now if it wasn't.
+ */
+export class StartUnconfirmed extends Error {
+  constructor(cause: unknown) {
+    super("The chat's start wasn't confirmed.", { cause });
+    this.name = "StartUnconfirmed";
+  }
+}
+
+/**
+ * A new thread with Auni, made with its first message: titled by it, with any starting settings,
+ * and that message's turn queued. A lost answer or a server fault may still have made it, so it's
+ * asked for once more, which core makes once (the same ids), and failing again it's unconfirmed;
+ * a refusal comes back at once.
+ */
+export async function startChat(
+  start: { readonly id: ThreadId; readonly messageId: string; readonly text: string },
+  options?: StartChatOptions,
+): Promise<{ readonly thread: Thread; readonly keyKeptOut: boolean }> {
   const body: StartChatRequest = {
-    text,
+    id: start.id,
+    messageId: start.messageId as StartChatRequest["messageId"],
+    text: start.text,
     ...(options?.modelSelection ? { modelSelection: options.modelSelection } : {}),
-    ...(options?.actMode ? { actMode: options.actMode } : {}),
-    ...(options?.budgetUsd !== undefined ? { budgetUsd: options.budgetUsd } : {}),
   };
-  const { thread } = startedChatWireSchema.parse(
-    await requestCore("places/chat", { method: "POST", body: JSON.stringify(body) }),
-  );
-  return toThread(thread);
+  const ask = () => requestCore("places/chat", { method: "POST", body: JSON.stringify(body) });
+  const answer = await ask().catch((error: unknown) => {
+    if (error instanceof CoreApiError && error.status < 500) throw error;
+    // The first may have gone through, so even a refusal now proves nothing.
+    return ask().catch((again: unknown) => {
+      throw new StartUnconfirmed(again);
+    });
+  });
+  const { thread, keyKeptOut } = startedChatWireSchema.parse(answer);
+  return { thread: toThread(thread), keyKeptOut: keyKeptOut === true };
 }

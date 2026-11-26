@@ -16,6 +16,7 @@ import { waitingElsewhere } from "../conversation/context.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
 import { actionCard, moveCards, planAction, pricedLater, rowLine } from "./action-card.ts";
+import { costFigures } from "./card-face.ts";
 import { costsLabel, costsTogether } from "./effect.ts";
 import {
   actionById,
@@ -32,6 +33,7 @@ import { feeCoinsSaid, feeCoinTold } from "./fee-coin-said.ts";
 import { fillIdentity } from "./fill-key.ts";
 import { findInstruments } from "./instruments.ts";
 import { namesLabel } from "./format.ts";
+import { heldByTakes, takeRecords } from "./takes.ts";
 import { recognisedHow } from "./recognised.ts";
 import { idleBridges, largestShortfall, uncoveredAccounts, walletCash } from "./funding.ts";
 import { placeName } from "./chains.ts";
@@ -76,7 +78,9 @@ const planLeg = z.object({
     .min(1)
     .max(200)
     .optional()
-    .describe('Optional short reason this pick belongs, e.g. "Makes the leading weight-loss drugs".'),
+    .describe(
+      'Optional short reason this pick belongs, e.g. "Makes the leading weight-loss drugs".',
+    ),
   note: z
     .string()
     .min(1)
@@ -111,32 +115,37 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
         "cash held for open orders `heldForOrders`, which is theirs but not free until those orders " +
         "fill or are cancelled), `cash` (dollar stablecoins, including savings and free margin: the " +
         "Cash Portfolio and Withdraw show; each holding's `venue` says where it is, `wallet` being " +
-        "what a withdrawal sends and an app's id cash kept there), and `onTheWay`, money bridged or " +
+        "what a withdrawal sends and an app's id cash kept there), `idleCashUsd`, the Cash Money shows " +
+        "and the figure to tell the owner as their cash: `cash` less savings a take bought, which are " +
+        "that take's (so `cash.usdValue` is their buying power, savings they could take out included), " +
+        "and `onTheWay`, money bridged or " +
         "moved into or out of a venue's account that hasn't landed yet. Sources listed under " +
         "`unavailable` could not be read and are missing from the totals. `looking` lists the " +
         "networks whose wallet Auni is still looking through for the first time: more may show up " +
         "there, so say so before judging a total. `averageCostUsd` is what one unit cost on average; " +
         "without it, nothing records what was paid, so say that rather than judge a gain or loss " +
         "from the price alone. A perp's is its entry price, and its value is the margin in it, not " +
-        "its size. `cashFreeUsd`, when present, is Cash less what cards still waiting in the " +
+        "its size; its `unrealizedPnlUsd` is what it has made so far, as its venue says. `cashFreeUsd`, when present, is Cash less what cards still waiting in the " +
         "owner's other threads count on: plan with that.",
       inputSchema: {},
       async handler() {
-        const [portfolio, waiting] = await Promise.all([
+        const [portfolio, records, waiting] = await Promise.all([
           readPortfolio(),
+          takeRecords(),
           waitingElsewhere(context.threadId),
         ]);
+        const read = { ...portfolio, idleCashUsd: heldByTakes(portfolio, records).cashUsd };
         // Cash a card in another thread still counts on isn't offered again as free.
         const promised = usdToCents(waiting.countsOnUsd);
         const free = usdToCents(portfolio.cash.usdValue) - promised;
         const told =
           promised > 0n
             ? {
-                ...portfolio,
+                ...read,
                 cashPromisedToWaitingCardsUsd: waiting.countsOnUsd,
                 cashFreeUsd: centsToUsd(free > 0n ? free : 0n),
               }
-            : portfolio;
+            : read;
         // Text alone: as structuredContent too, the brain would show the agent the whole portfolio twice.
         return result(
           [
@@ -217,8 +226,8 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
           id: randomUUID() as DepositCardWire["id"],
           title:
             tokens.length > 0
-              ? `Send me your ${namesLabel(tokens.map(({ name }) => name))}`
-              : "Send me anything",
+              ? `Send your ${namesLabel(tokens.map(({ name }) => name))}`
+              : "Add money",
           updatedAt: new Date().toISOString(),
           network,
           tokens,
@@ -347,7 +356,9 @@ function proposeActions(context: ToolTurn): AuniTool {
         .string()
         .min(1)
         .max(80)
-        .describe('What the card does, plainly: "Weight-loss drug picks" or "Close your Fed rate bets".'),
+        .describe(
+          'What the card does, plainly: "Weight-loss drug picks" or "Close your Fed rate bets".',
+        ),
       legs: z.array(planLeg).min(1).max(PLAN_LEGS),
       pays_with: payWithInput,
       replaces: replacesInput,
@@ -404,7 +415,7 @@ function proposeActions(context: ToolTurn): AuniTool {
       const paysWith = paysWithLines(paying, prepared);
       const buysFirst = feeCoinsSaid(rows);
       const later = pricedLater(rows);
-      const costs = costsLabel(costsTogether(prepared.map(({ preview }) => preview.effect)));
+      const costs = costFigures(costsTogether(prepared.map(({ preview }) => preview.effect)));
       // The legs the card names, past the moves that only bring their cash.
       const shown = rows.flatMap((_, index) => (isMove(index) ? [] : [index]));
       const planLegs = await Promise.all(
@@ -473,7 +484,7 @@ function proposeActions(context: ToolTurn): AuniTool {
         ...(paysWith.length > 0 ? { paysWith } : {}),
         ...(buysFirst ? { buysFirst } : {}),
         ...(later ? { pricedLater: later } : {}),
-        ...(costs ? { costs } : {}),
+        ...(costs.length > 0 ? { costFigures: costs } : {}),
         legs: planLegs,
       };
       const money = moneyLine(cardMoneys(rows));

@@ -27,8 +27,8 @@ describe("Aave's faces", () => {
   it("say a withdrawal as savings coming back to the wallet as cash", () => {
     const face = fillFace(withdrawFace("Monad"), usdc("1000000000"));
     expect([face.title, face.action, face.context]).toEqual([
-      "Take out of savings on Aave",
-      "Take out $1,000",
+      "Bring cash back from Aave",
+      "Bring back $1,000",
       "To your wallet on Monad",
     ]);
     expect(cardFaceSchema.parse(withdrawFace("Monad"))).toBeTruthy();

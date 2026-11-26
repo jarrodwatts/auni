@@ -1,3 +1,5 @@
+import "./vault-art.css";
+
 import { useId } from "react";
 
 /**

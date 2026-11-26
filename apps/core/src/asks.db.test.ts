@@ -350,7 +350,7 @@ describe("widening a thread's autonomy", () => {
     const allowed = await allowAction(actionId);
     expect(allowed).toMatchObject({
       kind: "allowed",
-      action: { status: "failed", error: "That thread was archived before you allowed this." },
+      action: { status: "failed", error: "That chat was archived before you allowed this." },
     });
     const [row] = await db.select().from(threads).where(eq(threads.id, threadId));
     expect(row?.actMode).toBe("ask_first");

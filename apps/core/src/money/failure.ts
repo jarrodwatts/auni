@@ -6,6 +6,7 @@ import { leftOutPermission } from "./card-face.ts";
 import { stepUpReason } from "./effect.ts";
 import { FeesUnpaid, NothingMoved } from "./recipe.ts";
 import { Refused } from "./refused.ts";
+import { WouldFail } from "./wallet-effect.ts";
 import { WITHDRAW_TOOL } from "./withdrawals.ts";
 
 // Why a move didn't go through, so its card can offer the one next step that
@@ -19,8 +20,16 @@ import { WITHDRAW_TOOL } from "./withdrawals.ts";
  * which can run again: execute refuses whatever is still wrong, with nothing sent.
  */
 const SAID: readonly (readonly [FailureKind, RegExp])[] = [
-  ["funds", /insufficient|not enough|too little|holds only|only has|exceeds (the )?balance/iu],
-  ["rule", /minimum|smallest size|allows at most|can only fund|not supported|not allowed/iu],
+  // Only words that name what the owner holds: "insufficient allowance" or "not enough liquidity"
+  // is no shortage of theirs, and adding money would change nothing.
+  [
+    "funds",
+    /insufficient[ _-]?(?:spot )?(?:funds|balance|margin|collateral|lamports)|exceeds (?:the |your )?balance|(?:not enough|too little) (?:money|funds|balance|cash|margin|collateral)|(?:too little|not enough|short of|needs?(?: about)?(?: [\d.,]+)?) \p{L}+ for (?:gas|(?:the |\p{L}+'s )?network fees?)|holds only|only has/iu,
+  ],
+  [
+    "rule",
+    /minimum|smallest size|allows at most|can only fund|not supported|not allowed|allowance|liquidity|too (?:little|small) to/iu,
+  ],
   ["busy", /in.?flight|rate.?limit|too many requests|\b429\b|quota|busy|try again later/iu],
   [
     "glitch",
@@ -34,8 +43,27 @@ export function failureKind(error: unknown): FailureKind {
   if (error instanceof NothingMoved) return "unfilled";
   if (error instanceof FeesUnpaid) return "fees";
   if (error instanceof Refused) return error.kind;
+  if (error instanceof WouldFail) return wouldFailKind(error.message);
   const message = error instanceof Error ? error.message : String(error);
   return SAID.find(([, said]) => said.test(message))?.[0] ?? "unknown";
+}
+
+/**
+ * A revert that says the trade would pay out under its least, or cost over its most: the price
+ * moved. Routers say it in words or in constants ("UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT").
+ */
+const SLIPPED =
+  /return(?:ed)? amount|too little received|slippage|insufficient[ _]output|excessive[ _]input|too much requested|amount is too (?:little|low)/iu;
+
+/**
+ * Why a move a simulation showed would revert stopped, so its card offers what can help: a price
+ * that moved is priced again (see quoteAgain), money short is added, and anything else is the
+ * contract refusing it as it is, which the same move running again would only meet again. That
+ * is a rule, never unknown, so its card offers asking Auni for another way, not Try again.
+ */
+function wouldFailKind(message: string): FailureKind {
+  if (SLIPPED.test(message)) return "price";
+  return SAID.find(([, said]) => said.test(message))?.[0] === "funds" ? "funds" : "rule";
 }
 
 /**
@@ -66,7 +94,8 @@ export function retryRefusal(
     | "lines"
     | "card"
     | "proposalId"
-  >,
+  > &
+    Partial<Pick<ActionRow, "previousErrors">>,
 ): RetryRefusal | null {
   if (row.status !== "failed") return "not_failed";
   // An ask that failed found Auni changed since its card: only a new card can ask again.
@@ -78,6 +107,12 @@ export function retryRefusal(
   // A step that failed before kinds were recorded may have been one that crashed after its
   // order reached the venue, and recorded nothing to show it: only a known kind runs again.
   if (row.failureKind === null || FINAL.has(row.failureKind)) return "not_retryable";
+  // A price is weighed again by a fresh quote before Try again is offered (see pricedPast), but a
+  // route can quote inside what was allowed and still fail its own simulation each time it is
+  // built: one that already ran again on a fresh quote and failed on its price again only fails
+  // the same way, so it waits for new terms from Auni.
+  if (row.failureKind === "price" && row.previousErrors?.some(({ kind }) => kind === "price"))
+    return "not_retryable";
   // One that sent its move, an unfilled order included, keeps sends a run again would settle by.
   if (row.txs.some((tx) => !tx.setup)) return "not_retryable";
   return null;

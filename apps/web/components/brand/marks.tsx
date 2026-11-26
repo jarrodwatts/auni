@@ -1,6 +1,7 @@
 import { servableImage } from "@auni/shared";
+import { Coins } from "lucide-react";
 import Image, { getImageProps } from "next/image";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { isTradeGlyph, logoInset, TradeGlyph } from "@/components/integrations/integration-mark";
 import type { Holding } from "@/lib/data/views";
@@ -71,62 +72,38 @@ export function LogoImage({
   );
 }
 
-/** Deep, brand-like colors for initials; never the gain, loss or action colors. */
-const MONOGRAM_COLORS = ["#0b5cab", "#5a2d8c", "#1b1f27", "#1f6f5c", "#9c3d24", "#34405a"];
-
-/** A name's initials, lit the way Auni's orbs are lit, so a missing logo still looks made. */
-export function Monogram({
-  name,
+/**
+ * What stands where a logo would when there is none: a neutral coin, the same for every such
+ * thing, so the name or ticker beside it does the naming. Never initials, which read as a brand.
+ */
+export function NoMark({
   size,
   className,
 }: {
-  readonly name: string;
   readonly size: number;
   readonly className?: string;
 }) {
-  // "Hims & Hers" reads as "HH": only words that start with a letter or digit count.
-  const letters = name
-    .split(/\s+/u)
-    .filter((word) => /^[\p{L}\p{N}]/u.test(word))
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join("");
-  let hash = 0;
-  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  const style: CSSProperties = {
-    width: size,
-    height: size,
-    background: [
-      "radial-gradient(circle at 30% 24%, color-mix(in oklab, var(--color-plate) 42%, transparent) 0, transparent 46%)",
-      // In the dark each colour is lifted a step, so the deepest of them still stands off the page.
-      "linear-gradient(var(--color-mark-lift), var(--color-mark-lift))",
-      MONOGRAM_COLORS[hash % MONOGRAM_COLORS.length],
-    ].join(", "),
-    boxShadow:
-      "inset 0 -2px 4px color-mix(in oklab, var(--color-shade) 18%, transparent), 0 0 0 1px color-mix(in oklab, var(--color-shade) 4%, transparent), 0 0 0 1px var(--color-mark-line)",
-    fontSize: Math.round(size * 0.36),
-  };
   return (
     <span
       aria-hidden
       className={cn(
-        "inline-flex flex-none items-center justify-center rounded-full font-semibold tracking-[-0.02em] text-plate",
+        "inline-flex flex-none items-center justify-center rounded-full bg-glyph-plate text-glyph-ink ring-1 ring-mark-line ring-inset",
         className,
       )}
-      style={style}
+      style={{ width: size, height: size }}
     >
-      {letters || "?"}
+      <Coins style={{ width: size * 0.5, height: size * 0.5 }} strokeWidth={1.75} />
     </span>
   );
 }
 
-/** A holding's logo; without one it can serve, its initials. */
+/** A holding's logo; without one it can serve, a neutral coin. */
 export function AssetLogo({
   holding,
   size = 40,
   className,
 }: {
-  readonly holding: Pick<Holding, "logoUrl" | "name">;
+  readonly holding: Pick<Holding, "logoUrl">;
   readonly size?: number;
   readonly className?: string;
 }) {
@@ -134,14 +111,14 @@ export function AssetLogo({
     <LogoImage
       src={holding.logoUrl}
       size={size}
-      fallback={<Monogram name={holding.name} size={size} className={className} />}
+      fallback={<NoMark size={size} className={className} />}
       className={className}
     />
   );
 }
 
 /** The direction a move went, as the small filled caret money apps use. */
-export function MoveCaret({ down }: { readonly down: boolean }) {
+function MoveCaret({ down }: { readonly down: boolean }) {
   return (
     <svg
       aria-hidden

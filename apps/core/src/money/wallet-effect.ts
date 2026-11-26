@@ -428,7 +428,7 @@ export class WouldFail extends Error {
   /** `cause` is what it reverted with, for the app whose contract it is (revertOf in refused.ts). */
   constructor(step: number, of: number, reason: string | undefined, cause: unknown) {
     super(
-      `Auni ran this first and it would have failed${reason ? ` ("${reason}")` : ""}, so it wasn't sent.`,
+      `A simulation showed it would fail${reason ? ` ("${reason}")` : ""}, so Auni didn't send it.`,
       { cause },
     );
     this.step = step;

@@ -8,7 +8,7 @@ import {
   type NetworkKey,
   type VenueEventCardWire,
 } from "@auni/shared";
-import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { fenced } from "../agent/fence.ts";
@@ -20,7 +20,7 @@ import { publishThread } from "../conversation/threads.ts";
 import { publishThreadEvent } from "../conversation/stream.ts";
 import { answered } from "../conversation/tidy.ts";
 import { db, type Tx } from "../db/client.ts";
-import { arrivals, messages, threads } from "../db/schema.ts";
+import { actions, arrivals, messages, threads } from "../db/schema.ts";
 import {
   deliverKind,
   foundKind,
@@ -31,10 +31,12 @@ import {
 import { defineJob } from "../jobs/queue.ts";
 import type { ArrivalKind } from "./arrivals.ts";
 import { chainName } from "./chains.ts";
-import { coinName } from "./coins.ts";
+import { coinName, isPlainCash } from "./coins.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
+import { spendsCashIn } from "./funding.ts";
 import { formatAmount, priceLabel, shortAddress, usdLabel } from "./format.ts";
 import { howItCame, MOVES, type Move } from "./how-it-came.ts";
+import { stagedLeg } from "./proposal-order.ts";
 import { SETTLING_MS } from "./readings.ts";
 import type { Fill } from "./recipe.ts";
 import type { Exit, Happened } from "./venue-statement.ts";
@@ -134,7 +136,48 @@ export async function tellArrivals(tx: Tx, recorded: readonly ArrivalRow[]): Pro
   if (news.length === 0) return landed;
   const cards = news.map(arrivalCard);
   const place = woken[0] ?? (await mainChat(tx));
-  return [...landed, await post(tx, place, cards)];
+  const forPlan = await fundedPlan(
+    tx,
+    place.id,
+    news.flatMap((one) => (one.direction === "in" ? one.rows : [])),
+  );
+  return [...landed, await post(tx, place, cards, forPlan ? { forPlan } : {})];
+}
+
+/**
+ * The plan in this chat this money in is for: still waiting on the owner's tap, and spending
+ * more cash on a chain where cash just came in than its own moves bring there. Its card tells
+ * the money above the step it makes possible. Any other deposit (a coin, cash on another chain,
+ * or money while a plan only sells) is no part of a plan and keeps its own place in the chat, as
+ * does money after a plan settled, however near. So does cash that came with a coin: the
+ * transaction is one card, which drawn inside the plan would show the coin as money for it too.
+ * The newest such plan, when several are.
+ */
+async function fundedPlan(
+  tx: Tx,
+  threadId: string,
+  deposits: readonly ArrivalRow[],
+): Promise<string | undefined> {
+  if (deposits.length === 0) return undefined;
+  if (!deposits.every((row) => isPlainCash(row.chain, row.instrument))) return undefined;
+  const chains = new Set(deposits.map((row) => row.chain));
+  const waiting = await tx
+    .select()
+    .from(actions)
+    .where(
+      and(
+        eq(actions.threadId, threadId),
+        eq(actions.status, "awaiting_permission"),
+        isNotNull(actions.proposalId),
+      ),
+    )
+    .orderBy(desc(actions.createdAt));
+  const plans = Map.groupBy(waiting, (leg) => leg.proposalId!);
+  for (const [plan, legs] of plans) {
+    const staged = legs.map(stagedLeg);
+    if ([...chains].some((chain) => spendsCashIn(staged, chain))) return plan;
+  }
+  return undefined;
 }
 
 /** A token they held quietly as Other that Auni came to recognise, as told. */
@@ -365,10 +408,12 @@ function venueEventCard(news: StatementNews, pnlUsd: number): VenueEventCardWire
     actionReference: news.actionId as VenueEventCardWire["actionReference"],
     outside: !isOwnOrder(news.happened.cause),
     // Cut to what a card takes, so a long sentence from a venue can't make one that fails to draw.
-    detail: [words.why, words.result ?? words.fill, news.unfinished]
+    // What it locked in is said apart, as a number the card can draw as a gain or a loss.
+    detail: [words.why, words.result ? null : words.fill, news.unfinished]
       .filter(Boolean)
       .join(" ")
       .slice(0, 300),
+    pnlUsd: words.result ? pnlUsd.toFixed(2) : null,
     logoUrl: news.face.logoUrl,
   };
 }
@@ -384,7 +429,7 @@ interface HappenedWords {
   readonly title: string;
   /** Why, in one sentence: "Its price moved against it until the margin behind it ran out." */
   readonly why: string;
-  /** What it locked in: "You lost $5.26."; null when nothing. */
+  /** What it locked in: "Realized loss: -$5.26."; null when nothing. */
   readonly result: string | null;
   /** What traded: "193.1 STRK sold at $0.07855." */
   readonly fill: string;
@@ -419,7 +464,7 @@ export function happenedWords(
     trade: "A trade outside Auni",
     limit: "Your limit order",
     // Which stop it was, as its order says; a stop-loss moved past the entry closes at a gain.
-    exit: exit ? `Your ${exit}` : "Your stop",
+    exit: exit === "take-profit" ? "Take-profit" : exit === "stop-loss" ? "Stop-loss" : "Your stop",
   }[happened.cause];
   const title = flips
     ? `${actor} closed your ${name} ${side} and opened a ${sideOf(after)}`
@@ -435,30 +480,49 @@ export function happenedWords(
   const made = Math.abs(pnlUsd) >= 0.005;
   return {
     title,
-    why: why(happened.cause, venue),
-    result: made ? `You ${pnlUsd < 0 ? "lost" : "made"} ${usdLabel(Math.abs(pnlUsd))}.` : null,
+    why: why(happened.cause, venue, exit),
+    result: made ? resultWords(pnlUsd) : null,
     fill: `${size(Number(happened.size))} ${happened.side === "buy" ? "bought" : "sold"} at ${priceLabel(price)}.`,
     before: before === 0 ? "Nothing" : position(before),
     after: after === 0 ? "Closed" : position(after),
   };
 }
 
-/** Why each kind of thing happened at `venue` (by name), said once for chat and activity alike. */
-export function why(cause: Happened["cause"], venue: string): string {
+/**
+ * Why each kind of thing happened at `venue` (by name), said once for chat and activity alike.
+ * `exit` is which of Auni's stops filled, when the venue said.
+ */
+export function why(cause: Happened["cause"], venue: string, exit?: Exit): string {
   return {
     liquidation: "Its price moved against it until the margin behind it ran out.",
     "auto-deleveraging": `${venue} shrank it to settle a liquidation on the other side that the market couldn't fill.`,
     trade: `It was traded in ${venue}'s own app or another one with access, not by Auni.`,
-    exit: "It reached a stop-loss or take-profit price Auni set.",
+    exit:
+      exit === "take-profit"
+        ? `Hit your take-profit price on ${venue}.`
+        : exit === "stop-loss"
+          ? `Hit your stop price on ${venue}.`
+          : `Hit a stop price Auni set on ${venue}.`,
     limit: "A limit order Auni placed earlier filled.",
   }[cause];
+}
+
+/** What a close locked in, signed: "Realized loss: -$76.51.", "Realized gain: +$12.00." */
+function resultWords(pnlUsd: number): string {
+  const amount = usdLabel(Math.abs(pnlUsd));
+  return pnlUsd < 0 ? `Realized loss: -${amount}.` : `Realized gain: +${amount}.`;
 }
 
 /**
  * One message of cards left in a thread, which the agent reads in its history as what happened, and
  * sent to their home channel with it, as Auni's answers said unasked are.
  */
-async function post(tx: Tx, place: Place, cards: readonly NewsCard[]): Promise<Posted> {
+async function post(
+  tx: Tx,
+  place: Place,
+  cards: readonly NewsCard[],
+  more: { readonly forPlan?: string } = {},
+): Promise<Posted> {
   const messageId = randomUUID();
   await tx.insert(messages).values({
     id: messageId,
@@ -467,7 +531,7 @@ async function post(tx: Tx, place: Place, cards: readonly NewsCard[]): Promise<P
     parts: [{ type: "data-cards", id: messageId, data: { cards } }],
     origin: "automation",
     // The agent reads it in the thread's history as what happened (see renderMessage).
-    metadata: { reason: cards.map(sentence).join(" "), posted: true },
+    metadata: { reason: cards.map(sentence).join(" "), posted: true, ...more },
   });
   await tx
     .update(threads)
@@ -539,10 +603,13 @@ function arrivalCard(news: News): ArrivalCardWire {
  * A card in a sentence: "$250 arrived: 0.081 ETH on Base.", "$40 left your
  * wallet on Base: 40 USDC to 0x1a2b3c…9f8e.", or "<venue> closed your
  * STRK long. Its price moved against it until the margin behind it ran out.
- * You lost $5.26."
+ * Realized loss: -$5.26."
  */
 function sentence(card: NewsCard): string {
-  if (card.kind === "venue_event") return `${card.title}. ${card.detail}`;
+  if (card.kind === "venue_event")
+    return [`${card.title}.`, card.detail, card.pnlUsd ? resultWords(Number(card.pnlUsd)) : null]
+      .filter(Boolean)
+      .join(" ");
   const { title, direction, network } = card;
   const each = card.moved
     .map(({ amount, symbol, to }) => `${amount} ${symbol}${to ? ` to ${to}` : ""}`)

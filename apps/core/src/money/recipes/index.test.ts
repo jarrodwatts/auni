@@ -25,6 +25,29 @@ describe("rowMoney", () => {
   });
 });
 
+describe("rowMoney floors", () => {
+  const sale = (note: string, run: ActionRow["run"] = {}) =>
+    ({
+      ...row("polymarket_order", {}, "0", { returnsUsd: "191.68" }),
+      card: { note },
+      run,
+    }) as ActionRow;
+
+  it("keeps a sale's floor with its card's condition until it has come back", () => {
+    expect(rowMoney(sale("at least, if all 310 sell"))).toEqual({
+      flow: "back",
+      usd: "191.68",
+      least: "if all 310 sell",
+    });
+    expect(rowMoney(sale("at least"))?.least).toBe("");
+    expect(rowMoney(sale("about"))?.least).toBeUndefined();
+    expect(rowMoney(sale("at least, if all 310 sell", { returnedUsd: "200.10" }))).toEqual({
+      flow: "back",
+      usd: "200.10",
+    });
+  });
+});
+
 describe("cardMoneys", () => {
   it("counts a buy's money once, as the buy, never again as the move that pays for it", () => {
     const buy = row("polymarket_order", { side: "buy", amountUsd: 20 }, "20");

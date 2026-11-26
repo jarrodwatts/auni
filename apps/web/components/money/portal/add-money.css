@@ -1,0 +1,89 @@
+/*
+ * Add money (Portal): the network, then the code with Auni in its middle, then the address and
+ * Copy. The code sits in the stage's flow, as tall as itself; when money lands it falls away and
+ * Auni grows back out of its middle (portal.css), and the amount takes the address's place.
+ */
+.auni-add-money {
+  --auni-portal-qr: 216px;
+  position: relative;
+}
+
+.auni-add-money .auni-portal-stage {
+  width: 100%;
+  height: var(--auni-portal-qr);
+  overflow: visible;
+}
+
+/*
+ * Landed, what asked for the money folds away (the head above Auni, the address under it), so
+ * the sheet closes round Auni and the amount. With a coin on its way, only once it has left its
+ * network's chip and is in Auni's mouth.
+ */
+.auni-add-money-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 450ms var(--motion-settle),
+    opacity 300ms ease;
+}
+
+.auni-add-money-fold > * {
+  min-height: 0;
+}
+
+/* Clipped only as it folds, so a chip's focus ring is never cut off while it shows. */
+.auni-add-money[data-landed] .auni-add-money-fold > * {
+  overflow: hidden;
+}
+
+.auni-add-money[data-landed] .auni-add-money-fold {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.auni-add-money[data-landed] .auni-portal-stage {
+  height: calc(var(--auni-portal-hero) + 24px);
+}
+
+.auni-add-money .auni-portal-stage {
+  transition: height 450ms var(--motion-settle);
+}
+
+.auni-add-money[data-arriving] :is(.auni-add-money-fold, .auni-portal-stage) {
+  transition-delay: 1000ms;
+}
+
+.auni-add-money-swap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.auni-add-money-swap > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity 400ms ease,
+    transform 550ms var(--motion-settle);
+}
+
+.auni-add-money-after {
+  align-self: start;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.auni-add-money[data-counting] .auni-add-money-before {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition-duration: 160ms, 300ms;
+}
+
+.auni-add-money[data-counting] .auni-add-money-after {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-add-money-swap > * {
+    transform: none !important;
+  }
+}

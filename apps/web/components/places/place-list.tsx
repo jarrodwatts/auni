@@ -1,136 +1,176 @@
 "use client";
 
-import { LayoutGrid, ReceiptText } from "lucide-react";
+import { ChevronRight, Hand, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 
-import { useActivity } from "@/components/activity/use-activity";
-import { APPS_HREF, chatHref } from "@/lib/app-links";
+import { useMoney } from "@/components/money/money-provider";
+import { APPS_HREF, NEEDS_YOU_HREF, chatHref } from "@/lib/app-links";
+import { formatUsdcBalance } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 import { ChatRow } from "./chat-row";
-import { PortfolioMark, UnreadCount, WaitingCount, WaitingDot } from "./place-marks";
+import { PortfolioMark, TakeFigures, WaitingCount } from "./place-marks";
 import {
   FOLD_FADE,
   ICON_CLASS_NAME,
   ICON_STROKE,
   PlaceRow,
-  RAIL_FADE,
   ROW_CLASS_NAME,
   ROW_LINE_CLASS_NAME,
   SectionLabel,
 } from "./sidebar-rows";
 import { type ChatPlace, type PlaceRoute, usePlaceRoute, usePlaces } from "./use-places";
 
-/** Recent threads shown before "Show more"; one that is open always shows. */
-const RECENT_THREADS = 12;
+/** Chats shown before "Show more"; one that is open always shows. */
+const RECENT_CHATS = 12;
 
-function visibleRecent(chats: readonly ChatPlace[], route: PlaceRoute): readonly ChatPlace[] {
+function visibleChats(chats: readonly ChatPlace[], route: PlaceRoute): readonly ChatPlace[] {
   return chats.filter(
-    ({ thread, waiting }, index) =>
-      index < RECENT_THREADS || waiting || (route.kind === "chat" && route.id === thread.id),
+    ({ thread }, index) =>
+      index < RECENT_CHATS || thread.pinned || (route.kind === "chat" && route.id === thread.id),
   );
 }
 
+/** How many chats wait on the owner, as a phone's Chats leads to them: "2 need you". */
+function needYou(count: number): string {
+  return `${count} ${count === 1 ? "needs" : "need"} you`;
+}
+
+/** What a waiting chat asks of the person, in full: a sale's floor comes with its condition. */
+export function askOf({ thread }: ChatPlace): string {
+  return thread.moneyLine ?? "Waiting for your answer";
+}
+
 /**
- * Unified navigation list: Portfolio, Activity, Apps, then Threads grouped into
- * Pinned, Active (waiting, running, watching, or Auto), and Recent.
+ * The places, then every chat in the one place it belongs: Needs you while something in it
+ * waits on the person, Your takes while it holds something, and Chats for the rest. On a phone's
+ * Chats page (`nav={false}`) the tab bar holds Money, Needs you and the rest, so only the chats
+ * show, under one row that leads to Needs you.
  */
-export function PlaceList({ folded = false }: { readonly folded?: boolean }) {
+export function PlaceList({
+  folded = false,
+  nav = true,
+}: {
+  readonly folded?: boolean;
+  readonly nav?: boolean;
+}) {
   const route = usePlaceRoute();
   const places = usePlaces();
-  const unread = useActivity().data?.unread ?? 0;
-  const [allRecent, setAllRecent] = useState(false);
+  const { portfolio } = useMoney();
+  const [allChats, setAllChats] = useState(false);
 
-  const shownRecent = allRecent ? places.recent : visibleRecent(places.recent, route);
-  const hiddenRecent = places.recent.length - shownRecent.length;
-
-  const renderThread = ({ thread, status }: ChatPlace) => (
-    <ChatRow
-      key={thread.id}
-      active={route.kind === "chat" && route.id === thread.id}
-      href={chatHref(thread.id)}
-      thread={thread}
-      status={status}
-    />
-  );
+  const shownChats = allChats ? places.others : visibleChats(places.others, route);
+  const hiddenChats = places.others.length - shownChats.length;
+  const isOpen = (place: ChatPlace) => route.kind === "chat" && route.id === place.thread.id;
 
   return (
     <>
-      <PlaceRow
-        active={route.kind === "portfolio"}
-        folded={folded}
-        href="/app"
-        mark={
-          <>
-            <PortfolioMark className={ICON_CLASS_NAME} />
-            {places.waitingCount > 0 ? (
-              <WaitingDot className={cn("-top-0.5 -right-0.5 size-2", RAIL_FADE)} />
-            ) : null}
-          </>
-        }
-        title="Portfolio"
-        trailing={places.waitingCount > 0 ? <WaitingCount count={places.waitingCount} /> : null}
-      />
-      <PlaceRow
-        active={route.kind === "activity"}
-        folded={folded}
-        href="/app/activity"
-        mark={
-          <>
-            <ReceiptText aria-hidden className={ICON_CLASS_NAME} strokeWidth={ICON_STROKE} />
-            {unread > 0 ? (
-              <span
-                aria-hidden
-                className={cn(
-                  "absolute -top-0.5 -right-0.5 size-2 rounded-full bg-negative ring-2 ring-sidebar",
-                  RAIL_FADE,
-                )}
+      {nav ? (
+        <>
+          <PlaceRow
+            active={route.kind === "portfolio" || route.kind === "activity"}
+            folded={folded}
+            href="/app"
+            mark={<PortfolioMark className={ICON_CLASS_NAME} />}
+            title="Money"
+            trailing={
+              portfolio ? (
+                <span className="text-meta text-muted-foreground tabular-nums lining-nums">
+                  {formatUsdcBalance(BigInt(portfolio.totalUsd.baseUnits))}
+                </span>
+              ) : null
+            }
+          />
+          <PlaceRow
+            active={route.kind === "apps"}
+            folded={folded}
+            href={APPS_HREF}
+            mark={<LayoutGrid aria-hidden className={ICON_CLASS_NAME} strokeWidth={ICON_STROKE} />}
+            title="Apps"
+            className="mt-px"
+          />
+        </>
+      ) : null}
+
+      {places.needsYou.length > 0 ? (
+        <div className="mt-5 first:mt-0">
+          <PlaceRow
+            active={route.kind === "needs-you"}
+            folded={folded}
+            href={NEEDS_YOU_HREF}
+            mark={
+              nav ? (
+                <WaitingCount count={places.waitingCount} className="px-1" />
+              ) : (
+                <Hand aria-hidden className="size-[18px] text-waiting" strokeWidth={ICON_STROKE} />
+              )
+            }
+            title={nav ? "Needs you" : needYou(places.waitingCount)}
+            titleClassName="font-medium text-waiting"
+            trailing={nav ? null : <ChevronRight aria-hidden className="size-4 text-faint" />}
+          />
+          {/* On a phone's Chats the tab holds the list itself; one row leads to it. */}
+          {nav ? (
+            <ul inert={folded} className={cn("flex flex-col gap-px", FOLD_FADE)}>
+              {places.needsYou.map((place) => (
+                <ChatRow
+                  key={place.thread.id}
+                  active={isOpen(place)}
+                  href={chatHref(place.thread.id)}
+                  thread={place.thread}
+                  status={place.status}
+                  detail={<span className="text-waiting">{askOf(place)}</span>}
+                  wrapDetail
+                />
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
+      {places.takes.length > 0 ? (
+        <div inert={folded} className={FOLD_FADE}>
+          <SectionLabel>Your takes</SectionLabel>
+          <ul className="flex flex-col gap-px">
+            {places.takes.map((place) => (
+              <ChatRow
+                key={place.thread.id}
+                active={isOpen(place)}
+                href={chatHref(place.thread.id)}
+                thread={place.thread}
+                status={place.status}
+                detail={place.take ? <TakeFigures take={place.take} /> : null}
               />
-            ) : null}
-          </>
-        }
-        title="Activity"
-        trailing={unread > 0 ? <UnreadCount count={unread} /> : null}
-        className="mt-px"
-      />
-      <PlaceRow
-        active={route.kind === "apps"}
-        folded={folded}
-        href={APPS_HREF}
-        mark={<LayoutGrid aria-hidden className={ICON_CLASS_NAME} strokeWidth={ICON_STROKE} />}
-        title="Apps"
-        className="mt-px"
-      />
-
-      {places.pinned.length > 0 ? (
-        <div inert={folded} className={FOLD_FADE}>
-          <SectionLabel>Pinned</SectionLabel>
-          <ul className="flex flex-col gap-px">{places.pinned.map(renderThread)}</ul>
+            ))}
+          </ul>
         </div>
       ) : null}
 
-      {places.active.length > 0 ? (
+      {places.others.length > 0 ? (
         <div inert={folded} className={FOLD_FADE}>
-          <SectionLabel>Active</SectionLabel>
-          <ul className="flex flex-col gap-px">{places.active.map(renderThread)}</ul>
-        </div>
-      ) : null}
-
-      {places.recent.length > 0 ? (
-        <div inert={folded} className={FOLD_FADE}>
-          <SectionLabel>Threads</SectionLabel>
-          <ul className="flex flex-col gap-px">{shownRecent.map(renderThread)}</ul>
-          {(allRecent ? places.recent.length > RECENT_THREADS : hiddenRecent > 0) ? (
+          <SectionLabel>Chats</SectionLabel>
+          <ul className="flex flex-col gap-px">
+            {shownChats.map((place) => (
+              <ChatRow
+                key={place.thread.id}
+                active={isOpen(place)}
+                href={chatHref(place.thread.id)}
+                thread={place.thread}
+                status={place.status}
+              />
+            ))}
+          </ul>
+          {(allChats ? places.others.length > RECENT_CHATS : hiddenChats > 0) ? (
             <button
               type="button"
-              onClick={() => setAllRecent(!allRecent)}
+              onClick={() => setAllChats(!allChats)}
               className={cn(
                 ROW_CLASS_NAME,
                 ROW_LINE_CLASS_NAME,
                 "mt-px w-full text-muted-foreground hover:text-ink",
               )}
             >
-              {allRecent ? "Show less" : `Show ${hiddenRecent} more`}
+              {allChats ? "Show less" : `Show ${hiddenChats} more`}
             </button>
           ) : null}
         </div>

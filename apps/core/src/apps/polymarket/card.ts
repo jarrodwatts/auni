@@ -34,15 +34,20 @@ export function orderFace(order: OrderWords): CardFace {
   // Said as its bound is, to the tenth of a cent a share can be priced at, so the two agree.
   const price = order.price === null ? null : cents(order.price);
   if (order.side === "sell") {
+    // An order that fills what it can and drops the rest may sell fewer shares, never more, so
+    // every figure is the most it sells, and what comes back is what all of them fetch at worst.
+    const most = order.shares ? `up to ${order.shares} shares` : null;
     return {
       title: `Sell ${outcome}`,
-      // What the shares fetch comes back, which the card's amount says; the title is whole.
-      note: "coming back",
-      action: `Sell ${outcome}`,
+      note: order.shares ? `at least, if all ${order.shares} sell` : "at least, if all sell",
+      action: most ? `Sell ${most}` : `Sell ${outcome}`,
       working: `Selling ${outcome}`,
       context: question,
       figures: figures(
-        order.shares ? { label: "Shares", value: order.shares } : null,
+        order.shares
+          ? { label: "You sell, up to", value: `${order.shares} shares`, role: "pays" }
+          : null,
+        { label: "You get, at least", value: AMOUNT, role: "gets" },
         price ? { label: "Price", value: price } : null,
         { label: "Price, at least", value: cents(order.worst) },
       ),
@@ -54,12 +59,16 @@ export function orderFace(order: OrderWords): CardFace {
   }
   return {
     title: `Buy ${outcome} for ${AMOUNT}`,
+    // The amount is the most it spends, fees included: an order that fills what it can may spend less.
+    note: "most it spends",
     action: `Buy ${AMOUNT}`,
     working: `Buying ${outcome}`,
     context: question,
     figures: figures(
-      { label: "You pay", value: AMOUNT },
-      order.shares ? { label: "You get, about", value: `${order.shares} shares` } : null,
+      { label: "You pay, at most", value: AMOUNT, role: "pays" },
+      order.shares
+        ? { label: "You get, about", value: `${order.shares} shares`, role: "gets" }
+        : null,
       price ? { label: "Price", value: price } : null,
       { label: "Price, at most", value: cents(order.worst) },
     ),
@@ -90,8 +99,8 @@ export function withdrawFace({ arrives, least, all }: WithdrawWords): CardFace {
     working: `Bringing it back from ${about.name}`,
     context: "To your own wallet on Polygon",
     figures: figures(
-      { label: `Leaves ${about.name}`, value: AMOUNT },
-      { label: "You get, about", value: `${arrives} of USDC` },
+      { label: `Leaves ${about.name}`, value: AMOUNT, role: "pays" },
+      { label: "You get, about", value: `${arrives} of USDC`, role: "gets" },
       { label: "You get, at least", value: `${least} of USDC` },
     ),
     finePrint: `${all ? "That is all the cash there now. " : ""}${about.name}'s dollars become USDC through a pool, so about what leaves arrives, and never less than the least shown here. Your bets stay where they are.`,

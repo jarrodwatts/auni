@@ -16,10 +16,8 @@ function share(holding: Holding, total: bigint): number {
 function useHoldingTint(holding: Holding): string {
   const colors = useBrandColors(holding.logoUrl);
   if (!colors) return "var(--border)";
-  const soft = (color: string) => `color-mix(in oklab, ${color} 62%, var(--background))`;
-  return colors.from === colors.to
-    ? soft(colors.from)
-    : `linear-gradient(90deg, ${soft(colors.from)}, ${soft(colors.to)})`;
+  // The logo's own colour, solid: a holding's colour comes from its mark, never a gradient.
+  return `color-mix(in oklab, ${colors.from} 62%, var(--background))`;
 }
 
 function Segment({
@@ -79,23 +77,21 @@ function BrandBar({ holdings }: { readonly holdings: readonly Holding[] }) {
   );
 }
 
-/** The proportion bar over one row per holding opened in this thread. */
+/** One row per position this take holds, under a bar of how it splits when there's more than one. */
 export function PaneHoldings({ holdings }: { readonly holdings: readonly Holding[] }) {
-  const total = holdings.reduce((sum, holding) => sum + BigInt(holding.value.baseUnits), 0n);
   return (
     <>
-      <BrandBar holdings={holdings} />
-      <ul className="mt-2 divide-y divide-foreground/[0.05]">
+      {holdings.length > 1 ? <BrandBar holdings={holdings} /> : null}
+      <ul className="mt-1 divide-y divide-border">
         {holdings.map((holding) => (
-          <HoldingRow key={holding.id} holding={holding} total={total} />
+          <HoldingRow key={holding.id} holding={holding} />
         ))}
       </ul>
     </>
   );
 }
 
-function HoldingRow({ holding, total }: { readonly holding: Holding; readonly total: bigint }) {
-  const tint = useHoldingTint(holding);
+function HoldingRow({ holding }: { readonly holding: Holding }) {
   const value = BigInt(holding.value.baseUnits);
   const change =
     holding.todayChangeBaseUnits === null ? null : BigInt(holding.todayChangeBaseUnits);
@@ -103,25 +99,18 @@ function HoldingRow({ holding, total }: { readonly holding: Holding; readonly to
     <li className="flex h-16 items-center gap-3">
       <AssetLogo holding={holding} size={40} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-medium text-ink">{holding.name}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted-foreground tabular-nums">
-          <span
-            aria-hidden
-            className="size-1.5 flex-none rounded-full"
-            style={{ background: tint }}
-          />
-          {share(holding, total).toFixed(0)}%
-        </p>
+        <p className="truncate text-body font-medium text-ink">{holding.name}</p>
+        {holding.detail ? (
+          <p className="mt-0.5 truncate text-meta text-muted-foreground">{holding.detail}</p>
+        ) : null}
       </div>
       <div className="flex-none text-right">
-        <p className="text-[15px] font-semibold text-ink tabular-nums">
-          {formatUsdcBalance(value)}
-        </p>
+        <p className="text-body font-semibold text-ink tabular-nums">{formatUsdcBalance(value)}</p>
         {change === null ? null : (
           <Change
             pct={changePercent(change, value)}
             period="today"
-            className="mt-0.5 block text-[13px] font-medium"
+            className="mt-0.5 block text-meta font-medium tabular-nums lining-nums"
           />
         )}
       </div>

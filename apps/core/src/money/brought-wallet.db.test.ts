@@ -191,26 +191,18 @@ describe("a wallet brought in with money already in it", () => {
     },
   );
 
-  it(
-    "calls the same money cash in the portfolio and in Withdraw, and says where it is",
-    LONG,
-    async () => {
-      forgetKept();
-      const [shown, cash] = await Promise.all([
-        portfolio(),
-        get("/withdrawals/cash").then((body) => withdrawCashWireSchema.parse(body)),
-      ]);
-      // Live, the portfolio said $15.19 of cash where Withdraw said $14.60: its wallet's USDC.
-      expect.soft(cash.cashUsd).toBe(shown.cashUsd);
-      expect.soft(cash).toMatchObject({
-        cashUsd: "12.87",
-        walletUsd: "8.70",
-        elsewhere: [
-          { name: "Hyperliquid", usdValue: "3.63" },
-          { name: "Aave", usdValue: "0.49" },
-          { name: "Polymarket", usdValue: "0.05" },
-        ],
-      });
-    },
-  );
+  it("counts every dollar of cash in Withdraw, and says where it is", LONG, async () => {
+    forgetKept();
+    const cash = withdrawCashWireSchema.parse(await get("/withdrawals/cash"));
+    // Live, the portfolio said $15.19 of cash where Withdraw said $14.60: its wallet's USDC.
+    expect.soft(cash).toMatchObject({
+      cashUsd: "12.87",
+      walletUsd: "8.70",
+      elsewhere: [
+        { name: "Hyperliquid", usdValue: "3.63" },
+        { name: "Aave", usdValue: "0.49" },
+        { name: "Polymarket", usdValue: "0.05" },
+      ],
+    });
+  });
 });

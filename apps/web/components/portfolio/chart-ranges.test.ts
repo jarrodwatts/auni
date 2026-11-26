@@ -38,14 +38,14 @@ describe("chartRanges", () => {
 describe("moveLabel", () => {
   it("names the period when the move counts from its start", () => {
     const ago = atNoon();
-    expect(moveLabel("1W", ago(7 * 24))).toBe("Past week");
-    expect(moveLabel("Today", ago(12))).toBe("Today");
+    expect(moveLabel("1W", ago(7 * 24))).toBe("in the past week");
+    expect(moveLabel("Today", ago(12))).toBe("today");
   });
 
   it("says where the move counts from when that is later than the period's start", () => {
     // Histories four hours and eight days old, each offered the shortest period that shows it all.
     const ago = atNoon();
-    expect(moveLabel("1W", ago(4))).toBe("Since Oct 24");
-    expect(moveLabel("1M", ago(8 * 24))).toBe("Since Oct 16");
+    expect(moveLabel("1W", ago(4))).toBe("since Oct 24");
+    expect(moveLabel("1M", ago(8 * 24))).toBe("since Oct 16");
   });
 });

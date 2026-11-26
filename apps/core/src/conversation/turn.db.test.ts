@@ -225,6 +225,52 @@ describe("a background turn that settles quietly", () => {
     const [after] = await db.select().from(threads).where(eq(threads.id, thread.id));
     expect(after).toMatchObject({ repliedAt: null, turnStartedAt: null });
   });
+  // A quiet call beside words or a card used to hide them all: the web app dropped the answer and
+  // no channel heard of it, a warning or a waiting card included (2026-11-25 review).
+  const quietly = fixture("settle-quietly.synthetic.json").slice(1, -1) as BrainEvent[];
+  const cases: [string, (threadId: string) => Promise<BrainEvent[]>][] = [
+    [
+      "beside words it wrote first",
+      async () => [
+        { type: "ready", model: "fake", login: "test" },
+        { type: "text", id: "t1", delta: "The sale left $40 on Polygon." },
+        ...quietly,
+        { type: "done" },
+      ],
+    ],
+    [
+      "beside a card it put up",
+      async (threadId) => [
+        { type: "ready", model: "fake", login: "test" },
+        ...cardFor((await insertAction({ threadId, status: "awaiting_permission" })).id),
+        ...quietly,
+        { type: "done" },
+      ],
+    ],
+    [
+      "before a usage limit cut it off",
+      async () => [
+        { type: "ready", model: "fake", login: "test" },
+        ...quietly,
+        { type: "limit", resetsAt: new Date(Date.now() + 60 * 60_000) },
+        { type: "error", message: "usage limit" },
+      ],
+    ],
+  ];
+  it.each(cases)("isn't quiet %s, and is told like any answer", async (_, events) => {
+    const { thread, fires } = await firedWatch();
+    replay.events = await events(thread.id);
+
+    await runConversationTurn({
+      threadId: thread.id,
+      turnId: "turn-1",
+      trigger: { kind: "background", reason: "Your watch fired.", fires },
+    });
+
+    const [answer] = await db.select().from(messages).where(eq(messages.threadId, thread.id));
+    expect(answer!.metadata).not.toHaveProperty("quiet");
+    expect((await threadRow(thread.id)).repliedAt).not.toBeNull();
+  });
 });
 
 describe("a background turn that fails", () => {

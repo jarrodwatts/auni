@@ -1,0 +1,91 @@
+.auni-star-toast [data-content] {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.auni-star-actions {
+  display: flex;
+  flex-basis: 100%;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.auni-star-not-now {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms var(--motion-settle);
+}
+
+.auni-star-not-now:hover {
+  color: var(--color-ink);
+}
+
+.auni-star-not-now:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 35%, transparent);
+}
+
+.auni-star-thanks {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auni-star-pop {
+  width: 14px;
+  height: 14px;
+  color: var(--primary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auni-star-swap {
+    animation: auni-star-swap 360ms var(--motion-settle) both;
+  }
+  /* One small hop: a crouch, up, a squashed landing, a little bounce, still. */
+  .auni-star-hop {
+    transform-origin: 50% 100%;
+    animation: auni-star-hop 900ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+  }
+  .auni-star-pop {
+    animation: auni-star-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 280ms both;
+  }
+}
+
+@keyframes auni-star-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes auni-star-hop {
+  0% {
+    transform: translateY(0) scale(1.08, 0.9);
+  }
+  25% {
+    transform: translateY(-16px) scale(0.94, 1.08);
+  }
+  50% {
+    transform: translateY(0) scale(1.1, 0.88);
+  }
+  62% {
+    transform: translateY(-5px) scale(0.98, 1.03);
+  }
+  80%,
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes auni-star-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-40deg);
+  }
+}

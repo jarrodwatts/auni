@@ -1,0 +1,80 @@
+/* A pick's card: it settles in from the side it opened on, glides between picks, and fades where it is. */
+.auni-pick-card {
+  animation: auni-pick-in 280ms var(--motion-settle) both;
+  transition: opacity 160ms ease;
+}
+
+.auni-pick-card[data-gliding] {
+  transition:
+    transform 380ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 160ms ease;
+}
+
+.auni-pick-card[data-closing] {
+  opacity: 0;
+}
+
+@keyframes auni-pick-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+/* What the card says cross-fades as it moves to another pick. */
+.auni-pick-swap {
+  animation: auni-pick-swap 220ms ease both;
+}
+
+@keyframes auni-pick-swap {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Its numbers arrive a beat after it, one after another. */
+.auni-pick-settle {
+  animation: auni-pick-rise 360ms var(--motion-settle) both;
+}
+
+.auni-pick-fact {
+  animation: auni-pick-rise 360ms var(--motion-settle) both;
+  animation-delay: calc(80ms + var(--fact) * 40ms);
+}
+
+@keyframes auni-pick-rise {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+/* A row opening on a touch screen: its height eases open and shut. */
+.auni-pick-inline {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 360ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 240ms ease;
+}
+
+.auni-pick-inline.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auni-pick-card,
+  .auni-pick-swap,
+  .auni-pick-settle,
+  .auni-pick-fact,
+  .auni-note-mascot,
+  .auni-note {
+    animation: none;
+  }
+  .auni-pick-card[data-gliding],
+  .auni-pick-inline {
+    transition: none;
+  }
+}

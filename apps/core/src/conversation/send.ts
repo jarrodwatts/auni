@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { usedChannel } from "../channels/home.ts";
-import { db } from "../db/client.ts";
+import { db, type Tx } from "../db/client.ts";
 import { messages, threads, type ThreadRow } from "../db/schema.ts";
 import { turnKind } from "../jobs/kinds.ts";
 import { keepKeyOut, pastedKey } from "./pasted-key.ts";
@@ -31,7 +31,7 @@ type Sent = "sent" | "key_kept_out" | "not_theirs";
  * by the agent, and Auni answers in its place.
  */
 export async function sendMessage(thread: ThreadRow, message: OwnerMessage): Promise<Sent> {
-  const { id, text, supersedesId, channel, channelRef } = message;
+  const { id, text, supersedesId, channel } = message;
 
   if (supersedesId) {
     const [replaced] = await db
@@ -53,42 +53,9 @@ export async function sendMessage(thread: ThreadRow, message: OwnerMessage): Pro
     return "key_kept_out";
   }
 
-  const outcome = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(messages)
-      .values({
-        id,
-        threadId: thread.id,
-        role: "user",
-        parts: [{ type: "text", text }],
-        supersedesId: supersedesId ?? null,
-        metadata: channel ? { channel, ...(channelRef && { channelRef }) } : {},
-      })
-      .onConflictDoNothing()
-      .returning({ id: messages.id });
-    if (row) {
-      // Replying to an archived chat brings it back into the list; replying reads it. The thread
-      // shows a turn coming from now, unless one runs: its marker is its turn token's, which a
-      // new message must never take away (conversation/turn.ts).
-      await tx
-        .update(threads)
-        .set({
-          turnStartedAt: sql`coalesce(${threads.turnStartedAt}, now())`,
-          updatedAt: sql`now()`,
-          archivedAt: null,
-          readAt: sql`now()`,
-        })
-        .where(eq(threads.id, thread.id));
-      // Where they last talked to Auni is where background answers follow them (channels/home.ts).
-      await usedChannel(tx, channel ?? null);
-      // The message id is the turn's key, so a message is answered once, and always: a stored
-      // message has its turn queued with it.
-      await turnKind.enqueue(tx, { threadId: thread.id, messageId: id }, { key: id });
-    }
-    return row ? "stored" : "duplicate";
-  });
+  const stored = await db.transaction((tx) => storeOwnerMessage(tx, thread.id, message));
   // A retried send: its first try stored it and queued its turn.
-  if (outcome === "duplicate") return "sent";
+  if (!stored) return "sent";
 
   void publishThread(thread.id);
   // A new message waits for a turn still running, and is answered next, from any app: what the
@@ -96,4 +63,48 @@ export async function sendMessage(thread: ThreadRow, message: OwnerMessage): Pro
   // it replaces stops, as they were taken back.
   if (supersedesId) stopTurn(thread.id, supersedesId);
   return "sent";
+}
+
+/**
+ * Stores the owner's message in a thread with the turn that answers it, in the caller's
+ * transaction (a new chat stores its first message as it's made). False for one stored already: a
+ * retried send, whose first try queued its turn.
+ */
+export async function storeOwnerMessage(
+  tx: Tx,
+  threadId: string,
+  message: OwnerMessage,
+): Promise<boolean> {
+  const { id, text, supersedesId, channel, channelRef } = message;
+  const [row] = await tx
+    .insert(messages)
+    .values({
+      id,
+      threadId,
+      role: "user",
+      parts: [{ type: "text", text }],
+      supersedesId: supersedesId ?? null,
+      metadata: channel ? { channel, ...(channelRef && { channelRef }) } : {},
+    })
+    .onConflictDoNothing()
+    .returning({ id: messages.id });
+  if (!row) return false;
+  // Replying to an archived chat brings it back into the list; replying reads it. The thread
+  // shows a turn coming from now, unless one runs: its marker is its turn token's, which a
+  // new message must never take away (conversation/turn.ts).
+  await tx
+    .update(threads)
+    .set({
+      turnStartedAt: sql`coalesce(${threads.turnStartedAt}, now())`,
+      updatedAt: sql`now()`,
+      archivedAt: null,
+      readAt: sql`now()`,
+    })
+    .where(eq(threads.id, threadId));
+  // Where they last talked to Auni is where background answers follow them (channels/home.ts).
+  await usedChannel(tx, channel ?? null);
+  // The message id is the turn's key, so a message is answered once, and always: a stored
+  // message has its turn queued with it.
+  await turnKind.enqueue(tx, { threadId, messageId: id }, { key: id });
+  return true;
 }

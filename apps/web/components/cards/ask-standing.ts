@@ -21,7 +21,7 @@ export function askStanding(
     case "failed":
       return { kind: "ended", label: error ?? "Didn't go through", tone: "quiet" };
     case "cancelled":
-      return { kind: "ended", label: "You said not now", tone: "quiet" };
+      return { kind: "ended", label: "Declined", tone: "quiet" };
     case "replaced":
       return { kind: "ended", label: "Replaced by a newer card", tone: "quiet" };
     case "retracted":

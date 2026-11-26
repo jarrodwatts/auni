@@ -140,6 +140,8 @@ export const polymarketOrder: Recipe<typeof input> = {
         : 0n;
     // Sized as execute will send it, so a card Polymarket would refuse is never offered.
     const sized = sizeOrder(order, market, book, selling, heldTo);
+    // A sale says the shares it sends, rounded to Polymarket's step as sized, not as asked.
+    const sends = selling !== null ? formatAmount(Number(microsText(sized.makerAmount))) : shares;
     // A sale gets back at least the cash it asks for, less Polymarket's fee.
     const sale = selling !== null ? sized : null;
     const returns =
@@ -155,13 +157,13 @@ export const polymarketOrder: Recipe<typeof input> = {
       question: market.question,
       outcome: market.outcome,
       price: price > 0 ? price : null,
-      shares,
+      shares: sends,
       worst: Number(microsText(sized.price)),
     };
     return {
       summary: isBuy
         ? `Buy ${usdLabel(order.amountUsd ?? 0)} of ${market.outcome} on "${market.question}"`
-        : `Sell ${order.shares !== undefined ? formatAmount(order.shares) : order.amountUsd === undefined ? `all ${shares}` : `${usdLabel(order.amountUsd)} of`} ${market.outcome} shares on "${market.question}"`,
+        : `Sell ${order.shares !== undefined ? sends : order.amountUsd === undefined ? `all ${sends}` : `${usdLabel(order.amountUsd)} of`} ${market.outcome} shares on "${market.question}"`,
       amountUsd: microsText(withFees),
       // Orders and batches Auni's code builds against Polymarket's fixed contracts; what it
       // gets lands in the owner's own deposit wallet.
@@ -169,7 +171,7 @@ export const polymarketOrder: Recipe<typeof input> = {
         gives: [
           isBuy
             ? { text: `up to ${usdLabel(usdOf(withFees))} of Polygon cash` }
-            : { text: `${shares ?? "your"} ${market.outcome} shares` },
+            : { text: `${sends ?? "your"} ${market.outcome} shares` },
         ],
         gets: [
           isBuy

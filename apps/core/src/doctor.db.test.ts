@@ -1,4 +1,4 @@
-import { NETWORKS, type EvmChainKey } from "@auni/shared";
+import { HELD, NETWORKS, type EvmChainKey } from "@auni/shared";
 import postgres from "postgres";
 import { InvalidParamsRpcError } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,20 +10,15 @@ import { appTroubles, jobs } from "./db/schema.ts";
 import { doctor, doctorSummary, line, type Finding } from "./doctor.ts";
 import { env } from "./env.ts";
 import * as migrations from "./db/migrations.ts";
-import { heldMoves } from "./money/reconcile.ts";
 import { checkRelease } from "./release/check.ts";
 import { runningVersion, versionLine } from "./release/layout.ts";
 import { holderName } from "./running.ts";
 import { ownCommand } from "./service.ts";
-import { wipe } from "./test/db.ts";
+import { insertAction, insertThread, wipe } from "./test/db.ts";
 
 vi.mock("./agent/brain.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   brainRows: vi.fn(),
-}));
-vi.mock("./money/reconcile.ts", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  heldMoves: vi.fn(),
 }));
 vi.mock("./money/chains.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -99,7 +94,6 @@ const of = (findings: readonly Finding[], check: Finding["check"]) =>
 beforeEach(async () => {
   await wipe(jobs, appTroubles);
   wallet.made = false;
-  vi.mocked(heldMoves).mockResolvedValue([]);
   layout.installed = false;
   service.command = null;
   service.lingers = null;
@@ -154,8 +148,8 @@ describe("auni doctor", () => {
     expect(of(findings, "brain")).toEqual([
       "note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready. You can also pick a model right in any thread.",
       // Each made ready from the web app, on any device; the command stays for this machine.
-      "fix  brain: Claude Code: sign it in from Settings → AI Brains, on any of your devices (or run `claude auth login` where Auni runs)",
-      "fix  brain: Codex: install it from Settings → AI Brains, on any of your devices (or run `npm install -g @openai/codex` where Auni runs)",
+      "fix  brain: Claude Code: sign it in from Settings → Your AI, on any of your devices (or run `claude auth login` where Auni runs)",
+      "fix  brain: Codex: install it from Settings → Your AI, on any of your devices (or run `npm install -g @openai/codex` where Auni runs)",
     ]);
     expect(of(findings, "wallet")).toEqual([
       expect.stringMatching(/^ok {3}wallet: .*no wallet yet: the owner makes or brings one/u),
@@ -280,7 +274,8 @@ describe("auni doctor", () => {
   });
 
   it("names a held move and points to its card in the default summary", async () => {
-    vi.mocked(heldMoves).mockResolvedValue(["held-id"]);
+    const { id } = await insertThread({ title: "Fed bet" });
+    await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
     const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
     await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
     try {
@@ -288,8 +283,8 @@ describe("auni doctor", () => {
       expect(doctorSummary(findings, "auni")).toContain(
         "1 move needs checking. Open its card in Auni to check its status.",
       );
-      expect(doctorSummary(findings, "auni")).not.toContain("held-id");
-      expect(JSON.stringify(findings)).toContain("held-id");
+      expect(doctorSummary(findings, "auni")).not.toContain(id);
+      expect(JSON.stringify(findings)).toContain(id);
     } finally {
       await auni.end();
     }
@@ -374,7 +369,7 @@ describe("auni doctor", () => {
         /^note brain: Auni asks Claude Code, then Codex, and thinks with the first that is ready\. You can also pick a model right in any thread\.$/u,
       ),
       "ok   brain: Claude Code, on your Claude Max plan",
-      "note brain: Codex's sign-in has expired: sign it in from Settings → AI Brains, on any of your devices (or run `codex login --device-auth` where Auni runs)",
+      "note brain: Codex's sign-in has expired: sign it in from Settings → Your AI, on any of your devices (or run `codex login --device-auth` where Auni runs)",
     ]);
   });
 
@@ -397,6 +392,97 @@ describe("auni doctor", () => {
         expect.stringMatching(
           /^ok {3}wallet: .*EVM 0xabc, its keys in the OS keychain, as "wallet-keys:\/me\/.auni" under "auni"$/u,
         ),
+      ]);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  // Health said "1 move needs checking. Open its card in chat" with no way to that chat
+  // (2026-11-25).
+  it("names the chat holding a move that needs checking", async () => {
+    // Another process holds the runner's lock, as a running Auni does.
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      // One withdrawal from Settings, in no chat, and one buy in a chat.
+      await insertAction({ phase: "needs_owner", startedAt: new Date() });
+      const { id } = await insertThread({ title: "Fed bet" });
+      await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
+      const held = (await doctor()).filter(({ says }) => says.includes("needs checking"));
+      expect(held).toEqual([
+        expect.objectContaining({ status: "fix", chats: [{ id, title: "Fed bet" }] }),
+        expect.objectContaining({
+          status: "fix",
+          heldMove: expect.objectContaining({ id: expect.any(String) }),
+        }),
+      ]);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  // A withdrawal from Settings is in no chat, yet Health told the owner to open its card in
+  // chat, with nowhere to go (2026-11-25).
+  it("gives a held move in no chat its own finding, which Health checks in place", async () => {
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      const withdrawal = await insertAction({
+        tool: "withdraw_usdc",
+        summary: "Withdraw $20 to JAVqaE…6X8n on Solana",
+        phase: "needs_owner",
+        startedAt: new Date(),
+        run: { held: "unanswered" },
+      });
+      const { id } = await insertThread({ title: "Fed bet" });
+      await insertAction({ threadId: id, phase: "needs_owner", startedAt: new Date() });
+      const held = (await doctor()).filter(
+        ({ check, status }) => check === "runner" && status === "fix",
+      );
+      // The terminal's own words for the first ride along unseen by Health (a symbol key).
+      expect(held).toEqual([
+        expect.objectContaining({
+          check: "runner",
+          status: "fix",
+          says: "1 move needs checking. Open its card in chat for details",
+          chats: [{ id, title: "Fed bet" }],
+        }),
+        {
+          check: "runner",
+          status: "fix",
+          says: `Withdraw $20 to JAVqaE…6X8n on Solana needs checking. ${HELD.unanswered}`,
+          heldMove: {
+            id: withdrawal.id,
+            summary: "Withdraw $20 to JAVqaE…6X8n on Solana",
+            why: HELD.unanswered,
+          },
+        },
+      ]);
+      expect(held[1]!.says).not.toMatch(/chat/u);
+    } finally {
+      await auni.end();
+    }
+  });
+
+  // With held moves in two chats, Health linked only the first (2026-11-25).
+  it("names every chat holding a move that needs checking, each once", async () => {
+    const auni = postgres(env.DATABASE_URL, { max: 1, onnotice: () => {} });
+    await auni`select pg_advisory_lock(hashtext('auni:runner'))`;
+    try {
+      const a = await insertThread({ title: "Fed bet" });
+      const b = await insertThread();
+      for (const threadId of [a.id, b.id, a.id])
+        await insertAction({ threadId, phase: "needs_owner", startedAt: new Date() });
+      const held = (await doctor()).filter(({ says }) => says.includes("need checking"));
+      expect(held).toEqual([
+        expect.objectContaining({
+          says: "3 moves need checking. Open their cards in chat for details",
+          chats: [
+            { id: a.id, title: "Fed bet" },
+            { id: b.id, title: null },
+          ],
+        }),
       ]);
     } finally {
       await auni.end();

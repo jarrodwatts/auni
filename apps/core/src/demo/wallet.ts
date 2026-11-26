@@ -4,6 +4,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { chainKey } from "../money/chains.ts";
 import type { EvmTx } from "../money/recipe.ts";
 import { WalletExists, type WalletProvider } from "../apps/contract.ts";
+import { PrivateFieldRefused } from "../private-fields.ts";
 import { chains } from "./world/chain.ts";
 
 // The demo's wallet: a wallet app like any other (apps/wallet.md) that reaches no key the
@@ -24,10 +25,40 @@ export const WALLET = {
   solana: "AuniDemo111111111111111111111111111111111111",
 } as const;
 
+/**
+ * `auni demo --first-run --no-wallet`: there's no wallet yet, as a new owner who didn't bring one
+ * meets first run, and their first take's chat makes it. Otherwise the demo starts with its wallet
+ * made, as an owner past first run has.
+ */
+const wallet = { made: true };
+
+export function startWithoutWallet(): void {
+  wallet.made = false;
+}
+
+/** The demo reads nothing of the owner's, so its field to bring a wallet takes no keys. */
+const TAKES_NO_KEYS =
+  "This is the demo, so it takes no keys: its wallet is made up. Nothing was saved.";
+
 export const demoWallet: WalletProvider = {
-  addresses: async () => WALLET,
-  // The demo starts with its wallet made, as an owner past first run has.
-  create: () => Promise.reject(new WalletExists()),
+  addresses: async () => (wallet.made ? WALLET : { evm: null, solana: null }),
+  create: async () => {
+    if (wallet.made) throw new WalletExists();
+    wallet.made = true;
+    return WALLET;
+  },
+  bring: {
+    id: "wallet-keys",
+    label: "Wallet keys",
+    goes: "Saved to your wallet, only on this computer. Your AI never sees it.",
+    app: "demo-wallet",
+    link: null,
+    confirms: true,
+    proof: false,
+    inputs: [{ name: "keys", label: "Your keys", placeholder: "Paste your keys", set: false }],
+    check: () => Promise.reject(new PrivateFieldRefused(TAKES_NO_KEYS)),
+    accept: () => Promise.reject(new PrivateFieldRefused(TAKES_NO_KEYS)),
+  },
   // The demo's chains ask no fee, so no move waits on the chain's coin.
   sponsored: () => true,
   signer: async ({ onSent }) => ({

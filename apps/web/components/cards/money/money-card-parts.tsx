@@ -1,5 +1,4 @@
 import { Check, X } from "lucide-react";
-import type { ReactNode } from "react";
 
 import { LogoImage, NoMark } from "@/components/brand/marks";
 import { IntegrationMark } from "@/components/integrations/integration-mark";
@@ -141,8 +140,3 @@ export function Late() {
  * borrow it; a card itself uses CardButton and CardActions.
  */
 export const MoneyButton = CardButton;
-
-/** Two equal-height buttons on one row, for a screen outside the conversation. */
-export function MoneyButtons({ children }: { readonly children: ReactNode }) {
-  return <div className="grid grid-cols-[1fr_1.6fr] gap-2">{children}</div>;
-}

@@ -78,7 +78,7 @@ describe("where a withdrawal goes, as its card says", () => {
     expect(named.summary).toBe("Withdraw $20 to JAVqaE…6X8n on Solana");
     expect(named.card?.receipt?.title).toBe("Withdrew $20 to JAVqaE…6X8n on Solana");
     expect((await withdrawUsdc.describe(input, {})).summary).toBe(
-      "Withdraw $20 to your wallet on Solana",
+      "Withdraw $20 to your other wallet on Solana",
     );
     expect((await withdrawUsdc.describe({ ...input, destination: "exchange" }, {})).summary).toBe(
       "Withdraw $20 to your exchange on Solana",

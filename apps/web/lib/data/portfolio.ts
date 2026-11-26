@@ -1,4 +1,5 @@
 import {
+  depositsWireSchema,
   NETWORK_KEYS,
   NETWORKS,
   otherTokensWireSchema,
@@ -26,7 +27,9 @@ export function toHolding(holding: HoldingWire): Holding {
     logoUrl: holding.logoUrl,
     value: usdc(dollarsToBaseUnits(holding.usdValue)),
     todayChangeBaseUnits:
-      holding.todayChangeUsd === null ? null : dollarsToBaseUnits(holding.todayChangeUsd).toString(),
+      holding.todayChangeUsd === null
+        ? null
+        : dollarsToBaseUnits(holding.todayChangeUsd).toString(),
   };
 }
 
@@ -50,6 +53,8 @@ export interface Portfolio {
   readonly otherTokens: number;
   /** Money sent in lately, newest first, for a screen waiting on it to see land. */
   readonly deposits: readonly DepositWire[];
+  /** The networks where a move can pay its network fee now, so Add money says when it can't. */
+  readonly feesPayable: readonly NetworkKey[];
 }
 
 /**
@@ -88,7 +93,36 @@ export async function getPortfolio(
     },
     otherTokens: body.otherTokens,
     deposits: body.deposits,
+    feesPayable: body.feesPayable,
   };
+}
+
+/**
+ * Where a screen about to wait for a deposit marks its start, on core's clock
+ * (`GET /portfolio/deposits` with no mark).
+ */
+export async function markDepositWait(signal?: AbortSignal): Promise<string> {
+  const body = depositsWireSchema.parse(
+    await requestCore("portfolio/deposits", { method: "GET", signal }),
+  );
+  return body.after;
+}
+
+/**
+ * Every deposit core recorded after `mark` (see markDepositWait), newest first; each ask has core
+ * look for money that landed.
+ */
+export async function getDepositsAfter(
+  mark: string,
+  signal?: AbortSignal,
+): Promise<readonly DepositWire[]> {
+  const body = depositsWireSchema.parse(
+    await requestCore(`portfolio/deposits?after=${encodeURIComponent(mark)}`, {
+      method: "GET",
+      signal,
+    }),
+  );
+  return body.deposits;
 }
 
 /** Total portfolio history over one range (`GET /portfolio/history`). */

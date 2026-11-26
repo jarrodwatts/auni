@@ -219,7 +219,10 @@ export function ActionPlanCard({
               watching={watchingFor === funding.needUsd}
               onAdd={() => {
                 setWatchingFor(funding.needUsd);
-                openAddMoney(wholeDollars(funding.needUsd));
+                openAddMoney({
+                  usd: String(wholeDollars(funding.needUsd)),
+                  chain: funding.chain,
+                });
               }}
               onDecline={() => void decide("decline")}
             />

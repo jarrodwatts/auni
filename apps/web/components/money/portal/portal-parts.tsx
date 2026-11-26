@@ -114,19 +114,22 @@ export function PortalHero({
   coin: arrived = null,
   hero,
   orbit,
+  ringed = orbit.networks.length > 1,
 }: {
   readonly body: RefObject<HTMLSpanElement | null>;
   readonly children?: ReactNode;
   readonly className?: string;
   /** The symbol of what arrived, while it does. */
   readonly coin?: string | null;
-  /** What useGaze sets Auni's eyes on. */
+  /** Where Auni stands in the scene. */
   readonly hero: RefObject<HTMLDivElement | null>;
   readonly orbit: OrbitProps;
+  /**
+   * Whether the networks ring Auni. A ring says "any of these", so by default only where there's
+   * more than one; with the networks chosen elsewhere (Add money's chips), none.
+   */
+  readonly ringed?: boolean;
 }) {
-  // A ring says "any of these": with a single network there is nothing to choose from, so Auni
-  // stands alone and the line under it names the one (see DepositCard).
-  const ringed = orbit.networks.length > 1;
   const arriving = orbit.networks.find(({ key }) => key === orbit.arriving) ?? null;
   const coin = useRef<HTMLSpanElement>(null);
   useCoinFlight(coin, arriving?.key ?? null);

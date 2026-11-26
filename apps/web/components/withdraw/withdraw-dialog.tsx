@@ -1,56 +1,65 @@
 "use client";
 
+import { NETWORKS } from "@auni/shared";
 import { useQuery } from "@tanstack/react-query";
-import { LoaderCircle } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { Check, LoaderCircle, Plus } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
+import { NetworkPicker } from "@/components/money/network-picker";
+import { MoneySheet } from "@/components/money/money-sheet";
+import { shortAddress } from "@/components/money/portal/deposit-addresses";
 import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
-import {
-  AuniDialogMascot,
-  auniDialogCardClass,
-  auniDialogDescriptionClass,
-  auniDialogOutlineButtonClass,
-  auniDialogOverlayClass,
-  auniDialogPrimaryButtonClass,
-  auniDialogTitleClass,
-} from "@/components/ui/auni-dialog";
+import { AuniDialogMascot, auniDialogPrimaryButtonClass } from "@/components/ui/auni-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Row, Rows } from "@/components/ui/row";
 import { CoreApiError } from "@/lib/core";
 import { decideAction, useLiveAction } from "@/lib/data/actions";
 import {
   addressFits,
-  proposeWithdrawal,
   cashWords,
+  placeName,
+  proposeWithdrawal,
   readWithdrawCash,
+  samePlace,
   sentWords,
+  typedDollars,
   WITHDRAW_NETWORKS,
+  type RecentPlace,
   type Withdrawal,
   type WithdrawDestination,
   type WithdrawNetwork,
 } from "@/lib/data/withdrawals";
-import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
+import { PlaceMark } from "./place-mark";
 import { WithdrawReview } from "./withdraw-review";
-
-const FIELD =
-  "h-11 w-full rounded-control border border-foreground/[0.12] bg-background px-3.5 text-body text-ink outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-foreground/25 focus-visible:ring-[3px] focus-visible:ring-ring/25";
-const LABEL = "flex flex-col gap-1.5 text-meta font-medium text-muted-foreground";
 
 type Step =
   | { readonly kind: "form" }
   | { readonly kind: "review"; readonly withdrawal: Withdrawal }
   | { readonly kind: "sent"; readonly withdrawal: Withdrawal };
 
-/** Settings' Withdraw: dollars out to an exchange or the person's own wallet, confirmed step by step. */
+/** Where the money goes: a place it went before, or one typed in now. */
+type To = { readonly kind: "recent"; readonly place: RecentPlace } | { readonly kind: "new" };
+
+const NEW: To = { kind: "new" };
+
+const CHIPS = WITHDRAW_NETWORKS.map(({ id, name }) => ({
+  key: id,
+  name,
+  logo: NETWORKS[id].logo,
+}));
+
+const DATE = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+/**
+ * Withdraw: dollars out to an exchange or a wallet, in one sheet. How much first, then where: a
+ * place it went before (which takes no proof again), or a new address on a network picked as
+ * chips. Review then shows the whole route, and the tap that sends it. Wherever it's opened
+ * (Money, Settings, search), it's this sheet.
+ */
 export function WithdrawDialog({
   open,
   onOpenChange,
@@ -60,6 +69,7 @@ export function WithdrawDialog({
 }) {
   const [step, setStep] = useState<Step>({ kind: "form" });
   const [amount, setAmount] = useState("");
+  const [to, setTo] = useState<To | null>(null);
   const [destination, setDestination] = useState<WithdrawDestination>("exchange");
   const [network, setNetwork] = useState<WithdrawNetwork>("base");
   const [address, setAddress] = useState("");
@@ -70,7 +80,16 @@ export function WithdrawDialog({
     queryFn: ({ signal }) => readWithdrawCash(signal),
     enabled: open,
   });
-  const max = cash.data?.maxUsd[network];
+  const recent = cash.data?.recent ?? [];
+  // The latest place is picked to start with, once it's read; else a new address. Touching the
+  // new address's fields picks it, so a read that lands late never swaps in a past place.
+  const chosen: To = to ?? (recent[0] ? { kind: "recent", place: recent[0] } : NEW);
+  const goesTo =
+    chosen.kind === "recent"
+      ? chosen.place
+      : { address, network, destination: destination as WithdrawDestination | null };
+  const max = cash.data?.maxUsd[goesTo.network];
+  const cashLine = cash.data ? cashWords(cash.data, goesTo.network, amount) : null;
   // After Allow the withdrawal runs on its own; watch it until it settles.
   const sent = step.kind === "sent" ? step.withdrawal : null;
   const live = useLiveAction(sent?.action.id ?? null);
@@ -85,10 +104,11 @@ export function WithdrawDialog({
     setStep({ kind: "form" });
     setAmount("");
     setAddress("");
+    setTo(null);
     setError(null);
   };
   const close = () => {
-    // A proposal left on the confirm step is declined, so nothing lingers waiting.
+    // A proposal left on the review step is declined, so nothing lingers waiting.
     if (step.kind === "review")
       void decideAction(step.withdrawal.action.id, "decline").catch(() => {});
     onOpenChange(false);
@@ -97,32 +117,32 @@ export function WithdrawDialog({
 
   const review = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const dollars = amount.replace(/[$,\s]/gu, "");
+    const dollars = typedDollars(amount);
     if (!/^\d+(\.\d{1,2})?$/u.test(dollars) || Number(dollars) <= 0)
       return setError("Enter an amount in dollars, like 50 or 12.50.");
-    if (max !== undefined && Number(dollars) > Number(max))
-      return setError(`You can withdraw up to ${formatUsd(max)} here.`);
-    if (!addressFits(network, address))
+    // The line under the amount already says how far it goes, and how to send more.
+    if (cashLine?.over) return setError(null);
+    if (!addressFits(goesTo.network, goesTo.address))
       return setError(
-        network === "solana"
-          ? "That isn't a Solana address. Copy it again."
-          : "That isn't an address on this network. It starts with 0x and has 42 characters.",
+        goesTo.network === "solana"
+          ? "That isn't a valid Solana address. Copy it again."
+          : `That isn't a valid ${networkName(goesTo.network)} address. It starts with 0x and has 42 characters.`,
       );
     setBusy(true);
     setError(null);
     try {
       const withdrawal = await proposeWithdrawal({
         amountUsd: dollars,
-        network,
-        address,
-        destination,
+        network: goesTo.network,
+        address: goesTo.address,
+        destination: goesTo.destination,
       });
       setStep({ kind: "review", withdrawal });
     } catch (caught) {
       setError(
         caught instanceof CoreApiError && caught.detail
           ? caught.detail
-          : "That didn't reach Auni. Nothing was sent, so try again.",
+          : "Couldn't reach Auni. Nothing was sent. Try again.",
       );
     } finally {
       setBusy(false);
@@ -134,160 +154,257 @@ export function WithdrawDialog({
       ? sentWords(sent, sentNow)
       : step.kind === "review"
         ? {
-            title: "Check before it goes",
-            lede: "Money sent to a wrong address can’t come back.",
+            title: "Check before you send",
+            lede: "Money sent to the wrong address can't come back.",
           }
-        : { title: "Withdraw", lede: "Send cash to an exchange or a wallet you own." };
+        : { title: "Withdraw", lede: "Send USDC to an exchange or another wallet." };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-      <DialogContent
-        className={cn(auniDialogCardClass, "max-h-[calc(100dvh-2rem)] overflow-y-auto")}
-        overlayClassName={auniDialogOverlayClass}
+    <MoneySheet open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+      {sentNow ? (
+        <AuniDialogMascot state={sentNow.status === "failed" ? "sad" : "celebrating"} />
+      ) : null}
+      <DialogTitle className={cn("pr-10 text-title text-ink", sentNow && "mt-4 text-center")}>
+        {heading.title}
+      </DialogTitle>
+      <DialogDescription
+        className={cn("mt-1.5 text-body text-muted-foreground", sentNow && "text-center")}
       >
-        <AuniDialogMascot
-          state={sentNow && sentNow.status !== "failed" ? "celebrating" : "listening"}
-        />
-        <DialogHeader className="mt-3.5 items-center gap-0 text-center sm:text-center">
-          <DialogTitle className={auniDialogTitleClass}>{heading.title}</DialogTitle>
-          <DialogDescription className={auniDialogDescriptionClass}>
-            {heading.lede}
-          </DialogDescription>
-        </DialogHeader>
+        {heading.lede}
+      </DialogDescription>
 
-        {step.kind === "review" ? (
-          <div className="mt-5">
-            <WithdrawReview
-              withdrawal={step.withdrawal}
-              onBack={() => {
-                void decideAction(step.withdrawal.action.id, "decline").catch(() => {});
-                setStep({ kind: "form" });
-              }}
-              onSent={(action) =>
-                setStep({ kind: "sent", withdrawal: { ...step.withdrawal, action } })
-              }
-            />
-          </div>
-        ) : step.kind === "sent" ? (
-          <Button
-            className={cn(auniDialogPrimaryButtonClass, "mt-6")}
-            onClick={close}
-            type="button"
-          >
+      {step.kind === "review" ? (
+        <WithdrawReview
+          className="mt-6"
+          withdrawal={step.withdrawal}
+          onBack={() => {
+            void decideAction(step.withdrawal.action.id, "decline").catch(() => {});
+            setStep({ kind: "form" });
+          }}
+          onSent={(action) => setStep({ kind: "sent", withdrawal: { ...step.withdrawal, action } })}
+        />
+      ) : step.kind === "sent" ? (
+        <DialogClose asChild>
+          <Button className={cn(auniDialogPrimaryButtonClass, "mt-7")} type="button">
             Done
           </Button>
-        ) : (
-          <form className="mt-5 flex flex-col gap-4" onSubmit={(event) => void review(event)}>
-            <label className={LABEL}>
-              Amount
-              <span className="relative">
-                <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-body text-muted-foreground">
-                  $
-                </span>
-                <input
-                  autoComplete="off"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  className={cn(FIELD, "pr-16 pl-7 tabular-nums")}
-                />
-                <button
-                  type="button"
-                  disabled={!max || Number(max) <= 0}
-                  onClick={() => max && setAmount(max)}
-                  className="absolute top-1/2 right-1.5 h-8 -translate-y-1/2 rounded-full px-3 text-meta font-semibold text-primary hover:bg-foreground/[0.04] disabled:opacity-40"
-                >
-                  Max
-                </button>
+        </DialogClose>
+      ) : (
+        <form className="mt-6 flex flex-col" onSubmit={(event) => void review(event)}>
+          <label className="block">
+            <span className="sr-only">Amount in dollars</span>
+            <span className="flex items-center gap-1 rounded-card border border-border px-4 py-3 transition-[border-color,box-shadow] focus-within:border-ink/40 focus-within:ring-[3px] focus-within:ring-ring/20">
+              <span aria-hidden className="text-card-money text-faint">
+                $
               </span>
-              <span className="font-normal">
-                {cash.data
-                  ? cashWords(cash.data)
-                  : cash.isError
-                    ? "Your cash couldn’t load right now."
-                    : "Reading your cash…"}
-              </span>
-            </label>
-
-            <div role="radiogroup" aria-label="Where it goes" className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  ["exchange", "An exchange", "Like Coinbase"],
-                  ["wallet", "My own wallet", "One you control"],
-                ] as const
-              ).map(([id, label, detail]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="radio"
-                  aria-checked={destination === id}
-                  onClick={() => setDestination(id)}
-                  className={cn(
-                    "rounded-control border px-3.5 py-2.5 text-left transition-colors",
-                    destination === id
-                      ? "border-foreground/40 bg-foreground/[0.03]"
-                      : "border-foreground/[0.1] hover:bg-foreground/[0.02]",
-                  )}
-                >
-                  <span className="block text-ui font-medium text-ink">{label}</span>
-                  <span className="block text-meta text-muted-foreground">{detail}</span>
-                </button>
-              ))}
-            </div>
-
-            <label className={LABEL}>
-              Network
-              <select
-                value={network}
-                onChange={(event) => setNetwork(event.target.value as WithdrawNetwork)}
-                className={cn(FIELD, "appearance-none")}
-              >
-                {WITHDRAW_NETWORKS.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name}
-                  </option>
-                ))}
-              </select>
-              {destination === "exchange" && network === "base" ? (
-                <span className="font-normal">Coinbase takes USDC on Base.</span>
-              ) : null}
-            </label>
-
-            <label className={LABEL}>
-              {destination === "exchange" ? "Your exchange’s USDC address" : "Your wallet address"}
               <input
-                autoCapitalize="off"
+                name="amount"
                 autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                placeholder={network === "solana" ? "Solana address" : "0x…"}
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                className={cn(FIELD, "font-mono text-ui")}
+                inputMode="decimal"
+                placeholder="0"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-card-money text-ink tabular-nums outline-none placeholder:text-faint"
               />
-            </label>
-
-            {error ? (
-              <p role="alert" className="text-meta text-destructive">
-                {error}
-              </p>
-            ) : null}
-
-            <div className="mt-1 grid grid-cols-2 gap-3">
-              <DialogClose asChild>
-                <Button className={auniDialogOutlineButtonClass} disabled={busy} variant="outline">
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button className={auniDialogPrimaryButtonClass} disabled={busy} type="submit">
-                {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : null}
-                Review
+              <Button
+                disabled={!max || Number(max) <= 0}
+                onClick={() => max && setAmount(max)}
+                size="sm"
+                type="button"
+                variant="secondary"
+              >
+                Max
               </Button>
+            </span>
+          </label>
+          <p
+            aria-live="polite"
+            className={cn(
+              "mt-2 text-meta",
+              cashLine?.over ? "text-negative" : "text-muted-foreground",
+            )}
+          >
+            {cashLine
+              ? cashLine.words
+              : cash.isError
+                ? "Couldn't load your balance. You can still enter an amount."
+                : "Checking your cash"}
+          </p>
+
+          <p className="mt-6 text-meta font-semibold text-muted-foreground">To</p>
+          {recent.length > 0 ? (
+            <Rows role="radiogroup" aria-label="Where it goes" className="mt-1">
+              {recent.map((place) => (
+                <li key={`${place.network}:${place.address}`}>
+                  <PlaceRow
+                    on={chosen.kind === "recent" && samePlace(chosen.place, place)}
+                    onPick={() => setTo({ kind: "recent", place })}
+                    place={place}
+                  />
+                </li>
+              ))}
+              <li>
+                <Pick
+                  on={chosen.kind === "new"}
+                  onPick={() => setTo(NEW)}
+                  mark={
+                    <span className="grid size-8 place-items-center rounded-full bg-foreground/[0.06] text-muted-foreground">
+                      <Plus aria-hidden className="size-4" />
+                    </span>
+                  }
+                  title="New address"
+                />
+              </li>
+            </Rows>
+          ) : null}
+
+          {chosen.kind === "new" ? (
+            <div className={cn("flex flex-col", recent.length > 0 ? "mt-4" : "mt-2")}>
+              <NetworkPicker
+                label="Network to send on"
+                networks={CHIPS}
+                value={network}
+                onChange={(key) => {
+                  setTo(NEW);
+                  setNetwork(key as WithdrawNetwork);
+                }}
+              />
+              <label className="mt-3 block">
+                <span className="sr-only">Address on {networkName(network)}</span>
+                <Input
+                  name="address"
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder={`Paste ${networkName(network)} address`}
+                  value={address}
+                  onChange={(event) => {
+                    setTo(NEW);
+                    setAddress(event.target.value);
+                  }}
+                  className="h-12 px-3.5 font-mono placeholder:font-sans"
+                />
+              </label>
+              <div
+                role="radiogroup"
+                aria-label="Whose address it is"
+                className="mt-3 grid grid-cols-2 gap-1 rounded-control bg-foreground/[0.05] p-1"
+              >
+                {(
+                  [
+                    ["exchange", "My exchange"],
+                    ["wallet", "My other wallet"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={destination === id}
+                    onClick={() => {
+                      setTo(NEW);
+                      setDestination(id);
+                    }}
+                    className={cn(
+                      "h-9 rounded-control text-ui font-medium transition-colors",
+                      destination === id
+                        ? "bg-popover text-ink ring-1 ring-border"
+                        : "text-muted-foreground hover:text-ink",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {destination === "exchange" ? (
+                <p className="mt-2 text-meta text-muted-foreground">
+                  {network === "base" ? "Coinbase takes USDC on Base. " : null}Copy your
+                  exchange&apos;s USDC deposit address for {networkName(network)}.
+                </p>
+              ) : null}
             </div>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+          ) : null}
+
+          {error ? (
+            <p role="alert" className="mt-4 text-meta text-negative">
+              {error}
+            </p>
+          ) : null}
+
+          <Button
+            className={cn(auniDialogPrimaryButtonClass, "mt-6")}
+            disabled={busy}
+            type="submit"
+          >
+            {busy ? <LoaderCircle aria-hidden className="animate-spin" /> : null}
+            Review
+          </Button>
+        </form>
+      )}
+    </MoneySheet>
+  );
+}
+
+function networkName(network: WithdrawNetwork): string {
+  return NETWORKS[network].name;
+}
+
+/** One choice of where it goes, as a row: a tick ends the one picked. */
+function Pick({
+  on,
+  onPick,
+  mark,
+  title,
+  meta,
+}: {
+  readonly on: boolean;
+  readonly onPick: () => void;
+  readonly mark: ReactNode;
+  readonly title: ReactNode;
+  readonly meta?: ReactNode;
+}) {
+  return (
+    <Row
+      asChild
+      mark={mark}
+      title={title}
+      meta={meta}
+      end={on ? <Check aria-hidden className="size-4 text-ink" /> : null}
+    >
+      <button type="button" role="radio" aria-checked={on} onClick={onPick} />
+    </Row>
+  );
+}
+
+/** A place money went before: whose it is and on which network, its ends, and when. */
+function PlaceRow({
+  on,
+  onPick,
+  place,
+}: {
+  readonly on: boolean;
+  readonly onPick: () => void;
+  readonly place: RecentPlace;
+}) {
+  const named = placeName(place.destination);
+  const whose = named
+    ? `${named.charAt(0).toUpperCase()}${named.slice(1)}`
+    : shortAddress(place.address);
+  return (
+    <Pick
+      on={on}
+      onPick={onPick}
+      mark={<PlaceMark destination={place.destination} network={place.network} size={32} />}
+      title={`${whose} on ${networkName(place.network)}`}
+      meta={
+        <>
+          {place.destination ? (
+            <span className="font-mono">{shortAddress(place.address)} </span>
+          ) : null}
+          Last sent {DATE.format(new Date(place.at))}
+        </>
+      }
+    />
   );
 }

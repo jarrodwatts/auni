@@ -39,10 +39,11 @@ export async function hasWallet(): Promise<boolean> {
 }
 
 /**
- * Makes the owner's wallet unless there is one: as their first take starts its chat, and again
- * as any move is prepared (money/actions.ts), so one that couldn't be made then is made when a
- * move first needs it. One made meanwhile, say by a second tab sending its first take at once,
- * or brought by the owner, is theirs. Open tabs hear of a new one, to show its addresses.
+ * Makes the owner's wallet unless there is one: as their first take starts its chat, as any move
+ * is prepared (money/actions.ts), and as Add money opens on none (POST /me/wallet), so one that
+ * couldn't be made earlier is made when a move or its address is first wanted. One made
+ * meanwhile, say by a second tab asking at once, or brought by the owner, is theirs: the wallet
+ * app makes one alone (WalletExists). Open tabs hear of a new one, to show its addresses.
  */
 export async function makeWalletIfNone(): Promise<void> {
   if (await hasWallet()) return;

@@ -4,6 +4,7 @@ import {
   valueRangeSchema,
   type ActionQuoteWire,
   type ActivityWire,
+  type depositsWireSchema,
   type HoldingWire,
   type OtherTokensWire,
   type portfolioWireSchema,
@@ -19,7 +20,7 @@ import { ownerHere } from "../auth/proof.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
 import { markActivitySeen, readActivity } from "./activity.ts";
-import { depositWire, recentDeposits } from "./arrivals.ts";
+import { depositMark, depositsAfter, depositWire, recentDeposits } from "./arrivals.ts";
 import { listOtherTokens } from "./buckets.ts";
 import { actionById, actionsForThread, actionWire, proposalActions } from "./actions.ts";
 import { allowAction, allowProposal, declineAction, declineProposal, outOfDate } from "./decide.ts";
@@ -31,6 +32,7 @@ import { quoteAgain, retryAction, retryProposal, type Retried } from "./retry.ts
 import { holdingViews } from "./holdings.ts";
 import { madeUsd, unpricedOf, walletFlows } from "./made.ts";
 import { addToken, readOtherTokens } from "./other-tokens.ts";
+import { feesPayable } from "./fee-coin.ts";
 import { portfolioNow } from "./portfolio.ts";
 import { plainCashUsd } from "./readings.ts";
 import { sweepSoon } from "./sweep.ts";
@@ -257,7 +259,7 @@ portfolioRouter.get("/", async (req, res) => {
   sweepSoon(req.query.deposit === "1");
   // The read first: what it finds already there begins to count as it reads (see first-look.ts).
   const portfolio = await portfolioNow();
-  const [flows, deposits, others, { timeZone }] = await Promise.all([
+  const [flows, deposits, others, { timeZone }, feesNow] = await Promise.all([
     walletFlows(),
     recentDeposits(),
     // A list that can't be read now hides the row, never the portfolio.
@@ -266,6 +268,7 @@ portfolioRouter.get("/", async (req, res) => {
       return [];
     }),
     theOwner(),
+    feesPayable(portfolio.holdings),
   ]);
   res.json({
     totalUsd: portfolio.totalUsd,
@@ -285,7 +288,34 @@ portfolioRouter.get("/", async (req, res) => {
     cashUsd: portfolio.cash.usdValue,
     otherTokens: others.length,
     deposits: deposits.map(depositWire),
+    feesPayable: feesNow,
   } satisfies z.input<typeof portfolioWireSchema>);
+});
+
+/** `?after=`: the mark a screen began waiting at, as core gave it (see depositMark). */
+const afterQuery = z.object({ after: z.iso.datetime({ offset: true }).optional() });
+
+/**
+ * What a screen waiting on a deposit sees land. Asked first with no `after`, it lands nothing
+ * and gives the mark to ask after, on core's clock; asked after it, every deposit recorded since,
+ * newest first and every one of them, and never one recorded before the screen began waiting.
+ * Each ask after the mark sweeps the wallets soon (see sweepSoon).
+ */
+portfolioRouter.get("/deposits", async (req, res) => {
+  const query = afterQuery.safeParse(req.query);
+  if (!query.success) return void res.status(400).json({ error: "invalid_after" });
+  const { after } = query.data;
+  if (after === undefined) {
+    res.json({ deposits: [], after: await depositMark() } satisfies z.input<
+      typeof depositsWireSchema
+    >);
+    return;
+  }
+  sweepSoon(true);
+  const deposits = await depositsAfter(after);
+  res.json({ deposits: deposits.map(depositWire), after } satisfies z.input<
+    typeof depositsWireSchema
+  >);
 });
 
 /** Their Other tokens as they open the list (see readOtherTokens). */

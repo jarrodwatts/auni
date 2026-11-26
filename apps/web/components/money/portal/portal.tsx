@@ -2,15 +2,23 @@
 
 import "./portal.css";
 
-import type { DepositWire } from "@auni/shared";
-import { X } from "lucide-react";
+import "./add-money.css";
+
+import { isCash, NETWORKS, type DepositWire, type NetworkKey } from "@auni/shared";
+import { Check, Copy } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 
 import { MascotArt } from "@/components/brand/mascot-art";
-import { auniDialogPrimaryButtonClass } from "@/components/ui/auni-dialog";
+import { FullAddress } from "@/components/cards/money/full-address";
+import { SpotlightShimmer } from "@/components/motion/spotlight-shimmer";
+import {
+  auniDialogOutlineButtonClass,
+  auniDialogPrimaryButtonClass,
+} from "@/components/ui/auni-dialog";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import type { FundingNeed } from "@/lib/app-links";
 import type { DepositNetwork } from "@/lib/data/portfolio";
 import { dollarsToBaseUnits } from "@/lib/data/usdc";
 import { formatUsd, formatUsdcBalance } from "@/lib/money";
@@ -18,16 +26,15 @@ import { QR_COLORS } from "@/lib/qr";
 import { useClipboardCopy } from "@/lib/use-clipboard-copy";
 import { cn } from "@/lib/utils";
 
+import { landedTotal, stillNeeded } from "../deposit-watch";
+import { NetworkPicker, type PickedNetwork } from "../network-picker";
 import {
   depositAddresses,
   networkNamed,
-  networkNames,
   PLACEHOLDERS,
   type DepositAddress,
 } from "./deposit-addresses";
 import {
-  addressRowsClass,
-  AddressRow,
   ARRIVE_MS,
   COUNT_DELAY_MS,
   COUNT_UP_MS,
@@ -35,13 +42,11 @@ import {
   NOD,
   play,
   PortalHero,
-  RowSkeleton,
 } from "./portal-parts";
 import { useCountUp } from "./use-count-up";
-import { useGaze } from "./use-gaze";
 
-/** Where money for a card is simplest to send: dollars, on the network Auni is built around. */
-const EASIEST = "Monad";
+/** Where money is simplest to send: dollars, on the network Auni is built around. */
+const EASIEST: NetworkKey = "monad";
 
 /** "0.081", "250", "1,234.56": enough to recognise what was sent. */
 const AMOUNT = new Intl.NumberFormat("en-US", {
@@ -51,218 +56,283 @@ const AMOUNT = new Intl.NumberFormat("en-US", {
 });
 
 interface PortalProps {
-  /** Every network money can arrive on; empty until the account's wallets are ready. */
+  /** Every network money can arrive on; empty until the wallets are ready. */
   readonly networks: readonly DepositNetwork[];
-  /** The deposit that landed while it was open, once one has. */
-  readonly landed: DepositWire | null;
-  /** The whole dollars a card needs, when one opened it ("50"). */
-  readonly need?: string | null;
+  /** Every deposit that landed while it was open, newest first. */
+  readonly landed: readonly DepositWire[];
+  /** What a card is short of, when one opened it. */
+  readonly need?: FundingNeed | null;
+  /** The networks where a move can pay its network fee now; null until the money is read. */
+  readonly feesPayable?: readonly NetworkKey[] | null;
+  /**
+   * Whether what lands is being counted yet (see useDepositWatch). The addresses never wait for
+   * it: paying shouldn't, and money sent before it starts is in the wallet all the same.
+   */
+  readonly watching: boolean;
 }
 
 /**
- * Money in from any other wallet or exchange, with no network to pick: one address takes it on
- * every EVM network, and Solana has its own. Auni waits front and centre in the orbit of every
- * network it takes, and watches what you do; an address in hand lights its networks, its code
- * grows out around Auni, and when the money lands a coin of its network flies into Auni, which
- * celebrates.
+ * Money in from an exchange or another wallet. The owner picks the network they'll send on
+ * first, since that's the one choice that can lose money, and its address shows at once as a
+ * code to scan, in full to check, and a button to copy, with Auni waiting in the middle of the
+ * code. When money lands, the code falls away, a coin of its network flies out of that network's
+ * chip into Auni, and the amount counts up, with Add more to send again. Money for a card counts
+ * only once it's USDC on the network the card is short on, and while it falls short the sheet
+ * says what's left and keeps watching.
  */
-export function Portal({ landed, need = null, networks }: PortalProps) {
-  // Stand-in addresses hold the rows' places until the account's wallets are ready.
+export function Portal({
+  landed,
+  need = null,
+  networks,
+  feesPayable = null,
+  watching,
+}: PortalProps) {
+  // Stand-in addresses hold the places until the wallets are ready.
   const ready = networks.length > 0;
   const promised = ready ? networks : PLACEHOLDERS;
   const addresses = depositAddresses(promised);
+  const [picked, setPicked] = useState<NetworkKey>(need?.chain ?? EASIEST);
+  const network = promised.find(({ key }) => key === picked) ?? promised[0]!;
+  const entry = addresses.find((each) => each.networks.includes(network)) ?? null;
   const clipboard = useClipboardCopy();
-  // The row in hand (pointed at or focused) lights its networks on the orbit; a code shows only
-  // once its button opens it.
-  const [pointed, setPointed] = useState<string | null>(null);
-  const [opened, setOpened] = useState<string | null>(null);
-  const find = (address: string | null) =>
-    addresses.find((entry) => entry.address === address) ?? null;
-  const qr = landed ? null : find(opened);
-  const copied = find(clipboard.copiedValue);
-  const inHand = find(pointed) ?? copied;
+  const copied = entry !== null && clipboard.copiedValue === entry.address;
+
+  const total = landedTotal(landed);
+  const left = stillNeeded(need, landed);
+  // How many had landed when the owner chose to add more: the code comes back until the next.
+  const [addingAfter, setAddingAfter] = useState(0);
+  // Done once something new landed and, for a card, once there's enough.
+  const done = landed.length > addingAfter && left === 0n;
+  const newest = landed[0] ?? null;
+  const arriving = done && newest ? networkNamed(promised, newest.network) : null;
 
   const hero = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLSpanElement>(null);
-  const done = useRef<HTMLButtonElement>(null);
-  useGaze(hero, qr === null && landed === null);
-  const arriving = landed ? networkNamed(promised, landed.network) : null;
+  const doneButton = useRef<HTMLButtonElement>(null);
+  const copyButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!landed) return;
+    if (!done) return;
     // The network's coin flies into Auni, which gulps it down and hops.
     const stop = landOn(body.current, arriving !== null);
-    // The addresses go inert as Done takes their place, which would leave a keyboard's focus
-    // on nothing, outside the dialog.
-    done.current?.focus();
+    // What was focused goes inert as Done takes its place.
+    doneButton.current?.focus();
     return stop;
-  }, [arriving, landed]);
-
-  // Escape folds an open code away rather than closing everything. Heard on the window as the key
-  // comes down, it's handled before the dialog's own listener on the document sees it.
-  const qrOpen = qr !== null;
+  }, [arriving, done]);
+  // Money that isn't enough yet gets a nod; the line under the title says what's left.
+  const shortLandings = left > 0n ? landed.length : 0;
   useEffect(() => {
-    if (!qrOpen) return;
-    const fold = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      setOpened(null);
-    };
-    window.addEventListener("keydown", fold, { capture: true });
-    return () => window.removeEventListener("keydown", fold, { capture: true });
-  }, [qrOpen]);
+    if (shortLandings > 0) play(body.current, NOD, 700);
+  }, [shortLandings]);
 
-  const arrived = landed ? dollarsToBaseUnits(landed.usdValue) : null;
   const counted = useCountUp(
-    arrived,
+    done ? total : null,
     COUNT_UP_MS,
     arriving ? ARRIVE_MS + COUNT_DELAY_MS : COUNT_DELAY_MS,
   );
-  const what = landed
-    ? `${AMOUNT.format(Number(landed.amount))} ${landed.symbol} on ${landed.network}`
+  const what = newest
+    ? `${AMOUNT.format(Number(newest.amount))} ${newest.symbol} on ${newest.network}` +
+      (landed.length > 1 ? `, and ${landed.length - 1} more` : "")
     : null;
+
+  const chips = promised.map(({ key, networkName, logo }): PickedNetwork => ({
+    key,
+    name: networkName,
+    logo,
+  }));
+  const { coin } = NETWORKS[network.key];
+  const needOn = need ? NETWORKS[need.chain].name : null;
 
   return (
     <div
-      className="auni-portal flex flex-col items-center text-center"
+      className="auni-portal auni-add-money flex flex-col text-left"
+      data-qr={done ? undefined : ""}
       data-copied={copied ? "" : undefined}
       data-arriving={arriving ? "" : undefined}
-      data-counting={landed && counted !== null ? "" : undefined}
-      data-landed={landed ? "" : undefined}
-      data-qr={qr ? "" : undefined}
+      data-counting={done && counted !== null ? "" : undefined}
+      data-landed={done ? "" : undefined}
     >
+      <div className="auni-add-money-fold" inert={done}>
+        <div className="auni-add-money-head">
+          <DialogTitle className="pr-10 text-title text-ink">
+            {need ? `Add ${formatUsd(need.usd)}` : "Add money"}
+          </DialogTitle>
+          <DialogDescription className="mt-1.5 text-body text-muted-foreground">
+            {need
+              ? forTheCard(need, left, landed.length > 0 ? what : null)
+              : "Send from an exchange or another wallet."}
+          </DialogDescription>
+          <NetworkPicker
+            className="mt-5"
+            label="Network to send on"
+            networks={chips.filter(({ key }) => isCash(key))}
+            more={chips.filter(({ key }) => !isCash(key))}
+            value={network.key}
+            onChange={setPicked}
+          />
+        </div>
+      </div>
+
       <PortalHero
         body={body}
-        className="mt-1"
-        coin={landed?.symbol ?? null}
+        className="mt-5 self-center"
+        coin={newest?.symbol ?? null}
         hero={hero}
-        orbit={{
-          networks: promised,
-          // While a code shows, the orbit holds still behind it; once money lands, only the mark
-          // it came on moves, into Auni.
-          lit: qr || landed ? null : (inHand?.networks ?? null),
-          arriving,
-          still: qr !== null,
-        }}
+        ringed={false}
+        orbit={{ networks: promised, lit: null, arriving }}
       >
-        <QrCard addresses={ready ? addresses : []} onFold={() => setOpened(null)} shown={qr} />
+        <QrCard addresses={ready ? addresses : []} shown={entry} />
       </PortalHero>
 
-      <div className="auni-portal-texts mt-[18px] w-full">
-        <div className="auni-portal-waiting">
-          <DialogTitle className="text-title text-ink">
-            {need ? `Send me ${formatUsd(need)}` : "Send me anything"}
-          </DialogTitle>
-          {/* For a card, the simplest way to the amount; else, everything it takes. */}
-          <DialogDescription className="mt-1.5 text-body leading-[22px] text-muted-foreground">
-            {need ? (
-              `USDC on ${EASIEST} is easiest`
-            ) : (
-              <>
-                <span aria-hidden>Any coin, on any of these networks</span>
-                <span className="sr-only">Any coin, on {networkNames(promised)}.</span>
-              </>
-            )}
-          </DialogDescription>
-        </div>
-        {/* Its lines hold their height while empty, so the dialog is as tall before as after. */}
-        <div aria-hidden className="auni-portal-landing">
-          <p className="min-h-12 text-hero-money text-ink">
-            {landed && counted !== null ? formatUsdcBalance(counted) : null}
-          </p>
-          {/* What came, once the amount has counted all the way to it. */}
-          <p
-            className={cn(
-              "mt-1 min-h-[22px] text-body leading-[22px] text-muted-foreground transition-opacity duration-300 motion-reduce:transition-none",
-              counted === arrived ? "opacity-100" : "opacity-0",
-            )}
-          >
-            {what}
-          </p>
-        </div>
-      </div>
-
-      {/* In the corner, but next after the title the dialog opens on, so Tab reaches it first. */}
-      <DialogClose aria-label="Close" className={cn(cornerButtonClass, "right-4")}>
-        <X aria-hidden className="size-4" />
-      </DialogClose>
-
-      <div className="auni-portal-acts mt-6 w-full">
-        <div className="auni-portal-addresses" inert={landed !== null}>
-          <div className={addressRowsClass}>
-            {ready
-              ? addresses.map((entry) => (
-                  <AddressRow
-                    key={entry.address}
-                    blocked={clipboard.blocked}
-                    copied={copied === entry}
-                    entry={entry}
-                    on={qr === entry}
-                    onCopy={() => {
-                      clipboard.copy(entry.address);
-                      play(body.current, NOD, 700);
-                    }}
-                    onPoint={(on) =>
-                      setPointed((current) =>
-                        on ? entry.address : current === entry.address ? null : current,
-                      )
-                    }
-                    onToggleQr={() => setOpened(opened === entry.address ? null : entry.address)}
-                  />
-                ))
-              : addresses.map((entry) => <RowSkeleton key={entry.address} />)}
+      <div className="auni-add-money-swap mt-5">
+        <div className="auni-add-money-fold auni-add-money-before" inert={done}>
+          <div className="flex flex-col items-center">
+            <p className="min-h-12 text-center text-ui leading-6">
+              {ready && entry ? (
+                <FullAddress address={entry.address} />
+              ) : (
+                <span
+                  aria-hidden
+                  className="auni-loading-sheen inline-block h-4 w-56 rounded-full"
+                />
+              )}
+            </p>
+            {/* The one thing that loses money: sending on a network this address isn't for. */}
+            <p className="mt-3 text-center text-ui text-ink">
+              Choose <span className="font-semibold">{network.networkName}</span> as the network
+              when you send.
+            </p>
+            <Button
+              ref={copyButton}
+              className={cn(auniDialogPrimaryButtonClass, "mt-4")}
+              disabled={!ready || !entry}
+              onClick={() => {
+                if (!entry) return;
+                clipboard.copy(entry.address);
+                play(body.current, NOD, 700);
+              }}
+              type="button"
+            >
+              {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied ? "Copied" : "Copy address"}
+            </Button>
+            {clipboard.blocked ? (
+              <p role="alert" className="mt-2 text-center text-meta text-muted-foreground">
+                Your browser blocked copying. Select the address above to copy it.
+              </p>
+            ) : null}
+            <p className="mt-3 text-center text-meta text-muted-foreground">
+              {need && need.chain !== network.key
+                ? `Your card needs USDC on ${needOn}. Money sent on ${network.networkName} won't count toward it.`
+                : need
+                  ? `Send USDC on ${network.networkName}.`
+                  : whatToSend(network.key)}
+              {/* Only where the wallet can't pay a fee yet (see feesPayable in core's fee-coin.ts). */}
+              {feesPayable && !feesPayable.includes(network.key)
+                ? network.key === "solana"
+                  ? " Also send a little SOL. It pays Solana's network fees."
+                  : ` Also send a little ${coin.asset.symbol}. It pays the first network fee, and after that Auni buys fees with your USDC.`
+                : null}
+            </p>
+            <p className="mt-5 text-center text-meta text-muted-foreground">
+              <SpotlightShimmer active={ready}>
+                {!ready
+                  ? "Preparing your wallet address"
+                  : watching
+                    ? `Watching for your transfer on ${network.networkName}`
+                    : `Getting ready to watch for your transfer on ${network.networkName}`}
+              </SpotlightShimmer>
+            </p>
           </div>
         </div>
-        <DialogClose asChild>
-          <Button
-            ref={done}
-            className={cn(auniDialogPrimaryButtonClass, "auni-portal-done h-12")}
-            inert={landed === null}
-            type="button"
-          >
-            Done
-          </Button>
-        </DialogClose>
+
+        <div
+          aria-hidden={!done}
+          className="auni-add-money-after flex flex-col items-center"
+          inert={!done}
+        >
+          <p className="min-h-12 text-hero-money text-ink">
+            {done && counted !== null ? formatUsdcBalance(counted) : null}
+          </p>
+          <p className="mt-1 min-h-6 text-center text-body text-muted-foreground">
+            {done ? `${what} arrived.` : null}
+          </p>
+          <div className="mt-6 grid w-full grid-cols-[auto_1fr] gap-3">
+            <Button
+              className={cn(auniDialogOutlineButtonClass, "px-6")}
+              onClick={() => {
+                setAddingAfter(landed.length);
+                // Done goes inert as the code comes back; the address is what's wanted next.
+                requestAnimationFrame(() => copyButton.current?.focus());
+              }}
+              type="button"
+              variant="secondary"
+            >
+              Add more
+            </Button>
+            <DialogClose asChild>
+              <Button ref={doneButton} className={auniDialogPrimaryButtonClass} type="button">
+                Done
+              </Button>
+            </DialogClose>
+          </div>
+        </div>
       </div>
-      {clipboard.blocked ? (
-        <p role="alert" className="mt-3 text-meta text-muted-foreground">
-          Copying was blocked. Select the address to copy it.
-        </p>
-      ) : null}
 
       {/* Copies and landings are said apart, so neither cuts the other off. */}
       <span aria-live="polite" className="sr-only">
-        {copied ? `Copied your ${networkNames(copied.networks)} address.` : ""}
+        {copied ? `Copied. Choose ${network.networkName} as the network when you send.` : ""}
       </span>
       <span aria-live="polite" className="sr-only">
-        {landed
-          ? `${formatUsdcBalance(dollarsToBaseUnits(landed.usdValue))} arrived: ${what}.`
-          : ""}
+        {newest ? `${formatUsdcBalance(total)} arrived: ${what}.` : ""}
       </span>
     </div>
   );
 }
 
-const cornerButtonClass =
-  "absolute top-4 z-10 grid size-[30px] place-items-center rounded-full bg-foreground/[0.05] text-muted-foreground outline-none transition-colors hover:bg-foreground/[0.09] hover:text-ink focus-visible:ring-[3px] focus-visible:ring-ring/35";
+/**
+ * What to send on a network, by the coins Auni always recognises there (its USDC, its USDT and
+ * its own coin, see coinName in core's coins.ts), then those a token list or real trading
+ * vouches for (core's recognised.ts). The watch counts only those: anyone can mint a token, so
+ * one Auni doesn't recognise lands in the wallet unannounced, and the sheet says so.
+ */
+export function whatToSend(key: NetworkKey): string {
+  const { name, usdc, usdt, coin } = NETWORKS[key];
+  const named = [usdc && "USDC", usdt && "USDT", coin.asset.symbol].filter(Boolean);
+  const coins = named.length > 1 ? `${named.slice(0, -1).join(", ")} or ${named.at(-1)}` : named[0];
+  return `Send ${coins} on ${name}, or another widely traded coin. Other coins still arrive, but may not show here.`;
+}
 
 /**
- * Every address's code, drawn once each, in a card that grows out around Auni; only the one
- * shown is unveiled, so moving between rows swaps one code for the other. A tap folds it away.
+ * What Add money says under its title for a card short of `need`, with `left` still to come once
+ * `arrived` (what landed, by name) came in: what to send, then how far along it is.
+ */
+function forTheCard(need: FundingNeed, left: bigint, arrived: string | null): string {
+  const on = NETWORKS[need.chain].name;
+  const asked = dollarsToBaseUnits(need.usd);
+  if (!arrived) return `Send ${formatUsd(need.usd)} USDC on ${on}, then go back to your card.`;
+  if (left === 0n) return `${formatUsd(need.usd)} arrived, enough for your card.`;
+  if (left < asked)
+    return `${formatUsdcBalance(asked - left)} arrived. ${formatUsdcBalance(left)} more USDC on ${on} to go.`;
+  // Only some other coin, or USDC on another network, came in: none of it is the card's cash.
+  return `${arrived} arrived. Your card still needs ${formatUsdcBalance(left)} USDC on ${on}.`;
+}
+
+/**
+ * Every address's code, drawn once each, on a plate Auni sits in the middle of: only the one for
+ * the picked network shows, so picking another EVM network keeps the same code (it is the same
+ * address), and Solana swaps it for its own.
  */
 function QrCard({
   addresses,
-  onFold,
   shown,
 }: {
   readonly addresses: readonly DepositAddress[];
-  readonly onFold: () => void;
   readonly shown: DepositAddress | null;
 }) {
   return (
-    // The code button on the row is the way to it by keyboard; this is a shortcut for a tap.
-    <div aria-hidden={shown ? undefined : true} className="auni-portal-qr" onClick={onFold}>
+    <div className="auni-portal-qr">
       {addresses.map((entry) => (
-        <QrCanvas key={entry.address} entry={entry} on={entry === shown} />
+        <QrCanvas key={entry.address} entry={entry} on={entry.address === shown?.address} />
       ))}
       <span className="auni-portal-qr-hole">
         <span className="auni-portal-qr-mascot">
@@ -278,10 +348,9 @@ function QrCanvas({ entry, on }: { readonly entry: DepositAddress; readonly on: 
   useEffect(() => {
     if (!canvas) return;
     // The bare address, nothing else. A link naming one chain would steer the scanning wallet to
-    // that chain alone, though the address takes money on every network listed with it, and an
-    // EIP-681 link can put a token contract where some apps read the destination. High error
-    // correction, so Auni sitting on the middle never breaks a scan. Drawn at twice the size it
-    // shows, for sharp screens.
+    // that chain alone, and an EIP-681 link can put a token contract where some apps read the
+    // destination. High error correction, so Auni sitting in the middle never breaks a scan.
+    // Drawn at twice the size it shows, for sharp screens.
     void QRCode.toCanvas(canvas, entry.address, {
       width: 384,
       margin: 0,
@@ -293,7 +362,7 @@ function QrCanvas({ entry, on }: { readonly entry: DepositAddress; readonly on: 
     <canvas
       ref={setCanvas}
       aria-hidden={on ? undefined : true}
-      aria-label={`QR code for your ${networkNames(entry.networks)} address`}
+      aria-label="QR code for this address"
       className="auni-portal-code"
       data-on={on ? "" : undefined}
       role="img"

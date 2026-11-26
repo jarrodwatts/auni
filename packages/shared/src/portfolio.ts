@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { dollarsSchema } from "./money.ts";
-import { NETWORK_KEYS } from "./networks.ts";
+import { CASH_KEYS, NETWORK_KEYS } from "./networks.ts";
 import { threadIdSchema } from "./shared.ts";
 
 /** One holding as a person reads it, on GET /portfolio and in a thread's inspector. */
@@ -33,9 +33,21 @@ const depositWireSchema = z.object({
   network: z.string(),
   /** Its dollars when it arrived. */
   usdValue: dollarsSchema,
+  /** The network whose cash it is, when it's the USDC Auni spends there; null for anything else. */
+  cash: z.enum(CASH_KEYS).nullable(),
 });
 
 export type DepositWire = z.infer<typeof depositWireSchema>;
+
+/**
+ * Core's GET /portfolio/deposits: every deposit recorded after the mark a screen began waiting
+ * at, newest first, and that mark, to ask after next time.
+ */
+export const depositsWireSchema = z.object({
+  deposits: z.array(depositWireSchema),
+  /** The instant the screen began waiting, on core's clock, exactly as core gave it. */
+  after: z.string(),
+});
 
 /** Core's GET /portfolio: the live total, all non-cash holdings, and cash. */
 export const portfolioWireSchema = z.object({
@@ -62,6 +74,8 @@ export const portfolioWireSchema = z.object({
   otherTokens: z.number().int().min(0),
   /** The latest few deposits recorded in the last hour, newest first. */
   deposits: z.array(depositWireSchema),
+  /** The networks where a move can pay its network fee now (see feesPayable in money/fee-coin.ts). */
+  feesPayable: z.array(z.enum(NETWORK_KEYS)),
 });
 
 /**

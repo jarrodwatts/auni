@@ -30,6 +30,14 @@ export async function revealWalletKeys(): Promise<{
 }
 
 /**
+ * Makes the owner's wallet when there's none yet (core's `POST /me/wallet`), and answers the
+ * owner as they are after; one already there is left as it is.
+ */
+export async function makeWallet(): Promise<Me> {
+  return meSchema.parse(await requestCore("me/wallet", { method: "POST", body: "{}" }));
+}
+
+/**
  * Makes the key a wallet brought with one alone lacks, beside it (`me.walletLacks`), and answers
  * the owner as they are after. A refusal, nothing to add, comes back as a CoreApiError.
  */

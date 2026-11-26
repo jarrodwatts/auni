@@ -1,10 +1,21 @@
 "use client";
 
-import type { ThreadId, ValueRange } from "@auni/shared";
-import { keepPreviousData, skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import type { DepositWire, ThreadId, ValueRange } from "@auni/shared";
+import {
+  keepPreviousData,
+  queryOptions,
+  skipToken,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 
-import { getPortfolio, getValueHistory } from "@/lib/data/portfolio";
+import {
+  getDepositsAfter,
+  getPortfolio,
+  getValueHistory,
+  markDepositWait,
+} from "@/lib/data/portfolio";
 import { getTakes } from "@/lib/data/takes";
 import { getThreadState } from "@/lib/data/threads";
 
@@ -58,6 +69,48 @@ export function useTakes() {
     refetchInterval: MONEY_POLL_MS,
     refetchOnWindowFocus: (query) => query.state.status === "error",
   });
+}
+
+const NO_DEPOSITS: readonly DepositWire[] = [];
+
+/**
+ * For an ask Add money can't do without: asked again until it's answered, 1s, 2s, 4s and on to
+ * every 30s apart, since a core restarting or a database blip must never leave it stuck (review
+ * of 2026-11-25), and kept once answered.
+ */
+export const UNTIL_ANSWERED = {
+  staleTime: Infinity,
+  retry: true,
+  retryDelay: (failures: number) => Math.min(1_000 * 2 ** failures, 30_000),
+} as const;
+
+/** The read of a deposit wait's start mark, for the wait begun at `opened`, until it comes. */
+export const depositMarkQuery = (opened: number) =>
+  queryOptions({
+    queryKey: ["deposit-mark", opened],
+    queryFn: ({ signal }) => markDepositWait(signal),
+    ...UNTIL_ANSWERED,
+  });
+
+/**
+ * A screen waiting for a deposit: it first has core mark the instant it began, on the clock core
+ * records deposits by, then reads every deposit recorded after that mark, newest first, every 10
+ * seconds, with core looking for money that landed each time. So one landing just after it opened
+ * counts, a burst between two reads counts in full, and one recorded before it opened never does.
+ * `watching` is false until the mark is in, as nothing that lands can be counted before then; the
+ * addresses show at once all the same, since only the counting waits for it.
+ */
+export function useDepositWatch() {
+  // This screen's own wait, so opening it again marks a new start.
+  const [opened] = useState(() => performance.now());
+  const mark = useQuery(depositMarkQuery(opened));
+  const after = mark.data;
+  const read = useQuery({
+    queryKey: ["deposits", after],
+    queryFn: after === undefined ? skipToken : ({ signal }) => getDepositsAfter(after, signal),
+    refetchInterval: DEPOSIT_POLL_MS,
+  });
+  return { watching: after !== undefined, landed: read.data ?? NO_DEPOSITS };
 }
 
 /** Live holdings opened in one thread and its remaining auto-spend budget. */

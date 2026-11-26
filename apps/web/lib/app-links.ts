@@ -1,3 +1,5 @@
+import { isCash, type CashKey } from "@auni/shared";
+
 /** Add money and Settings open from anywhere by URL. */
 export const FUNDING_DIALOG_PARAM = "fund";
 export const SETTINGS_DIALOG_PARAM = "settings";
@@ -31,15 +33,23 @@ function withParam(pathname: string, search: string | undefined, param: string, 
   return `${pathname}?${params.toString()}`;
 }
 
-/** Add money, open for anything, or for the whole dollars a card needs (`need`, as "50"). */
-export function fundingDialogHref(pathname: string, search?: string, need?: number): string {
-  return withParam(pathname, search, FUNDING_DIALOG_PARAM, need ? String(need) : DIALOG_OPEN_VALUE);
+/** What a card is short of: whole dollars ("50") of USDC on one network. */
+export interface FundingNeed {
+  readonly usd: string;
+  readonly chain: CashKey;
 }
 
-/** What Add money's parameter says: closed (null), open, or open for the dollars a card needs. */
-export function fundingAsked(value: string | null): { readonly need: string | null } | null {
+/** Add money, open for anything, or for what a card is short of, as "50-base". */
+export function fundingDialogHref(pathname: string, search?: string, need?: FundingNeed): string {
+  const value = need ? `${need.usd}-${need.chain}` : DIALOG_OPEN_VALUE;
+  return withParam(pathname, search, FUNDING_DIALOG_PARAM, value);
+}
+
+/** What Add money's parameter says: closed (null), open, or open for what a card is short of. */
+export function fundingAsked(value: string | null): { readonly need: FundingNeed | null } | null {
   if (value === DIALOG_OPEN_VALUE) return { need: null };
-  return value && /^[1-9]\d*$/u.test(value) ? { need: value } : null;
+  const [, usd, chain] = /^([1-9]\d*)-([a-z]+)$/u.exec(value ?? "") ?? [];
+  return usd && chain && isCash(chain) ? { need: { usd, chain } } : null;
 }
 
 export function settingsDialogHref(

@@ -17,6 +17,7 @@ import {
   reportSubject,
   settingsDialogHref,
   settingsSection,
+  type FundingNeed,
   type ReportSubject,
   type SettingsSection,
 } from "@/lib/app-links";
@@ -37,8 +38,8 @@ export function useAppDialogs() {
     () => ({
       addMoneyHref,
       settingsHref,
-      /** Opens Add money; from a card, for the whole dollars it needs. */
-      openAddMoney: (need?: number) =>
+      /** Opens Add money; from a card, for what it's short of. */
+      openAddMoney: (need?: FundingNeed) =>
         router.push(fundingDialogHref(pathname, search, need), { scroll: false }),
       openSettings: (section?: SettingsSection) =>
         router.push(settingsHref(section), { scroll: false }),

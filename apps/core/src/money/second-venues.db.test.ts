@@ -3,14 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 import { toolsFor } from "../agent/mcp.ts";
 import { db } from "../db/client.ts";
-import {
-  actions,
-  arrivalCursors,
-  arrivals,
-  fills,
-  otherTokens,
-  threads,
-} from "../db/schema.ts";
+import { actions, arrivalCursors, arrivals, fills, otherTokens, threads } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
 import { PERPS, perpsStatement } from "../test/second-venues/perps.ts";
 import {

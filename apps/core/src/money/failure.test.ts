@@ -220,6 +220,42 @@ describe("retryRefusal", () => {
     expect(retryRefusal({ ...failed, status: "done" })).toBe("not_failed");
   });
 
+  // Found in review: a card from before format 4 named a spender by its first and last four
+  // digits, which another address can share, and pinned only those words.
+  it("never runs again a format-2 or 3 card that vouched for a power over the wallet by its words alone", () => {
+    const lets = { label: "Lets", value: "0xAbCd…1234 spend your USDC" };
+    const shortly = { needsStepUp: `lets ${lets.value}` };
+    const two = { ...failed, cardFormat: 2, lines: [lets], card: FACE, details: shortly };
+    expect(retryRefusal(two)).toBe("not_retryable");
+    // Format 3 gave each permission its own entry, but still pinned it by its short words.
+    expect(retryRefusal({ ...two, cardFormat: 3 })).toBe("not_retryable");
+    // An order or a venue's permission a format-2 or 3 card showed among its terms isn't one.
+    const order = { label: "Lets", value: "Hyperliquid close the whole position at $90" };
+    expect(retryRefusal({ ...two, lines: [order], details: {} })).toBeNull();
+    expect(retryRefusal({ ...two, cardFormat: 3, lines: [order], details: {} })).toBeNull();
+    // One pinned exactly runs again, with the owner's proof as any power over the wallet takes.
+    const exactly = { ...shortly, grantsExactly: "spend:0x1:0x1:0x2::" };
+    expect(retryRefusal({ ...two, details: exactly })).toBe("needs_proof");
+    expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT, details: exactly })).toBe("needs_proof");
+    // Found in review: one pinned before each permission kept which token account or NFT it
+    // reaches, whatever its card's format, vouched for less than a send is now held to.
+    const fewer = { ...shortly, grantsExactly: "spend:0x1:0x2" };
+    expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT, details: fewer })).toBe("not_retryable");
+    // Found in review: or before it kept the contract that keeps it, which told a token's own
+    // allowance from Permit2's or a credit delegation over it.
+    const unkept = { ...shortly, grantsExactly: "spend:0x1:0x2::" };
+    expect(retryRefusal({ ...two, cardFormat: CARD_FORMAT, details: unkept })).toBe(
+      "not_retryable",
+    );
+    // Found in review: a format-1 card pinned no more, whether core drew its line whole or its
+    // own words warned of it, so it is never tried again either.
+    const one = { ...two, cardFormat: 1 };
+    expect(retryRefusal({ ...one, card: null })).toBe("not_retryable");
+    const warned = { ...FACE, warning: `It lets ${lets.value} afterwards.` };
+    expect(retryRefusal({ ...one, card: warned })).toBe("not_retryable");
+    expect(retryRefusal({ ...one, card: warned, details: exactly })).toBe("needs_proof");
+  });
+
   // Its run may grant what that card never showed, such as a first sale's lasting permission.
   it("never runs again a card drawn before cards said all they say now that left a permission out", () => {
     const lets = { label: "Lets", value: "Polymarket's exchanges trade your shares" };
@@ -255,7 +291,13 @@ describe("retryRefusal", () => {
     expect(retryRefusal({ ...failed, tool: "withdraw_usdc" })).toBe("needs_proof");
     expect(retryRefusal({ ...failed, details: { leavesTo: "0xabc" } })).toBe("needs_proof");
     expect(
-      retryRefusal({ ...failed, details: { needsStepUp: "lets 0xabc spend your USDC" } }),
+      retryRefusal({
+        ...failed,
+        details: {
+          needsStepUp: "lets 0xabc spend your USDC",
+          grantsExactly: "spend:0x1:0x1:0xabc::",
+        },
+      }),
     ).toBe("needs_proof");
   });
 });

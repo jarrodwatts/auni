@@ -11,7 +11,7 @@ import {
 
 import type { ActionRow } from "../db/schema.ts";
 import type { AppLogo } from "./app-logo.ts";
-import { LINES, sentTo, type Cost, type Effect } from "./effect.ts";
+import { LINES, sentTo, unpinnedGrant, type Cost, type Effect } from "./effect.ts";
 import { feeLabel } from "./format.ts";
 import { lostSaid } from "./gone-for-good.ts";
 import { moneyOf, type ActionPreview } from "./recipe.ts";
@@ -467,19 +467,23 @@ type OldCard = Pick<ActionRow, "lines" | "card" | "cardFormat" | "tool" | "propo
 const SHOWS_PERMISSIONS = 2;
 
 /**
- * Whether a card drawn before cards showed every permission (SHOWS_PERMISSIONS) left out a lasting
- * permission one of its moves leaves, as its recorded Lets line names them, so the owner allowed
- * it unseen: a plan's card drew no move's Lets line, and a lone move's card showed it whole only
- * when core drew its face from its lines and the line fit (LINE_MOST, where a figure was cut), or
- * the move's own words warned of it whole, as the card drew them: after what it sends for good,
- * and cut where a warning was (lossWarning in action-card.ts). An old row doesn't
- * mark which of what it lets is an order its face showed among its terms (Grant.order), so each
- * counts as a permission.
+ * Whether a card left out a lasting permission one of its moves leaves, so the owner allowed it
+ * unseen. A row that pinned a permission over the main wallet by less than all it is, as every
+ * card did until format 4 (by its short words alone, which another can share), is taken back
+ * whatever it showed (see unpinnedGrant). A card from SHOWS_PERMISSIONS on said every other
+ * permission. One before it is judged by its recorded Lets line: a plan's card drew no move's
+ * Lets line, and a lone move's card showed it whole only when core drew its face from its lines
+ * and the line fit (LINE_MOST, where a figure was cut), or the move's own words warned of it
+ * whole, as the card drew them: after what it sends for good, and cut where a warning was
+ * (lossWarning in action-card.ts). Such an old row doesn't mark which of what it lets is an order
+ * its face showed among its terms (Grant.order), so each counts as a permission.
  */
 export function leftOutPermission(legs: readonly OldCard[]): boolean {
   return legs.some((leg) => {
+    if (isAsk(leg.tool)) return false;
+    if (unpinnedGrant(leg.details)) return true;
     const lets = leg.lines.find(({ label }) => label === LETS_LINE)?.value;
-    if (!lets || leg.cardFormat >= SHOWS_PERMISSIONS || isAsk(leg.tool)) return false;
+    if (!lets || leg.cardFormat >= SHOWS_PERMISSIONS) return false;
     if (leg.proposalId !== null) return true;
     if (leg.card === null) return lets.length > LINE_MOST;
     return !warnedFirst(lostSaid(leg), leg.card.warning)?.includes(lets);

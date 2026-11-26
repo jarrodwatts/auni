@@ -582,7 +582,11 @@ describe("withLeaves", () => {
   it("says every permission a move leaves, each whole on its own, whoever wrote its face", () => {
     const granted = withLeaves(face, {
       grants: [
-        { lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" },
+        {
+          lets: "0x1a2b…9f8e spend your USDC",
+          reach: "wallet",
+          exact: { kind: "spend", token: "0x1", to: "0x2" },
+        },
         {
           lets: "Polymarket's exchanges trade the shares in your Polymarket wallet",
           reach: "venue",
@@ -600,21 +604,21 @@ describe("withLeaves", () => {
 
   it("never drops or cuts one, however long the tokens' own names make them", () => {
     // Two allowances over tokens whose contracts name themselves at length: once these were one
-    // sentence cut at 500 characters, and the second fell off the end. Names are never shortened,
-    // since the check before signing compares these words (see assertStillAsShown).
+    // sentence cut at 500 characters, and the second fell off the end. Names are never shortened.
+    // Each holder is named whole (42 characters), so two such names are what still fit.
     const names = new Map([
-      [TOKEN_A, { symbol: "A".repeat(200), decimals: 18 }],
-      [TOKEN_B, { symbol: "B".repeat(200), decimals: 18 }],
+      [TOKEN_A, { symbol: "A".repeat(160), decimals: 18 }],
+      [TOKEN_B, { symbol: "B".repeat(160), decimals: 18 }],
     ]);
-    const grants = [TOKEN_A, TOKEN_B].map((token) => ({
-      lets: grantLabel({ kind: "spend", token, to: SPENDER }, names),
-      reach: "wallet" as const,
-    }));
+    const grants = [TOKEN_A, TOKEN_B].map((token) => {
+      const exact = { kind: "spend", token, to: SPENDER } as const;
+      return { lets: grantLabel(exact, names), reach: "wallet" as const, exact };
+    });
     expect(tooMuchToShow({ grants })).toBeNull();
     const card = fitted(withLeaves({ ...face, warning: "W".repeat(500) }, { grants }));
     expect(card.leaves?.map(({ says }) => says)).toEqual([
-      `From now on, it lets 0x2222…2222 spend your ${"A".repeat(200)}.`,
-      `From now on, it lets 0x2222…2222 spend your ${"B".repeat(200)}.`,
+      `From now on, it lets ${SPENDER} spend your ${"A".repeat(160)}.`,
+      `From now on, it lets ${SPENDER} spend your ${"B".repeat(160)}.`,
     ]);
     expect(cardFaceSchema.safeParse(card).success).toBe(true);
   });
@@ -642,8 +646,16 @@ describe("withLeaves", () => {
         gives: [],
         gets: [],
         grants: [
-          { lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" },
-          { lets: "0x1a2b…9f8e spend your WETH", reach: "wallet" },
+          {
+            lets: "0x1a2b…9f8e spend your USDC",
+            reach: "wallet",
+            exact: { kind: "spend", token: "0x1", to: "0x2" },
+          },
+          {
+            lets: "0x1a2b…9f8e spend your WETH",
+            reach: "wallet",
+            exact: { kind: "spend", token: "0x3", to: "0x2" },
+          },
         ],
       }),
     });
@@ -658,6 +670,7 @@ describe("tooMuchToShow", () => {
   const spend = (index: number) => ({
     lets: `0x${String(index).repeat(4)}…${String(index).repeat(4)} spend your USDC`,
     reach: "wallet" as const,
+    exact: { kind: "spend" as const, token: "0x1", to: "0x2" },
   });
   const few = { grants: [spend(1), spend(2), spend(3)] };
 
@@ -673,16 +686,21 @@ describe("tooMuchToShow", () => {
   // signing passed a swapped one. Whole, a name too long for a card gets no card instead.
   it("refuses one permission whose token's name is too long to show whole", () => {
     const names = new Map([[TOKEN_A, { symbol: "A".repeat(500), decimals: 18 }]]);
-    const lets = grantLabel({ kind: "spend", token: TOKEN_A, to: SPENDER }, names);
+    const exact = { kind: "spend", token: TOKEN_A, to: SPENDER } as const;
+    const lets = grantLabel(exact, names);
     expect(lets).toContain("A".repeat(500));
-    expect(tooMuchToShow({ grants: [{ lets, reach: "wallet" }] })).toMatch(/^It leaves 1 /u);
+    expect(tooMuchToShow({ grants: [{ lets, reach: "wallet", exact }] })).toMatch(/^It leaves 1 /u);
   });
 
   // What it measures is the most a card draws: the plain face's one sentence, each leaf in it.
   it("passes exactly what a card draws whole, and one character more is refused", () => {
     const at = (length: number) => ({
       grants: [
-        { lets: "x".repeat(length - "From now on, it lets .".length), reach: "wallet" as const },
+        {
+          lets: "x".repeat(length - "From now on, it lets .".length),
+          reach: "wallet" as const,
+          exact: { kind: "spend" as const, token: "0x1", to: "0x2" },
+        },
       ],
     });
     expect(tooMuchToShow(at(500))).toBeNull();

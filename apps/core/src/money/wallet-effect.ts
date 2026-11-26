@@ -43,11 +43,34 @@ export interface Moved {
   readonly in: readonly TokenLeg[];
 }
 
-/** A permission over the owner's tokens left to someone, on any chain. */
+/**
+ * A permission over the owner's tokens left to someone, on any chain, with every distinction a
+ * simulation sees, since its card is allowed for that one permission (see pinnedApproval):
+ * - `spend`: spend the token by its own allowance (a Solana delegate), or move the one NFT `id`;
+ * - `permit`: spend the token through `contract`, which keeps allowances over many tokens for
+ *   whoever the owner names (Permit2), a power the token's own allowance to it only opens;
+ * - `borrow`: borrow the token in the owner's name, the debt theirs and their lending position
+ *   behind it (a lending market's credit delegation, kept by its debt token `contract`);
+ * - `positions`: borrow against and withdraw the owner's positions at `contract` (Morpho's
+ *   authorization);
+ * - `operator`: move all of the token, whatever it is;
+ * - `ownership`: own the contract `token`, or on Solana the token `account` itself;
+ * - `close`: close the Solana token `account`, taking the SOL it holds.
+ */
 export interface TokenGrant {
-  readonly kind: "spend" | "operator" | "ownership";
+  readonly kind: "spend" | "permit" | "borrow" | "positions" | "operator" | "ownership" | "close";
+  /** The token's whole address on EVM (a contract's, for ownership), or its mint on Solana. */
   readonly token: string;
   readonly to: string;
+  /**
+   * On EVM, the contract that keeps the permission, whose own state says it: the token's, for
+   * its own allowance; an allowance keeper's, as Permit2 is; a lending market's debt token.
+   */
+  readonly contract?: string;
+  /** On Solana, the one token account of the owner's it reaches. */
+  readonly account?: string;
+  /** On EVM, the one NFT an approval reaches, by its id. */
+  readonly id?: string;
 }
 
 /** What a transaction does to the owner's wallet, on any chain, as a simulation or a receipt reads it. */
@@ -68,6 +91,7 @@ export interface Leg extends TokenLeg {
 interface Grant extends TokenGrant {
   readonly token: Address;
   readonly to: Address;
+  readonly contract: Address;
   readonly check?: { readonly to: Address; readonly data: Hex };
 }
 
@@ -165,6 +189,23 @@ function read(logs: readonly Log[], owner: Address) {
   const nftsIn = new Map<Address, bigint>();
   const sentTo = new Set<Address>();
   const grants = new Map<string, Grant | null>();
+  /**
+   * A permission `contract` keeps, by what it keys it by there, or false when the log takes it
+   * back; `data` reads it there, to say whether it outlives the batch.
+   */
+  const keep = (
+    contract: Address,
+    key: string,
+    grant: (Omit<Grant, "contract" | "check"> & { readonly data?: Hex }) | false,
+  ) => {
+    if (!grant) {
+      grants.set(`${contract}:${key}`, null);
+      return;
+    }
+    const { data, ...kept } = grant;
+    const check = data ? { check: { to: contract, data } } : {};
+    grants.set(`${contract}:${key}`, { ...kept, contract, ...check });
+  };
   const add = (legs: Map<Address, bigint>, token: Address, amount: bigint) =>
     legs.set(token, (legs.get(token) ?? 0n) + amount);
   const mine = (topic: Hex | undefined) =>
@@ -211,50 +252,38 @@ function read(logs: readonly Log[], owner: Address) {
     } else if ((selector === AUTHORIZED_OPERATOR || selector === REVOKED_OPERATOR) && mine(two)) {
       const to = topicAddress(one!);
       const authorized = selector === AUTHORIZED_OPERATOR;
-      grants.set(
-        `${contract}:${to}`,
-        authorized ? { kind: "operator", token: contract, to } : null,
-      );
+      keep(contract, to, authorized && { kind: "operator", token: contract, to });
     } else if (!mine(one) || !two) {
       continue;
     } else if (selector === APPROVAL) {
       const to = topicAddress(two);
       // An approval to no one, as clearing an NFT's or burning one logs, grants nothing.
       if (isAddressEqual(to, zeroAddress)) {
-        grants.set(`${contract}:${to}:${three}`, null);
+        keep(contract, `${to}:${three}`, false);
         continue;
       }
       // An NFT's approval indexes the token id; it lasts until that token moves.
       const data = three
         ? encodeFunctionData({ abi: reads, functionName: "getApproved", args: [BigInt(three)] })
         : encodeFunctionData({ abi: erc20Abi, functionName: "allowance", args: [owner, to] });
-      const check = { to: contract, data };
-      grants.set(`${contract}:${to}:${three}`, { kind: "spend", token: contract, to, check });
+      const id = three ? { id: BigInt(three).toString() } : {};
+      keep(contract, `${to}:${three}`, { kind: "spend", token: contract, to, ...id, data });
     } else if ((selector === PERMIT2_APPROVAL || selector === PERMIT2_PERMIT) && three) {
       const [token, to] = [topicAddress(two), topicAddress(three)];
       const args = [owner, token, to] as const;
-      const check = {
-        to: contract,
-        data: encodeFunctionData({ abi: reads, functionName: "allowance", args }),
-      };
-      grants.set(`${contract}:${token}:${to}`, { kind: "spend", token, to, check });
+      const data = encodeFunctionData({ abi: reads, functionName: "allowance", args });
+      keep(contract, `${token}:${to}`, { kind: "permit", token, to, data });
     } else if (selector === APPROVAL_FOR_ALL) {
       const to = topicAddress(two);
-      grants.set(
-        `${contract}:${to}`,
-        word(data) ? { kind: "operator", token: contract, to } : null,
-      );
+      keep(contract, to, word(data) > 0n && { kind: "operator", token: contract, to });
     } else if ((selector === OWNERSHIP || selector === OWNERSHIP_STARTED) && !mine(two)) {
-      grants.set(contract, { kind: "ownership", token: contract, to: topicAddress(two) });
+      keep(contract, "", { kind: "ownership", token: contract, to: topicAddress(two) });
     } else if (selector === BORROW_DELEGATION && three) {
       const [to, token] = [topicAddress(two), topicAddress(three)];
-      grants.set(`${contract}:${to}:${token}`, word(data) ? { kind: "spend", token, to } : null);
+      keep(contract, `${to}:${token}`, word(data) > 0n && { kind: "borrow", token, to });
     } else if (selector === MORPHO_AUTHORIZATION && three) {
       const to = topicAddress(three);
-      grants.set(
-        `${contract}:${to}`,
-        word(data) ? { kind: "operator", token: contract, to } : null,
-      );
+      keep(contract, to, word(data) > 0n && { kind: "positions", token: contract, to });
     }
   }
   const net = (sums: Map<Address, bigint>, against: Map<Address, bigint>) =>
@@ -513,12 +542,31 @@ export function worth(legs: readonly TokenLeg[], names: ReadonlyMap<string, Toke
   }, 0);
 }
 
-/** "0x1a2b3c…9f8e spend your USDC": who holds the permission, and what it lets them do. */
+/** Permit2's address, the same on every chain. */
+const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+
+/**
+ * "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b spend your USDC": who holds the permission, by
+ * their whole address, since anyone can make one that shares a short form's first and last
+ * digits; and what it lets them do, by its kind (see TokenGrant). A lending market is named by
+ * no app's name, which any contract can claim.
+ */
 export function grantLabel(grant: TokenGrant, names: ReadonlyMap<string, TokenName>): string {
-  const to = shortAddress(grant.to);
-  if (grant.kind === "ownership") return `${to} own ${shortAddress(grant.token)}`;
+  const { kind, to, account, id, contract = "" } = grant;
   const token = tokenLabel(grant.token, names);
-  return grant.kind === "spend" ? `${to} spend your ${token}` : `${to} move all your ${token}`;
+  if (kind === "close") return `${to} close your ${token} account`;
+  if (kind === "ownership")
+    return account ? `${to} own your ${token} account` : `${to} own ${grant.token}`;
+  if (kind === "operator") return `${to} move all your ${token}`;
+  if (kind === "borrow") return `${to} borrow ${token} against your lending position`;
+  if (kind === "positions")
+    return `${to} borrow against and withdraw your positions at ${shortAddress(contract)}`;
+  if (kind === "permit") {
+    const keeper =
+      contract.toLowerCase() === PERMIT2.toLowerCase() ? "Permit2" : shortAddress(contract);
+    return `${to} spend your ${token} through ${keeper}`;
+  }
+  return id ? `${to} move your ${token} #${id}` : `${to} spend your ${token}`;
 }
 
 /**

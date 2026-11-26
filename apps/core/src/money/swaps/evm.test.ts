@@ -158,7 +158,7 @@ describe("sendEvmSwap", () => {
     );
     await expect(sendEvmSwap(wallets, request, route)).rejects.toThrow("would send more");
     vi.mocked(simulateEffect).mockResolvedValue(
-      seen({ grants: [{ kind: "spend", token: USDC, to: ROUTER }] }),
+      seen({ grants: [{ kind: "spend", contract: USDC, token: USDC, to: ROUTER }] }),
     );
     await expect(sendEvmSwap(wallets, request, route)).rejects.toThrow("permission");
     expect(sent).toEqual([]);

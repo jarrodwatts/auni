@@ -75,7 +75,11 @@ describe("the proof rung", () => {
   });
 
   it("takes the owner's proof for what its card pinned, wherever its money has gone before", async () => {
-    const lets = { lets: "0x2222…2222 spend your USDC", reach: "wallet" } as const;
+    const lets = {
+      lets: "0x2222…2222 spend your USDC",
+      reach: "wallet",
+      exact: { kind: "spend", token: "0x1", to: "0x2" },
+    } as const;
     const row = await card({ gives: [], gets: [], grants: [lets] });
     expect(row.details).toMatchObject({ needsStepUp: "lets 0x2222…2222 spend your USDC" });
     expect(await needsStepUp(row)).toBe(true);

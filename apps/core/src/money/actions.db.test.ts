@@ -192,6 +192,55 @@ describe("executeAction", () => {
       expect(executions).toBe(0);
     });
 
+    // Found in review: a lone raw move from an older card named its power over the wallet by its
+    // short words alone and pinned no exact one, so its check before signing refuses it every
+    // time; it ran its fee top-ups first and then failed, where it should be taken back.
+    it("takes back a move that named a power over the wallet by its words alone, however its card showed it", async () => {
+      const lets = { label: "Lets", value: "0xAbCd…1234 spend your USDC" };
+      const words = { needsStepUp: `lets ${lets.value}` };
+      const raw = (fields: Parameters<typeof insertAction>[0]) =>
+        old({ tool: "evm_transaction", lines: [lets], details: words, ...fields });
+      const rows = [
+        await raw({ card: null }),
+        await raw({ card: { ...FACE, warning: `It lets ${lets.value} afterwards.` } }),
+        await raw({ cardFormat: 2, card: null }),
+        await raw({ cardFormat: 3, card: null }),
+        // Found in review: pinned before each permission kept which token account or NFT it reaches.
+        await raw({
+          cardFormat: CARD_FORMAT,
+          card: null,
+          details: { ...words, grantsExactly: "spend:0x1:0x2" },
+        }),
+        // Found in review: pinned before each kept the contract that keeps it, so a token's own
+        // allowance, Permit2's and a credit delegation over it were pinned alike.
+        await raw({
+          cardFormat: CARD_FORMAT,
+          card: null,
+          details: { ...words, grantsExactly: "spend:0x1:0x2::" },
+        }),
+      ];
+      for (const { id } of rows)
+        expect(await executeAction(id)).toMatchObject({
+          status: "retracted",
+          error: RETRACTED.unshown,
+          startedAt: null,
+        });
+      expect(executions).toBe(0);
+      expect(signing.options).toBeUndefined();
+      // One pinned exactly, as a card drawn now pins it, isn't taken back: it starts, and goes on
+      // to ask for the owner's proof, as any power over the wallet does.
+      const pinned = await raw({
+        cardFormat: CARD_FORMAT,
+        card: null,
+        details: { ...words, grantsExactly: "spend:0x1:0x1:0x2::" },
+      });
+      expect(await executeAction(pinned.id)).toMatchObject({
+        status: "failed",
+        error: expect.stringContaining("never checked it was you"),
+        startedAt: expect.any(Date),
+      });
+    });
+
     it("runs when its card showed every permission it leaves, or leaves none, or is drawn now", async () => {
       const shown = await old({
         card: { ...FACE, warning: `It lets ${LETS.value} afterwards.` },

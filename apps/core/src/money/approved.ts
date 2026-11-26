@@ -1,5 +1,5 @@
 import type { ActionRow } from "../db/schema.ts";
-import { stepUpOnly, sameDestination, type Effect } from "./effect.ts";
+import { sameDestination, unshownGrant, type Effect } from "./effect.ts";
 import { parseUnits } from "./usd.ts";
 import type { Moved, Simulated, TokenLeg } from "./wallet-effect.ts";
 
@@ -234,17 +234,20 @@ export function assertBytesDo(now: Simulated | null, asked: Asked): void {
 /**
  * Refuses a raw transaction whose fresh effect strays from what its card
  * showed, whether a tap alone or one with the owner's proof approved it: either vouched only
- * for what was shown. Nothing new may need that proof (see pinnedApproval),
- * which covers every permission it leaves; money leaving the owner may go only
+ * for what was shown. Nothing new may need that proof (see pinnedApproval): it may leave only
+ * the permissions its card showed, each the same exactly (see unshownGrant), and be no blinder
+ * than its card said; money leaving the owner may go only
  * where its card named; and nothing may leave past what the card showed.
  * The agent's bytes state no least they get, so what the card showed arriving may
  * come in up to 3% under, as the chain moves between the card and the send. A
  * card drawn without a simulation showed no amounts to hold it to, and took the owner's proof.
  */
 export function assertStillAsShown(approved: Approved, fresh: Effect, now: Simulated | null): void {
+  const grant = unshownGrant(approved.details, fresh);
+  if (grant) throw new Error(`This now lets ${grant.lets}, so nothing was sent.`);
   const shownReasons = approved.details.needsStepUp?.split("; ") ?? [];
-  const reason = stepUpOnly(fresh).find((each) => !shownReasons.includes(each));
-  if (reason) throw new Error(`This now ${reason}, so nothing was sent.`);
+  if (fresh.blind && !shownReasons.includes(fresh.blind))
+    throw new Error(`This now ${fresh.blind}, so nothing was sent.`);
   const shownTo = approved.details.leavesTo?.split(",").filter(Boolean) ?? [];
   if (
     shownTo.length > 0 &&

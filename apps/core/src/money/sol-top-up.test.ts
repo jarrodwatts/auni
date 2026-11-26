@@ -450,7 +450,9 @@ describe("what a card pins of the SOL it buys", () => {
   it("says a dollar of Monad's USDC sent to the pay-in service, and counts it where it is spent", async () => {
     const plan = await solForFees(SHORT);
     expect(topUpDetails(plan)).toEqual(pinned("1000000"));
-    expect(said(plan)).toBe("Also buys about $1 of SOL for network fees, most of which stays in your wallet. Bought through Carry.");
+    expect(said(plan)).toBe(
+      "Also buys about $1 of SOL for network fees, most of which stays in your wallet. Bought through Carry.",
+    );
     // A dollar beside the card's own amount: in a specialist's pot, and of Monad's cash in a plan.
     expect(feeCoinUsd(topUpDetails(plan))).toBe("1.00");
     expect(cash(plan)).toEqual({ from: "monad", usd: "1.00" });
@@ -460,7 +462,9 @@ describe("what a card pins of the SOL it buys", () => {
     vi.mocked(paysOwnGas).mockResolvedValue(false);
     const plan = await solForFees(SHORT);
     expect(topUpDetails(plan)).toEqual(pinned("383320", "swap"));
-    expect(said(plan)).toBe("Also buys about $0.38 of SOL for network fees, most of which stays in your wallet. Bought through Route.");
+    expect(said(plan)).toBe(
+      "Also buys about $0.38 of SOL for network fees, most of which stays in your wallet. Bought through Route.",
+    );
     expect(feeCoinUsd(topUpDetails(plan))).toBe("0.38");
     expect(cash(plan)).toEqual({ from: "solana", usd: "0.38" });
   });
@@ -468,7 +472,9 @@ describe("what a card pins of the SOL it buys", () => {
   it("counts nothing beside the amount of a move that buys its SOL out of what it sends, and still says it", async () => {
     vi.mocked(paysOwnGas).mockResolvedValue(false);
     const plan = outOfWhatItSends(await solForFees(SHORT));
-    expect(said(plan)).toBe("Also buys about $0.38 of SOL for network fees, most of which stays in your wallet. Bought through Route.");
+    expect(said(plan)).toBe(
+      "Also buys about $0.38 of SOL for network fees, most of which stays in your wallet. Bought through Route.",
+    );
     expect(feeCoinUsd(topUpDetails(plan))).toBeNull();
     expect(cash(plan)).toBeNull();
   });
@@ -478,7 +484,7 @@ describe("what a card pins of the SOL it buys", () => {
     vi.mocked(paysOwnGas).mockResolvedValue(false);
     const swapped = { details: topUpDetails(await solForFees(SHORT)) };
     expect(feeCoinsSaid([paidIn, swapped])).toBe(
-"Also buys about $1.38 of SOL for network fees, most of which stays in your wallet. Bought through Carry and Route.",
+      "Also buys about $1.38 of SOL for network fees, most of which stays in your wallet. Bought through Carry and Route.",
     );
   });
 });
@@ -524,7 +530,7 @@ describe("a card buys SOL once", () => {
     expect(
       feeCoinsSaid([first!.preview, later!.preview].map(({ details }) => ({ details: details! }))),
     ).toBe(
-"Also buys about $1 of SOL for network fees, most of which stays in your wallet. Bought through Carry.",
+      "Also buys about $1 of SOL for network fees, most of which stays in your wallet. Bought through Carry.",
     );
   });
 
@@ -585,7 +591,7 @@ describe("a card buys SOL once", () => {
     const previews = [first!, second!, third!].map(({ preview }) => preview);
     expect(costsLabel(costsTogether(previews.map(({ effect }) => effect)))).toBeNull();
     expect(feeCoinsSaid(previews.map(({ details }) => ({ details: details! })))).toBe(
-"Also buys about $1.25 of ETH and SOL for network fees, most of which stays in your wallet. Bought through Carry.",
+      "Also buys about $1.25 of ETH and SOL for network fees, most of which stays in your wallet. Bought through Carry.",
     );
     expect(previews.map(({ details }) => feeCoinCash(details!))).toEqual([
       { from: "monad", usd: "0.25" },

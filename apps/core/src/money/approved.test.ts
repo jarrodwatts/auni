@@ -16,8 +16,8 @@ import {
   PriceMoved,
   quoteHoldingProceeds,
 } from "./approved.ts";
-import type { Effect, Grant } from "./effect.ts";
-import type { WalletEffect } from "./wallet-effect.ts";
+import { pinnedApproval, type Effect, type Grant } from "./effect.ts";
+import type { TokenGrant, WalletEffect } from "./wallet-effect.ts";
 
 describe("assertApprovedSale", () => {
   const approved = { amountUsd: "0.00", details: { [APPROVED_SALE]: "10.5" } };
@@ -184,7 +184,12 @@ describe("assertStillAsShown", () => {
   });
   const trade: Effect = { gives: [{ text: "5 USDC" }], gets: [{ text: "100 PRL" }], grants: [] };
   const approved = { amountUsd: "5.00", details: approvedEffect(simulated(5_000_000n, 100n)) };
-  const spends: Grant = { lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" };
+  const SPENDER = "0xAbCd000000000000000000000000000000001234" as const;
+  const spends = (exact: Partial<TokenGrant> = {}): Grant => ({
+    lets: "0xAbCd…1234 spend your USDC",
+    reach: "wallet",
+    exact: { kind: "spend", contract: USDC, token: USDC, to: SPENDER, ...exact },
+  });
 
   it("lets a raw transaction go while it sends no more and gets about what its card showed", () => {
     expect(() => assertStillAsShown(approved, trade, simulated(5_000_000n, 97n))).not.toThrow();
@@ -199,15 +204,95 @@ describe("assertStillAsShown", () => {
 
   it("refuses a permission or a blind call its card never showed, but sends one the owner's proof vouched for", () => {
     const now = simulated(5_000_000n, 100n);
-    expect(() => assertStillAsShown(approved, { ...trade, grants: [spends] }, now)).toThrow(
-      "This now lets 0x1a2b…9f8e spend your USDC, so nothing was sent.",
+    expect(() => assertStillAsShown(approved, { ...trade, grants: [spends()] }, now)).toThrow(
+      "This now lets 0xAbCd…1234 spend your USDC, so nothing was sent.",
     );
     expect(() => assertStillAsShown(approved, { ...trade, blind: "it's blind" }, now)).toThrow(
       /it's blind/u,
     );
-    const details = { ...approved.details, needsStepUp: `lets ${spends.lets}` };
-    const vouched = { ...approved, details };
-    expect(() => assertStillAsShown(vouched, { ...trade, grants: [spends] }, now)).not.toThrow();
+    const shown = { ...trade, grants: [spends()] };
+    const vouched = { ...approved, details: { ...approved.details, ...pinnedApproval(shown) } };
+    expect(() => assertStillAsShown(vouched, shown, now)).not.toThrow();
+    // The same spender, its address in other letters' case.
+    const lower = spends({ to: SPENDER.toLowerCase() as `0x${string}` });
+    expect(() => assertStillAsShown(vouched, { ...trade, grants: [lower] }, now)).not.toThrow();
+  });
+
+  // Found in review: it compared each permission by its words, which name a spender by its first
+  // and last four digits (anyone can make an address that shares them in seconds) and a token by
+  // its symbol (anyone can name one USDC), so either swapped passed.
+  it("refuses a permission whose words match what its card showed but is another, exactly", () => {
+    const now = simulated(5_000_000n, 100n);
+    const shown = { ...trade, grants: [spends()] };
+    const vouched = { ...approved, details: { ...approved.details, ...pinnedApproval(shown) } };
+    const other = (exact: Partial<TokenGrant>) => () =>
+      assertStillAsShown(vouched, { ...trade, grants: [spends(exact)] }, now);
+    expect(other({ to: "0xAbCd999999999999999999999999999999991234" })).toThrow(/now lets/u);
+    expect(other({ token: TOKEN })).toThrow(/now lets/u);
+    expect(other({ kind: "operator" })).toThrow(/now lets/u);
+  });
+
+  // Found in review: a token's allowance, Permit2's allowance over it and a credit delegation to
+  // borrow it were pinned alike, by their token and holder, so one passed as another.
+  it("refuses a permission over the same token and holder that is another kind, or another contract keeps", () => {
+    const now = simulated(5_000_000n, 100n);
+    const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+    const shown = { ...trade, grants: [spends({ kind: "permit", contract: PERMIT2 })] };
+    const vouched = { ...approved, details: { ...approved.details, ...pinnedApproval(shown) } };
+    const fresh = (exact: Partial<TokenGrant>) => () =>
+      assertStillAsShown(vouched, { ...trade, grants: [spends(exact)] }, now);
+    expect(fresh({ kind: "permit", contract: PERMIT2.toLowerCase() })).not.toThrow();
+    expect(fresh({ kind: "permit", contract: TOKEN })).toThrow(/now lets/u);
+    expect(fresh({})).toThrow(/now lets/u);
+    expect(fresh({ kind: "borrow", contract: PERMIT2 })).toThrow(/now lets/u);
+  });
+
+  // Found in review: it pinned a permission by its kind, token and holder alone, so one over
+  // another NFT of the same collection, or another of the owner's token accounts for the same
+  // mint, passed as the one the card showed.
+  it("refuses a permission over another NFT, or another token account, than its card showed", () => {
+    const now = simulated(5_000_000n, 100n);
+    const held = (exact: Partial<TokenGrant>) => {
+      const shown = { ...trade, grants: [spends(exact)] };
+      const vouched = { ...approved, details: { ...approved.details, ...pinnedApproval(shown) } };
+      return (fresh: Partial<TokenGrant>) => () =>
+        assertStillAsShown(vouched, { ...trade, grants: [spends(fresh)] }, now);
+    };
+    const nft = held({ id: "7" });
+    expect(nft({ id: "7" })).not.toThrow();
+    expect(nft({ id: "8" })).toThrow(/now lets/u);
+    expect(nft({ id: undefined })).toThrow(/now lets/u);
+    const account = held({ account: "6Fnf9PuEXNhbZbrmUxPirWHRQWt4VpxVbXywqM3xhFgg" });
+    expect(account({ account: "6Fnf9PuEXNhbZbrmUxPirWHRQWt4VpxVbXywqM3xhFgg" })).not.toThrow();
+    expect(account({ account: "FzbcyEZ9m8xjtergWgWDq7mfPoHEbboBF791B6cTpzbq" })).toThrow(
+      /now lets/u,
+    );
+    expect(
+      account({ account: "6Fnf9PuEXNhbZbrmUxPirWHRQWt4VpxVbXywqM3xhFgg", kind: "close" }),
+    ).toThrow(/now lets/u);
+  });
+
+  it("refuses a permission pinned by fewer parts than each is kept by now", () => {
+    const now = simulated(5_000_000n, 100n);
+    const details = {
+      ...approved.details,
+      needsStepUp: `lets ${spends().lets}`,
+      grantsExactly: `spend:${USDC}:${SPENDER}`,
+    };
+    // As each was pinned before it kept the contract that keeps it.
+    const unkept = { ...details, grantsExactly: `spend:${USDC}:${SPENDER}::` };
+    for (const each of [details, unkept])
+      expect(() =>
+        assertStillAsShown({ ...approved, details: each }, { ...trade, grants: [spends()] }, now),
+      ).toThrow(/now lets/u);
+  });
+
+  it("refuses a permission a card pinned only in words, as cards were before", () => {
+    const now = simulated(5_000_000n, 100n);
+    const details = { ...approved.details, needsStepUp: `lets ${spends().lets}` };
+    expect(() =>
+      assertStillAsShown({ ...approved, details }, { ...trade, grants: [spends()] }, now),
+    ).toThrow(/now lets/u);
   });
 
   it("sends money leaving only where its card named, and never where Auni can't name", () => {

@@ -91,9 +91,13 @@ export const CARD_WAITS_MS = 24 * 60 * 60_000;
  * a tab still running the web app from before is told to reload (core's money/decide.ts).
  * 2 says every permission a move leaves. 3 carries each thing a move leaves (a permission, a
  * resting order) as its own entry (CardFace.leaves), where a card at 2 said them in its warning
- * or, on a plan, its moves' lines, which a web app drawing 3 no longer reads.
+ * or, on a plan, its moves' lines, which a web app drawing 3 no longer reads. 4 names whoever
+ * holds a permission over the main wallet by their whole address, and says its kind, the contract
+ * that keeps it and what it reaches (spending a token by its own allowance or through Permit2,
+ * borrowing against a lending position, closing or owning a token account; one NFT or all of
+ * them), which is what Allow now vouches for (core's money/effect.ts, unshownGrant).
  */
-export const CARD_FORMAT = 3;
+export const CARD_FORMAT = 4;
 
 /**
  * Why Auni took back a card still waiting for the owner's tap, in the words its card, its

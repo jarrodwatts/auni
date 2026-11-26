@@ -26,7 +26,11 @@ const withdrawal = (to: string): Effect => ({
   grants: [],
   to: [to],
 });
-const spends: Grant = { lets: "0x1a2b…9f8e spend your USDC", reach: "wallet" };
+const spends: Grant = {
+  lets: "0x1a2b…9f8e spend your USDC",
+  reach: "wallet",
+  exact: { kind: "spend", token: "0x1", to: "0x2" },
+};
 
 describe("approval", () => {
   it("is a tap for a trade whose gets land where Auni sees them", () => {

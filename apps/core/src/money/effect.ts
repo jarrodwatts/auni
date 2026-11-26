@@ -1,6 +1,7 @@
 import { LETS_LINE, listed, type ActionLine } from "@auni/shared";
 
 import { feeLabel, shortAddress, usdLabel } from "./format.ts";
+import type { TokenGrant } from "./wallet-effect.ts";
 
 // What a move does to the owner's money, whoever built its bytes: what they
 // give, what they get and where Auni sees it, and any lasting power anyone
@@ -30,13 +31,8 @@ interface Get extends Amount {
 }
 
 /** A lasting power over the owner's money, as what it lets someone do: "0x1a2b…9f8e spend your USDC". */
-export interface Grant {
+export type Grant = {
   readonly lets: string;
-  /**
-   * What it can reach: the owner's main wallet, or only what they have already
-   * put in a venue's wallet or account of their own.
-   */
-  readonly reach: "wallet" | "venue";
   /**
    * An order the owner places, which the venue fills later on its own (a resting limit, a
    * stop-loss): one of the move's own terms, which its face says among its figures. Absent for a
@@ -44,7 +40,22 @@ export interface Grant {
    * withLeaves).
    */
   readonly order?: true;
-}
+} & (
+  | {
+      /** It reaches only what the owner has already put in a venue's wallet or account of their own. */
+      readonly reach: "venue";
+    }
+  | {
+      /**
+       * It reaches the owner's main wallet, so it is named `exact`ly: its kind, the contract that
+       * keeps it, the token's whole address or mint, whoever holds it, and the one token account
+       * or NFT it reaches. That, never its words, is what its card pins and what is checked again
+       * before signing (see pinnedApproval).
+       */
+      readonly reach: "wallet";
+      readonly exact: TokenGrant;
+    }
+);
 
 /** Part of what a move costs, in dollars. */
 export interface Cost {
@@ -77,24 +88,96 @@ function leavesYou(effect: Effect): boolean {
  * Why an effect takes proof the owner is there, wherever its money goes:
  * each lasting power over the main wallet, and anything a tap can't see.
  */
-export function stepUpOnly(effect: Effect): string[] {
+function stepUpOnly(effect: Effect): string[] {
   return [
-    ...effect.grants.flatMap(({ lets, reach }) => (reach === "wallet" ? [`lets ${lets}`] : [])),
+    ...walletGrants(effect).map(({ lets }) => `lets ${lets}`),
     ...(effect.blind ? [effect.blind] : []),
   ];
+}
+
+const walletGrants = (effect: Pick<Effect, "grants">) =>
+  effect.grants.flatMap((grant) => (grant.reach === "wallet" ? [grant] : []));
+
+/**
+ * Under this details key, each lasting power over the main wallet a card showed, exactly:
+ * "kind:contract:token:holder:account:id,…", a part it doesn't name left empty (see TokenGrant).
+ */
+const GRANTS_EXACTLY = "grantsExactly";
+
+const pinned = ({ kind, contract = "", token, to, account = "", id = "" }: TokenGrant) =>
+  [kind, contract, token, to, account, id].join(":");
+
+/**
+ * The powers over the main wallet an action pinned exactly; null when it pinned none, or pinned
+ * them before each was kept whole (fewer parts: before the contract that keeps it, or which
+ * token account or NFT it reaches), which says less than its card is now held to.
+ */
+function pinnedGrants(details: Record<string, string>): TokenGrant[] | null {
+  const each = details[GRANTS_EXACTLY]?.split(",").map((grant) => grant.split(":"));
+  if (!each?.every((parts) => parts.length === 6)) return null;
+  return each.map(([kind, contract, token, to, account, id]) => ({
+    kind: kind as TokenGrant["kind"],
+    token: token!,
+    to: to!,
+    ...(contract ? { contract } : {}),
+    ...(account ? { account } : {}),
+    ...(id ? { id } : {}),
+  }));
 }
 
 /**
  * What an action keeps of its effect for the ladder's proof rung (see
  * stepUpReason), so the tap is judged by the card the owner saw: the reasons
  * that hold wherever the money goes, and where money leaving the owner goes.
+ * Each power over the main wallet is kept exactly too (see unshownGrant), as its words
+ * may name two different ones the same.
  */
 export function pinnedApproval(effect: Effect): Record<string, string> {
   const needsStepUp = stepUpOnly(effect).join("; ");
+  const grants = walletGrants(effect).map(({ exact }) => pinned(exact));
   return {
     ...(needsStepUp ? { needsStepUp } : {}),
+    ...(grants.length > 0 ? { [GRANTS_EXACTLY]: grants.join(",") } : {}),
     ...(leavesYou(effect) ? { leavesTo: (effect.to ?? []).join(",") } : {}),
   };
+}
+
+/**
+ * The same permission: its kind, the contract that keeps it, its token, who holds it and what of
+ * it it reaches, each whole.
+ */
+function samePermission(left: TokenGrant, right: TokenGrant): boolean {
+  return (
+    left.kind === right.kind &&
+    sameDestination(left.contract ?? "", right.contract ?? "") &&
+    sameDestination(left.token, right.token) &&
+    sameDestination(left.to, right.to) &&
+    // A Solana account, whose base58 is exact, and an NFT's id, in decimal.
+    left.account === right.account &&
+    left.id === right.id
+  );
+}
+
+/**
+ * Whether an action pinned a power over the main wallet by less than all it is: by its words
+ * alone, or before every part of it was kept (see pinnedGrants).
+ */
+export function unpinnedGrant(details: Record<string, string>): boolean {
+  const words = details.needsStepUp?.split("; ").some((reason) => reason.startsWith("lets "));
+  return words === true && pinnedGrants(details) === null;
+}
+
+/**
+ * The first power over the main wallet `fresh` leaves that its card didn't show, by what it is
+ * exactly, never its words; null when it shows them all. A card that pinned them by less than all
+ * they are (see unpinnedGrant) showed none of them.
+ */
+export function unshownGrant(details: Record<string, string>, fresh: Effect): Grant | null {
+  const shown = pinnedGrants(details) ?? [];
+  return (
+    walletGrants(fresh).find(({ exact }) => !shown.some((each) => samePermission(each, exact))) ??
+    null
+  );
 }
 
 /**

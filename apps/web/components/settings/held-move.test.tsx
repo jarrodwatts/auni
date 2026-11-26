@@ -60,7 +60,10 @@ const show = (...moves: Held[]) =>
 // A withdrawal from Settings is in no chat, yet Health told the owner to open its card in
 // chat, with nowhere to go (2026-11-25).
 it("checks a held move in no chat in place, under the move itself", async () => {
-  vi.mocked(heldTap).mockResolvedValue({ phase: "needs_owner" } as never);
+  vi.mocked(heldTap).mockResolvedValue({
+    phase: "needs_owner",
+    run: { held: "unanswered" },
+  } as never);
   show(twenty);
   const [row] = rows();
   expect(row!.textContent).toContain("Withdraw $20 to JAVqaE…6X8n on Solana");

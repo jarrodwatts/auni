@@ -60,8 +60,10 @@ export interface Browser {
 export async function launch(keptProfile?: string, signal?: AbortSignal): Promise<Browser> {
   const executable = chromePath();
   signal?.throwIfAborted();
-  const scratch = mkdtempSync(join(tmpdir(), "auni-shots-"));
-  const profile = keptProfile ?? join(scratch, "profile");
+  // Chromium adds its own directory and SingletonSocket under TMPDIR. Use a short,
+  // private path so even a long caller TMPDIR leaves room for that Unix socket.
+  const scratch = mkdtempSync(join(process.platform === "win32" ? tmpdir() : "/tmp", "a-"));
+  const profile = keptProfile ?? join(scratch, "p");
   const chrome = spawn(
     executable,
     [

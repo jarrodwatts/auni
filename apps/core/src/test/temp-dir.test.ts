@@ -1,8 +1,9 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, inject, it } from "vitest";
 
+import { doorSocket } from "../auth/tailscale.ts";
 import { tempDir } from "./temp-dir.ts";
 
 let shared: string;
@@ -31,4 +32,9 @@ describe("scratch folders", () => {
 
 it("removes the suite's folder once all its tests finish", () => {
   expect(existsSync(shared)).toBe(false);
+});
+
+it("leaves room for the Tailscale socket under a 64-byte temporary path", () => {
+  const socket = relative(dirname(inject("tempRoot")), doorSocket());
+  expect(64 + 1 + Buffer.byteLength(socket)).toBeLessThanOrEqual(103);
 });

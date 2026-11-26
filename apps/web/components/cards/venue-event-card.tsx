@@ -1,29 +1,38 @@
 import type { VenueEventCardWire } from "@auni/shared";
 
-import { AssetLogo } from "@/components/brand/marks";
+import { formatUsdcChange } from "@/lib/money";
+import { dollarsToBaseUnits } from "@/lib/data/usdc";
 import { cn } from "@/lib/utils";
 
+import { CardFrame, CardReceipt } from "./card-parts";
+import { EventMark } from "./event-mark";
+
 /**
- * Something a venue did to a position, as core leaves it in the thread
- * it touched: the venue acting by itself, ringed so it reads as
- * something to look at, or an order Auni placed earlier filling.
+ * Something a venue did to a position, as core leaves it in the thread it touched: a stop or a
+ * limit order of Auni's filling, the venue acting by itself, or a market paying out. An event,
+ * drawn settled: what happened, why, and what it locked in, as a gain or a loss.
  */
 export function VenueEventCard({ card }: { readonly card: VenueEventCardWire }) {
+  const pnl = card.pnlUsd ? dollarsToBaseUnits(card.pnlUsd) : null;
   return (
-    <div
-      className="my-2 flex w-full min-w-0 items-start gap-3 rounded-card border border-foreground/[0.08] bg-card px-3.5 py-3"
-      data-outside={card.outside}
-      data-testid="venue-event"
-    >
-      <AssetLogo
-        holding={{ logoUrl: card.logoUrl }}
-        size={36}
-        className={cn("flex-none", card.outside && "ring-2 ring-negative/70 ring-offset-1")}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-body leading-5 font-medium text-ink">{card.title}</p>
-        <p className="mt-0.5 text-ui leading-5 break-words text-muted-foreground">{card.detail}</p>
-      </div>
+    <div data-outside={card.outside} data-testid="venue-event">
+      {/* The venue acting by itself (a liquidation, a trade made outside Auni) is a warning. */}
+      <CardFrame label={card.title} phase="confirmed" tone={card.outside ? "warning" : null}>
+        <CardReceipt
+          mark={<EventMark logoUrl={card.logoUrl} />}
+          title={card.title}
+          detail={card.detail}
+          whole
+          amount={
+            pnl !== null ? (
+              <span className={cn(pnl < 0n ? "text-negative" : "text-positive")}>
+                {formatUsdcChange(pnl)}
+              </span>
+            ) : null
+          }
+          amountNote={pnl === null ? null : pnl < 0n ? "realized loss" : "realized gain"}
+        />
+      </CardFrame>
     </div>
   );
 }

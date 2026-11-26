@@ -56,7 +56,7 @@ const stake = (threadId: string, fields: Partial<typeof actions.$inferInsert> = 
       figures: [{ label: "You send", value: "1 ETH", note: "$3,412" }],
       finePrint: null,
       checks: {
-        checked: "Checked by running it first",
+        checked: "Observed in simulation",
         unchecked: null,
         why: "No app for Lido yet, so Auni read this by running it first.",
       },

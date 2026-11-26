@@ -25,11 +25,16 @@ export function QrCodeCanvas({
 
   useEffect(() => {
     if (!canvas || !value) return;
+    // Drawn at twice its size for a sharp code; the library then sets the canvas's own style to
+    // that width, so it is put back to the size it shows at.
     void QRCode.toCanvas(canvas, value, {
       width: size * 2,
       margin: 1,
       errorCorrectionLevel: "M",
       color: QR_COLORS,
+    }).then(() => {
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
     });
   }, [canvas, size, value]);
 

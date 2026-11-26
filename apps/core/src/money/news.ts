@@ -408,10 +408,12 @@ function venueEventCard(news: StatementNews, pnlUsd: number): VenueEventCardWire
     actionReference: news.actionId as VenueEventCardWire["actionReference"],
     outside: !isOwnOrder(news.happened.cause),
     // Cut to what a card takes, so a long sentence from a venue can't make one that fails to draw.
-    detail: [words.why, words.result ?? words.fill, news.unfinished]
+    // What it locked in is said apart, as a number the card can draw as a gain or a loss.
+    detail: [words.why, words.result ? null : words.fill, news.unfinished]
       .filter(Boolean)
       .join(" ")
       .slice(0, 300),
+    pnlUsd: words.result ? pnlUsd.toFixed(2) : null,
     logoUrl: news.face.logoUrl,
   };
 }
@@ -427,7 +429,7 @@ interface HappenedWords {
   readonly title: string;
   /** Why, in one sentence: "Its price moved against it until the margin behind it ran out." */
   readonly why: string;
-  /** What it locked in: "You lost $5.26."; null when nothing. */
+  /** What it locked in: "Realized loss: -$5.26."; null when nothing. */
   readonly result: string | null;
   /** What traded: "193.1 STRK sold at $0.07855." */
   readonly fill: string;
@@ -462,7 +464,7 @@ export function happenedWords(
     trade: "A trade outside Auni",
     limit: "Your limit order",
     // Which stop it was, as its order says; a stop-loss moved past the entry closes at a gain.
-    exit: exit ? `Your ${exit}` : "Your stop",
+    exit: exit === "take-profit" ? "Take-profit" : exit === "stop-loss" ? "Stop-loss" : "Your stop",
   }[happened.cause];
   const title = flips
     ? `${actor} closed your ${name} ${side} and opened a ${sideOf(after)}`
@@ -478,23 +480,37 @@ export function happenedWords(
   const made = Math.abs(pnlUsd) >= 0.005;
   return {
     title,
-    why: why(happened.cause, venue),
-    result: made ? `You ${pnlUsd < 0 ? "lost" : "made"} ${usdLabel(Math.abs(pnlUsd))}.` : null,
+    why: why(happened.cause, venue, exit),
+    result: made ? resultWords(pnlUsd) : null,
     fill: `${size(Number(happened.size))} ${happened.side === "buy" ? "bought" : "sold"} at ${priceLabel(price)}.`,
     before: before === 0 ? "Nothing" : position(before),
     after: after === 0 ? "Closed" : position(after),
   };
 }
 
-/** Why each kind of thing happened at `venue` (by name), said once for chat and activity alike. */
-export function why(cause: Happened["cause"], venue: string): string {
+/**
+ * Why each kind of thing happened at `venue` (by name), said once for chat and activity alike.
+ * `exit` is which of Auni's stops filled, when the venue said.
+ */
+export function why(cause: Happened["cause"], venue: string, exit?: Exit): string {
   return {
     liquidation: "Its price moved against it until the margin behind it ran out.",
     "auto-deleveraging": `${venue} shrank it to settle a liquidation on the other side that the market couldn't fill.`,
     trade: `It was traded in ${venue}'s own app or another one with access, not by Auni.`,
-    exit: "It reached a stop-loss or take-profit price Auni set.",
+    exit:
+      exit === "take-profit"
+        ? `Hit your take-profit price on ${venue}.`
+        : exit === "stop-loss"
+          ? `Hit your stop price on ${venue}.`
+          : `Hit a stop price Auni set on ${venue}.`,
     limit: "A limit order Auni placed earlier filled.",
   }[cause];
+}
+
+/** What a close locked in, signed: "Realized loss: -$76.51.", "Realized gain: +$12.00." */
+function resultWords(pnlUsd: number): string {
+  const amount = usdLabel(Math.abs(pnlUsd));
+  return pnlUsd < 0 ? `Realized loss: -${amount}.` : `Realized gain: +${amount}.`;
 }
 
 /**
@@ -587,10 +603,13 @@ function arrivalCard(news: News): ArrivalCardWire {
  * A card in a sentence: "$250 arrived: 0.081 ETH on Base.", "$40 left your
  * wallet on Base: 40 USDC to 0x1a2b3c…9f8e.", or "<venue> closed your
  * STRK long. Its price moved against it until the margin behind it ran out.
- * You lost $5.26."
+ * Realized loss: -$5.26."
  */
 function sentence(card: NewsCard): string {
-  if (card.kind === "venue_event") return `${card.title}. ${card.detail}`;
+  if (card.kind === "venue_event")
+    return [`${card.title}.`, card.detail, card.pnlUsd ? resultWords(Number(card.pnlUsd)) : null]
+      .filter(Boolean)
+      .join(" ");
   const { title, direction, network } = card;
   const each = card.moved
     .map(({ amount, symbol, to }) => `${amount} ${symbol}${to ? ` to ${to}` : ""}`)

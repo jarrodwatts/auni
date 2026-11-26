@@ -334,7 +334,9 @@ describe("figures", () => {
       "components/places/pane-holdings.tsx",
       "components/withdraw/withdraw-review.tsx",
       "components/cards/money/pick-detail.tsx",
-      "components/cards/money/action-card.tsx",
+      // A card's head and receipt, and a money card's exchange and facts.
+      "components/cards/card-parts.tsx",
+      "components/cards/money/move-body.tsx",
     ])
       expect(readFileSync(join(WEB, file), "utf8"), file).toContain("tabular-nums");
   });

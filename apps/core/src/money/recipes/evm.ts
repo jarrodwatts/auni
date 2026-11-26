@@ -12,10 +12,10 @@ import { z } from "zod";
 import { appLogo } from "../app-logo.ts";
 import { approvedEffect, approvedMoved, assertStillAsShown } from "../approved.ts";
 import { chainIdOf, chainKey, evmChainById, evmClient, isUsdcAt, RESERVES } from "../chains.ts";
-import { costsLabel, staysYours, type Cost, type Effect } from "../effect.ts";
+import { staysYours, type Cost, type Effect } from "../effect.ts";
 import { EVM_NATIVE, evmTokenKey } from "../fill-key.ts";
 import { appFace, tradeFace, withFace, type TradeTerms } from "../card-face.ts";
-import { formatAmount, shortAddress, usdLabel } from "../format.ts";
+import { formatAmount, usdLabel } from "../format.ts";
 import {
   appTerms,
   fillsFor,
@@ -76,9 +76,9 @@ function builtCall({ to, data, value }: z.infer<typeof call>): BuiltCall {
 }
 
 /** What the batch calls last; a token by name, so an approval's card says whose contract it is. */
-function calleeLabel(to: string, names: ReadonlyMap<Address, TokenName>): string {
+function calleeName(to: string, names: ReadonlyMap<Address, TokenName>): string | null {
   const token = isAddress(to) ? names.get(getAddress(to)) : undefined;
-  return token ? `${token.symbol} contract (${shortAddress(to)})` : shortAddress(to);
+  return token ? `the ${token.symbol} contract` : null;
 }
 
 /**
@@ -109,7 +109,7 @@ function tradeTerms(
     selling: amounts([sold], names),
     atLeast: null,
     price: null,
-    costs: costsLabel(costs),
+    costs,
   };
 }
 
@@ -262,10 +262,10 @@ export const sendEvmTransaction: Recipe<typeof input> = {
     // The app's name may be the agent's word, so the card also shows the contract the batch ends
     // on, by the name the app that vouches for it gives it where one does.
     const last = calls.at(-1)!.to;
-    const via = known ? `${known.callee} (${shortAddress(last)})` : calleeLabel(last, names);
+    const through = { via: known ? known.callee : calleeName(last, names), contract: last };
     const terms =
       hint && simulated
-        ? appTerms(hintFor(hint, effect), site, logo, simulated, names, name, networkFee, via)
+        ? appTerms(hintFor(hint, effect), site, logo, simulated, names, name, networkFee, through)
         : null;
     const sells = rawSale(
       simulated,

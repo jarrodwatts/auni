@@ -314,7 +314,7 @@ export const hyperliquidSetStops: Recipe<typeof stopsInput> = {
         gets: [],
         grants: [
           ...set(stops.stopLoss, `close your ${market.name} position`),
-          ...set(stops.takeProfit, "take profit on it"),
+          ...set(stops.takeProfit, `take profit on your ${market.name} position`),
         ],
       },
       // The market as it resolved, and its price as the card says it, beside which the stops sit.

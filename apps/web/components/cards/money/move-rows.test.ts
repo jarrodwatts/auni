@@ -405,13 +405,13 @@ describe("planLeg", () => {
 describe("actionRows", () => {
   const words = { working: "Buying Nvidia", done: "Bought Nvidia" };
 
-  it("is approving, with the rest to come, while the tap is on its way", () => {
+  it("is allowing, with the rest to come, while the tap is on its way", () => {
     const rows = actionRows(
       { tool: "stock_trade", details: {} },
       { status: "awaiting_permission", phase: null, txs: [] },
       words,
     );
-    expect(read(rows)).toEqual(["now: Approving", "waiting: Buying Nvidia", "waiting: Confirming"]);
+    expect(read(rows)).toEqual(["now: Allowing", "waiting: Buying Nvidia", "waiting: Confirming"]);
     expect(rows.every((row) => row.logo === null && row.meta === null)).toBe(true);
   });
 
@@ -421,11 +421,7 @@ describe("actionRows", () => {
       { status: "running", phase: "sending", txs: [{ chain: "monad", hash: "0xa", setup: true }] },
       words,
     );
-    expect(read(approving)).toEqual([
-      "done: Approved",
-      "now: Buying Nvidia",
-      "waiting: Confirming",
-    ]);
+    expect(read(approving)).toEqual(["done: Allowed", "now: Buying Nvidia", "waiting: Confirming"]);
     const sent = actionRows(
       { tool: "evm_swap", details: {} },
       {
@@ -439,7 +435,7 @@ describe("actionRows", () => {
       words,
     );
     expect(read(sent)).toEqual([
-      "done: Approved",
+      "done: Allowed",
       "done: Sent on Monad",
       "now: Confirming on Monad",
     ]);
@@ -452,7 +448,7 @@ describe("actionRows", () => {
       { working: "Moving $11", done: "Moved $11 from Monad to Ethereum" },
     );
     expect(read(rows)).toEqual([
-      "done: Approved",
+      "done: Allowed",
       "done: Sent on Monad",
       "now: On its way to Ethereum",
     ]);
@@ -465,7 +461,7 @@ describe("actionRows", () => {
       { working: "Moving $20", done: "Moved $20 to Hyperliquid" },
     );
     expect(read(rows)).toEqual([
-      "done: Approved",
+      "done: Allowed",
       "done: Sent on Arbitrum",
       "done: Arrived on Hyperliquid",
     ]);
@@ -479,7 +475,7 @@ describe("actionRows", () => {
       words,
     );
     expect(read(sending)).toEqual([
-      "done: Approved",
+      "done: Allowed",
       "now: Withdrawing $20",
       "waiting: On its way to Arbitrum",
     ]);
@@ -488,7 +484,7 @@ describe("actionRows", () => {
       { status: "running", phase: "landing", txs: [] },
       words,
     );
-    expect(read(out)).toEqual(["done: Approved", "done: Sent", "now: On its way to Arbitrum"]);
+    expect(read(out)).toEqual(["done: Allowed", "done: Sent", "now: On its way to Arbitrum"]);
   });
 
   it("keeps an order working until it fills, since it leaves no transaction to tick", () => {
@@ -497,13 +493,13 @@ describe("actionRows", () => {
       { status: "running", phase: "sending", txs: [] },
       { working: "Opening your long", done: "Opened long on BTC" },
     );
-    expect(read(working)).toEqual(["done: Approved", "now: Opening your long"]);
+    expect(read(working)).toEqual(["done: Allowed", "now: Opening your long"]);
     const filled = actionRows(
       { tool: "hyperliquid_order", details: {} },
       { status: "done", phase: null, txs: [] },
       { working: "Opening your long", done: "Opened long on BTC" },
     );
-    expect(read(filled)).toEqual(["done: Approved", "done: Opened long on BTC"]);
+    expect(read(filled)).toEqual(["done: Allowed", "done: Opened long on BTC"]);
   });
 
   it("ticks every step in past words once it lands", () => {
@@ -512,7 +508,7 @@ describe("actionRows", () => {
       { status: "done", phase: null, txs: [{ chain: "solana", hash: "5x" }] },
       words,
     );
-    expect(read(rows)).toEqual(["done: Approved", "done: Sent on Solana", "done: Bought Nvidia"]);
+    expect(read(rows)).toEqual(["done: Allowed", "done: Sent on Solana", "done: Bought Nvidia"]);
   });
 });
 
@@ -562,7 +558,7 @@ describe("overall", () => {
 });
 
 describe("a held row", () => {
-  const why = "Auni sent it and never heard back, so it can't tell whether it went through.";
+  const why = "Auni sent this and didn't get a receipt back.";
   const held = { status: "running", started: true, held: true, error: why } as const;
 
   it("stops, named as it was asked, and waits on the person with why", () => {
@@ -576,12 +572,12 @@ describe("a held row", () => {
     expect(cash).toMatchObject({ label: "Move $30 to Polygon", failure: { held: true } });
   });
 
-  it("is counted on its card as not confirmed, never as gone through or not", () => {
+  it("is counted on its card as status unknown, never as gone through or not", () => {
     const after = { done: 0, flow: "in", own: "2 picks", phase: "after" } as const;
-    expect(headerLine({ ...after, held: 1, total: 1 }).text).toBe("Not confirmed");
-    expect(headerLine({ ...after, held: 1, total: 2 }).text).toBe("1 not confirmed");
+    expect(headerLine({ ...after, held: 1, total: 1 }).text).toBe("Status unknown");
+    expect(headerLine({ ...after, held: 1, total: 2 }).text).toBe("1 with status unknown");
     expect(headerLine({ ...after, done: 1, held: 1, total: 2 }).text).toBe(
-      "1 of 2 went through, 1 not confirmed",
+      "1 of 2 went through, 1 with status unknown",
     );
   });
 });

@@ -126,16 +126,21 @@ describe("a swap Claude built through KyberSwap", () => {
     expect(read.card?.title).toBe("Sell ETH");
     expect(read.card?.context).toBe("KyberSwap on Base");
     expect(read.card?.finePrint).toBe(
-      "If the price slips more than 1% before it goes through, the swap fails and only the network fee is spent. It goes through KyberSwap's router (0x6131…37b5).",
+      "If the price slips more than 1% before it goes through, the swap fails and only the network fee is spent. It goes through KyberSwap's router.",
     );
-    expect(plain.card?.finePrint).toBe("It goes through 0x2222…2222.");
+    // Nothing names the contract the plain one calls, so only its whole address says it.
+    expect(plain.card?.finePrint).toBeNull();
     // What moves, the dollars, every figure, and tap or proof are the simulation's alone.
-    expect(read.card?.figures).toEqual(plain.card?.figures);
+    // Each names the contract it calls, whole: the two call different ones.
+    const terms = (figures = read.card?.figures) =>
+      figures?.filter(({ label }) => label !== "Contract");
+    expect(terms()).toEqual(terms(plain.card?.figures));
     expect(read.card?.figures.map(({ label }) => label)).toEqual([
       "You sell",
       "You get, about",
       "Price",
       "Vs market",
+      "Contract",
     ]);
     expect(read.effect).toEqual(plain.effect);
     expect(effectLines(read.effect)).toEqual(effectLines(plain.effect));

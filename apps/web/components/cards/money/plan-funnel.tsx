@@ -1,11 +1,12 @@
 "use client";
 
+import type { ActionPlanCardWire } from "@auni/shared";
 import { CircleAlert, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { CardActions, CardButton } from "@/components/cards/card-parts";
 import { AutoHeight } from "@/components/motion/auto-height";
 
-import { MoneyButton, MoneyButtons } from "./money-card-parts";
 import styles from "./money-card.module.css";
 import funnel from "./plan-funnel.module.css";
 
@@ -65,20 +66,14 @@ export function FundStep({
           Sent it already? It can take a few minutes to show up here.
         </p>
       ) : null}
-      <MoneyButtons>
-        <MoneyButton
-          busy={pending === "decline"}
-          disabled={pending !== null}
-          tone="quiet"
-          onClick={onDecline}
-        >
-          Not now
-        </MoneyButton>
-        <MoneyButton disabled={pending !== null} tone="primary" onClick={onAdd}>
+      <CardActions
+        decline={{ busy: pending === "decline", disabled: pending !== null, onClick: onDecline }}
+      >
+        <CardButton disabled={pending !== null} tone="primary" onClick={onAdd}>
           <Plus aria-hidden className="size-4" />
           Add ${wholeDollars(needUsd).toLocaleString("en-US")} to start
-        </MoneyButton>
-      </MoneyButtons>
+        </CardButton>
+      </CardActions>
     </>
   );
 }
@@ -108,25 +103,19 @@ export function ReadyStep({
   return (
     <>
       <StepError>{error}</StepError>
-      <MoneyButtons>
-        <MoneyButton
-          busy={pending === "decline"}
-          disabled={pending !== null}
-          tone="quiet"
-          onClick={onDecline}
-        >
-          Not now
-        </MoneyButton>
-        <MoneyButton
+      <CardActions
+        decline={{ busy: pending === "decline", disabled: pending !== null, onClick: onDecline }}
+      >
+        <CardButton
           busy={pending === "allow"}
           className={landed ? funnel.glow : undefined}
           disabled={pending !== null}
           tone="primary"
           onClick={onAllow}
         >
-          {move}
-        </MoneyButton>
-      </MoneyButtons>
+          <span className="truncate">{move}</span>
+        </CardButton>
+      </CardActions>
     </>
   );
 }
@@ -148,13 +137,21 @@ export function PaysWith({ lines }: { readonly lines: readonly string[] }) {
   );
 }
 
-/** What a card's moves cost in all, in core's words, said before the tap, as how it pays is. */
-export function Costs({ costs }: { readonly costs: string | undefined }) {
-  if (!costs) return null;
+/**
+ * What a card's moves cost in all, each by its own name as a lone card says it ("Price impact
+ * $2.70"), said before the tap, as how it pays is.
+ */
+export function Costs({ costs }: { readonly costs: ActionPlanCardWire["costFigures"] }) {
+  if (!costs?.length) return null;
   return (
-    <p className="mt-3 text-meta leading-[1.4] text-muted-foreground">
-      <span className="font-medium text-ink">Costs</span> {costs}
-    </p>
+    <ul className="mt-3 space-y-1 text-meta leading-[1.4] text-muted-foreground">
+      {costs.map(({ label, value }) => (
+        <li key={label}>
+          <span className="font-medium text-ink">{label}</span>{" "}
+          <span className="tabular-nums">{value}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -168,51 +165,57 @@ export function CardNote({ says }: { readonly says: string | undefined }) {
   return <p className="mt-3 text-meta leading-[1.4] text-muted-foreground">{says}</p>;
 }
 
-/** Money counting up as it goes in, each digit rolling to its new value. */
+/** As long as a digit takes to roll (plan-funnel.module.css). */
+const ROLL_MS = 760;
+
+/**
+ * Money counting up as it goes in, each digit rolling from its old value to its new one. At rest
+ * it is plain text; the columns of digits are drawn only while a change rolls.
+ */
 export function RollingNumber({ value }: { readonly value: string }) {
+  const [last, setLast] = useState(value);
+  // A change rolling: drawn first at the old digits, then moved to the new ones.
+  const [roll, setRoll] = useState<{ readonly from: string; readonly moved: boolean } | null>(null);
+  if (value !== last) {
+    setLast(value);
+    setRoll({ from: last, moved: false });
+  }
+  useEffect(() => {
+    if (!roll) return undefined;
+    if (!roll.moved) {
+      const frame = requestAnimationFrame(() => setRoll({ ...roll, moved: true }));
+      return () => cancelAnimationFrame(frame);
+    }
+    const done = window.setTimeout(() => setRoll(null), ROLL_MS);
+    return () => window.clearTimeout(done);
+  }, [roll]);
+  if (!roll) return <span>{value}</span>;
   const chars = [...value];
+  const before = [...roll.from];
   return (
     <span className="inline-flex">
       <span className="sr-only">{value}</span>
-      {chars.map((char, index) =>
+      {chars.map((char, index) => {
         // Keyed from the right, so "$9" becoming "$15" rolls the units rather than shifting them.
-        /\d/u.test(char) ? (
-          <span key={chars.length - index} aria-hidden className="h-lh overflow-hidden">
-            <span className={funnel.roll} style={{ transform: `translateY(-${char}lh)` }}>
+        const place = chars.length - index;
+        const was = before[before.length - place] ?? "0";
+        const at = roll.moved ? char : /\d/u.test(was) ? was : "0";
+        return /\d/u.test(char) ? (
+          <span key={place} aria-hidden className="h-lh overflow-hidden">
+            <span className={funnel.roll} style={{ transform: `translateY(-${at}lh)` }}>
               {DIGITS.map((digit) => (
                 <span key={digit}>{digit}</span>
               ))}
             </span>
           </span>
         ) : (
-          <span key={chars.length - index} aria-hidden>
+          <span key={place} aria-hidden>
             {char}
           </span>
-        ),
-      )}
+        );
+      })}
     </span>
   );
 }
 
 const DIGITS = [..."0123456789"];
-
-/** One line where a proposal used to be: declined, or updated by a newer one. */
-export function ProposalReceipt({
-  mark,
-  name,
-  status,
-}: {
-  readonly mark: ReactNode;
-  readonly name: string;
-  readonly status: string;
-}) {
-  return (
-    <div className="flex items-center gap-3.5">
-      <span className="flex flex-none opacity-55 grayscale">{mark}</span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-body font-semibold tracking-[-0.01em] text-ink">{name}</p>
-        <p className="truncate text-meta text-muted-foreground">{status}</p>
-      </div>
-    </div>
-  );
-}

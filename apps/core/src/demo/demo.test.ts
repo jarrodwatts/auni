@@ -100,9 +100,10 @@ describe("auni demo", () => {
         log,
       ) ?? [];
     expect(Number(done)).toBeGreaterThanOrEqual(10);
-    // Four moves and an offer of an app left for the owner to tap; the one move the story has
-    // fail and the held one its owner closed; and the one move left held, the only one running.
-    expect(Number(waiting)).toBe(5);
+    // Four moves, a plan of two and an offer of an app left for the owner to tap; the one move
+    // the story has fail and the held one its owner closed; and the one move left held, the only
+    // one running.
+    expect(Number(waiting)).toBe(7);
     expect(Number(failed)).toBe(2);
     expect(Number(held)).toBe(1);
   });
@@ -206,7 +207,7 @@ describe("auni demo", () => {
     // Half of the MON the wallet can spare, which leaves the tour its own stake.
     const stake = await type("Stake 50 MON with Kintsu");
     expect(await words(stake)).toMatch(
-      /Checked by running it first.*Not checked: what Auni says about it.*No app for Kintsu yet/su,
+      /Observed in simulation.*Auni's note \(unverified\).*No app for Kintsu yet/su,
     );
     await allowAll(stake);
     // Its landing tells the brain no app covers it, and the brain offers to ask for one: a
@@ -218,23 +219,23 @@ describe("auni demo", () => {
     const unstake = await words(await type("demo: unstake"));
     expect(unstake).toMatch(/"takesProof":true/u);
     expect(unstake).toMatch(/Nothing back.*No app for Kintsu yet/su);
-    expect(unstake).not.toMatch(/Not checked/u);
+    expect(unstake).not.toMatch(/unverified/u);
 
     // A sale Polymarket never answers is held: the brain is woken once and says so, Check
-    // again finds nothing new, and Close ends it as closed by the owner, with nothing sold.
+    // status finds nothing new, and Dismiss card ends it as closed by the owner, with nothing sold.
     const unheard = await type("demo: held");
     const [sale] = await cards(unheard);
     await ask(`/actions/${sale!.id}/allow`, { cardFormat: CARD_FORMAT });
     const phase = async () => (await cards(unheard))[0]?.phase;
     await expect.poll(phase, { timeout: 60_000, interval: 250 }).toBe("needs_owner");
-    await says(unheard, /most likely never went in.*close that card/su);
+    await says(unheard, /most likely never went in.*dismiss that card/su);
     expect(await ask(`/actions/${sale!.id}/check`, {})).toMatchObject({
-      action: { phase: "needs_owner", error: expect.stringContaining("never heard back") },
+      action: { phase: "needs_owner", error: expect.stringContaining("didn't get a receipt back") },
     });
     expect(await ask(`/actions/${sale!.id}/close`, {})).toMatchObject({
       action: { status: "failed", failureKind: "sent", run: { settledBy: "owner" } },
     });
-    await says(unheard, /Closed\. Your Fed position is as it was/u);
+    await says(unheard, /Dismissed\. Your Fed position is as it was/u);
 
     // A scene whose tool refuses (closing a sliver is below Hyperliquid's minimum) says what
     // Auni answered, rather than speak of a card that isn't there.
@@ -381,7 +382,7 @@ describe("the demo's brain", () => {
     ).toBe("held-told");
     expect(
       sceneNamed(
-        "Background event: Action 1 (Sell 40 Yes shares) finished as failed: You closed it before Auni could tell whether it went through.",
+        "Background event: Action 1 (Sell 40 Yes shares) finished as failed: You dismissed this card before Auni could tell whether it went through.",
       ),
     ).toBe("closed");
   });

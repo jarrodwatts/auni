@@ -72,15 +72,14 @@ export interface MoveRun {
  * confirmed. Auni reads again by itself, and the owner can have it read now or close the move.
  */
 export const HELD = {
-  unrecorded: "Its money moved, but Auni couldn't read what it got back.",
-  unanswered: "Auni sent it and never heard back, so it can't tell whether it went through.",
+  unrecorded: "Its money moved, but Auni couldn't read what came back.",
+  unanswered: "Auni sent this and didn't get a receipt back.",
   overdue: "It was sent over a day ago and still hasn't confirmed.",
 } as const;
 export type HeldWhy = keyof typeof HELD;
 
 /** What is true of every held move, said once under why it is held. */
-export const HELD_SAFE =
-  "Auni won't send it again, and your portfolio shows what you hold either way.";
+export const HELD_SAFE = "It won't retry on its own, and your balance shows what's actually there.";
 
 /** How long a card waits for the owner's tap before Auni takes it back as stale. */
 export const CARD_WAITS_MS = 24 * 60 * 60_000;
@@ -90,9 +89,11 @@ export const CARD_WAITS_MS = 24 * 60 * 60_000;
  * it allows one, as the format it drew. Raise it whenever cards start saying something they
  * didn't: a card recorded before is taken back, never allowed or tried again as it was shown, and
  * a tab still running the web app from before is told to reload (core's money/decide.ts).
- * 2 says every permission a move leaves.
+ * 2 says every permission a move leaves. 3 carries each thing a move leaves (a permission, a
+ * resting order) as its own entry (CardFace.leaves), where a card at 2 said them in its warning
+ * or, on a plan, its moves' lines, which a web app drawing 3 no longer reads.
  */
-export const CARD_FORMAT = 2;
+export const CARD_FORMAT = 3;
 
 /**
  * Why Auni took back a card still waiting for the owner's tap, in the words its card, its
@@ -111,8 +112,8 @@ export const RETRACTED = {
 
 /** How a held move the owner closed reads afterwards: when its money had moved, and when nothing showed it had. */
 export const CLOSED = {
-  moved: "You closed it. Its money moved, and Auni kept no record of what it got back.",
-  unknown: "You closed it before Auni could tell whether it went through.",
+  moved: "You dismissed this card. The money moved, and Auni kept no record of what came back.",
+  unknown: "You dismissed this card before Auni could tell whether it went through.",
 } as const;
 
 /**

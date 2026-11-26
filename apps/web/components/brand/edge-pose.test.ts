@@ -24,21 +24,18 @@ const LANDED: EdgeScene = { kind: "landed" };
 const FAILED: EdgeScene = { kind: "failed" };
 
 describe("restPose", () => {
-  it("peeks calmly at a card waiting on the person, and gets to work once it runs", () => {
+  it("peeks calmly at a card waiting on the person", () => {
     expect(restPose(READY)).toEqual({ place: "peek", mood: "calm", grip: true });
-    expect(restPose(running("a"))).toEqual({ place: "peek", mood: "work", grip: true });
   });
 
   it("pulls itself up, worried, when a row needs the person", () => {
     expect(restPose(attention("a"))).toEqual({ place: "up", mood: "worried", grip: true });
   });
 
-  it("sits on the edge, happy and letting go, once everything lands", () => {
-    expect(restPose(LANDED)).toEqual({ place: "sit", mood: "happy", grip: false });
-  });
-
-  it("stays down and sad when it didn't go through for good", () => {
-    expect(restPose(FAILED)).toEqual({ place: "eyes", mood: "sad", grip: true });
+  it("ducks out of sight once the card needs nothing more of the person", () => {
+    expect(restPose(running("a")).place).toBe("hidden");
+    expect(restPose(LANDED).place).toBe("hidden");
+    expect(restPose(FAILED).place).toBe("hidden");
   });
 });
 

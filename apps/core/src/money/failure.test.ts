@@ -6,6 +6,7 @@ import { failureKind, retryRefusal } from "./failure.ts";
 import { FeesUnpaid, MayHaveSent, NothingMoved } from "./recipe.ts";
 import { Refused, refused } from "./refused.ts";
 import { FACE } from "../test/recipe.ts";
+import { WouldFail } from "./wallet-effect.ts";
 
 describe("failureKind", () => {
   it("knows a price past what was approved by its refusal, whatever it says", () => {
@@ -60,8 +61,14 @@ describe("failureKind", () => {
       "Ledger holds only 0.5 of it.",
       "insufficient funds for gas * price + value",
       "Transfer amount exceeds balance",
+      // Found in review: Solana's and a venue's shortfalls fell to unknown, offering a Try again
+      // that meets the same shortfall, and no Add money.
+      "The wallet needs about 0.002 SOL for Solana's network fees and holds too little, and too little USDC on Solana to buy it (about $0.38).",
+      "Needs SOL for network fees",
+      'It fails in a simulation ({"InstructionError":[0,{"Custom":1}]}: Transfer: insufficient lamports 5000, need 10000), so nothing was sent.',
+      "Insufficient spot balance asset=10000",
     ])
-      expect(failureKind(new Error(said))).toBe("funds");
+      expect({ said, kind: failureKind(new Error(said)) }).toEqual({ said, kind: "funds" });
   });
 
   it("reads a venue's rules", () => {
@@ -107,6 +114,60 @@ describe("failureKind", () => {
     expect(failureKind(new NothingMoved("No one filled the order on Monad."))).toBe("unfilled");
   });
 
+  // Live demo: "the pool is paused" read as unknown, so the card's only button was a Try again
+  // that would revert the same way.
+  it("reads what a simulated revert says, and never offers running the same move again blind", () => {
+    const fail = (reason?: string) => failureKind(new WouldFail(1, 1, reason, null));
+    expect(fail("the pool is paused")).toBe("rule");
+    expect(fail()).toBe("rule");
+    expect(fail("Return amount is not enough")).toBe("price");
+    expect(fail("ERC20: transfer amount exceeds balance")).toBe("funds");
+  });
+
+  // Reviewers' real revert strings: an underscore slippage revert, an allowance or an empty pool
+  // read as money short, and the card offered Add money, which could help none of them.
+  it("calls a revert money short only when it names the owner's balance", () => {
+    const fail = (reason: string) => failureKind(new WouldFail(1, 1, reason, null));
+    const kinds = {
+      price: [
+        "UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT",
+        "Too little received",
+        "Return amount is not enough",
+        "Returned amount is too little",
+        "amount is too little",
+        "Price slippage check",
+        "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT",
+        "Too much requested",
+      ],
+      funds: [
+        "ERC20: transfer amount exceeds balance",
+        "Insufficient balance",
+        "insufficient funds for gas * price + value",
+        "Dai/insufficient-balance",
+      ],
+      rule: [
+        "ERC20: insufficient allowance",
+        "ERC20: transfer amount exceeds allowance",
+        "UniswapV2: INSUFFICIENT_LIQUIDITY",
+        "Insufficient liquidity",
+        "Not enough liquidity",
+        "Pausable: paused",
+        "the pool is paused",
+        "UniswapV2Router: EXPIRED",
+        "Transaction too old",
+        "",
+      ],
+    } as const;
+    for (const [kind, reasons] of Object.entries(kinds))
+      for (const reason of reasons)
+        expect({ reason, kind: fail(reason) }).toEqual({ reason, kind });
+  });
+
+  it("never reads an allowance or a pool's liquidity as money short, simulated or not", () => {
+    for (const said of ["ERC20: insufficient allowance", "Not enough liquidity in the pool"])
+      expect(failureKind(new Error(said))).toBe("rule");
+  });
+
   it("calls anything else unknown", () => {
     expect(failureKind("something odd")).toBe("unknown");
   });
@@ -132,6 +193,16 @@ describe("retryRefusal", () => {
       expect(retryRefusal({ ...failed, failureKind })).toBeNull();
   });
 
+  // A route can quote inside the card's bounds and still fail its own simulation every time it is
+  // built: Try again ran it once on a fresh quote and it failed on its price again.
+  it("runs a moved price again once, never a second time it fails on its price", () => {
+    const moved = { ...failed, failureKind: "price" as const };
+    const before = (kind: "price" | "glitch") => [{ error: "Too little received", kind, at: "" }];
+    expect(retryRefusal({ ...moved, previousErrors: [] })).toBeNull();
+    expect(retryRefusal({ ...moved, previousErrors: before("glitch") })).toBeNull();
+    expect(retryRefusal({ ...moved, previousErrors: before("price") })).toBe("not_retryable");
+  });
+
   it("never runs a step that failed before kinds were recorded, which may have sent", () => {
     expect(retryRefusal({ ...failed, failureKind: null })).toBe("not_retryable");
   });
@@ -152,9 +223,13 @@ describe("retryRefusal", () => {
   // Its run may grant what that card never showed, such as a first sale's lasting permission.
   it("never runs again a card drawn before cards said all they say now that left a permission out", () => {
     const lets = { label: "Lets", value: "Polymarket's exchanges trade your shares" };
-    const old = { ...failed, cardFormat: CARD_FORMAT - 1, lines: [lets], card: FACE };
+    const old = { ...failed, cardFormat: 1, lines: [lets], card: FACE };
     expect(retryRefusal(old)).toBe("not_retryable");
     expect(retryRefusal({ ...old, proposalId: "plan" })).toBe("not_retryable");
+    // Found in review: one allowed on a card that already showed every permission (format 2 on),
+    // whatever later formats changed, was allowed having seen it all, so it can still run.
+    expect(retryRefusal({ ...old, cardFormat: 2 })).toBeNull();
+    expect(retryRefusal({ ...old, cardFormat: 2, proposalId: "plan" })).toBeNull();
     // Found in review: one that leaves nothing, or showed what it leaves, can still finish its plan.
     expect(retryRefusal({ ...old, lines: [] })).toBeNull();
     // Core's plain face drew the line, as far as a figure went (500 characters).

@@ -10,10 +10,18 @@ import { useRefreshMoney } from "@/components/portfolio/use-portfolio";
 import { actionKey, decideAction, useLiveAction } from "@/lib/data/actions";
 import { cn } from "@/lib/utils";
 
-import { askFace } from "./ask-face";
+import { askFace, doneTitle } from "./ask-face";
 import { askStanding } from "./ask-standing";
+import {
+  CardActions,
+  CardAlert,
+  CardButton,
+  CardFrame,
+  CardHead,
+  CardReceipt,
+  NOT_REACHED_TAP,
+} from "./card-parts";
 import { ConnectCard } from "./connect-card";
-import { MoneyButton, MoneyButtons, MoneyCardFrame } from "./money/money-card-parts";
 import { SecretCard } from "./secret-card";
 
 /**
@@ -67,58 +75,46 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
 
   if (standing.kind === "ended") {
     const done = standing.tone === "done";
+    // Done, it reads as a receipt: in the past tense, with how it acts under it, as money cards do.
+    const past = done ? doneTitle(face.title) : null;
     return (
-      <MoneyCardFrame
+      <CardFrame
         auni={live.data && done ? { kind: "landed" } : null}
         label={card.summary}
         phase={done ? "confirmed" : "expired"}
       >
-        <div className="flex items-center gap-3.5" data-testid="ask-card" data-standing="ended">
-          <AskMark ask={card.ask} muted={!done} size={38} />
-          <div className="min-w-0 flex-1">
-            <p className="text-body leading-5 font-semibold tracking-[-0.01em] text-ink">
-              {face.title}
-            </p>
-            <p className="mt-0.5 line-clamp-2 text-meta leading-[1.4] text-muted-foreground">
-              {standing.label}
-            </p>
-          </div>
+        <div data-testid="ask-card" data-standing="ended">
+          <CardReceipt
+            mark={<AskMark ask={card.ask} muted={!done} size={38} />}
+            title={past ?? face.title}
+            detail={past ? face.line : standing.label}
+          />
         </div>
-      </MoneyCardFrame>
+      </CardFrame>
     );
   }
 
   const busy = pending !== null || standing.kind === "working";
   return (
-    <MoneyCardFrame auni={live.data ? { kind: "ready" } : null} label={card.summary} phase="open">
+    <CardFrame
+      auni={live.data ? { kind: "ready" } : null}
+      label={card.summary}
+      phase="open"
+      tone="waiting"
+    >
       <div data-testid="ask-card" data-standing={standing.kind}>
-        {/* One header, read like a money card's: what it is on the left, its number on the right. */}
-        <div className="flex items-center gap-3">
-          <AskMark ask={card.ask} size={44} />
-          <div className="min-w-0 flex-1">
-            <p className="text-reading leading-[1.3] font-semibold tracking-[-0.015em] text-balance text-ink">
-              {face.title}
-            </p>
-            {face.line ? (
-              <p className="mt-0.5 text-meta leading-[18px] text-pretty text-muted-foreground">
-                {face.line}
-              </p>
-            ) : null}
-          </div>
-          {face.figure ? (
-            <div className="flex-none pl-1 text-right">
-              <p className="text-card-money text-ink">{face.figure.value}</p>
-              <p className="mt-0.5 text-meta leading-4 text-muted-foreground">
-                {face.figure.label}
-              </p>
-            </div>
-          ) : null}
-        </div>
+        {/* One head, read like a money card's: what it is on the left, its number on the right. */}
+        <CardHead
+          mark={<AskMark ask={card.ask} size={44} />}
+          title={face.title}
+          line={face.line}
+          figure={face.figure ? { value: face.figure.value, note: face.figure.label } : null}
+        />
         {face.details.length > 0 ? (
-          <dl className="mt-5 flex flex-col gap-3.5 border-t border-foreground/[0.06] pt-5">
+          <dl className="mt-5 flex flex-col gap-3.5 border-t border-border pt-5">
             {face.details.map((line) => (
               <div key={line.label} className="min-w-0">
-                <dt className="text-meta leading-4 text-muted-foreground">{line.label}</dt>
+                <dt className="text-caption text-muted-foreground">{line.label}</dt>
                 <dd
                   className={cn(
                     "mt-1 text-body leading-[1.45] break-words whitespace-pre-wrap text-ink",
@@ -132,35 +128,28 @@ function PlainAsk({ card }: { readonly card: AskCardWire }) {
             ))}
           </dl>
         ) : null}
-        {failed ? (
-          <p role="alert" className="mt-4 text-meta text-destructive">
-            That didn&apos;t reach Auni, so nothing changed. Try again.
-          </p>
-        ) : null}
+        {failed ? <CardAlert>{NOT_REACHED_TAP}</CardAlert> : null}
         <div className="mt-5">
-          <MoneyButtons>
-            <MoneyButton
-              tone="quiet"
-              busy={pending === "decline"}
-              busyLabel="Declining"
-              disabled={busy}
-              onClick={() => void decide("decline")}
-            >
-              Not now
-            </MoneyButton>
-            <MoneyButton
+          <CardActions
+            decline={{
+              busy: pending === "decline",
+              disabled: busy,
+              onClick: () => void decide("decline"),
+            }}
+          >
+            <CardButton
               tone="primary"
               busy={pending === "allow" || standing.kind === "working"}
               busyLabel="Working on it"
               disabled={busy}
               onClick={() => void decide("allow")}
             >
-              {face.action}
-            </MoneyButton>
-          </MoneyButtons>
+              <span className="truncate">{face.action}</span>
+            </CardButton>
+          </CardActions>
         </div>
       </div>
-    </MoneyCardFrame>
+    </CardFrame>
   );
 }
 

@@ -15,7 +15,7 @@ import { settleFromReceipts } from "./reconcile.ts";
 import { insertFills, requireAction, soldHolding } from "./record.ts";
 import { centsToUsd, formatUnits, parseUnits, usdToCents } from "./usd.ts";
 
-// The owner's two taps on a held move (see `needs_owner` in life.ts): Check again and Close.
+// The owner's two taps on a held move (see `needs_owner` in life.ts): Check status and Dismiss card.
 // Neither sends anything, and neither records what a move got or brought in that Auni didn't
 // read from the chain or the venue: Check again is the read reconcile makes, made now, and
 // Close ends the move, saying it was closed, with its thread's budget on the safe side.

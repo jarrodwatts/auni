@@ -392,7 +392,7 @@ describe("waiting on a deposit", () => {
     });
     expect(card).toMatchObject({
       kind: "deposit",
-      title: "Send me your STANDARD and ORBIO",
+      title: "Send your STANDARD and ORBIO",
       network: "robinhood",
       tokens: [
         { name: "STANDARD", address: STANDARD },
@@ -418,7 +418,7 @@ describe("waiting on a deposit", () => {
     }
 
     expect((await waitWithCard()).card).toMatchObject({
-      title: "Send me anything",
+      title: "Add money",
       network: null,
       tokens: [],
     });

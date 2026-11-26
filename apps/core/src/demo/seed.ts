@@ -388,7 +388,7 @@ export async function seed(): Promise<void> {
     await closeWhatIsHeld();
   });
 
-  // A move that failed, left as it is so its card shows Try again.
+  // A move that failed, left as it is so its card shows why and what can help.
   await step(2, "10:25", async () => {
     const chat = await startChat("Buy $400 of Coinbase");
     await say(chat, "Buy $400 of Coinbase.");
@@ -417,8 +417,8 @@ export async function seed(): Promise<void> {
 
   // Lately: a question answered, and cards left for a tap, one of them an app offered.
   await step(...lately(), async () => {
-    // The same sale tried again and unanswered again: left held, so its card shows Check again
-    // and Close. Allowed before the cards below are made, which wait for a tap.
+    // The same sale tried again and unanswered again: left held, so its card shows Check status
+    // and Dismiss card. Allowed before the cards below are made, which wait for a tap.
     await say(trimming, "Try that sale again.");
     await allowWaiting();
     // Answered and tidied away: archived, so search finds it and History doesn't list it.
@@ -426,6 +426,11 @@ export async function seed(): Promise<void> {
     await say(asked, "How am I doing?");
     await archiveChat(asked, true);
     await say(await startChat("Buy $250 of Nvidia"), "Buy $250 of Nvidia.");
+    // A plan of two moves on one card, left for one tap.
+    await say(
+      await startChat("Double down on AI"),
+      "I think the AI buildout has years to run. Can you run that for me with $3,000?",
+    );
     await say(await startChat("Close my bitcoin long"), "Close my bitcoin long.");
     await say(await startChat("Sell half of my Fed bet"), "Sell half of my Fed bet.");
     await say(await startChat("Stake 60 of my MON with Kintsu"), "Stake 60 of my MON with Kintsu.");

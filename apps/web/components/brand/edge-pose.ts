@@ -35,20 +35,25 @@ interface Pose {
   readonly grip: boolean;
 }
 
-/** Where Auni rests in each scene, between the moments it reacts. */
+/**
+ * Where Auni rests in each scene, between the moments it reacts. It rests in view only while the
+ * card waits on the owner: for their tap, money to land, or a row only they can sort out. Once
+ * they tap it ducks behind the card while the money moves, and after cheering a landing (or
+ * slumping at a failure) it sinks out of sight: a card that needs nothing more is left alone.
+ */
 export function restPose(scene: EdgeScene): Pose {
   switch (scene.kind) {
     case "funding":
     case "ready":
       return { place: "peek", mood: "calm", grip: true };
-    case "running":
-      return { place: "peek", mood: "work", grip: true };
     case "attention":
       return { place: "up", mood: "worried", grip: true };
+    case "running":
+      return { place: "hidden", mood: "work", grip: false };
     case "landed":
-      return { place: "sit", mood: "happy", grip: false };
+      return { place: "hidden", mood: "happy", grip: false };
     case "failed":
-      return { place: "eyes", mood: "sad", grip: true };
+      return { place: "hidden", mood: "sad", grip: false };
   }
 }
 

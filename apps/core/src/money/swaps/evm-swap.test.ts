@@ -98,7 +98,7 @@ describe("previewEvmSwap", () => {
       context: "WETH on Base",
       receipt: { title: "Bought Wrapped Ether", detail: "About 0.01 WETH" },
     });
-    expect(figureOf(preview, "Through")).toBe("KyberSwap, filled on Kuru and PancakeSwap");
+    expect(figureOf(preview, "Via")).toBe("KyberSwap");
     // Recorded with the card, so Activity can say it once it's done.
     expect(preview.details?.through).toBe("KyberSwap, filled on Kuru and PancakeSwap");
   });
@@ -218,7 +218,7 @@ describe("Monad stock swaps", () => {
     expect(card.unpriced).toBe("loses on fill");
     // Its card says the loss in dollars.
     expect(card.card).toMatchObject({ price: "$190.00" });
-    expect(figureOf(card, "Costs")).toBe("$5 price move");
+    expect(figureOf(card, "Price impact")).toBe("$5");
     // At $192 it loses 4%, within the default 5% limit, so it is priced and acts on its own.
     const within = await previewEvmSwap(buy, async () => owner, { quote, stockUsd: 192 });
     expect(within.unpriced).toBeUndefined();
@@ -232,7 +232,7 @@ describe("Monad stock swaps", () => {
       maxLossPct: 3,
     });
     expect(card.unpriced).toBe("loses on fill");
-    expect(card.effect.costs).toEqual([{ label: "price move", usd: 20 }]);
+    expect(card.effect.costs).toEqual([{ label: "price impact", usd: 20 }]);
   });
 
   it("refuses at execute a buy whose fresh quote now gets less than its card said at least", async () => {

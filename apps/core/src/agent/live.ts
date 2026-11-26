@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { CARD_FORMAT } from "@auni/shared";
 import { sql } from "drizzle-orm";
 import { generatePrivateKey } from "viem/accounts";
 
@@ -60,6 +61,8 @@ export async function liveCore(): Promise<LiveCore> {
       ...begins("awaiting_permission"),
       tool: "withdraw_usdc",
       input: {},
+      // Drawn as cards are now, so Auni starting doesn't take it back as out of date.
+      cardFormat: CARD_FORMAT,
     })
     .returning();
 

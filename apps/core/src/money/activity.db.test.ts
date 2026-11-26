@@ -207,7 +207,7 @@ describe("GET /activity", () => {
     expect(stop).toMatchObject({
       amount: { usd: "2.40", direction: "out", tone: "loss" },
       receipt: {
-        steps: [{ text: "It reached a stop-loss or take-profit price Auni set.", amountUsd: null }],
+        steps: [{ text: "Hit a stop price Auni set on Hyperliquid.", amountUsd: null }],
         story: {
           gave: { label: "Your 1x long", value: "$14.10" },
           got: { label: "Realized loss", value: "$2.40", tone: "loss" },

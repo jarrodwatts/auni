@@ -41,7 +41,7 @@ export interface Grant {
    * An order the owner places, which the venue fills later on its own (a resting limit, a
    * stop-loss): one of the move's own terms, which its face says among its figures. Absent for a
    * permission, which core says on every card in its own words, whoever wrote its face (see
-   * withPermissions).
+   * withLeaves).
    */
   readonly order?: true;
 }
@@ -140,7 +140,7 @@ export function stepUpWhy(
   details: Record<string, string>,
   known: readonly string[],
 ): string | null {
-  const so = (why: string) => `${why}, so Auni checks it's you.`;
+  const so = (why: string) => `${why}, so confirm it's you first.`;
   if (goesSomewhereNew(details, known))
     return so(
       details.leavesTo
@@ -152,7 +152,7 @@ export function stepUpWhy(
   return so(
     reasons.some((reason) => reason.startsWith("lets "))
       ? "It leaves a permission over your wallet behind"
-      : "Auni can't see everything it does by running it first",
+      : "Auni can't see everything it does in simulation",
   );
 }
 
@@ -229,7 +229,7 @@ export function effectLines(effect: Effect): ActionLine[] {
 
 /**
  * A move's Lets line: every lasting power it leaves, orders it places included, as each card and
- * plan draws it, and as the fit check measures it (see tooMuchToWarn); null when it leaves none.
+ * plan draws it, and as the fit check measures it (see tooMuchToShow); null when it leaves none.
  */
 export function letsSaid(grants: readonly Grant[]): string | null {
   return grants.length > 0 ? listed(grants.map(({ lets }) => lets)) : null;

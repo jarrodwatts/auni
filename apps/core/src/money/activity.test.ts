@@ -261,7 +261,7 @@ describe("saying what a venue did", () => {
     expect(said(STRK, "STRK", -5.256182)).toEqual({
       title: "Hyperliquid closed your STRK long",
       why: "Its price moved against it until the margin behind it ran out.",
-      result: "You lost $5.26.",
+      result: "Realized loss: -$5.26.",
       fill: "193.1 STRK sold at $0.07855.",
       before: "193.1 STRK long, worth $15.17",
       after: "Closed",
@@ -276,7 +276,7 @@ describe("saying what a venue did", () => {
     );
     expect(words).toMatchObject({
       title: "Hyperliquid closed part of your STRK short",
-      result: "You made $2.50.",
+      result: "Realized gain: +$2.50.",
       before: "300 STRK short, worth $23.56",
       after: "100 STRK short, worth $7.85",
     });
@@ -293,12 +293,13 @@ describe("saying what a venue did", () => {
       why: "A limit order Auni placed earlier filled.",
     });
     expect(said({ ...STRK, cause: "exit" }, "STRK", 3, "take-profit")).toMatchObject({
-      title: "Your take-profit closed your STRK long",
-      why: "It reached a stop-loss or take-profit price Auni set.",
+      title: "Take-profit closed your STRK long",
+      why: "Hit your take-profit price on Hyperliquid.",
     });
     // A stop-loss moved past the entry closes at a gain, and is still the stop-loss.
     expect(said({ ...STRK, cause: "exit" }, "STRK", 0.01, "stop-loss")).toMatchObject({
-      title: "Your stop-loss closed your STRK long",
+      title: "Stop-loss closed your STRK long",
+      why: "Hit your stop price on Hyperliquid.",
     });
     expect(said({ ...STRK, cause: "exit" }, "STRK", -1)).toMatchObject({
       title: "Your stop closed your STRK long",

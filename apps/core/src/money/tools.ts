@@ -16,6 +16,7 @@ import { waitingElsewhere } from "../conversation/context.ts";
 import { db } from "../db/client.ts";
 import { threads } from "../db/schema.ts";
 import { actionCard, moveCards, planAction, pricedLater, rowLine } from "./action-card.ts";
+import { costFigures } from "./card-face.ts";
 import { costsLabel, costsTogether } from "./effect.ts";
 import {
   actionById,
@@ -219,8 +220,8 @@ export function moneyTools(context: ToolTurn, reach: Reach = { solana: true }): 
           id: randomUUID() as DepositCardWire["id"],
           title:
             tokens.length > 0
-              ? `Send me your ${namesLabel(tokens.map(({ name }) => name))}`
-              : "Send me anything",
+              ? `Send your ${namesLabel(tokens.map(({ name }) => name))}`
+              : "Add money",
           updatedAt: new Date().toISOString(),
           network,
           tokens,
@@ -408,7 +409,7 @@ function proposeActions(context: ToolTurn): AuniTool {
       const paysWith = paysWithLines(paying, prepared);
       const buysFirst = feeCoinsSaid(rows);
       const later = pricedLater(rows);
-      const costs = costsLabel(costsTogether(prepared.map(({ preview }) => preview.effect)));
+      const costs = costFigures(costsTogether(prepared.map(({ preview }) => preview.effect)));
       // The legs the card names, past the moves that only bring their cash.
       const shown = rows.flatMap((_, index) => (isMove(index) ? [] : [index]));
       const planLegs = await Promise.all(
@@ -477,7 +478,7 @@ function proposeActions(context: ToolTurn): AuniTool {
         ...(paysWith.length > 0 ? { paysWith } : {}),
         ...(buysFirst ? { buysFirst } : {}),
         ...(later ? { pricedLater: later } : {}),
-        ...(costs ? { costs } : {}),
+        ...(costs.length > 0 ? { costFigures: costs } : {}),
         legs: planLegs,
       };
       const money = moneyLine(cardMoneys(rows));

@@ -334,5 +334,5 @@ function FileRow({
 }
 
 /** A small quiet action beside a row: "Replace", "Where?". */
-export const quietPillClass =
+const quietPillClass =
   "flex h-9 flex-none items-center rounded-full bg-foreground/[0.05] px-4 text-ui font-semibold text-ink transition-colors duration-200 ease-settle hover:bg-foreground/[0.08] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-55";

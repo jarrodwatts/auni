@@ -189,7 +189,10 @@ export const sendSolanaTransaction: Recipe<typeof input> = {
     const sells = rawSale(seen, names, (token) => token === NETWORKS.solana.usdc, solanaMintKey);
     const networkFee = feeUsd >= 0.01 ? usdLabel(feeUsd) : null;
     const terms = hint
-      ? appTerms(hintFor(hint, effect), site, logo, seen, names, "Solana", networkFee, via)
+      ? appTerms(hintFor(hint, effect), site, logo, seen, names, "Solana", networkFee, {
+          via: null,
+          contract: via,
+        })
       : null;
     const made: ActionPreview = {
       summary,

@@ -14,7 +14,7 @@ export const MAX_BUY_IMPACT_PCT = 5;
  * it fills better than the market.
  */
 export function tradeCosts(impactUsd: number | null): Cost[] {
-  return impactUsd !== null && impactUsd >= 0.01 ? [{ label: "price move", usd: impactUsd }] : [];
+  return impactUsd !== null && impactUsd >= 0.01 ? [{ label: "price impact", usd: impactUsd }] : [];
 }
 
 export class HttpError extends Error {

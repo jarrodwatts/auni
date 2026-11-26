@@ -124,7 +124,7 @@ const STOPS: readonly Stop[] = [
       {
         hears: event("finished as failed"),
         notice:
-          "Nothing is sent a second time by itself: **Try again** on the card is yours to tap.",
+          "I simulated that buy first, saw the pool was paused, and didn't send it, so your money stayed where it was. Running it again would meet the same pause, so the card offers no **Try again**, and my reply offers another way.",
         on: true,
       },
     ],
@@ -137,7 +137,7 @@ const STOPS: readonly Stop[] = [
       {
         hears: REPLY,
         notice:
-          "I ran that transaction before showing you anything. Under **Checked by running it first** is what the run did. My own sentence sits apart, under **Not checked**. Tap the card's button to stake.",
+          "I simulated that transaction before showing you anything. Under **Observed in simulation** is what the simulation showed. My own note sits apart, under **Auni's note (unverified)**. Tap the card's button to stake.",
       },
       { hears: event("finished as done[^]*No app for Kintsu"), on: true },
     ],
@@ -157,7 +157,7 @@ const STOPS: readonly Stop[] = [
       {
         hears: REPLY,
         notice:
-          "Read the line under the field: what you paste there never passes through me. This demo has no Jupiter to reach, so tap **Not now**.",
+          "Read the line under the field: what you paste there never passes through me. This demo has no Jupiter to reach, so tap **Decline**.",
       },
       // A key pasted after all connects it, which shows as much.
       { hears: event("The owner (declined|saved their)"), on: true },

@@ -5,7 +5,7 @@ import { walletsFor } from "../../test/wallets.ts";
 import type { ActionRow } from "../../db/schema.ts";
 import { publicClient } from "../../money/chains.ts";
 import { insideApproved, PriceMoved } from "../../money/approved.ts";
-import { withPermissions } from "../../money/card-face.ts";
+import { withLeaves } from "../../money/card-face.ts";
 import { effectLines } from "../../money/effect.ts";
 import { moneyOf } from "../../money/recipe.ts";
 import { feeTerms, orderBook, postOrder } from "./clob.ts";
@@ -107,6 +107,19 @@ describe("polymarketOrder", () => {
     expect(small.details).toEqual({ priceAtLeast: "0.49", returnsUsd: "0.49" });
   });
 
+  it("shows on a sale's card the shares it sends, as Polymarket's step rounds them", async () => {
+    const order = { market: "rain", outcome: "Yes", side: "sell" as const, shares: 10.009 };
+    const { card, effect, summary } = await polymarketOrder.describe(order, {});
+    expect(summary).toMatch(/^Sell 10 Yes shares/u);
+    expect(card?.figures[0]).toEqual({
+      label: "You sell, up to",
+      value: "10 shares",
+      role: "pays",
+    });
+    expect(card?.action).toBe("Sell up to 10 shares");
+    expect(effect.gives).toEqual([{ text: "10 Yes shares" }]);
+  });
+
   it("never offers an order Polymarket would refuse", async () => {
     const buy = { market: "rain", outcome: "Yes", side: "buy" as const };
     await expect(polymarketOrder.describe({ ...buy, amountUsd: 0.5 }, {})).rejects.toThrow(
@@ -139,12 +152,14 @@ describe("polymarketOrder", () => {
     const order = { market: "rain", outcome: "Yes", side: "sell" as const, shares: 10 };
     approvedAlready(false);
     const first = await polymarketOrder.describe(order, {});
-    expect(withPermissions(first.card!, first.effect).warning).toBe(
-      "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
-    );
+    expect(withLeaves(first.card!, first.effect).leaves).toEqual([
+      {
+        says: "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
+      },
+    ]);
     approvedAlready(true);
     const again = await polymarketOrder.describe(order, {});
-    expect(withPermissions(again.card!, again.effect).warning).toBeUndefined();
+    expect(withLeaves(again.card!, again.effect).leaves).toBeUndefined();
   });
 });
 

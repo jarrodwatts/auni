@@ -129,9 +129,9 @@ describe("previewSolanaSwap", () => {
     expect(effectLines(card.effect)).toEqual([
       { label: "You give", value: "2,100,000 XYZ ($300)" },
       { label: "You get", value: "about $170 of USDC, at least $168.30" },
-      { label: "Costs", value: "$130 price move" },
+      { label: "Costs", value: "$130 price impact" },
     ]);
-    expect(figureOf(card, "Costs")).toBe("$130 price move");
+    expect(figureOf(card, "Price impact")).toBe("$130");
   });
 
   // As $15 of SMRx did on 2026-10-30: a pool seeded with dust, quoting a small impact on its own price.
@@ -148,7 +148,7 @@ describe("previewSolanaSwap", () => {
       { owner: async () => "owner" },
     );
     expect(card.unpriced).toBe("loses on fill");
-    expect(figureOf(card, "Costs")).toBe("$14.86 price move");
+    expect(figureOf(card, "Price impact")).toBe("$14.86");
   });
 
   it("lets a sale that fills near the market's price run on its own", async () => {
@@ -176,8 +176,8 @@ describe("previewSolanaSwap", () => {
     // The trade's figures and its lines both say only what it loses to fill; the dollar of SOL
     // is said as it is on an EVM chain, beside the move and never as a cost, since most of it
     // stays in the wallet.
-    expect(figureOf(card, "Costs")).toBe("$3 price move");
-    expect(effectLines(card.effect)).toContainEqual({ label: "Costs", value: "$3 price move" });
+    expect(figureOf(card, "Price impact")).toBe("$3");
+    expect(effectLines(card.effect)).toContainEqual({ label: "Costs", value: "$3 price impact" });
     // What execute spends on it, and no more.
     expect(card.details).toMatchObject(pinnedSol("1000000"));
     // Pinned as every purchase of a fee's coin is, so the same rules read it off this card: its

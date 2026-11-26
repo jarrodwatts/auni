@@ -199,8 +199,12 @@ describe("executeAction", () => {
       const plain = await old({ card: null });
       const none = await old({ lines: [] });
       const now = await old({ cardFormat: CARD_FORMAT });
-      for (const { id } of [shown, plain, none, now]) await executeAction(id);
-      expect(executions).toBe(4);
+      // Found in review: allowed on a card at format 2, which showed every permission, before
+      // cards moved them to entries of their own (format 3): the owner saw them all.
+      const whole = await old({ cardFormat: 2 });
+      const wholePlan = await old({ cardFormat: 2, proposalId: PLAN });
+      for (const { id } of [shown, plain, none, now, whole, wholePlan]) await executeAction(id);
+      expect(executions).toBe(6);
     });
 
     it("takes back the whole plan while none of it has started, waking its thread once", async () => {
@@ -632,9 +636,12 @@ describe("recordActions", () => {
       }),
     });
     const { rows } = await recordActions({ threadId: null }, [await prepareLeg(sale, {})], null);
-    expect(rows[0]?.card?.warning).toBe(
-      "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
-    );
+    expect(rows[0]?.card?.leaves).toEqual([
+      {
+        says: "From now on, it lets Polymarket's exchanges trade the shares in your Polymarket wallet.",
+      },
+    ]);
+    expect(rows[0]?.cardFormat).toBe(CARD_FORMAT);
   });
 
   it("acts on its own only in an active Auto thread with a positive budget", async () => {

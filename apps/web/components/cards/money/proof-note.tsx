@@ -23,7 +23,7 @@ export function ProofNote({
         className,
       )}
     >
-      <KeyRound aria-hidden className="mt-0.5 size-4 flex-none text-primary" />
+      <KeyRound aria-hidden className="mt-0.5 size-4 flex-none text-ink-soft" />
       <span>{children}</span>
     </p>
   );

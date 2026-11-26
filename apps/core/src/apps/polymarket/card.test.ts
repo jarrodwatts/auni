@@ -23,8 +23,8 @@ describe("a Polymarket order's face", () => {
     expect(content.action).toBe("Buy $5");
     expect(content.context).toBe("Will it rain?");
     expect(content.figures).toEqual([
-      { label: "You pay", value: "$5" },
-      { label: "You get, about", value: "8.06 shares" },
+      { label: "You pay, at most", value: "$5", role: "pays" },
+      { label: "You get, about", value: "8.06 shares", role: "gets" },
       { label: "Price", value: "62¢" },
       { label: "Price, at most", value: "63¢" },
     ]);
@@ -32,6 +32,8 @@ describe("a Polymarket order's face", () => {
       `Each share pays $1 if the answer is Yes, and Polymarket collects it for you when the market resolves. ${WAITS}`,
     );
     expect(content.price).toBe("62¢");
+    // It may fill less, never more: the amount is the most it spends.
+    expect(content.note).toBe("most it spends");
   });
 
   it("says the price as its bound is, so it never reads over the most a buy pays", () => {
@@ -42,12 +44,21 @@ describe("a Polymarket order's face", () => {
     expect(face.price).toBe("99.6¢");
   });
 
-  it("keeps what a sale brought back on its receipt", () => {
-    const face = orderFace({ ...order, side: "sell", price: 0.5, shares: "10", worst: 0.485 });
+  it("says a sale's every figure as the most it sells, since it may fill in part", () => {
+    const face = orderFace({
+      ...order,
+      side: "sell",
+      price: 0.5,
+      shares: "10",
+      worst: 0.485,
+    });
     // Where the cash lands, and that it comes home when asked, is said where it is about to land.
     expect(face.finePrint).toBe(`It sells at the best price on Polymarket's book. ${WAITS}`);
-    expect(face.figures).toEqual([
-      { label: "Shares", value: "10" },
+    expect(face.action).toBe("Sell up to 10 shares");
+    expect(face.note).toBe("at least, if all 10 sell");
+    expect(fillFace(face, usdc("3980000")).figures).toEqual([
+      { label: "You sell, up to", value: "10 shares", role: "pays" },
+      { label: "You get, at least", value: "$3.98", role: "gets" },
       { label: "Price", value: "50¢" },
       { label: "Price, at least", value: "48.5¢" },
     ]);
@@ -74,7 +85,9 @@ describe("a Polymarket order's face", () => {
     for (const side of ["buy", "sell"] as const) {
       const face = orderFace({ ...order, side, price: null, shares: null });
       expect(face.figures.map(({ label }) => label)).toEqual(
-        side === "buy" ? ["You pay", "Price, at most"] : ["Price, at least"],
+        side === "buy"
+          ? ["You pay, at most", "Price, at most"]
+          : ["You get, at least", "Price, at least"],
       );
       expect(face.price).toBeNull();
       expect(cardFaceSchema.parse(face)).toEqual(face);

@@ -258,6 +258,7 @@ const chipClass =
  */
 export function AddressRow({
   blocked,
+  brief,
   copied,
   entry,
   on = false,
@@ -267,6 +268,8 @@ export function AddressRow({
 }: {
   /** The browser refused to copy, so the whole address shows, to be selected by hand. */
   readonly blocked: boolean;
+  /** The line under the address, its networks by default; null for none, where they're named above. */
+  readonly brief?: string | null;
   readonly copied: boolean;
   readonly entry: DepositAddress;
   readonly on?: boolean;
@@ -301,9 +304,11 @@ export function AddressRow({
         >
           {blocked ? entry.address : shortAddress(entry.address)}
         </span>
-        <span className="block truncate text-meta leading-[18px] text-muted-foreground">
-          {networksInBrief(entry.networks)}
-        </span>
+        {brief === null ? null : (
+          <span className="block truncate text-meta leading-[18px] text-muted-foreground">
+            {brief ?? networksInBrief(entry.networks)}
+          </span>
+        )}
       </span>
       <span className="flex items-center gap-2">
         {onToggleQr ? (

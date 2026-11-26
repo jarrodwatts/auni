@@ -131,17 +131,17 @@ const SCENES: readonly Scene[] = [
       );
       yield* call("get_portfolio", {});
       yield* say(
-        "Polymarket still shows all of your Yes shares, so that order most likely never went in. If you still want to sell, close that card and I'll put the sale up again.",
+        "Polymarket still shows all of your Yes shares, so that order most likely never went in. If you still want to sell, dismiss that card and I'll put the sale up again.",
       );
     },
   },
   {
     name: "closed",
     shows: null,
-    hears: /finished as (done|failed): You closed it/u,
+    hears: /finished as (done|failed): You dismissed this card/u,
     async *play({ say }) {
       yield* say(
-        "Closed. Your Fed position is as it was, so that order never went in. Say the word and I'll put the sale up again.",
+        "Dismissed. Your Fed position is as it was, so that order never went in. Say the word and I'll put the sale up again.",
       );
     },
   },
@@ -155,7 +155,10 @@ const SCENES: readonly Scene[] = [
     async *play({ heard, say }) {
       if (!/finished as failed/u.test(heard)) return;
       yield* say(
-        "That route turned the trade down, which usually clears quickly. Tap Try again in a minute, or say the word and I'll look for another route.",
+        // A failed move would only fail the same way again, so the reply offers another way, never it.
+        /\bpaused\b/u.test(heard)
+          ? "The pool is paused, so the same buy would fail again. I can route it another way, or pick a different stock."
+          : "I can find another way to do it.",
       );
     },
   },
@@ -889,7 +892,7 @@ const SCENES: readonly Scene[] = [
   },
   {
     name: "fail",
-    shows: "a move that fails once allowed, with Try again",
+    shows: "a move that fails once allowed, saying why and what can help",
     hears: /buy.*coinbase/iu,
     async *play({ say, call }) {
       yield* say(

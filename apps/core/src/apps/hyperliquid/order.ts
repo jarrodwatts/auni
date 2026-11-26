@@ -202,15 +202,20 @@ export const hyperliquidOrder: Recipe<typeof input> = {
     const stopLoss = order.stopLoss === undefined ? null : priceLabel(order.stopLoss);
     const takeProfit = order.takeProfit === undefined ? null : priceLabel(order.takeProfit);
     const rests = order.orderType === "limit";
-    // Orders left resting on Hyperliquid's book, which it fills later on the account's cash.
+    // Orders left resting on Hyperliquid's book, which it fills later on the account's cash. Each
+    // names its market, since a plan says them apart from the move they belong to. A stop is the
+    // position's, so on one already open it covers what is held now from the start.
+    const whole = `your whole ${market.name} ${order.side}${position ? ", the part you hold now included," : ""}`;
     const resting = [
-      ...(rests ? [`Hyperliquid fill it at ${priceLabel(price)} or better until you cancel`] : []),
+      ...(rests
+        ? [
+            `Hyperliquid fill your ${market.name} ${order.side} at ${priceLabel(price)} or better until you cancel`,
+          ]
+        : []),
       ...(stopLoss
-        ? [`Hyperliquid close the whole position at market if ${market.name} reaches ${stopLoss}`]
+        ? [`Hyperliquid close ${whole} at market if ${market.name} reaches ${stopLoss}`]
         : []),
-      ...(takeProfit
-        ? [`Hyperliquid take profit on the whole position at market at ${takeProfit}`]
-        : []),
+      ...(takeProfit ? [`Hyperliquid take profit on ${whole} at market at ${takeProfit}`] : []),
     ].map((lets) => ({ lets, reach: "venue" as const, order: true as const }));
     // How far the price can go against the position before it is liquidated (see about).
     const wipedOut = liquidationMove(order.side === "long", order.leverage, market.maxLeverage);

@@ -140,16 +140,17 @@ describe("onStopAsked", () => {
   });
 
   it("stops at once on a second Ctrl-C, but not on one press that arrives twice", () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["performance"] });
     try {
       const signals = new EventEmitter();
       const stop = vi.fn();
       const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
       onStopAsked(stop, signals);
       signals.emit("SIGINT");
+      vi.advanceTimersByTime(999);
       signals.emit("SIGINT");
       expect(exit).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(1_500);
+      vi.advanceTimersByTime(1);
       signals.emit("SIGINT");
       expect(stop).toHaveBeenCalledTimes(1);
       expect(exit).toHaveBeenCalledWith(130);

@@ -17,6 +17,9 @@ const LIVE_PORT = 4517;
 
 const scratch = mkdtempSync(join(tmpdir(), "auni-live-"));
 process.once("exit", () => rmSync(scratch, { recursive: true, force: true }));
+// Node's default signal exits skip the exit event.
+process.once("SIGINT", () => process.exit(130));
+process.once("SIGTERM", () => process.exit(143));
 const home = join(scratch, "data");
 mkdirSync(home, { mode: 0o700 });
 

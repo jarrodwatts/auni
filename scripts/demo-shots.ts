@@ -240,10 +240,11 @@ const BRING_WALLET: Opener = {
 
 /**
  * A first take whose start is asked for twice and both answers are lost (neither reaches core
- * here), from the first starting point: its words back in the box, and the line under it.
+ * here), sent from the first starting point, which puts its words in the box: its words back in
+ * the box, and the line under it.
  */
 const START_LOST: Opener = {
-  does: `(() => {
+  does: `(async () => {
   const real = globalThis.fetch;
   globalThis.fetch = (input, init) =>
     new URL(typeof input === "string" ? input : input.url, location.href).pathname === "/core/places/chat"
@@ -251,6 +252,8 @@ const START_LOST: Opener = {
       : real(input, init);
   const point = [...document.querySelectorAll("li > button")].find((el) => el.getClientRects().length > 0);
   point?.click();
+  await new Promise((done) => setTimeout(done, 300));
+  document.querySelector("textarea")?.form?.requestSubmit();
   return Boolean(point);
 })()`,
   shows: `[...document.querySelectorAll('[role="alert"]')].some((el) => el.textContent?.includes("couldn't confirm"))`,

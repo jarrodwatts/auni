@@ -3,7 +3,6 @@
 import { Check, ChevronRight } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { badgeClass } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cardClass } from "@/components/ui/card";
 import { inputClass } from "@/components/ui/input";
@@ -236,27 +235,6 @@ export function Refusal({ children }: { readonly children: ReactNode }) {
       {children}
     </p>
   );
-}
-
-/**
- * A state word as a pill, in the tones first run's wizard names them; each the Badge primitive's:
- * what works is neutral, what's broken waits on the owner.
- */
-export function SettingsBadge({
-  tone = "neutral",
-  children,
-}: {
-  readonly tone?: "ok" | "warn" | "error" | "accent" | "neutral";
-  readonly children: ReactNode;
-}) {
-  const badge = {
-    ok: "neutral",
-    warn: "waiting",
-    error: "waiting",
-    accent: "neutral",
-    neutral: "neutral",
-  } as const;
-  return <span className={badgeClass(badge[tone])}>{children}</span>;
 }
 
 /** A field in Settings: the Input primitive's, a row's height. */

@@ -373,7 +373,7 @@ function FileRow({
 }
 
 /** A small quiet action beside a row: "Replace", "Where?". */
-export const quietPillClass = buttonVariants({ variant: "secondary", size: "sm" });
+const quietPillClass = buttonVariants({ variant: "secondary", size: "sm" });
 
 /** A site an app's help names ("example.com"), anywhere in its words. */
 const SITE = /\b((?:[a-z0-9-]+\.)+(?:com|io|ai|xyz|org|net|app|dev|fi|trade|exchange))\b/giu;

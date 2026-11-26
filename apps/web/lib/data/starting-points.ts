@@ -3,7 +3,7 @@ import {
   type StartingPoint,
   type StartingPointsWire,
 } from "@auni/shared";
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { requestCore } from "@/lib/core";
@@ -77,20 +77,6 @@ export function useStartingPoints(): {
     waiting: query.isPending || waitingOn(query.data),
     pending: query.data?.pending ?? false,
   };
-}
-
-/** Asks core to regenerate tailored starting points right away from current signals. */
-export function useRefreshStartingPoints() {
-  const client = useQueryClient();
-  return useMutation<StartingPointsWire>({
-    mutationFn: async () =>
-      startingPointsWireSchema.parse(
-        await requestCore("starting-points/refresh", { method: "POST", body: "{}" }),
-      ),
-    onSuccess: (wire) => {
-      client.setQueryData<Read>(KEY, { ...wire, waitingSince: Date.now() });
-    },
-  });
 }
 
 /** The same points, kept read wherever the app is open, so a new chat never waits for them. */

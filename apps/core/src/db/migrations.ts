@@ -35,31 +35,75 @@ async function pending(client: Sql) {
 export async function migrateDatabase(url: string, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
   const client = ownSession(url);
-  let waiting: { cancel(): void } | null = null;
+  let active: { cancel(): void } | null = null;
   let forceEnd: ReturnType<typeof setTimeout> | undefined;
-  // A stop asked while waiting on the lock sends Postgres's cancel request (falling back to
-  // closing the socket if Postgres doesn't answer), so the backend leaves the wait cleanly;
-  // during a migration it closes the session so the transaction rolls back whole.
+  // Track every query on this session (including inside Drizzle's migration transaction) so a stop
+  // sends Postgres's cancel request for whatever is in flight (advisory lock wait or blocked DDL),
+  // letting the transaction roll back and release its locks before closing the connection.
+  const track = <T>(query: T): T => {
+    if (
+      query &&
+      typeof query === "object" &&
+      "cancel" in query &&
+      typeof query.cancel === "function" &&
+      "then" in query &&
+      typeof query.then === "function"
+    ) {
+      const pending = query as { cancel(): void; then: Promise<unknown>["then"] };
+      active = pending;
+      const clear = () => {
+        if (active === pending) active = null;
+      };
+      void pending.then(clear, clear);
+    }
+    return query;
+  };
+  const wrap = (session: Sql): Sql =>
+    new Proxy(session, {
+      apply: (target, self, args) => {
+        signal?.throwIfAborted();
+        return track(Reflect.apply(target, self, args) as unknown);
+      },
+      get: (target, key) => {
+        if (key === "unsafe") {
+          return (...args: unknown[]) => {
+            signal?.throwIfAborted();
+            return track(
+              Reflect.apply(target.unsafe as (...a: unknown[]) => unknown, target, args),
+            );
+          };
+        }
+        if (key === "begin") {
+          return (...args: unknown[]) => {
+            signal?.throwIfAborted();
+            const fnIndex = typeof args[0] === "function" ? 0 : 1;
+            const fn = args[fnIndex] as (tx: Sql) => unknown;
+            const next = [...args];
+            next[fnIndex] = (tx: Sql) => fn(wrap(tx));
+            return Reflect.apply(target.begin as (...a: unknown[]) => unknown, target, next);
+          };
+        }
+        return Reflect.get(target, key) as unknown;
+      },
+    });
   const abort = () => {
-    if (waiting) {
-      waiting.cancel();
-      forceEnd = setTimeout(() => void client.end({ timeout: 0 }), 500);
-      forceEnd.unref();
-    } else void client.end({ timeout: 0 });
+    active?.cancel();
+    // Fallback if Postgres doesn't answer the cancel request (e.g. unreachable network).
+    forceEnd = setTimeout(() => void client.end({ timeout: 0 }), 500);
+    forceEnd.unref();
   };
   signal?.addEventListener("abort", abort, { once: true });
   try {
-    const lock = client`select pg_advisory_lock(hashtext('auni:migrate'))`;
-    waiting = lock;
-    await lock;
-    waiting = null;
+    const tracked = signal ? wrap(client) : client;
+    await tracked`select pg_advisory_lock(hashtext('auni:migrate'))`;
     signal?.throwIfAborted();
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS_FOLDER });
+    await migrate(drizzle(tracked), { migrationsFolder: MIGRATIONS_FOLDER });
   } finally {
     signal?.removeEventListener("abort", abort);
     clearTimeout(forceEnd);
-    // Closing the session lets go of the lock.
-    await client.end(signal?.aborted ? { timeout: 1 } : undefined);
+    // Closing the session lets go of the lock; once aborted, close promptly rather than waiting
+    // on a half-open connect or hung server.
+    await client.end(signal?.aborted ? { timeout: 0 } : undefined);
   }
 }
 

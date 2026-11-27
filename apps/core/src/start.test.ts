@@ -238,7 +238,7 @@ describe("start() cancelled by a signal", () => {
     await Promise.resolve();
 
     // Listeners close and the runner begins draining immediately, before startup finishes unwinding.
-    expect(serverClose).toHaveBeenCalledTimes(1);
+    expect(serverClose).toHaveBeenCalled();
     expect(runnerStop).toHaveBeenCalledTimes(1);
     expect(logs.join("\n")).toContain("Stopping Auni. Moves in progress will finish first");
     expect(closeDatabaseConnection).not.toHaveBeenCalled();
@@ -284,17 +284,19 @@ describe("start() cancelled by a signal", () => {
   });
 
   it("stops at once without waiting when a signal arrives while opening the browser", async () => {
-    const opening = deferred();
-    vi.mocked(openBrowser).mockImplementationOnce(() => {
-      process.emit("SIGTERM", "SIGTERM");
-      // Intentionally never settles: opening the browser must never hold up a stop.
-      return opening.promise;
-    });
+    // Settles only when the stop cuts it off, as the real opener does (open-browser.test.ts).
+    vi.mocked(openBrowser).mockImplementationOnce(
+      (_url, signal) =>
+        new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(signal.reason));
+          process.emit("SIGTERM", "SIGTERM");
+        }),
+    );
 
     const running = start(database, { web: true, open: true, jobs: true });
     await running;
     expect(await exitedWith).toBe(0);
-    expect(serverClose).toHaveBeenCalledTimes(1);
+    expect(serverClose).toHaveBeenCalled();
     expect(webKill).toHaveBeenCalledTimes(1);
     expect(runnerStop).toHaveBeenCalledTimes(1);
     expect(release).toHaveBeenCalledTimes(1);
@@ -338,6 +340,32 @@ describe("start() cancelled by a signal", () => {
     expect(await exitedWith).toBe(130);
     expect(runnerStop).toHaveBeenCalledTimes(1);
     expect(logs.join("\n")).toContain("Stopping Auni. Moves in progress will finish first");
+    expect(errors).toEqual([]);
+  });
+
+  it("keeps Postgres up until a handover's in-flight runner drain finishes", async () => {
+    const { lendToHandover } = await import("./handover/hand-over.ts");
+    const draining = deferred();
+    runnerStop.mockImplementation(() => draining.promise);
+
+    await start(database, { web: false, open: false, jobs: true });
+    const lent = vi.mocked(lendToHandover).mock.calls[0]?.[0];
+    expect(lent).toBeTruthy();
+
+    // Handover starts draining the runner (a move in flight), then SIGTERM arrives mid-drain.
+    const handoverStop = lent!.stopJobs();
+    process.emit("SIGTERM", "SIGTERM");
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect(closeDatabaseConnection).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+    expect(logs.join("\n")).toContain("Stopping Auni. Moves in progress will finish first");
+
+    draining.resolve();
+    await handoverStop;
+    expect(await exitedWith).toBe(0);
+    expect(closeDatabaseConnection).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
     expect(errors).toEqual([]);
   });
 });

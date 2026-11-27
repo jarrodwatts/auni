@@ -128,6 +128,26 @@ describe("whileBooting", () => {
     expect(signals.listenerCount("SIGINT")).toBe(0);
   });
 
+  it("never starts when a stop arrived while start.ts was loading", async () => {
+    const signals = new EventEmitter();
+    const release = vi.fn(async () => {});
+    const begin = vi.fn(async () => {});
+
+    await whileBooting(
+      async (booting) => {
+        booting.hold({ release });
+        // Delivered on the next turn, as a signal that came during a long import is.
+        setImmediate(() => signals.emit("SIGTERM"));
+        return booting.handOff(begin);
+      },
+      { signals },
+    );
+
+    expect(begin).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBe(0);
+  });
+
   it("detaches listeners and leaves the database with start() once handed off", async () => {
     const signals = new EventEmitter();
     const release = vi.fn(async () => {});
@@ -135,7 +155,7 @@ describe("whileBooting", () => {
     await whileBooting(
       async (booting) => {
         booting.hold({ release });
-        return booting.handOff(
+        return booting.handOff(() =>
           Promise.resolve().then(() => {
             expect(signals.listenerCount("SIGINT")).toBe(0);
             expect(signals.listenerCount("SIGTERM")).toBe(0);

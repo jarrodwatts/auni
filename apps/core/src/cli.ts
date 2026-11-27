@@ -62,8 +62,7 @@ switch (command) {
         // Auni's own Postgres is up; an owner's own database is known to answer once migrated.
         if (database) told.memoryReady();
         const { start } = await import("./start.ts");
-        if (booting.signal.aborted) return;
-        return booting.handOff(
+        return booting.handOff(() =>
           start(database, {
             web,
             open: !flags.has("--no-open"),

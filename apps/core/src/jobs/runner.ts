@@ -411,22 +411,26 @@ export async function startRunner(
   }, tick);
 
   const looping = loop();
+  let stopped: Promise<void> | undefined;
   return {
-    async stop() {
-      stopping = true;
-      clearInterval(ticker);
-      poke();
-      await looping;
-      endTurns("stopped");
-      await Promise.race([
-        Promise.all([...running.values()].map(({ done }) => done)),
-        new Promise((resolve) => setTimeout(resolve, DRAIN_MS).unref()),
-      ]);
-      await listening?.unlisten();
-      // Closing the session lets go of the lock.
-      await lock?.close();
-    },
+    // Asked twice (a handover stopping it as Auni stops), both wait on the one drain.
+    stop: () => (stopped ??= drain()),
   };
+
+  async function drain() {
+    stopping = true;
+    clearInterval(ticker);
+    poke();
+    await looping;
+    endTurns("stopped");
+    await Promise.race([
+      Promise.all([...running.values()].map(({ done }) => done)),
+      new Promise((resolve) => setTimeout(resolve, DRAIN_MS).unref()),
+    ]);
+    await listening?.unlisten();
+    // Closing the session lets go of the lock.
+    await lock?.close();
+  }
 }
 
 function said(error: unknown): string {

@@ -49,8 +49,8 @@ interface BootControl {
   readonly signal: AbortSignal;
   /** Give `database` to this guard so it is released if boot is stopped before `start()`. */
   hold(database: { release(): Promise<void> } | null): void;
-  /** Hand off to `start()` synchronously once it has installed its own stop handlers. */
-  handOff<T>(started: Promise<T>): Promise<T>;
+  /** Calls `begin` (`start()`, which installs its own stop handlers), unless a stop came first. */
+  handOff(begin: () => Promise<void>): Promise<void>;
 }
 
 /**
@@ -88,9 +88,16 @@ export async function whileBooting(
       hold(db) {
         database = db;
       },
-      handOff(started) {
+      async handOff(begin) {
+        // A signal that came while start.ts loaded (a second or more, all at once) is heard first.
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        if (abort.signal.aborted) return;
         handedOff = true;
         database = null;
+        // start() adds its listeners before these go: with none left for a moment, Node would
+        // drop a signal still on its way.
+        const started = begin();
         off();
         return started;
       },

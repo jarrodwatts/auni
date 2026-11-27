@@ -521,6 +521,41 @@ describe("the runner", () => {
     expect(ended).toEqual(["hanging-turn"]);
     await until(() => allDone("slow-send", 1));
   });
+
+  it("shares one drain when stop() is called twice while a job is in flight", async () => {
+    let release = () => {};
+    let started = false;
+    let finished = false;
+    const job = defineJob({
+      kind: jobKind("shared-drain", z.object({})),
+      run: () => {
+        started = true;
+        return new Promise<void>((resolve) => {
+          release = () => {
+            finished = true;
+            resolve();
+          };
+        });
+      },
+    });
+    await job.kind.enqueue(db, {});
+    const active = await start([job]);
+    await until(() => started);
+
+    const first = active.stop();
+    const second = active.stop();
+    expect(second).toBe(first);
+
+    await sleep(50);
+    expect(finished).toBe(false);
+    expect(await lockSessions(true)).toHaveLength(1);
+
+    release();
+    await Promise.all([first, second]);
+    runner = undefined;
+    expect(await allDone("shared-drain", 1)).toBe(true);
+    expect(await lockSessions(true)).toEqual([]);
+  });
 });
 
 describe("pruneJob", () => {

@@ -64,7 +64,6 @@ export async function start(
   let webApp: ChildProcess | undefined;
   let stopping = false;
   let runnerDrain: Promise<void> | undefined;
-  const closedServers = new Set<Server>();
   const cancelling = new AbortController();
 
   // Asked now, beside everything else, and told the moment it's known, so knowing what Auni
@@ -90,20 +89,16 @@ export async function start(
     webApp?.kill();
     webApp = undefined;
     // No new requests; one in flight, such as a money tool call waiting on its send, carries on.
-    for (const server of servers) {
-      if (closedServers.has(server)) continue;
-      closedServers.add(server);
-      server.close();
-    }
+    // Called again once startup settles; closing a closed server does nothing.
+    for (const server of servers) server.close();
   };
   const drainRunner = (): Promise<void> | undefined => {
     if (runner && !runnerDrain) {
-      const target = runner;
       console.log(
         `Stopping Auni. Moves in progress will finish first${runsAs() === "terminal" ? " (press Ctrl-C again to stop immediately)" : ""}.`,
       );
       // Turns end now; other jobs (a send in flight among them) get up to two minutes.
-      runnerDrain = target.stop();
+      runnerDrain = runner.stop();
     }
     return runnerDrain;
   };
@@ -209,9 +204,9 @@ export async function start(
         // A handover to another machine stops the runner while it hands Auni over (handover/).
         lendToHandover({
           stopJobs: async () => {
-            const was = runner;
+            // Kept until drained, so a stop asked meanwhile waits on the same drain.
+            await runner?.stop();
             runner = undefined;
-            await was?.stop();
           },
           startJobs: async () => {
             if (stopping || runner) return;
@@ -310,29 +305,6 @@ async function coreServing(signal?: AbortSignal): Promise<boolean> {
   );
 }
 
-/** Settles with `work`, or rejects at once if `signal` aborts first. */
-function untilAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) return work;
-  if (signal.aborted) {
-    work.catch(() => {});
-    return Promise.reject(signal.reason);
-  }
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(signal.reason);
-    signal.addEventListener("abort", onAbort, { once: true });
-    work.then(
-      (value) => {
-        signal.removeEventListener("abort", onAbort);
-        resolve(value);
-      },
-      (error: unknown) => {
-        signal.removeEventListener("abort", onAbort);
-        reject(error);
-      },
-    );
-  });
-}
-
 /**
  * Opens Auni in this machine's browser: with no browser paired yet, the one-time pairing link,
  * which signs that browser in as the owner's; after that, the app. The link goes to the browser
@@ -375,7 +347,7 @@ export async function openOwner({
       : pairingLink(await mintPairingCode(), landsOn);
     if (signal?.aborted) return false;
     opening();
-    const opened = await untilAbort(openBrowser(url, signal), signal).then(
+    const opened = await openBrowser(url, signal).then(
       () => true,
       () => false,
     );

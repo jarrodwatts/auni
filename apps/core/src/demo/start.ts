@@ -80,8 +80,7 @@ export async function startDemo({
     const { seed } = firstRun ? await import("./first-run.ts") : await import("./seed.ts");
     // The browser lands on a new chat: first run's question, or one whose first starting point is
     // the tour (tour.ts).
-    if (booting.signal.aborted) return;
-    return booting.handOff(
+    return booting.handOff(() =>
       start(database, {
         web,
         open,

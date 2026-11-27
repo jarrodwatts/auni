@@ -1,13 +1,23 @@
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterAll, afterEach, vi } from "vitest";
 
 import { tempDir } from "./temp-dir.ts";
 
-// Each file gets its own home, so tests and children spawned by them never reach ~/.auni.
-// Auni creates work and tools folders beside its home. Keep all three inside the scratch folder.
-// The Tailscale tests bind a Unix socket here, so keep both names short.
-process.env.AUNI_HOME = join(tempDir("", afterAll), "h");
+// Each file gets its own home and temp folder inside the run's scratch root, so tests and any
+// children they spawn never reach ~/.auni or leave folders behind in the caller's TMPDIR.
+// Auni creates work and tools folders beside its home, and Tailscale tests bind a Unix socket
+// inside it, so keep the folder names short.
+const scratch = tempDir("", afterAll);
+process.env.AUNI_HOME = join(scratch, "h");
+const tmp = join(scratch, "t");
+mkdirSync(tmp);
+process.env.TMPDIR = tmp;
+if (process.platform === "win32") {
+  process.env.TEMP = tmp;
+  process.env.TMP = tmp;
+}
 
 // The OS keychain outlives every test, so reaching it fails the test that did, even where the
 // keys would have gone to a file once it refused (as every caller of a keychain that isn't

@@ -61,6 +61,8 @@ vi.mock("../agent/brain.ts", async (importOriginal) => {
             },
           },
     brainBox: async () => ({}),
+    limitNotice: async (picked: { about: { name: string } }, resetsAt: Date | null) =>
+      `${picked.about.name} has reached its usage limit. Auni can answer again ${resetsAt ? "then" : "once it resets"}.`,
   };
 });
 /** Runs as suggest_replies is called, before it answers. */

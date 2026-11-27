@@ -33,26 +33,34 @@ vi.mock("@/lib/data/me", () => ({
   answerStarPrompt: async () => void (core.answers += 1),
 }));
 
+import { askForStarOnce } from "./star-prompt";
+
 const IDLE_MS = 30_000;
+
+/** A page load: a fresh window and its listeners, while the tab's storage stays. */
+function reload() {
+  page.events = new EventTarget();
+  vi.stubGlobal("window", {
+    addEventListener: page.events.addEventListener.bind(page.events),
+    removeEventListener: page.events.removeEventListener.bind(page.events),
+    open: (url: string) => void page.opened.push(url),
+  });
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
   toast.mockReset();
   toast.dismiss.mockReset();
   Object.assign(core, { starred: false, asks: true, stars: true, answers: 0 });
-  Object.assign(page, { focused: true, activeElement: null, events: new EventTarget() });
-  Object.assign(page, { fresh: true, opened: [], session: new Map() });
+  Object.assign(page, { focused: true, activeElement: null, fresh: true, opened: [] });
+  page.session = new Map();
   vi.stubGlobal("document", {
     hasFocus: () => page.focused,
     get activeElement() {
       return page.activeElement;
     },
   });
-  vi.stubGlobal("window", {
-    addEventListener: page.events.addEventListener.bind(page.events),
-    removeEventListener: page.events.removeEventListener.bind(page.events),
-    open: (url: string) => void page.opened.push(url),
-  });
+  reload();
   vi.stubGlobal("navigator", {
     userActivation: {
       get isActive() {
@@ -71,15 +79,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** A page load: the module starts again, and the tab's storage stays. */
-async function load() {
-  vi.resetModules();
-  return (await import("./star-prompt")).askForStarOnce;
-}
-
-/** Asks, and leaves the page idle long enough to be asked. */
+/** Starts a fresh page load, asks, and leaves the page idle long enough to be asked. */
 async function idleAsk() {
-  const asked = (await load())();
+  reload();
+  const asked = askForStarOnce();
   await vi.advanceTimersByTimeAsync(IDLE_MS);
   await asked;
 }
@@ -95,7 +98,7 @@ const actions = () => shown().action as Actions;
 
 describe("the ask for a star", () => {
   it("asks only once the focused page has been idle", async () => {
-    void (await load())();
+    const asked = askForStarOnce();
     await vi.advanceTimersByTimeAsync(IDLE_MS - 1);
     page.events.dispatchEvent(new Event("keydown"));
     await vi.advanceTimersByTimeAsync(IDLE_MS - 1);
@@ -114,6 +117,7 @@ describe("the ask for a star", () => {
     page.activeElement = null;
     page.events.dispatchEvent(new Event("pointerdown"));
     await vi.advanceTimersByTimeAsync(IDLE_MS);
+    await asked;
     expect(shown()).toMatchObject({
       id: "star-prompt",
       title: "Enjoying Auni?",
@@ -128,6 +132,12 @@ describe("the ask for a star", () => {
     expect(toast).toHaveBeenCalledOnce();
     page.session.clear();
     await idleAsk();
+    expect(toast).toHaveBeenCalledTimes(2);
+    // Same page load, even without storage: still never asks twice.
+    page.session.clear();
+    const sameLoad = askForStarOnce();
+    await vi.advanceTimersByTimeAsync(IDLE_MS);
+    await sameLoad;
     expect(toast).toHaveBeenCalledTimes(2);
   });
 

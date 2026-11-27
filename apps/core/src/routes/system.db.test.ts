@@ -27,6 +27,11 @@ const proof = vi.hoisted(() => ({ here: false }));
 vi.mock("../auth/proof.ts", () => ({
   ownerHere: () => proof.here,
 }));
+vi.mock("../agent/brain.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../agent/brain.ts")>()),
+  brainRows: async () => [],
+  pickBrain: async () => ({ fixes: [] }),
+}));
 
 const app = express()
   .use("/system", systemRouter)

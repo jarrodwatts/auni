@@ -17,18 +17,26 @@
 // same pictures byte for byte, on any day and any machine: a picture differs only where the app
 // does.
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempDisposableSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempDisposableSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import {
+  openShotFolder,
+  SHOT_WIDTHS,
+  shotLookDir,
+  type ShotFolder,
+  type ShotLook,
+  type ShotSize,
+} from "../apps/core/src/demo/shots.ts";
 import { launch, type Page } from "./browser.ts";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = resolve(process.argv[2] ?? join(ROOT, "demo-shots"));
 /** The looks to take, each as the system's: Auni follows it when the owner has picked none. */
-const LOOKS = (["light", "dark"] as const).filter(
+const LOOKS: readonly ShotLook[] = (["light", "dark"] as const).filter(
   (look) => !process.argv[3] || look === process.argv[3],
 );
 if (LOOKS.length === 0) throw new Error(`"${process.argv[3]}" is no look: light or dark.`);
@@ -39,10 +47,6 @@ const ONLY = process.env.SHOTS_ONLY ? new RegExp(process.env.SHOTS_ONLY, "u") : 
 /** The moment every picture is taken at, and the time zone its dates are read in. */
 const AT = "2026-11-11T12:00:00Z";
 const TIME_ZONE = "UTC";
-const WIDTHS = [
-  { name: "desktop", width: 1280, height: 860 },
-  { name: "phone", width: 390, height: 844 },
-] as const;
 
 /**
  * Starts the demo and resolves with the link that signs a browser in: its seeded owner, or with
@@ -188,15 +192,16 @@ interface Opener {
  */
 async function take(
   page: Page,
-  out: string,
+  out: ShotFolder,
   name: string,
   url: string,
   from: "top" | "end",
   first?: Opener,
-  { only, once = false }: { only?: (typeof WIDTHS)[number]["name"]; once?: boolean } = {},
+  { only, once = false }: { only?: ShotSize; once?: boolean } = {},
 ): Promise<void> {
   if (ONLY && !ONLY.test(name)) return;
-  for (const { name: size, width, height } of WIDTHS.filter((w) => !only || w.name === only)) {
+  const screen = out.screen(name);
+  for (const { name: size, width, height } of SHOT_WIDTHS.filter((w) => !only || w.name === only)) {
     await page.picture(width, height);
     await page.open(url);
     // A blinking caret would make two pictures of one screen differ.
@@ -219,13 +224,13 @@ async function take(
     await page.evaluate(SCROLL(from, from));
     await sleep(300);
     for (let part = 1; part <= 8; part += 1) {
-      const file = `${name}.${size}${part === 1 ? "" : `.${part}`}.png`;
-      writeFileSync(join(out, file), await page.picture(width, height));
+      const file = screen.save(size, part, await page.picture(width, height));
       console.log(file);
       if (once || !(await page.evaluate<boolean>(SCROLL(from)))) break;
       await sleep(300);
     }
   }
+  screen.finish();
 }
 
 /**
@@ -428,8 +433,7 @@ const PAUSE = (ms: number) => `new Promise((done) => setTimeout(() => done(true)
  * demo and a browser of its own, since looking changes what a screen shows next (a row that
  * was new, a chat that was unread): both looks picture the same owner at the same moment.
  */
-async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
-  mkdirSync(out, { recursive: true });
+async function shoot(look: ShotLook, out: ShotFolder): Promise<void> {
   await withDemo(look, [], async (page, { origin, href }) => {
     // A browser that isn't this one: unpaired, and then with the link this one already spent.
     await withBrowser(look, async (stranger) => {
@@ -684,7 +688,7 @@ async function shoot(look: (typeof LOOKS)[number], out: string): Promise<void> {
  * and as one with none yet does (`--no-wallet`, with the dialog to bring one), and, with their AI
  * not yet signed in (`--signed-out`), its ask for one and the sign-in it starts.
  */
-async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise<void> {
+async function shootFirstRun(look: ShotLook, out: ShotFolder): Promise<void> {
   for (const flags of [[], ["--no-wallet"], ["--signed-out"]]) {
     await withDemo(look, ["--first-run", ...flags], async (page, { origin }) => {
       const url = `${origin}/app/new`;
@@ -706,13 +710,13 @@ async function shootFirstRun(look: (typeof LOOKS)[number], out: string): Promise
 
 using scratch = mkdtempDisposableSync(join(tmpdir(), "auni-shots-"));
 try {
-  rmSync(OUT, { recursive: true, force: true });
   for (const look of LOOKS) {
-    const out = look === "light" ? OUT : join(OUT, look);
+    const out = openShotFolder(shotLookDir(OUT, look), { prune: !ONLY });
     await shoot(look, out);
     if (!ONLY || ONLY.test("first-run")) await shootFirstRun(look, out);
+    interrupt.signal.throwIfAborted();
+    out.finish();
   }
-  interrupt.signal.throwIfAborted();
   console.log(`\nThe demo's screens are in ${OUT}`);
 } catch (error) {
   if (!interrupt.signal.aborted) throw error;

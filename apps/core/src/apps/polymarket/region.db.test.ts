@@ -32,6 +32,7 @@ const REFUSED =
 vi.mock(import("../../agent/brain.ts"), async (original) => ({
   ...(await original()),
   brainRows: async () => [],
+  pickBrain: async () => ({ fixes: [] }),
 }));
 vi.mock(import("../../money/wallets.ts"), async (original) => ({
   ...(await original()),

@@ -2,10 +2,7 @@
  * A terminal sends Ctrl-C to the whole process group, and pnpm can relay it too.
  * Only an interrupt at least a second after the first counts as another press.
  */
-function ctrlCHandler(
-  stop: () => void,
-  force: () => void = () => process.exit(130),
-): () => void {
+function ctrlCHandler(stop: () => void, force: () => void = () => process.exit(130)): () => void {
   let firstInterrupt: number | undefined;
   return () => {
     const now = performance.now();
@@ -99,6 +96,7 @@ export async function whileBooting(
       },
     });
   } catch (error) {
+    if (!abort.signal.aborted) await new Promise<void>((resolve) => setImmediate(resolve));
     if (!abort.signal.aborted) throw error;
   } finally {
     try {

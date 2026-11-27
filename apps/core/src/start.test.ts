@@ -4,6 +4,7 @@ import type { Server } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Postgres } from "./db/embedded.ts";
+import { closeDatabaseConnection } from "./db/client.ts";
 import { migrateDatabase } from "./db/migrations.ts";
 import { startRunnerWhenFree } from "./jobs/runner.ts";
 import { openBrowser } from "./open-browser.ts";
@@ -82,6 +83,8 @@ let logs: string[];
 let database: Postgres;
 let release: ReturnType<typeof vi.fn<() => Promise<void>>>;
 let runnerStop: ReturnType<typeof vi.fn<() => Promise<void>>>;
+let serverClose: ReturnType<typeof vi.fn<() => void>>;
+let webKill: ReturnType<typeof vi.fn<() => void>>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -112,12 +115,14 @@ beforeEach(() => {
     hold: vi.fn(async () => {}),
   };
   runnerStop = vi.fn(async () => {});
+  serverClose = vi.fn();
+  webKill = vi.fn();
   vi.mocked(startRunnerWhenFree).mockResolvedValue({ stop: runnerStop });
   vi.mocked(listen).mockResolvedValue([
-    { close: vi.fn(), closeAllConnections: vi.fn() } as unknown as Server,
+    { close: serverClose, closeAllConnections: vi.fn() } as unknown as Server,
   ]);
   vi.mocked(startWebApp).mockResolvedValue({
-    kill: vi.fn(),
+    kill: webKill,
     once: vi.fn(),
   } as unknown as ChildProcess);
 });
@@ -128,16 +133,23 @@ afterEach(() => {
 
 describe("start() cancelled by a signal", () => {
   it("exits quietly with 130 when Ctrl-C interrupts database migration", async () => {
-    const migrating = deferred();
-    vi.mocked(migrateDatabase).mockImplementationOnce(() => migrating.promise);
+    let sawAbort = false;
+    vi.mocked(migrateDatabase).mockImplementationOnce(
+      (_url, signal) =>
+        new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => {
+            sawAbort = true;
+            reject(new Error("CONNECTION_DESTROYED"));
+          });
+          process.emit("SIGINT", "SIGINT");
+        }),
+    );
 
     const running = start(database, { web: false, open: false, jobs: true });
-    process.emit("SIGINT", "SIGINT");
-    // Stopping Postgres cuts off the migration query, as pg_ctl stop -m fast does.
-    migrating.reject(new Error("terminating connection due to administrator command"));
 
     await running;
     expect(await exitedWith).toBe(130);
+    expect(sawAbort).toBe(true);
     expect(release).toHaveBeenCalledTimes(1);
     expect(errors).toEqual([]);
     expect(logs.join("\n")).not.toContain("Moves in progress");
@@ -145,9 +157,14 @@ describe("start() cancelled by a signal", () => {
 
   it("waits for an in-flight migration to settle before releasing Postgres and skips later steps", async () => {
     const migrating = deferred();
-    vi.mocked(migrateDatabase).mockImplementationOnce(() => migrating.promise);
+    const migrateStarted = deferred();
+    vi.mocked(migrateDatabase).mockImplementationOnce(() => {
+      migrateStarted.resolve();
+      return migrating.promise;
+    });
 
     const running = start(database, { web: false, open: false, jobs: true });
+    await migrateStarted.promise;
     process.emit("SIGINT", "SIGINT");
     await Promise.resolve();
     expect(release).not.toHaveBeenCalled();
@@ -182,7 +199,7 @@ describe("start() cancelled by a signal", () => {
     expect(runnerStop).toHaveBeenCalledTimes(1);
     expect(release).toHaveBeenCalledTimes(1);
     expect(errors).toEqual([]);
-    expect(logs.join("\n")).not.toContain("Moves in progress");
+    expect(logs.join("\n")).toContain("Stopping Auni. Moves in progress will finish first");
   });
 
   it("aborts startWebApp and exits quietly with 130 when Ctrl-C arrives while web starts", async () => {
@@ -205,26 +222,97 @@ describe("start() cancelled by a signal", () => {
     expect(errors).toEqual([]);
   });
 
-  it("exits quietly with 130 when Ctrl-C arrives while opening the browser", async () => {
+  it("drains the runner and closes listeners at once while startup unwinds, keeping Postgres up until both finish", async () => {
+    const building = deferred<ChildProcess>();
+    const draining = deferred();
+    const buildStarted = deferred();
+    runnerStop.mockImplementationOnce(() => draining.promise);
+    vi.mocked(startWebApp).mockImplementationOnce(() => {
+      buildStarted.resolve();
+      return building.promise;
+    });
+
+    const running = start(database, { web: true, open: false, jobs: true });
+    await buildStarted.promise;
+    process.emit("SIGINT", "SIGINT");
+    await Promise.resolve();
+
+    // Listeners close and the runner begins draining immediately, before startup finishes unwinding.
+    expect(serverClose).toHaveBeenCalledTimes(1);
+    expect(runnerStop).toHaveBeenCalledTimes(1);
+    expect(logs.join("\n")).toContain("Stopping Auni. Moves in progress will finish first");
+    expect(closeDatabaseConnection).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+
+    // Startup settles while a move is still draining: Postgres stays up.
+    building.reject(new Error("The web app exited (SIGINT)."));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(closeDatabaseConnection).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+
+    // Once the move finishes draining, Postgres closes and Auni exits quietly.
+    draining.resolve();
+    await running;
+    expect(await exitedWith).toBe(130);
+    expect(closeDatabaseConnection).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(errors).toEqual([]);
+  });
+
+  it("stops a runner that startup finishes creating just as a stop begins", async () => {
+    const starting = deferred<{ stop: () => Promise<void> }>();
+    const waitStarted = deferred();
+    vi.mocked(startRunnerWhenFree).mockImplementationOnce(() => {
+      waitStarted.resolve();
+      return starting.promise;
+    });
+
+    const running = start(database, { web: false, open: false, jobs: true });
+    await waitStarted.promise;
+    process.emit("SIGINT", "SIGINT");
+    await Promise.resolve();
+    expect(runnerStop).not.toHaveBeenCalled();
+
+    starting.resolve({ stop: runnerStop });
+    await running;
+    expect(await exitedWith).toBe(130);
+    expect(runnerStop).toHaveBeenCalledTimes(1);
+    expect(closeDatabaseConnection).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(errors).toEqual([]);
+  });
+
+  it("stops at once without waiting when a signal arrives while opening the browser", async () => {
     const opening = deferred();
     vi.mocked(openBrowser).mockImplementationOnce(() => {
-      process.emit("SIGINT", "SIGINT");
+      process.emit("SIGTERM", "SIGTERM");
+      // Intentionally never settles: opening the browser must never hold up a stop.
       return opening.promise;
     });
 
     const running = start(database, { web: true, open: true, jobs: true });
-    opening.reject(new Error("CONNECTION_ENDED"));
     await running;
-    expect(await exitedWith).toBe(130);
+    expect(await exitedWith).toBe(0);
+    expect(serverClose).toHaveBeenCalledTimes(1);
+    expect(webKill).toHaveBeenCalledTimes(1);
+    expect(runnerStop).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
     expect(errors).toEqual([]);
+    expect(logs.join("\n")).toContain("Stopping Auni. Moves in progress will finish first");
     expect(logs.join("\n")).not.toContain("Keep this terminal open");
   });
 
   it("exits quietly with 0 when SIGTERM arrives during startup", async () => {
     const migrating = deferred();
-    vi.mocked(migrateDatabase).mockImplementationOnce(() => migrating.promise);
+    const migrateStarted = deferred();
+    vi.mocked(migrateDatabase).mockImplementationOnce(() => {
+      migrateStarted.resolve();
+      return migrating.promise;
+    });
 
     const running = start(database, { web: false, open: false, jobs: true });
+    await migrateStarted.promise;
     process.emit("SIGTERM", "SIGTERM");
     migrating.reject(new Error("terminating connection due to administrator command"));
 

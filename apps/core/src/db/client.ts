@@ -54,6 +54,7 @@ export const notifications = {
 };
 
 let files: Promise<string | null> | undefined;
+let closing = false;
 
 /**
  * Where Postgres keeps its own files, asked once. Run on this machine as the owner (embedded, or
@@ -64,9 +65,11 @@ export function databaseFiles(): Promise<string | null> {
   files ??= client<{ data_directory: string }[]>`show data_directory`.then(
     ([row]) => row?.data_directory ?? null,
     (error: unknown) => {
-      console.warn(
-        `Postgres won't say where it keeps its files (${error instanceof Error ? error.message : String(error)}), so the agent's box can't hide them if they're on this machine.`,
-      );
+      // Asked as Auni stops, the answer no longer matters.
+      if (!closing)
+        console.warn(
+          `Postgres won't say where it keeps its files (${error instanceof Error ? error.message : String(error)}), so the agent's box can't hide them if they're on this machine.`,
+        );
       return null;
     },
   );
@@ -78,5 +81,6 @@ export async function pingDatabase(): Promise<void> {
 }
 
 export async function closeDatabaseConnection(): Promise<void> {
+  closing = true;
   await client.end({ timeout: 5 });
 }

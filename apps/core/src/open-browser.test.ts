@@ -50,4 +50,18 @@ describe.runIf(process.platform === "linux")("openBrowser", () => {
     vi.stubEnv("SSH_CONNECTION", "192.0.2.1 34567 192.0.2.2 22");
     expect(canOpenBrowser()).toBe(false);
   });
+
+  it("stops waiting on a slow opener as soon as its signal aborts", async () => {
+    const bin = tempDir("auni-opener-");
+    writeFileSync(join(bin, "xdg-open"), "#!/bin/sh\nexec sleep 2\n");
+    chmodSync(join(bin, "xdg-open"), 0o755);
+    vi.stubEnv("PATH", `${bin}:${process.env.PATH}`);
+
+    const abort = new AbortController();
+    const opening = openBrowser("http://localhost:3000/app#pair=code", abort.signal);
+    const began = performance.now();
+    setTimeout(() => abort.abort(new Error("stopped")), 50);
+    await expect(opening).rejects.toThrow("stopped");
+    expect(performance.now() - began).toBeLessThan(1_000);
+  });
 });

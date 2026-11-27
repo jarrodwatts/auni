@@ -32,14 +32,34 @@ async function pending(client: Sql) {
  * Brings the database at `url` to this version's schema, as `auni` does before anything
  * else touches it. Two starting at once on one database take turns.
  */
-export async function migrateDatabase(url: string): Promise<void> {
+export async function migrateDatabase(url: string, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
   const client = ownSession(url);
+  let waiting: { cancel(): void } | null = null;
+  let forceEnd: ReturnType<typeof setTimeout> | undefined;
+  // A stop asked while waiting on the lock sends Postgres's cancel request (falling back to
+  // closing the socket if Postgres doesn't answer), so the backend leaves the wait cleanly;
+  // during a migration it closes the session so the transaction rolls back whole.
+  const abort = () => {
+    if (waiting) {
+      waiting.cancel();
+      forceEnd = setTimeout(() => void client.end({ timeout: 0 }), 500);
+      forceEnd.unref();
+    } else void client.end({ timeout: 0 });
+  };
+  signal?.addEventListener("abort", abort, { once: true });
   try {
-    await client`select pg_advisory_lock(hashtext('auni:migrate'))`;
+    const lock = client`select pg_advisory_lock(hashtext('auni:migrate'))`;
+    waiting = lock;
+    await lock;
+    waiting = null;
+    signal?.throwIfAborted();
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS_FOLDER });
   } finally {
+    signal?.removeEventListener("abort", abort);
+    clearTimeout(forceEnd);
     // Closing the session lets go of the lock.
-    await client.end();
+    await client.end(signal?.aborted ? { timeout: 1 } : undefined);
   }
 }
 

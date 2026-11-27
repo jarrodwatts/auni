@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -39,6 +41,47 @@ describe("migrations", () => {
       await expect(client`insert into owner (id) values (2)`).rejects.toThrow(/owner_one_row/u);
     } finally {
       await client.end();
+    }
+  });
+
+  it("cancels waiting on another session's migration lock when its signal aborts", async () => {
+    const holder = postgres(url, { max: 1, onnotice: () => {} });
+    const abort = new AbortController();
+    try {
+      await holder`select pg_advisory_lock(hashtext('auni:migrate'))`;
+      const waiting = migrateDatabase(url, abort.signal);
+      // Wait until the migration session is actually blocked on the advisory lock.
+      let blocked = false;
+      for (let i = 0; i < 40; i++) {
+        const rows = await holder<{ pid: number }[]>`
+          select pid from pg_stat_activity
+          where datname = ${name} and wait_event_type = 'Lock' and wait_event = 'advisory'`;
+        if (rows.length > 0) {
+          blocked = true;
+          break;
+        }
+        await sleep(25);
+      }
+      expect(blocked).toBe(true);
+
+      const started = performance.now();
+      abort.abort();
+      await expect(waiting).rejects.toThrow();
+      expect(performance.now() - started).toBeLessThan(2_000);
+
+      // The cancelled wait doesn't linger in Postgres either.
+      let remaining = 1;
+      for (let i = 0; i < 40; i++) {
+        const rows = await holder<{ pid: number }[]>`
+          select pid from pg_stat_activity
+          where datname = ${name} and wait_event_type = 'Lock' and wait_event = 'advisory'`;
+        remaining = rows.length;
+        if (remaining === 0) break;
+        await sleep(25);
+      }
+      expect(remaining).toBe(0);
+    } finally {
+      await holder.end();
     }
   });
 });

@@ -45,7 +45,8 @@ const HANDOFF_MS = 5_000;
  * does. Rejects when there is no opener or it failed: xdg-open exits non-zero on a desktop with
  * no browser to hand it to, which a screen alone (DISPLAY) doesn't promise.
  */
-export function openBrowser(url: string): Promise<void> {
+export function openBrowser(url: string, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(signal.reason);
   const os = platform();
   const [command, ...args] =
     os === "darwin"
@@ -57,18 +58,30 @@ export function openBrowser(url: string): Promise<void> {
           : ["xdg-open", url];
   return new Promise((resolve, reject) => {
     const opener = spawn(command!, args, { stdio: "ignore", detached: true });
+    const cleanup = () => {
+      clearTimeout(running);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      opener.unref();
+      reject(signal?.reason);
+    };
     const running = setTimeout(() => {
+      cleanup();
       opener.unref();
       resolve();
     }, HANDOFF_MS);
+    signal?.addEventListener("abort", onAbort, { once: true });
     opener.once("error", (error) => {
-      clearTimeout(running);
+      cleanup();
       reject(error);
     });
-    opener.once("exit", (code, signal) => {
-      clearTimeout(running);
+    opener.once("exit", (code, signalCode) => {
+      cleanup();
       if (code === 0) resolve();
-      else reject(new Error(`${command} couldn't open a browser (it exited ${code ?? signal})`));
+      else
+        reject(new Error(`${command} couldn't open a browser (it exited ${code ?? signalCode})`));
     });
   });
 }

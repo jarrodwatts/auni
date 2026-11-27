@@ -63,7 +63,8 @@ export async function start(
   let servers: Server[] = [];
   let webApp: ChildProcess | undefined;
   let stopping = false;
-  let started = false;
+  let runnerDrain: Promise<void> | undefined;
+  const closedServers = new Set<Server>();
   const cancelling = new AbortController();
 
   // Asked now, beside everything else, and told the moment it's known, so knowing what Auni
@@ -85,6 +86,28 @@ export async function start(
     );
   });
 
+  const closeListeners = () => {
+    webApp?.kill();
+    webApp = undefined;
+    // No new requests; one in flight, such as a money tool call waiting on its send, carries on.
+    for (const server of servers) {
+      if (closedServers.has(server)) continue;
+      closedServers.add(server);
+      server.close();
+    }
+  };
+  const drainRunner = (): Promise<void> | undefined => {
+    if (runner && !runnerDrain) {
+      const target = runner;
+      console.log(
+        `Stopping Auni. Moves in progress will finish first${runsAs() === "terminal" ? " (press Ctrl-C again to stop immediately)" : ""}.`,
+      );
+      // Turns end now; other jobs (a send in flight among them) get up to two minutes.
+      runnerDrain = target.stop();
+    }
+    return runnerDrain;
+  };
+
   const stop = async (code: number) => {
     if (stopping) return;
     stopping = true;
@@ -93,23 +116,24 @@ export async function start(
       // The terminal back first, for what's said as Auni stops; inside, so nothing it throws
       // skips stopping Postgres.
       told.abandon();
+      // Stop admitting new requests and new jobs at once, while any in-flight startup step unwinds
+      // alongside and Postgres stays up until both are done.
+      closeListeners();
+      const firstDrain = drainRunner();
       // So an Auni started meanwhile waits for this one's Postgres to stop, and runs its own.
-      await database?.stopping();
-      // Let any in-flight startup step settle (or unwind after cancelling.abort()) before tearing
-      // down resources and stopping Postgres, so nothing races with teardown or dies mid-connect.
-      await startup;
-      if (runner && started)
-        console.log(
-          `Stopping Auni. Moves in progress will finish first${runsAs() === "terminal" ? " (press Ctrl-C again to stop immediately)" : ""}.`,
-        );
-      webApp?.kill();
-      // No new requests; one in flight, such as a money tool call waiting on its send, carries on.
-      for (const server of servers) server.close();
-      // Turns end now; other jobs (a send in flight among them) get up to two minutes.
-      await runner?.stop();
+      const dbStopping = database?.stopping();
+      // Anything startup finished creating just as the stop began is closed and drained as soon as
+      // startup settles, without waiting for an earlier long drain.
+      const startupDone = startup.then(() => {
+        closeListeners();
+        return drainRunner();
+      });
+      const results = await Promise.allSettled([dbStopping, firstDrain, startupDone]);
+      const failed = results.find((r) => r.status === "rejected");
       for (const server of servers) server.closeAllConnections();
       await closeDatabaseConnection();
       await database?.release();
+      if (failed) throw failed.reason;
     } catch (error) {
       // Stopping ends in an exit whatever failed on the way, said once, never an unhandled crash.
       console.error("Auni stopped with an error:", error);
@@ -139,7 +163,9 @@ export async function start(
 
   // Never calls stop() itself so stop() can safely await it without deadlocking; returns an exit
   // code when startup ends early (error, already running, taking over), or null otherwise.
-  const startup = (async (): Promise<number | null> => {
+  // Deferred one microtask so `startup` is always assigned before any step can trigger `stop()`.
+  const startup = Promise.resolve().then(async (): Promise<number | null> => {
+    if (stopping) return null;
     if (takingOver()) {
       console.error(
         "Auni is still moving from the other computer and isn't ready yet. Run the auni take-over command again to finish.",
@@ -149,7 +175,7 @@ export async function start(
     // Moved to another machine, this copy runs nothing: its page sends the owner there.
     const handed = handedOver();
     try {
-      await migrateDatabase(env.DATABASE_URL);
+      await migrateDatabase(env.DATABASE_URL, cancelling.signal);
       if (stopping) return null;
       told.memoryReady();
       // The terminal's hop plays in full while the owner's first take is still ahead.
@@ -169,7 +195,7 @@ export async function start(
           `Auni moved to ${handed.machine} (${handed.to}), so this copy is paused. Your local data and keys stay here until you run auni uninstall.`,
         );
       } else if (runJobs) {
-        runner = await startRunnerWhenFree(jobs, coreServing, {
+        runner = await startRunnerWhenFree(jobs, () => coreServing(cancelling.signal), {
           onWait: () =>
             told.waiting(
               "A previous Auni process is still finishing work in progress. Starting as soon as it finishes.",
@@ -188,7 +214,10 @@ export async function start(
             await was?.stop();
           },
           startJobs: async () => {
-            if (!stopping) runner ??= await startRunner(jobs);
+            if (stopping || runner) return;
+            const next = await startRunner(jobs, { signal: cancelling.signal });
+            if (stopping) await next.stop();
+            else runner = next;
           },
           pack: packHere,
         });
@@ -216,6 +245,9 @@ export async function start(
       }
       told.pageReady();
     } catch (error) {
+      // A process-group signal can kill a synchronous child (e.g. git in buildVersion) and throw
+      // before libuv delivers the signal here; yield one turn so onStopAsked runs first.
+      if (!stopping) await new Promise<void>((resolve) => setImmediate(resolve));
       // A stop the owner asked for cancels whatever step was in flight; stop() cleans up and exits.
       if (stopping) return null;
       told.abandon();
@@ -225,7 +257,7 @@ export async function start(
         console.log(
           holder ? `Auni is already running ${where(holder)}.` : "Auni is already running.",
         );
-        await openOwner({ web, open, printsLink, landsOn });
+        await openOwner({ web, open, printsLink, landsOn, signal: cancelling.signal });
         if (stopping) return null;
         return 0;
       }
@@ -246,6 +278,7 @@ export async function start(
       say: told.say,
       // Auni leaps into the browser as it opens, filling the moment it takes to come up.
       opening: () => told.leaving(),
+      signal: cancelling.signal,
     }).catch((error: unknown) => {
       if (stopping) return false;
       told.abandon();
@@ -253,7 +286,6 @@ export async function start(
       return false;
     });
     if (stopping) return null;
-    started = true;
     const mode = runsAs();
     if (mode === "terminal") told.say("Keep this terminal open. Ctrl-C stops Auni.");
     else if (options.stopHint) told.say(options.stopHint);
@@ -261,20 +293,44 @@ export async function start(
     else told.say(`Auni is running ${where({ as: mode })}. Stop it with ${auniCommand()} stop.`);
     told.up(opened);
     return null;
-  })();
+  });
 
   const earlyExit = await startup;
   if (earlyExit !== null) await stop(earlyExit);
 }
 
 /** Whether an Auni serves this machine's API port: one that is stopping has closed it. */
-async function coreServing(): Promise<boolean> {
+async function coreServing(signal?: AbortSignal): Promise<boolean> {
+  const timeout = AbortSignal.timeout(2_000);
   return fetch(`http://${env.HOST}:${env.PORT}/health`, {
-    signal: AbortSignal.timeout(2_000),
+    signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
   }).then(
     () => true,
     () => false,
   );
+}
+
+/** Settles with `work`, or rejects at once if `signal` aborts first. */
+function untilAbort<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) {
+    work.catch(() => {});
+    return Promise.reject(signal.reason);
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /**
@@ -291,6 +347,7 @@ export async function openOwner({
   landsOn = "/app",
   say = (line) => console.log(line),
   opening = () => {},
+  signal,
 }: {
   readonly web: boolean;
   readonly open: boolean;
@@ -300,24 +357,29 @@ export async function openOwner({
   readonly say?: (line: string) => void;
   /** Told as the browser opens: the terminal's Auni leaps into it. */
   readonly opening?: () => void;
+  /** Cancels waiting on the browser opener when Auni is stopping. */
+  readonly signal?: AbortSignal | undefined;
 }): Promise<boolean> {
-  if (!web) return false;
+  if (!web || signal?.aborted) return false;
   // Through Tailscale there is nothing to pair, and this machine's own browser is never let in.
   if (env.TAILSCALE_OWNER) {
     say(`\nOpen Auni from a device signed in to Tailscale.\n${env.WEB_ORIGIN}`);
     return false;
   }
   const paired = (await lastPaired()) !== null;
+  if (signal?.aborted) return false;
   const screen = canOpenBrowser();
   if (open && screen) {
     const url = paired
       ? `${env.WEB_ORIGIN}${landsOn}`
       : pairingLink(await mintPairingCode(), landsOn);
+    if (signal?.aborted) return false;
     opening();
-    const opened = await openBrowser(url).then(
+    const opened = await untilAbort(openBrowser(url, signal), signal).then(
       () => true,
       () => false,
     );
+    if (signal?.aborted) return false;
     if (opened) {
       noteBrowserTry("opened");
       say(`\nAuni is open in your browser.\n${env.WEB_ORIGIN}`);
@@ -331,6 +393,7 @@ export async function openOwner({
     : printsLink
       ? `Open ${pairingLink(await mintPairingCode(), landsOn)}\nThis link works once and expires after 15 minutes.`
       : `Auni is at ${env.WEB_ORIGIN}\nRun ${auniCommand()} pair to get a sign-in link.`;
+  if (signal?.aborted) return false;
   say(`\n${tunnel}${link}`);
   return false;
 }

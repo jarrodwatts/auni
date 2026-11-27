@@ -1,7 +1,6 @@
 import { EVM_CHAIN_KEYS } from "@auni/shared";
 
-import { ctrlCHandler } from "../ctrl-c.ts";
-import type { Postgres } from "../db/embedded.ts";
+import { whileBooting } from "../ctrl-c.ts";
 import { demoEnvironment, takeHome } from "./home.ts";
 import { standInForTheWorld } from "./world.ts";
 
@@ -49,40 +48,22 @@ export async function startDemo({
         : 'Tap "Take the tour" once Auni opens.') +
       "\nNever send real money to a demo address.\n\nStarting the demo.",
   );
-  // During boot, wait for Postgres to finish starting before stopping it and removing its
-  // files. start() installs Auni's regular shutdown handlers before it first yields.
-  let interrupted = false;
-  let database: Postgres | undefined;
-  const interrupt = () => {
-    interrupted = true;
-  };
-  const ctrlC = ctrlCHandler(
-    () => {
-      interrupt();
-      process.exitCode = 130;
-    },
-    () => {
-      // Once Postgres is up, the exit handler can find the server to stop it.
-      if (database) process.exit(130);
-    },
-  );
-  process.on("SIGINT", ctrlC);
-  process.on("SIGTERM", interrupt);
-  process.on("SIGHUP", interrupt);
-  try {
+  await whileBooting(async (booting) => {
     const { home, ports } = await demoEnvironment(port, [...EVM_CHAIN_KEYS, "solana"]);
-    if (interrupted) return;
+    if (booting.signal.aborted) return;
     takeHome(home);
     const { openPostgres } = await import("../db/embedded.ts");
 
     const { auniLog, keptSecret } = await import("../data-dir.ts");
-    if (interrupted) return;
+    if (booting.signal.aborted) return;
     process.env.TURN_TOKEN_SECRET = keptSecret("turn-token-secret");
-    database = await openPostgres({ runsAuni: true });
-    if (interrupted) return;
+    const database = await openPostgres({ runsAuni: true, signal: booting.signal });
+    booting.hold(database);
+    if (booting.signal.aborted) return;
     process.env.DATABASE_URL = database.url;
     // Before anything that reads the time is loaded, and before core makes its tables.
     if (at !== undefined) await (await import("./clock.ts")).startClock(at, database.url);
+    if (booting.signal.aborted) return;
 
     const { services } = await import("./world/index.ts");
     standInForTheWorld(services, ports);
@@ -99,39 +80,35 @@ export async function startDemo({
     const { seed } = firstRun ? await import("./first-run.ts") : await import("./seed.ts");
     // The browser lands on a new chat: first run's question, or one whose first starting point is
     // the tour (tour.ts).
-    if (interrupted) return;
-    const started = start(database, {
-      web,
-      open,
-      jobs: true,
-      onceUp: async () => {
-        if (firstRun) return seed();
-        console.log("Preparing sample takes.");
-        // The sample history plays real jobs. Keep their diagnostics in the demo log and show
-        // them in the terminal if setup fails.
-        const output = takeOutput(process.stdout, process.stderr);
-        try {
-          await seed();
-          output.toLog(auniLog());
-        } finally {
-          output.toTerminal();
-        }
-      },
-      printsLink: true,
-      stopHint: "Stop this process to end the demo.",
-      landsOn: "/app/new",
-    });
-    database = undefined; // start() now handles shutdown and owns the database.
-    return started;
-  } catch (error) {
-    if (!interrupted) throw error;
-  } finally {
-    try {
-      if (database) await database.release();
-    } finally {
-      process.off("SIGINT", ctrlC);
-      process.off("SIGTERM", interrupt);
-      process.off("SIGHUP", interrupt);
-    }
-  }
+    if (booting.signal.aborted) return;
+    return booting.handOff(
+      start(database, {
+        web,
+        open,
+        jobs: true,
+        onceUp: async (signal) => {
+          if (firstRun) return seed();
+          console.log("Preparing sample takes.");
+          // The sample history plays real jobs. Keep their diagnostics in the demo log and show
+          // them in the terminal if setup fails; a stop asked by the owner stays quiet.
+          const output = takeOutput(process.stdout, process.stderr);
+          const toLog = () => output.toLog(auniLog());
+          signal.addEventListener("abort", toLog, { once: true });
+          try {
+            await seed(signal);
+            toLog();
+          } catch (error) {
+            if (signal.aborted) toLog();
+            else throw error;
+          } finally {
+            signal.removeEventListener("abort", toLog);
+            if (!signal.aborted) output.toTerminal();
+          }
+        },
+        printsLink: true,
+        stopHint: "Stop this process to end the demo.",
+        landsOn: "/app/new",
+      }),
+    );
+  });
 }

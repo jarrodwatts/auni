@@ -32,6 +32,8 @@ import { playPricesAt, TODAY } from "./world/prices.ts";
 
 const DAY_MS = 24 * 60 * 60_000;
 
+let stopSignal: AbortSignal | undefined;
+
 /**
  * Waits until core has nothing left to do: no job due or running but the loops that never end,
  * and no move still on its way. A move that lands later is checked every ten seconds, which the
@@ -40,6 +42,7 @@ const DAY_MS = 24 * 60 * 60_000;
 async function quiet(): Promise<void> {
   const deadline = Date.now() + 60_000;
   for (let still = 0; still < 3;) {
+    stopSignal?.throwIfAborted();
     await db.execute(sql`
       update jobs set run_at = now()
       where kind = 'landing' and finished_at is null and started_at is null and run_at > now()`);
@@ -62,7 +65,7 @@ async function quiet(): Promise<void> {
         `The demo's seed waited a minute on: ${stuck.map(({ what }) => what).join("; ")}.`,
       );
     }
-    await sleep(50);
+    await sleep(50, undefined, { signal: stopSignal });
   }
 }
 
@@ -251,6 +254,7 @@ async function passes(ms: number): Promise<void> {
  * are the same whenever the demo is run.
  */
 async function step(daysAgo: number, clock: string, play: () => Promise<void>): Promise<void> {
+  stopSignal?.throwIfAborted();
   playing.since = await secondBefore();
   const [hours, minutes] = clock.split(":").map(Number);
   const then = new Date(playing.since);
@@ -293,7 +297,16 @@ function lately(): [daysAgo: number, clock: string] {
 }
 
 /** Makes the demo's owner. Runs once core's jobs and API are up (start.ts). */
-export async function seed(): Promise<void> {
+export async function seed(signal?: AbortSignal): Promise<void> {
+  stopSignal = signal;
+  try {
+    await runSeed();
+  } finally {
+    stopSignal = undefined;
+  }
+}
+
+async function runSeed(): Promise<void> {
   const seedBegan = Date.now();
   setPace(0);
   await db.update(owner).set({

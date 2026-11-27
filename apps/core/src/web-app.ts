@@ -34,6 +34,8 @@ interface WebOutput {
   readonly quiet?: boolean;
   /** Called as a build starts; unset, it is said. */
   readonly onBuild?: () => void;
+  /** Cancels a build or startup wait when Auni is stopping. */
+  readonly signal?: AbortSignal | undefined;
 }
 
 function childOutput(quiet: boolean): IOType[] {
@@ -48,10 +50,12 @@ function passOnErrors(child: ChildProcess): void {
 export async function buildWebApp({
   quiet = false,
   onBuild = () => console.log("Building the web app, once for each version of it…"),
+  signal,
 }: WebOutput = {}): Promise<void> {
   const childEnv = webEnv();
   const version = buildVersion(childEnv);
   if (version === null || readOr(STAMP) !== version) {
+    signal?.throwIfAborted();
     onBuild();
     // The image optimizer keeps what it served for a month by address, so a picture changed in
     // place (a network's mark) would show as it was: a new build starts with none kept.
@@ -62,9 +66,16 @@ export async function buildWebApp({
       stdio: [...childOutput(quiet), "ipc"],
     });
     passOnErrors(build);
-    const [code] = (await once(build, "exit")) as [number | null];
-    if (code !== 0) throw new Error(`The web app's build failed (${code}).`);
-    if (version !== null) writeFileSync(STAMP, version);
+    const killOnAbort = () => build.kill();
+    signal?.addEventListener("abort", killOnAbort, { once: true });
+    try {
+      const [code] = (await once(build, "exit")) as [number | null];
+      signal?.throwIfAborted();
+      if (code !== 0) throw new Error(`The web app's build failed (${code}).`);
+      if (version !== null) writeFileSync(STAMP, version);
+    } finally {
+      signal?.removeEventListener("abort", killOnAbort);
+    }
   }
 }
 
@@ -76,7 +87,9 @@ export function webAppBuilt(): boolean {
 
 /** Builds the web app if it needs it, starts it, and resolves once it reaches core. */
 export async function startWebApp(output: WebOutput = {}): Promise<ChildProcess> {
+  const { signal } = output;
   await buildWebApp(output);
+  signal?.throwIfAborted();
   const childEnv = webEnv();
   const child = spawn(
     process.execPath,
@@ -95,19 +108,32 @@ export async function startWebApp(output: WebOutput = {}): Promise<ChildProcess>
     { cwd: WEB, env: childEnv, stdio: [...childOutput(output.quiet ?? false), "ipc"] },
   );
   passOnErrors(child);
-  // Ready once a request through its /core rewrite comes back from core.
-  for (let tries = 0; ; tries++) {
-    if (child.exitCode !== null) throw new Error(`The web app exited (${child.exitCode}).`);
-    const ok = await fetch(`http://${webHost()}:${env.WEB_PORT}/core/health`).then(
-      (response) => response.ok,
-      () => false,
-    );
-    if (ok) return child;
-    if (tries === 120) {
-      child.kill();
-      throw new Error("The web app didn't come up within a minute.");
+  const killOnAbort = () => child.kill();
+  signal?.addEventListener("abort", killOnAbort, { once: true });
+  try {
+    // Ready once a request through its /core rewrite comes back from core.
+    for (let tries = 0; ; tries++) {
+      signal?.throwIfAborted();
+      if (child.exitCode !== null || child.signalCode !== null)
+        throw new Error(`The web app exited (${child.exitCode ?? child.signalCode}).`);
+      const ok = await fetch(`http://${webHost()}:${env.WEB_PORT}/core/health`, {
+        ...(signal ? { signal } : {}),
+      }).then(
+        (response) => response.ok,
+        () => false,
+      );
+      if (ok) return child;
+      if (tries === 120) {
+        child.kill();
+        throw new Error("The web app didn't come up within a minute.");
+      }
+      await sleep(500, undefined, { signal });
     }
-    await sleep(500);
+  } catch (error) {
+    child.kill();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", killOnAbort);
   }
 }
 

@@ -155,6 +155,13 @@
       "when": 1795645242906,
       "tag": "0021_channel_deposit_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795831166288,
+      "tag": "0022_action_seq",
+      "breakpoints": true
     }
   ]
 }

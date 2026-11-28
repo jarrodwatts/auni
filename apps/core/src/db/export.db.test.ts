@@ -108,6 +108,17 @@ describe("an export", () => {
     // The next start finds nothing to do: it is this version's database, whole.
     await migrateDatabase(emptyUrl);
     expect(await everything(emptyUrl)).toEqual(before);
+    // Identity sequences advance past imported values so new rows keep increasing.
+    const imported = postgres(emptyUrl, { max: 1, onnotice: () => {} });
+    try {
+      const [next] = await imported<{ seq: string }[]>`
+        insert into actions (thread_id, summary, amount_usd, status, tool, input)
+        values (${thread.id}, 'After import', 1.00, 'awaiting_permission', 'buy_token', '{}')
+        returning seq::text`;
+      expect(Number(next!.seq)).toBeGreaterThan(action.seq);
+    } finally {
+      await imported.end();
+    }
   });
 
   it("never writes over a database Auni has used", async () => {

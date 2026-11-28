@@ -1,5 +1,5 @@
 import { ASK_TOOL_NAMES, CARD_FORMAT, CARD_WAITS_MS } from "@auni/shared";
-import { and, eq, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { result, type AuniTool } from "../agent/tool.ts";
@@ -57,7 +57,7 @@ export interface WaitingCard {
 /** Each card among `rows`, by its id, with what it asks: its move, or its moves in turn. */
 export function cardsOf(rows: readonly ActionRow[]): WaitingCard[] {
   const cards = new Map<string, string[]>();
-  for (const row of rows) {
+  for (const row of rows.toSorted((a, b) => a.seq - b.seq)) {
     const id = row.proposalId ?? row.id;
     cards.set(id, [...(cards.get(id) ?? []), row.summary]);
   }
@@ -113,7 +113,7 @@ export async function replaceCards(
                 notInArray(actions.tool, [...ASK_TOOL_NAMES]),
               ),
             )
-            .orderBy(actions.createdAt)
+            .orderBy(asc(actions.seq))
         ).filter((row) => !also.some(({ id }) => id === row.id)),
       )
     : [];

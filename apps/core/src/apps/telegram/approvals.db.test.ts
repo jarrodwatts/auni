@@ -429,6 +429,47 @@ describe("pairing", () => {
     }
   });
 
+  it("keeps /pending cards in creation order when several share the same millisecond", async () => {
+    const sameMs = new Date("2026-11-28T00:00:00.123Z");
+    const names = ["First card", "Second card", "Third card", "Fourth card", "Fifth card"];
+    const created: ActionRow[] = [];
+    for (const summary of names) created.push(await waiting({ summary, createdAt: sameMs }));
+    await db.insert(messages).values({
+      threadId: thread.id,
+      role: "assistant",
+      parts: [
+        {
+          type: "data-cards",
+          data: {
+            cards: created.map((action) => ({
+              kind: "action",
+              actionReference: action.id,
+              title: action.summary,
+            })),
+          },
+        },
+      ],
+    });
+    fake.calls.length = 0;
+    fake.message({ from: OWNER }, "/pending");
+    await fake.handled();
+    const replies = fake.sent("sendMessage");
+    expect(replies).toHaveLength(5);
+    expect(replies.slice(0, 4).map(({ text }) => String(text))).toEqual([
+      expect.stringContaining("First card"),
+      expect.stringContaining("Second card"),
+      expect.stringContaining("Third card"),
+      expect.stringContaining("Fourth card"),
+    ]);
+    expect(String(replies[4]?.text)).toContain("1 more waiting");
+    expect(
+      await db
+        .select()
+        .from(channelDeliveries)
+        .where(eq(channelDeliveries.actionId, created[4]!.id)),
+    ).toEqual([]);
+  });
+
   it("reads cash and the value of each take for /money without a local-only link", async () => {
     const position: Holding = {
       venue: "wallet",

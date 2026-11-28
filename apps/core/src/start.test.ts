@@ -353,8 +353,10 @@ describe("start() cancelled by a signal", () => {
     expect(lent).toBeTruthy();
 
     // Handover starts draining the runner (a move in flight), then SIGTERM arrives mid-drain.
+    expect(lent!.signal?.aborted).toBe(false);
     const handoverStop = lent!.stopJobs();
     process.emit("SIGTERM", "SIGTERM");
+    expect(lent!.signal?.aborted).toBe(true);
     await new Promise((r) => setTimeout(r, 30));
 
     expect(closeDatabaseConnection).not.toHaveBeenCalled();

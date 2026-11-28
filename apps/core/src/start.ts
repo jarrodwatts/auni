@@ -215,6 +215,7 @@ export async function start(
             else runner = next;
           },
           pack: packHere,
+          signal: cancelling.signal,
         });
       } else told.say("Background work is off.");
       servers = await listen();

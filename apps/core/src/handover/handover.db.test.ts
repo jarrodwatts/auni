@@ -11,6 +11,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { tempDir } from "../test/temp-dir.ts";
 import type { WalletKeys } from "../apps/contract.ts";
 import { dataDir, envFile } from "../data-dir.ts";
+import { db } from "../db/client.ts";
 import { env } from "../env.ts";
 import { insertThread } from "../test/db.ts";
 import {
@@ -392,5 +393,82 @@ describe("handing Auni over to a machine that stays on", { timeout: 60_000 }, ()
     expect(finished).toMatchObject({ code: 0 });
     expect(await targetRows()).toEqual([{ title: "Gold" }]);
     expect(JSON.parse(readFileSync(join(target, "wallet-keys.json"), "utf8"))).toEqual(KEYS);
+  });
+
+  it("ends quietly without querying or packing when Auni stops during the runner drain", async () => {
+    const stopping = new AbortController();
+    let releaseDrain!: () => void;
+    let enteredDrain!: () => void;
+    const draining = new Promise<void>((resolve) => (releaseDrain = resolve));
+    const entered = new Promise<void>((resolve) => (enteredDrain = resolve));
+    const pack = vi.fn(packHere);
+    const select = vi.spyOn(db, "select");
+    const said = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      lendToHandover({
+        stopJobs: async () => {
+          runner.stops += 1;
+          enteredDrain();
+          await draining;
+        },
+        startJobs: async () => void (runner.starts += 1),
+        pack,
+        signal: stopping.signal,
+      });
+      const { command } = await offerHandover(machine(), HERE);
+      const { from, code } = readCommand(command);
+      const proof = proofText(await keysFor(code));
+      const response = ask(from, "/handover/bundle", proof);
+      await entered;
+      expect(handoverState()).toMatchObject({ stage: "handing" });
+
+      stopping.abort();
+      releaseDrain();
+      const settled = await response;
+      expect(settled.status).toBe(410);
+      expect(await settled.json()).toEqual({ error: "cancelled" });
+      expect(select).not.toHaveBeenCalled();
+      expect(pack).not.toHaveBeenCalled();
+      expect(handoverState()).toMatchObject({ stage: "ended", ended: "cancelled" });
+      expect(runner).toEqual({ stops: 1, starts: 0 });
+      expect(said).not.toHaveBeenCalled();
+    } finally {
+      select.mockRestore();
+      said.mockRestore();
+    }
+  });
+
+  it("ends quietly without logging when Auni stops while packing", async () => {
+    const stopping = new AbortController();
+    let failPack!: (error: Error) => void;
+    let enteredPack!: () => void;
+    const packing = new Promise<Buffer>((_resolve, reject) => (failPack = reject));
+    const entered = new Promise<void>((resolve) => (enteredPack = resolve));
+    const said = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      lendToHandover({
+        ...laptop(() => {
+          enteredPack();
+          return packing;
+        }),
+        signal: stopping.signal,
+      });
+      const { command } = await offerHandover(machine(), HERE);
+      const { from, code } = readCommand(command);
+      const proof = proofText(await keysFor(code));
+      const response = ask(from, "/handover/bundle", proof);
+      await entered;
+
+      stopping.abort();
+      failPack(new Error("CONNECTION_ENDED"));
+      const settled = await response;
+      expect(settled.status).toBe(410);
+      expect(await settled.json()).toEqual({ error: "cancelled" });
+      expect(handoverState()).toMatchObject({ stage: "ended", ended: "cancelled" });
+      expect(runner).toEqual({ stops: 1, starts: 0 });
+      expect(said).not.toHaveBeenCalled();
+    } finally {
+      said.mockRestore();
+    }
   });
 });

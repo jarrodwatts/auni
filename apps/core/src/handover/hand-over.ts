@@ -46,6 +46,8 @@ export interface Laptop {
   startJobs(): Promise<void>;
   /** Everything Auni keeps, packed for the new machine (packHere), read with the runner stopped. */
   pack(): Promise<Buffer>;
+  /** Aborts as Auni stops, so a handover in flight ends quietly instead of querying or packing. */
+  readonly signal?: AbortSignal;
 }
 
 /** How long the code works, from when the owner asks for it. */
@@ -134,6 +136,7 @@ export async function offerHandover(
   const lent = laptop;
   server.on("request", (req: IncomingMessage, res: ServerResponse) => {
     answer(opened, lent, req, res).catch((error: unknown) => {
+      if (lent.signal?.aborted) return;
       console.error("a request to hand Auni over failed", error);
       if (!res.headersSent) reply(res, 500, "failed");
     });
@@ -207,6 +210,7 @@ function end(ended: Offer, why: Ended): void {
 async function takeBack(taken: Offer, lent: Laptop, why: Ended): Promise<void> {
   if (taken.stage !== "handing" && taken.stage !== "handed") return;
   end(taken, why);
+  if (lent.signal?.aborted) return;
   await lent.startJobs();
 }
 
@@ -277,6 +281,11 @@ async function handOver(on: Offer, lent: Laptop, res: ServerResponse): Promise<v
     end(on, "expired");
     return reply(res, 410, "expired");
   }
+  const cancelled = () => {
+    end(on, "cancelled");
+    if (!res.headersSent && !res.destroyed) reply(res, 410, "cancelled");
+  };
+  if (lent.signal?.aborted) return cancelled();
   on.stage = "handing";
   // Cut off before every byte went (the new machine gone, the network dropped): taken back.
   let gone = false;
@@ -288,7 +297,10 @@ async function handOver(on: Offer, lent: Laptop, res: ServerResponse): Promise<v
   let sealed: Buffer;
   try {
     await lent.stopJobs();
-    if (await jobsStillRunning()) {
+    if (lent.signal?.aborted) return cancelled();
+    const busy = await jobsStillRunning();
+    if (lent.signal?.aborted) return cancelled();
+    if (busy) {
       // A send that outlasted the runner's two minutes: never hand over what's mid-send.
       on.stage = "waiting";
       await lent.startJobs();
@@ -296,10 +308,12 @@ async function handOver(on: Offer, lent: Laptop, res: ServerResponse): Promise<v
     }
     sealed = seal(on.keys, await lent.pack());
   } catch (error) {
+    if (lent.signal?.aborted) return cancelled();
     console.error("Auni couldn't be packed to be handed over", error);
     await takeBack(on, lent, "failed");
     return reply(res, 500, "failed");
   }
+  if (lent.signal?.aborted) return cancelled();
   if (gone) return takeBack(on, lent, "cut_short");
   on.stage = "handed";
   on.answer = setTimeout(() => void takeBack(on, lent, "no_answer"), on.answerMs).unref();

@@ -98,7 +98,7 @@ async function waitingAsks(threadIds: readonly string[]): Promise<Map<string, st
         or(eq(actions.status, "awaiting_permission"), eq(actions.phase, "needs_owner")),
       ),
     )
-    .orderBy(desc(actions.createdAt));
+    .orderBy(desc(actions.seq));
   const asks = new Map<string, string>();
   for (const action of waiting) {
     if (!action.threadId || asks.has(action.threadId)) continue;

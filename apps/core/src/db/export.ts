@@ -247,10 +247,20 @@ export async function importDatabase(
         // The row's own text, not the parsed copy: Postgres reads its numbers exactly.
         const row = line.slice(line.indexOf('"row":') + '"row":'.length, -1);
         await tx`
-          insert into ${tx(parsed.table)}
+          insert into ${tx(parsed.table)} overriding system value
           select * from json_populate_record(null::${tx(parsed.table)}, ${row}::json)`;
         rows += 1;
       }
+      // Advance identity sequences past the imported values so new rows keep increasing.
+      const identities = await tx<{ table: string; column: string; sequence: string }[]>`
+        select table_name as "table", column_name as "column",
+               pg_get_serial_sequence(format('%I.%I', table_schema, table_name), column_name) as sequence
+        from information_schema.columns
+        where table_schema = 'public' and is_identity = 'YES'`;
+      for (const { table, column, sequence } of identities)
+        await tx`
+          select setval(${sequence}::regclass, coalesce(max(${tx(column)}), 1), max(${tx(column)}) is not null)
+          from ${tx(table)}`;
       for (const { table, name, definition } of references)
         await tx.unsafe(`alter table ${table} add constraint "${name}" ${definition}`);
     });

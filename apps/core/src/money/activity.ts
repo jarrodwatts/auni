@@ -446,7 +446,7 @@ export async function readActivity(only: string | null): Promise<ActivityWire> {
   const done = eq(actions.status, "done");
   const [rows, recorded, arrived, named, names] = await Promise.all([
     // In the order they were made, so a card's picks are said in its order.
-    db.select().from(actions).where(done).orderBy(asc(actions.createdAt)),
+    db.select().from(actions).where(done).orderBy(asc(actions.seq)),
     db
       .select({
         actionId: fills.actionId,

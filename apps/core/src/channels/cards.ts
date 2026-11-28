@@ -97,7 +97,7 @@ export async function legsOf(target: CardTarget): Promise<ActionRow[]> {
         ? eq(actions.id, target.actionId)
         : eq(actions.proposalId, target.proposalId),
     )
-    .orderBy(asc(actions.createdAt), asc(actions.id));
+    .orderBy(asc(actions.seq));
 }
 
 function targetOf(delivery: ChannelDeliveryRow): CardTarget | null {

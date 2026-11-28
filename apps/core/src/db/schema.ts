@@ -206,6 +206,9 @@ export const actions = pgTable(
   "actions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    // Database-assigned insertion order, so cards and a plan's legs keep a steady order even when
+    // recorded in one transaction or the same millisecond.
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity().notNull(),
     // Null for a withdrawal started from Settings, outside every conversation.
     threadId: uuid("thread_id").references(() => threads.id),
     // Legs of one proposal card share this id; one Allow covers them all.

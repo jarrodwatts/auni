@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { RETRACTED } from "@auni/shared";
-import { and, eq, gt, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { mainChat } from "../conversation/places.ts";
@@ -213,7 +213,7 @@ async function pending(found: Found, chat: string): Promise<void> {
     .select()
     .from(actions)
     .where(or(eq(actions.status, "awaiting_permission"), eq(actions.phase, "needs_owner")))
-    .orderBy(actions.createdAt, actions.id);
+    .orderBy(asc(actions.seq));
   let ready = 0;
   for (const group of Map.groupBy(rows, (row) => row.proposalId ?? row.id).values()) {
     const row = group.find(({ phase }) => phase === "needs_owner") ?? group[0]!;

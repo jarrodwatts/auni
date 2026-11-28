@@ -6,6 +6,8 @@ import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { accounts } from "../apps/registry.ts";
+import { legsOf } from "../channels/cards.ts";
+import { waitingCardsContext, waitingElsewhere } from "../conversation/context.ts";
 import { db } from "../db/client.ts";
 import { actions, fills, jobs, threads } from "../db/schema.ts";
 import { insertAction, insertThread, wipe } from "../test/db.ts";
@@ -13,12 +15,14 @@ import { actionKind, turnKind } from "../jobs/kinds.ts";
 import { queued } from "../test/jobs.ts";
 import { FACE, stubRecipe } from "../test/recipe.ts";
 import {
+  actionsForThread,
   actionWire,
   decideActions,
   executeAction,
   LEG_SAID,
   pausedSaid,
   prepareLeg,
+  proposalActions,
   proposeAction,
   recordActions,
   SETTLED_SAID,
@@ -866,5 +870,43 @@ describe("decideActions", () => {
         "u",
       ),
     );
+  });
+
+  it("keeps a plan's legs in the exact order recorded even when they share a timestamp and update out of order", async () => {
+    const thread = await insertThread({ title: "Basket" });
+    const other = await insertThread({ title: "Other" });
+    const proposalId = randomUUID();
+    const names = ["First leg", "Second leg", "Third leg", "Fourth leg", "Fifth leg"];
+    const legs = await Promise.all(
+      names.map((summary) =>
+        prepareLeg(
+          stubRecipe({
+            describe: async () => ({
+              summary,
+              amountUsd: "10",
+              effect: { gives: [{ text: "10 USDC" }], gets: [{ text: summary }], grants: [] },
+            }),
+          }),
+          {},
+        ),
+      ),
+    );
+    const { rows } = await recordActions({ threadId: thread.id }, legs, proposalId);
+    // All legs inserted in one transaction share the exact same createdAt.
+    expect(new Set(rows.map((row) => row.createdAt.getTime())).size).toBe(1);
+    // Mutate legs in reverse order so PostgreSQL heap order no longer matches insertion order.
+    for (const row of rows.toReversed()) {
+      await db.update(actions).set({ updatedAt: new Date() }).where(eq(actions.id, row.id));
+    }
+
+    expect((await proposalActions(proposalId)).map((row) => row.summary)).toEqual(names);
+    expect((await legsOf({ proposalId })).map((row) => row.summary)).toEqual(names);
+    expect((await actionsForThread(thread.id)).map((row) => row.summary)).toEqual(
+      names.toReversed(),
+    );
+    const here = await waitingCardsContext(thread.id);
+    expect(here).toContain(`- card ${proposalId}: ${names.join("; ")}`);
+    const elsewhere = await waitingElsewhere(other.id);
+    expect(elsewhere.lines).toEqual([`- card ${proposalId} in "Basket": ${names.join("; ")}`]);
   });
 });

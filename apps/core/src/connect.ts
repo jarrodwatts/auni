@@ -146,7 +146,7 @@ export async function declinedOffers(
         eq(actions.status, "cancelled"),
       ),
     )
-    .orderBy(actions.tool, asked, desc(actions.updatedAt));
+    .orderBy(actions.tool, asked, desc(actions.updatedAt), desc(actions.id));
   const fields = await privateFields();
   const lines = declined.flatMap(({ tool, asked: id, summary, at }) => {
     const day = at.toLocaleDateString("en-US", { timeZone, dateStyle: "long" });

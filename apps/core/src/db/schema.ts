@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import type {
   ActionLine,
   ActionStatus,
@@ -39,6 +41,38 @@ import type { ReadingHolding } from "../money/portfolio.ts";
 // Money is always numeric/decimal-string, never float. Status-ish columns are
 // free text plus a CHECK: cheaper to extend with a new value than an enum migration.
 const TIMESTAMPTZ = { withTimezone: true, mode: "date", precision: 3 } as const;
+
+let lastActionMs = 0;
+let actionCounter = 0;
+
+/**
+ * A time-ordered UUID (RFC 9562 version 7) that strictly increases on every call in this process,
+ * even within one millisecond or if the clock steps backward, so actions created together (a plan's
+ * legs, back-to-back cards) break `created_at` ties in the exact order they were made.
+ */
+export function orderedUuid(): string {
+  const now = Date.now();
+  if (now > lastActionMs) {
+    lastActionMs = now;
+    actionCounter = 0;
+  } else {
+    actionCounter += 1;
+    if (actionCounter > 0xfff) {
+      lastActionMs += 1;
+      actionCounter = 0;
+    }
+  }
+  const bytes = randomBytes(16);
+  // 48-bit millisecond timestamp, big-endian (bytes 0..5).
+  bytes.writeUIntBE(lastActionMs, 0, 6);
+  // Version 7 in high nibble of byte 6, 12-bit monotonic counter across low nibble of 6 and byte 7.
+  bytes[6] = 0x70 | (actionCounter >>> 8);
+  bytes[7] = actionCounter & 0xff;
+  // RFC 9562 variant (10xx) in high two bits of byte 8.
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 // The owner's settings: Auni runs for one person, so this is one row (id 1), made by the
 // migration that made the table. Read it with theOwner() (auth/owner.ts).
@@ -205,7 +239,7 @@ export interface PreviousError {
 export const actions = pgTable(
   "actions",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: uuid("id").defaultRandom().$defaultFn(orderedUuid).primaryKey(),
     // Null for a withdrawal started from Settings, outside every conversation.
     threadId: uuid("thread_id").references(() => threads.id),
     // Legs of one proposal card share this id; one Allow covers them all.

@@ -1,5 +1,5 @@
 import { ASK_TOOL_NAMES } from "@auni/shared";
-import { and, desc, eq, ne, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, ne, notInArray } from "drizzle-orm";
 
 import { fenced } from "../agent/fence.ts";
 import { reachWire } from "../always-on.ts";
@@ -52,13 +52,13 @@ export async function waitingElsewhere(
         ne(actions.threadId, threadId),
       ),
     )
-    .orderBy(desc(actions.createdAt));
+    .orderBy(desc(actions.createdAt), desc(actions.id));
   if (rows.length === 0) return { countsOnUsd: "0.00", lines: [] };
   const byCard = Map.groupBy(rows, ({ action }) => action.proposalId ?? action.id);
   const amounts: string[] = [];
   const lines: string[] = [];
   for (const [id, entries] of byCard) {
-    const legs = entries.map(({ action }) => action);
+    const legs = entries.map(({ action }) => action).toReversed();
     const moneys = cardMoneys(legs);
     for (const money of moneys) if (money?.flow === "in") amounts.push(money.usd);
     const where = entries[0]?.title?.trim() || "another thread";
@@ -81,7 +81,7 @@ export async function waitingCardsContext(threadId: string): Promise<string | nu
           notInArray(actions.tool, [...ASK_TOOL_NAMES]),
         ),
       )
-      .orderBy(actions.createdAt),
+      .orderBy(asc(actions.createdAt), asc(actions.id)),
     waitingElsewhere(threadId),
   ]);
   const here = cardsOf(hereRows);

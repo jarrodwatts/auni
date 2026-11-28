@@ -1,5 +1,5 @@
 import { ASK_TOOL_NAMES, CARD_FORMAT, CARD_WAITS_MS } from "@auni/shared";
-import { and, eq, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { result, type AuniTool } from "../agent/tool.ts";
@@ -113,7 +113,7 @@ export async function replaceCards(
                 notInArray(actions.tool, [...ASK_TOOL_NAMES]),
               ),
             )
-            .orderBy(actions.createdAt)
+            .orderBy(asc(actions.createdAt), asc(actions.id))
         ).filter((row) => !also.some(({ id }) => id === row.id)),
       )
     : [];

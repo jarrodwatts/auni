@@ -1,5 +1,5 @@
 import { CARD_FORMAT, RAW_TRANSACTION_TOOLS, RETRACTED, type actionWireSchema } from "@auni/shared";
-import { and, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import { toolInput } from "../agent/tool.ts";
@@ -508,7 +508,7 @@ export async function actionsForThread(threadId: string): Promise<ActionRow[]> {
     .select()
     .from(actions)
     .where(eq(actions.threadId, threadId))
-    .orderBy(desc(actions.createdAt))
+    .orderBy(desc(actions.createdAt), desc(actions.id))
     .limit(200);
 }
 
@@ -520,7 +520,7 @@ export async function proposalActions(
     .select()
     .from(actions)
     .where(eq(actions.proposalId, proposalId))
-    .orderBy(actions.createdAt);
+    .orderBy(asc(actions.createdAt), asc(actions.id));
 }
 
 /** One action, or every leg of one proposal card. */

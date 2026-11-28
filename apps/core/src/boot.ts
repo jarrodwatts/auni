@@ -19,9 +19,11 @@ let opened: Postgres | null = null;
 export async function boot({
   runsAuni = false,
   waiting = (line) => console.log(line),
+  signal,
 }: {
   readonly runsAuni?: boolean;
   readonly waiting?: (line: string) => void;
+  readonly signal?: AbortSignal;
 } = {}): Promise<Postgres | null> {
   // Node's diagnostic report looks up every open socket's peer by name, synchronously, which
   // freezes the whole program for seconds once Auni holds connections to RPCs and price feeds.
@@ -35,6 +37,7 @@ export async function boot({
   if (process.env.DATABASE_URL?.trim()) return null;
   const database = await openPostgres({
     runsAuni,
+    signal,
     onWait: () =>
       waiting(
         "Auni's database is in use by another auni command, or by the Auni stopped a moment ago, still finishing what it was running. This one starts as soon as it's let go of.",

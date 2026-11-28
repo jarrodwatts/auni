@@ -67,7 +67,12 @@ export interface Postgres {
 export async function openPostgres({
   runsAuni = false,
   onWait,
-}: { readonly runsAuni?: boolean; readonly onWait?: () => void } = {}): Promise<Postgres> {
+  signal,
+}: {
+  readonly runsAuni?: boolean;
+  readonly onWait?: () => void;
+  readonly signal?: AbortSignal | undefined;
+} = {}): Promise<Postgres> {
   const dir = join(dataDir(), "postgres");
   const password = keptSecret("postgres-password");
   const bin = await binaries();
@@ -97,10 +102,12 @@ export async function openPostgres({
   };
 
   /** A hold on the server, started if it's stopped; null while `auni` waits for others to let go. */
-  const take = () =>
+  const take = (cancel?: AbortSignal) =>
     locked(async (): Promise<Held | null> => {
-      if (!existsSync(join(dir, "PG_VERSION"))) await initialise(bin.initdb, dir, password);
+      cancel?.throwIfAborted();
+      if (!existsSync(join(dir, "PG_VERSION"))) await initialise(bin.initdb, dir, password, cancel);
       else await sameMajor(bin.pg_ctl, dir);
+      cancel?.throwIfAborted();
       if (await postgresRunning()) {
         const url = at(portOf(dir));
         const others = await holdsOn(url);
@@ -109,30 +116,37 @@ export async function openPostgres({
         // Nobody holds it, so a process that died left it, running where that one ran.
         await stop();
       }
+      cancel?.throwIfAborted();
       const port = await portToStart();
-      await run(bin.pg_ctl, [
-        "start",
-        "-D",
-        dir,
-        "-w",
-        "-l",
-        postgresLog(),
-        // TCP on this machine only, and no Unix socket, which a box that shows /tmp would expose.
-        "-o",
-        `-p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories=''`,
-      ]);
+      try {
+        await run(bin.pg_ctl, [
+          "start",
+          "-D",
+          dir,
+          "-w",
+          "-l",
+          postgresLog(),
+          // TCP on this machine only, and no Unix socket, which a box that shows /tmp would expose.
+          "-o",
+          `-p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories=''`,
+        ]);
+      } catch (error) {
+        // Ctrl-C in a terminal reaches pg_ctl too; if it had already launched postgres, stop it.
+        if (cancel?.aborted && (await postgresRunning())) await stop().catch(() => {});
+        throw error;
+      }
       return holding(at(port), runsAuni ? "keeps" : "uses");
-    });
-  const takeWhenFree = async (): Promise<Held> => {
+    }, cancel);
+  const takeWhenFree = async (cancel?: AbortSignal): Promise<Held> => {
     for (let waited = false; ; waited = true) {
-      const held = await take();
+      const held = await take(cancel);
       if (held) return held;
       if (!waited) onWait?.();
-      await sleep(500);
+      await sleep(500, undefined, { signal: cancel });
     }
   };
 
-  let held: Held | null = await takeWhenFree();
+  let held: Held | null = await takeWhenFree(signal);
   const { url } = held;
   return {
     url,
@@ -240,10 +254,11 @@ export async function stopPostgres(): Promise<void> {
  * Runs `fn` holding the data folder's Postgres lock: a file only one process can make, naming
  * its pid, so a lock left by a process that died is taken over.
  */
-async function locked<T>(fn: () => Promise<T>): Promise<T> {
+async function locked<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 });
   const lock = join(dataDir(), "postgres.lock");
   for (;;) {
+    signal?.throwIfAborted();
     try {
       writeFileSync(lock, String(process.pid), { flag: "wx", mode: 0o600 });
       break;
@@ -251,7 +266,7 @@ async function locked<T>(fn: () => Promise<T>): Promise<T> {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
     if (!alive(Number(readFileSync(lock, "utf8").trim() || 0))) rmSync(lock, { force: true });
-    else await sleep(100);
+    else await sleep(100, undefined, { signal });
   }
   try {
     return await fn();
@@ -291,26 +306,38 @@ async function binaries(): Promise<Binaries> {
 }
 
 /** Makes the database files, in a folder of their own until done, so a half-made one is never used. */
-async function initialise(initdb: string, dir: string, password: string): Promise<void> {
+async function initialise(
+  initdb: string,
+  dir: string,
+  password: string,
+  signal?: AbortSignal,
+): Promise<void> {
   const making = `${dir}.new`;
   const passwordFile = join(dataDir(), "postgres-password.initdb");
   rmSync(making, { recursive: true, force: true });
   mkdirSync(making, { mode: 0o700 });
   writeFileSync(passwordFile, password, { mode: 0o600 });
   try {
-    await run(initdb, [
-      "-D",
-      making,
-      "-U",
-      USER,
-      `--pwfile=${passwordFile}`,
-      "--auth=scram-sha-256",
-      "--encoding=UTF8",
-      // Unicode-aware upper() and lower() that sort the same on every machine.
-      "--locale-provider=builtin",
-      "--builtin-locale=C.UTF-8",
-      "--locale=C",
-    ]);
+    await run(
+      initdb,
+      [
+        "-D",
+        making,
+        "-U",
+        USER,
+        `--pwfile=${passwordFile}`,
+        "--auth=scram-sha-256",
+        "--encoding=UTF8",
+        // Unicode-aware upper() and lower() that sort the same on every machine.
+        "--locale-provider=builtin",
+        "--builtin-locale=C.UTF-8",
+        "--locale=C",
+      ],
+      { signal },
+    );
+  } catch (error) {
+    rmSync(making, { recursive: true, force: true });
+    throw error;
   } finally {
     rmSync(passwordFile, { force: true });
   }

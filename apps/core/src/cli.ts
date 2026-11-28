@@ -49,16 +49,30 @@ switch (command) {
     // Told from the first moment, as Auni wakes its memory (hello/telling.ts).
     const { startTelling } = await import("./hello/telling.ts");
     const told = startTelling({ web });
-    const database = await boot({ runsAuni: true, waiting: told.waiting });
-    // Auni's own Postgres is up; an owner's own database is known to answer once migrated.
-    if (database) told.memoryReady();
-    const { start } = await import("./start.ts");
-    await start(database, {
-      web,
-      open: !flags.has("--no-open"),
-      jobs: !flags.has("--no-jobs"),
-      told,
-    });
+    const { whileBooting } = await import("./ctrl-c.ts");
+    await whileBooting(
+      async (booting) => {
+        const database = await boot({
+          runsAuni: true,
+          waiting: told.waiting,
+          signal: booting.signal,
+        });
+        booting.hold(database);
+        if (booting.signal.aborted) return;
+        // Auni's own Postgres is up; an owner's own database is known to answer once migrated.
+        if (database) told.memoryReady();
+        const { start } = await import("./start.ts");
+        return booting.handOff(() =>
+          start(database, {
+            web,
+            open: !flags.has("--no-open"),
+            jobs: !flags.has("--no-jobs"),
+            told,
+          }),
+        );
+      },
+      { onStop: () => told.abandon() },
+    );
     break;
   }
   case "demo": {

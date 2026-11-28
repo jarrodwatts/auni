@@ -66,18 +66,26 @@ export async function startRunnerWhenFree(
     onWait,
     everyMs = 1_000,
     mostMs = STOPPING_MS,
-  }: { readonly onWait?: () => void; readonly everyMs?: number; readonly mostMs?: number } = {},
+    signal,
+  }: {
+    readonly onWait?: () => void;
+    readonly everyMs?: number;
+    readonly mostMs?: number;
+    readonly signal?: AbortSignal;
+  } = {},
 ): Promise<Runner> {
   const until = Date.now() + mostMs;
   for (let waited = false; ; waited = true) {
+    signal?.throwIfAborted();
     try {
-      return await startRunner(jobs);
+      return await startRunner(jobs, { signal });
     } catch (error) {
+      if (signal?.aborted) throw error;
       if (!(error instanceof AlreadyRunning) || (await serving())) throw error;
       if (Date.now() >= until) throw new StillStopping();
       if (!waited) onWait?.();
     }
-    await sleep(everyMs);
+    await sleep(everyMs, undefined, { signal });
   }
 }
 
@@ -124,8 +132,9 @@ export async function takeRunnerLock(lost: () => void): Promise<Session | null> 
 /** Starts running `jobs`; throws AlreadyRunning when another runner has this database. */
 export async function startRunner(
   jobs: readonly Job<unknown>[],
-  options: { readonly sleepGapMs?: number } = {},
+  options: { readonly sleepGapMs?: number; readonly signal?: AbortSignal | undefined } = {},
 ): Promise<Runner> {
+  const { signal } = options;
   const byKind = new Map(jobs.map((job) => [job.kind.name, job]));
   const kinds = toTextArray([...byKind.keys()]);
 
@@ -149,6 +158,7 @@ export async function startRunner(
     const session: Session | null = await takeRunnerLock(() => {
       if (lock !== session) return;
       lock = null;
+      if (stopping || signal?.aborted) return;
       console.error(
         "Auni's job runner lost its lock on the database: the connection holding it closed. It starts no job until it holds the lock again.",
       );
@@ -319,6 +329,7 @@ export async function startRunner(
         if (stopping || poked) continue;
         await nap(wait);
       } catch (error) {
+        if (stopping) break;
         console.error("the job runner couldn't read its queue", error);
         await new Promise((resolve) => setTimeout(resolve, 5_000));
       }
@@ -367,15 +378,20 @@ export async function startRunner(
     // What the wallet signed that no node answered for goes out now, the same bytes.
     await theWallet()
       .resend?.()
-      .catch((error: unknown) => console.error("signed sends weren't resent", error));
+      .catch((error: unknown) => {
+        if (!signal?.aborted) console.error("signed sends weren't resent", error);
+      });
   };
 
-  let listening: { unlisten(): Promise<void> };
+  let listening: { unlisten(): Promise<void> } | undefined;
   try {
     await recover();
+    signal?.throwIfAborted();
     listening = await notifications.listen(JOBS_CHANNEL, poke);
+    signal?.throwIfAborted();
   } catch (error) {
-    await lock?.close();
+    await listening?.unlisten().catch(() => {});
+    await lock?.close().catch(() => {});
     throw error;
   }
 
@@ -395,22 +411,26 @@ export async function startRunner(
   }, tick);
 
   const looping = loop();
+  let stopped: Promise<void> | undefined;
   return {
-    async stop() {
-      stopping = true;
-      clearInterval(ticker);
-      poke();
-      await looping;
-      endTurns("stopped");
-      await Promise.race([
-        Promise.all([...running.values()].map(({ done }) => done)),
-        new Promise((resolve) => setTimeout(resolve, DRAIN_MS).unref()),
-      ]);
-      await listening.unlisten();
-      // Closing the session lets go of the lock.
-      await lock?.close();
-    },
+    // Asked twice (a handover stopping it as Auni stops), both wait on the one drain.
+    stop: () => (stopped ??= drain()),
   };
+
+  async function drain() {
+    stopping = true;
+    clearInterval(ticker);
+    poke();
+    await looping;
+    endTurns("stopped");
+    await Promise.race([
+      Promise.all([...running.values()].map(({ done }) => done)),
+      new Promise((resolve) => setTimeout(resolve, DRAIN_MS).unref()),
+    ]);
+    await listening?.unlisten();
+    // Closing the session lets go of the lock.
+    await lock?.close();
+  }
 }
 
 function said(error: unknown): string {

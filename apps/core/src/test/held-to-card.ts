@@ -111,6 +111,7 @@ function cardOf(
 ): ActionRow {
   return {
     id: "00000000-0000-4000-8000-0000000000c4",
+    seq: 1,
     threadId: null,
     proposalId: null,
     summary: preview.summary,

@@ -29,6 +29,7 @@ import {
 } from "./actions.ts";
 import { APPROVED_SALE_OF } from "./approved.ts";
 import { QUANTITY_DECIMALS } from "./fill-key.ts";
+import { advanceProposal } from "./proposal-run.ts";
 import { MayHaveSent, NothingMoved, type Recipe } from "./recipe.ts";
 import { recipeForTool } from "./recipes/index.ts";
 import { PLAN_LEGS } from "./tools.ts";
@@ -337,17 +338,18 @@ describe("executeAction", () => {
           createdAt: new Date(2026, 0, index + 1),
           summary: `Buy $25 of Yes on “Will the published year-end figures for market ${index} meet or exceed the target in the December announcement, using the final release and any revisions made before the close of the calendar year?”`,
         });
-      const picks = await Promise.all(
-        [1, 2].map((day) =>
-          old({
+      const picks = [];
+      for (const day of [1, 2]) {
+        picks.push(
+          await old({
             ...plan,
             proposalId: PLAN,
             amountUsd: "25",
             summary: `Polymarket pick ${day}`,
             createdAt: new Date(2026, 1, day),
           }),
-        ),
-      );
+        );
+      }
       lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
       try {
         await Promise.all(picks.map(({ id }) => executeAction(id)));
@@ -373,17 +375,18 @@ describe("executeAction", () => {
     it("names every leg that didn't go through, and what to do, at the biggest plan", async () => {
       const thread = await insertThread();
       await funded({ threadId: thread.id, createdAt: new Date(2026, 0, 1) });
-      const picks = await Promise.all(
-        Array.from({ length: PLAN_LEGS - 1 }, (_, index) =>
-          old({
+      const picks = [];
+      for (let index = 0; index < PLAN_LEGS - 1; index += 1) {
+        picks.push(
+          await old({
             threadId: thread.id,
             proposalId: PLAN,
             amountUsd: "25",
             summary: `Buy $25 of Yes on “Will the Federal Reserve cut interest rates by 25 basis points at its December 2026 meeting? (${index + 1})”`,
             createdAt: new Date(2026, 1, index + 1),
           }),
-        ),
-      );
+        );
+      }
       lookup.recipe = { ...buy, fundedFrom: () => "polygon" } satisfies Recipe;
       try {
         await Promise.all(picks.map(({ id }) => executeAction(id)));
@@ -405,17 +408,18 @@ describe("executeAction", () => {
     it("says each leg's own reason in its line when its group's legs don't share one", async () => {
       const thread = await insertThread();
       await funded({ threadId: thread.id, createdAt: new Date(2026, 0, 1) });
-      const picks = await Promise.all(
-        ["polygon", "base"].map((place, index) =>
-          old({
+      const picks = [];
+      for (const [index, place] of ["polygon", "base"].entries()) {
+        picks.push(
+          await old({
             threadId: thread.id,
             proposalId: PLAN,
             input: { usd: "10", place },
             summary: `Pick on ${place}`,
             createdAt: new Date(2026, 1, index + 1),
           }),
-        ),
-      );
+        );
+      }
       lookup.recipe = {
         ...buy,
         fundedFrom: ({ input }) => String(input.place),
@@ -892,8 +896,13 @@ describe("decideActions", () => {
       ),
     );
     const { rows } = await recordActions({ threadId: thread.id }, legs, proposalId);
-    // All legs inserted in one transaction share the exact same createdAt.
+    // All legs inserted in one transaction share the exact same createdAt, and get strictly
+    // increasing database-assigned seq numbers in card order.
     expect(new Set(rows.map((row) => row.createdAt.getTime())).size).toBe(1);
+    expect(rows.map((row) => row.summary)).toEqual(names);
+    for (let index = 1; index < rows.length; index += 1) {
+      expect(rows[index]!.seq).toBeGreaterThan(rows[index - 1]!.seq);
+    }
     // Mutate legs in reverse order so PostgreSQL heap order no longer matches insertion order.
     for (const row of rows.toReversed()) {
       await db.update(actions).set({ updatedAt: new Date() }).where(eq(actions.id, row.id));
@@ -908,5 +917,75 @@ describe("decideActions", () => {
     expect(here).toContain(`- card ${proposalId}: ${names.join("; ")}`);
     const elsewhere = await waitingElsewhere(other.id);
     expect(elsewhere.lines).toEqual([`- card ${proposalId} in "Basket": ${names.join("; ")}`]);
+
+    // Allowing the plan queues its first stage in card (seq) order despite reversed heap order.
+    const enqueueSpy = vi.spyOn(actionKind, "enqueue");
+    try {
+      const allowed = await decideActions({ proposalId }, "allow");
+      expect(allowed.map((row) => row.summary)).toEqual(names);
+      expect(enqueueSpy.mock.calls.map(([, payload]) => payload.actionId)).toEqual(
+        rows.map((row) => row.id),
+      );
+    } finally {
+      enqueueSpy.mockRestore();
+    }
+  });
+
+  it("queues a plan's later stage in card order even when legs updated out of order", async () => {
+    const thread = await insertThread({ title: "Staged" });
+    const proposalId = randomUUID();
+    const funding = stubRecipe({
+      tool: "bridge_usdc",
+      readies: () => "polygon",
+      describe: async () => ({
+        summary: "Fund Polygon",
+        amountUsd: "30",
+        effect: { gives: [{ text: "30 USDC" }], gets: [{ text: "30 USDC on Polygon" }], grants: [] },
+      }),
+    });
+    const pick = (summary: string) =>
+      stubRecipe({
+        tool: "stock_trade",
+        fundedFrom: () => "polygon",
+        describe: async () => ({
+          summary,
+          amountUsd: "10",
+          effect: { gives: [{ text: "10 USDC" }], gets: [{ text: summary }], grants: [] },
+        }),
+      });
+    const pickNames = ["First pick", "Second pick", "Third pick"];
+    const legs = [
+      await prepareLeg(funding, {}),
+      ...(await Promise.all(pickNames.map((summary) => prepareLeg(pick(summary), {})))),
+    ];
+    const { rows } = await recordActions({ threadId: thread.id }, legs, proposalId);
+    const [fundRow, ...pickRows] = rows;
+    // Allow, mark the funding leg done, and mutate the later-stage legs in reverse order.
+    lookup.recipe = buy;
+    vi.mocked(recipeForTool).mockImplementation((tool) =>
+      tool === "bridge_usdc" ? funding : pick(tool),
+    );
+    try {
+      await decideActions({ proposalId }, "allow");
+      await db
+        .update(actions)
+        .set({ status: "done", phase: null, updatedAt: new Date() })
+        .where(eq(actions.id, fundRow!.id));
+      for (const row of pickRows.toReversed()) {
+        await db.update(actions).set({ updatedAt: new Date() }).where(eq(actions.id, row.id));
+      }
+
+      const enqueueSpy = vi.spyOn(actionKind, "enqueue");
+      try {
+        await advanceProposal(proposalId, false);
+        expect(enqueueSpy.mock.calls.map(([, payload]) => payload.actionId)).toEqual(
+          pickRows.map((row) => row.id),
+        );
+      } finally {
+        enqueueSpy.mockRestore();
+      }
+    } finally {
+      vi.mocked(recipeForTool).mockImplementation(() => lookup.recipe as Recipe);
+    }
   });
 });

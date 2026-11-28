@@ -52,7 +52,7 @@ export async function waitingElsewhere(
         ne(actions.threadId, threadId),
       ),
     )
-    .orderBy(desc(actions.createdAt), desc(actions.id));
+    .orderBy(desc(actions.seq));
   if (rows.length === 0) return { countsOnUsd: "0.00", lines: [] };
   const byCard = Map.groupBy(rows, ({ action }) => action.proposalId ?? action.id);
   const amounts: string[] = [];
@@ -81,7 +81,7 @@ export async function waitingCardsContext(threadId: string): Promise<string | nu
           notInArray(actions.tool, [...ASK_TOOL_NAMES]),
         ),
       )
-      .orderBy(asc(actions.createdAt), asc(actions.id)),
+      .orderBy(asc(actions.seq)),
     waitingElsewhere(threadId),
   ]);
   const here = cardsOf(hereRows);

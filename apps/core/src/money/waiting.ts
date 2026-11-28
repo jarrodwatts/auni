@@ -57,7 +57,7 @@ export interface WaitingCard {
 /** Each card among `rows`, by its id, with what it asks: its move, or its moves in turn. */
 export function cardsOf(rows: readonly ActionRow[]): WaitingCard[] {
   const cards = new Map<string, string[]>();
-  for (const row of rows) {
+  for (const row of rows.toSorted((a, b) => a.seq - b.seq)) {
     const id = row.proposalId ?? row.id;
     cards.set(id, [...(cards.get(id) ?? []), row.summary]);
   }
@@ -113,7 +113,7 @@ export async function replaceCards(
                 notInArray(actions.tool, [...ASK_TOOL_NAMES]),
               ),
             )
-            .orderBy(asc(actions.createdAt), asc(actions.id))
+            .orderBy(asc(actions.seq))
         ).filter((row) => !also.some(({ id }) => id === row.id)),
       )
     : [];

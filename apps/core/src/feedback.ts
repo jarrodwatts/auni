@@ -210,7 +210,7 @@ export async function appRequest(
         inArray(actions.tool, [...RAW_TRANSACTION_TOOLS]),
       ),
     )
-    .orderBy(asc(actions.createdAt), asc(actions.id));
+    .orderBy(asc(actions.seq));
   const worked = done.filter((row) => builtFor(row)?.toLowerCase() === asked.name.toLowerCase());
   const chains = [...new Set(worked.map((row) => placeName(shownHoldings(row).chain)))];
   const links = transactionLinks(worked);

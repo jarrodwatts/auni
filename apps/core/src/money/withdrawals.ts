@@ -210,7 +210,7 @@ export async function recentWithdrawals(): Promise<RecentWithdrawal[]> {
     .select({ input: actions.input, details: actions.details, at: actions.updatedAt })
     .from(actions)
     .where(and(eq(actions.tool, WITHDRAW_TOOL), eq(actions.status, "done")))
-    .orderBy(desc(actions.updatedAt), desc(actions.id))
+    .orderBy(desc(actions.updatedAt), desc(actions.seq))
     .limit(50);
   return recentPlaces(rows);
 }

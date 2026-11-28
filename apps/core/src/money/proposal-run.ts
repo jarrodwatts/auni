@@ -3,7 +3,7 @@ import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { publishThread } from "../conversation/threads.ts";
 import { db } from "../db/client.ts";
 import { actions } from "../db/schema.ts";
-import { lockLegs, queueExecution, settledOutcome } from "./actions.ts";
+import { lockLegs, proposalActions, queueExecution, settledOutcome } from "./actions.ts";
 import { cashCents } from "./funding.ts";
 import { step } from "./life.ts";
 import { awaitedCash, nextStep, stagedLeg } from "./proposal-order.ts";
@@ -29,7 +29,7 @@ interface Advanced {
  * to spend money that isn't there.
  */
 export async function advanceProposal(proposalId: string, patient: boolean): Promise<Advanced> {
-  const rows = await db.select().from(actions).where(eq(actions.proposalId, proposalId));
+  const rows = await proposalActions(proposalId);
   const legs = rows.map(stagedLeg);
   const next = nextStep(legs);
   if (next.kind === "none") return { waiting: false, wake: null };

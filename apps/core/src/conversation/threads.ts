@@ -98,14 +98,14 @@ async function waitingAsks(threadIds: readonly string[]): Promise<Map<string, st
         or(eq(actions.status, "awaiting_permission"), eq(actions.phase, "needs_owner")),
       ),
     )
-    .orderBy(desc(actions.createdAt), desc(actions.id));
+    .orderBy(desc(actions.seq));
   const asks = new Map<string, string>();
   for (const action of waiting) {
     if (!action.threadId || asks.has(action.threadId)) continue;
     const held = action.phase === "needs_owner";
     const legs =
       action.proposalId && !held
-        ? waiting.filter((leg) => leg.proposalId === action.proposalId).toReversed()
+        ? waiting.filter((leg) => leg.proposalId === action.proposalId)
         : [action];
     const moneys = cardMoneys(legs);
     const line = askLine(

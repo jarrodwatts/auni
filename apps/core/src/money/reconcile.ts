@@ -47,7 +47,7 @@ export async function reconcileStuckActions(): Promise<ActionRow[]> {
         lt(actions.startedAt, sql`now() - make_interval(secs => ${STUCK_AFTER_MS / 1000})`),
       ),
     )
-    .orderBy(desc(actions.startedAt), desc(actions.id))
+    .orderBy(desc(actions.startedAt), desc(actions.seq))
     .limit(100);
   const settled: ActionRow[] = [];
   for (const action of stuck) {
@@ -89,7 +89,7 @@ export async function heldMoves(): Promise<
     .from(actions)
     .leftJoin(threads, eq(threads.id, actions.threadId))
     .where(eq(actions.phase, "needs_owner"))
-    .orderBy(asc(actions.createdAt), asc(actions.id))
+    .orderBy(asc(actions.seq))
     .limit(50);
   return rows.map(({ id, summary, run, threadId, title }) => ({
     id,

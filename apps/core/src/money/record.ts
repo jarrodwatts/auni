@@ -332,7 +332,7 @@ export async function onTheirWay(): Promise<OnItsWay[]> {
     .select()
     .from(actions)
     .where(eq(actions.phase, "landing"))
-    .orderBy(asc(actions.createdAt), asc(actions.id));
+    .orderBy(asc(actions.seq));
   const landed = await Promise.all(
     running.map((action) => {
       const recipe = recipeForTool(action.tool);

@@ -508,7 +508,7 @@ export async function actionsForThread(threadId: string): Promise<ActionRow[]> {
     .select()
     .from(actions)
     .where(eq(actions.threadId, threadId))
-    .orderBy(desc(actions.createdAt), desc(actions.id))
+    .orderBy(desc(actions.seq))
     .limit(200);
 }
 
@@ -520,7 +520,7 @@ export async function proposalActions(
     .select()
     .from(actions)
     .where(eq(actions.proposalId, proposalId))
-    .orderBy(asc(actions.createdAt), asc(actions.id));
+    .orderBy(asc(actions.seq));
 }
 
 /** One action, or every leg of one proposal card. */
@@ -542,13 +542,15 @@ export async function decideActions(
     // A card that can no longer be allowed as shown is taken back before an Allow, so none is
     // (see retractStale). A Decline is the owner's no, which the agent hears as one, whatever card.
     if (decision === "allow") stale = await retractStale(tx);
-    const decided = await step(
-      tx,
-      decision,
-      "actionId" in target
-        ? eq(actions.id, target.actionId)
-        : eq(actions.proposalId, target.proposalId),
-    );
+    const decided = (
+      await step(
+        tx,
+        decision,
+        "actionId" in target
+          ? eq(actions.id, target.actionId)
+          : eq(actions.proposalId, target.proposalId),
+      )
+    ).toSorted((a, b) => a.seq - b.seq);
     if (decision === "allow") {
       // An ask is one row, applied as it's allowed: nothing to queue, nothing left running.
       const [ask] = decided.filter((row) => isAsk(row.tool));
@@ -713,11 +715,12 @@ async function recordLater(tx: Tx, action: ActionRow, later: readonly Later[] = 
  * one before it settles (see advanceProposal).
  */
 export async function startProposal(executor: Executor, rows: readonly ActionRow[]): Promise<void> {
-  const step = nextStep(rows.map(stagedLeg));
+  const ordered = rows.toSorted((a, b) => a.seq - b.seq);
+  const step = nextStep(ordered.map(stagedLeg));
   if (step.kind === "start")
     await queueExecution(
       executor,
-      rows.filter((row) => step.ids.includes(row.id)),
+      ordered.filter((row) => step.ids.includes(row.id)),
     );
 }
 

@@ -171,7 +171,7 @@ async function fundedPlan(
         isNotNull(actions.proposalId),
       ),
     )
-    .orderBy(desc(actions.createdAt), desc(actions.id));
+    .orderBy(desc(actions.seq));
   const plans = Map.groupBy(waiting, (leg) => leg.proposalId!);
   for (const [plan, legs] of plans) {
     const staged = legs.map(stagedLeg);
